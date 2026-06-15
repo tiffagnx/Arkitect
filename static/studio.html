@@ -161,6 +161,25 @@
   .pw-row label { font:500 10.5px Inter; color:var(--dim); width:66px; flex:none; }
   .pw-row input[type=range] { flex:1; accent-color:var(--pink); height:4px; cursor:pointer; }
   .pw-row output { font:500 10px 'Space Mono'; color:var(--teal); width:44px; text-align:right; }
+  /* TIFF VERB faceplate — his plugin, made pretty */
+  .verb-open { width:100%; padding:9px; border-radius:10px; cursor:pointer; font:700 11px Oxanium; letter-spacing:.09em;
+    color:#14040E; background:linear-gradient(120deg,#FF73BE,var(--pink) 55%,var(--violet)); border:none; box-shadow:0 4px 16px rgba(233,30,140,.32); }
+  .verb-open:hover { box-shadow:0 5px 24px rgba(233,30,140,.55); }
+  .verbwin { position:fixed; left:150px; top:120px; z-index:320; width:328px;
+    background:radial-gradient(130% 90% at 28% -10%, #2c1334 0%, #160e1e 68%); border:1px solid rgba(233,30,140,.42); border-radius:17px;
+    box-shadow:0 24px 74px rgba(0,0,0,.74), 0 0 46px rgba(233,30,140,.13); overflow:hidden; }
+  .vw-bar { display:flex; align-items:baseline; gap:9px; padding:14px 17px 12px; cursor:move; user-select:none; border-bottom:1px solid var(--hairline); }
+  .vw-title { font:700 17px Oxanium; letter-spacing:.15em; background:linear-gradient(100deg,#FF8FC9,var(--pink) 45%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .vw-sub { font:400 8.5px 'Space Mono'; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+  .vw-x { margin-left:auto; background:rgba(0,0,0,.32); border:none; color:#FFB3C2; width:23px; height:23px; border-radius:7px; cursor:pointer; font-size:12px; }
+  .vw-x:hover { background:var(--pink); color:#fff; }
+  .vw-body { display:flex; justify-content:space-around; gap:6px; padding:22px 18px 16px; }
+  .vw-fader { display:flex; flex-direction:column; align-items:center; gap:11px; }
+  .vw-fader output { font:600 11px 'Space Mono'; color:var(--teal); min-height:14px; }
+  .vw-fader label { font:700 8.5px 'Space Mono'; letter-spacing:.13em; color:var(--dim); }
+  .vfader { -webkit-appearance:slider-vertical; appearance:slider-vertical; writing-mode:vertical-lr; direction:rtl;
+    width:12px; height:156px; accent-color:var(--pink); cursor:pointer; }
+  .vw-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 0 14px; }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -238,11 +257,19 @@
     </div>
     <div class="module">
       <h3 class="pink">TIFF VERB</h3>
-      <div class="krow"><label>Size</label><input type="range" id="vSize" min="0.4" max="6" step="0.1" value="2.2" /><output id="vSizeO">2.2s</output></div>
-      <div class="krow"><label>Tone</label><input type="range" id="vTone" min="800" max="14000" step="100" value="6000" /><output id="vToneO">6.0k</output></div>
-      <div class="krow"><label>Pre-dly</label><input type="range" id="vPre" min="0" max="0.12" step="0.005" value="0.02" /><output id="vPreO">20ms</output></div>
-      <div class="krow"><label>Return</label><input type="range" id="vRet" min="0" max="1.5" step="0.01" value="0.8" /><output id="vRetO">0.80</output></div>
-      <div style="font:400 9.5px 'Space Mono'; color:var(--dim); margin-top:6px">your reverb. each track has a SEND.</div>
+      <button class="verb-open" id="verbOpen">🌀 OPEN TIFF VERB</button>
+      <div style="font:400 9.5px 'Space Mono'; color:var(--dim); margin-top:7px">your reverb — each track has a VERB send.</div>
+    </div>
+    <!-- TIFF VERB faceplate: a real plugin window (hidden until opened; ids preserved so the audio wiring stays bound) -->
+    <div class="verbwin" id="verbWin" style="display:none">
+      <div class="vw-bar"><span class="vw-title">TIFF VERB</span><span class="vw-sub">convolution reverb</span><button class="vw-x" id="verbClose" title="close">✕</button></div>
+      <div class="vw-body">
+        <div class="vw-fader"><output id="vSizeO">2.2s</output><input type="range" id="vSize" class="vfader" orient="vertical" min="0.4" max="6" step="0.1" value="2.2" /><label>SIZE</label></div>
+        <div class="vw-fader"><output id="vToneO">6.0k</output><input type="range" id="vTone" class="vfader" orient="vertical" min="800" max="14000" step="100" value="6000" /><label>TONE</label></div>
+        <div class="vw-fader"><output id="vPreO">20ms</output><input type="range" id="vPre" class="vfader" orient="vertical" min="0" max="0.12" step="0.005" value="0.02" /><label>PRE-DLY</label></div>
+        <div class="vw-fader"><output id="vRetO">0.80</output><input type="range" id="vRet" class="vfader" orient="vertical" min="0" max="1.5" step="0.01" value="0.8" /><label>RETURN</label></div>
+      </div>
+      <div class="vw-foot">your sound · drag the levers · drag the top bar to move me</div>
     </div>
     <div class="module">
       <h3>Plugins loaded</h3>
@@ -2290,6 +2317,11 @@ let irTimer = null;
 const reIR = () => { if (!verb) return; clearTimeout(irTimer);
   irTimer = setTimeout(() => { verb.convolver.buffer = makeIR(ctx, parseFloat($("vSize").value), parseFloat($("vTone").value)); }, 200); };
 $("vSize").addEventListener("change", reIR); $("vTone").addEventListener("change", reIR);
+// TIFF VERB faceplate — open / close / drag (it's his plugin; give it a real window)
+document.body.appendChild($("verbWin"));   // out of the sidebar so position:fixed is viewport-relative (not clipped)
+$("verbOpen").onclick = () => { const w = $("verbWin"); w.style.display = "block"; bringFront(w); };
+$("verbClose").onclick = () => { $("verbWin").style.display = "none"; };
+makeDraggable($("verbWin"), $("verbWin").querySelector(".vw-bar"));
 
 /* ── files in ── */
 $("addfiles").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
