@@ -87,6 +87,14 @@
   .toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:99; opacity:0; transition:opacity .18s; pointer-events:none;
     background:rgba(20,8,20,.94); border:1px solid var(--hairline); color:#FFD6EA; font:500 12px Inter; padding:9px 16px; border-radius:11px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
   .toast.on { opacity:1; }
+  .ctxmenu { position:fixed; z-index:200; display:none; min-width:188px; padding:5px;
+    background:#160e1e; border:1px solid var(--hairline); border-radius:11px; box-shadow:0 14px 44px rgba(0,0,0,.62); }
+  .ctxmenu.on { display:block; }
+  .ctxmenu .mi { padding:8px 12px; border-radius:7px; font:500 12.5px Inter; color:var(--text); cursor:pointer; }
+  .ctxmenu .mi:hover { background:rgba(233,30,140,.18); }
+  .ctxmenu .mi.dis { color:var(--dim); opacity:.45; cursor:default; }
+  .ctxmenu .mi.dis:hover { background:none; }
+  .ctxmenu .sep { height:1px; background:var(--hairline); margin:5px 4px; }
   .chip.ai { color:#E6CBFF; border-color:rgba(139,92,246,.45);
     background:linear-gradient(120deg,rgba(233,30,140,.16),rgba(139,92,246,.18)); }
   .chip.ai:hover { border-color:rgba(233,30,140,.6); color:#FFE3F4; box-shadow:0 0 12px rgba(139,92,246,.3); }
@@ -258,9 +266,61 @@ function applyEdit(t, keepInside){
   flash(keepInside ? "Trimmed to selection" : "Cut the selection out");
 }
 function undoTrack(t){
-  for(let i=UNDO.length-1;i>=0;i--){ if(UNDO[i].trackId===t.id){ const u=UNDO.splice(i,1)[0]; t.buffer=u.buffer; t.offset=u.offset; SEL=null; if(playing) restartPlayback(); flash("Undone"); return; } }
+  for(let i=UNDO.length-1;i>=0;i--){ if(UNDO[i].trackId===t.id){ const u=UNDO.splice(i,1)[0]; t.buffer=u.buffer; t.offset=u.offset; SEL=null;
+    if(u.removeTrackId){ const rt=tracks.find(x=>x.id===u.removeTrackId); if(rt){ tracks.splice(tracks.indexOf(rt),1); document.getElementById("lane-"+rt.id)?.remove(); } }
+    if(playing) restartPlayback(); flash("Undone"); return; } }
   flash("Nothing to undo on this stem");
 }
+// SEPARATE: split a stem at a point into two pieces that stay lined up on the timeline
+function splitTrack(t, frac){
+  frac = Math.max(0.001, Math.min(0.999, frac));
+  const origBuf = t.buffer, origOff = t.offset||0, splitTime = frac * t.buffer.duration;
+  const before = bufSlice(t.buffer, 0, frac, true);   // keep [0, frac]
+  const after  = bufSlice(t.buffer, frac, 1, true);   // keep [frac, 1]
+  const nt = { id:Math.random().toString(36).slice(2), name:t.name+" ·b", buffer:after,
+    gain:t.gain, pan:t.pan, eq:{lo:t.eq.lo,mid:t.eq.mid,hi:t.eq.hi}, comp:t.comp, send:t.send,
+    inserts:JSON.parse(JSON.stringify(t.inserts||[])), muted:false, solo:false, src:null, live:null,
+    color:t.color, offset:origOff+splitTime };
+  t.buffer = before;
+  UNDO.push({ trackId:t.id, buffer:origBuf, offset:origOff, removeTrackId:nt.id });
+  const idx = tracks.indexOf(t); tracks.splice(idx+1, 0, nt);
+  laneUi(nt);
+  const tl = document.getElementById("lane-"+t.id), nl = document.getElementById("lane-"+nt.id);
+  if(tl && nl) tl.parentNode.insertBefore(nl, tl.nextSibling);   // sit the 2nd piece right under the 1st
+  SEL=null; if(playing) restartPlayback(); flash("Separated into two");
+}
+// SILENCE: zero the selected region in place (keeps the stem's length)
+function silenceSel(t){
+  if(!SEL||SEL.trackId!==t.id||Math.abs(SEL.a-SEL.b)<0.002){ flash("Drag a region first"); return; }
+  pushUndo(t);
+  const buf=t.buffer, N=buf.length, a=Math.floor(Math.min(SEL.a,SEL.b)*N), b=Math.floor(Math.max(SEL.a,SEL.b)*N);
+  const out=ctx.createBuffer(buf.numberOfChannels,N,buf.sampleRate);
+  for(let k=0;k<buf.numberOfChannels;k++){ const s=buf.getChannelData(k), d=out.getChannelData(k); d.set(s); for(let i=a;i<b;i++) d[i]=0; }
+  t.buffer=out; if(playing) restartPlayback(); flash("Silenced selection");
+}
+// right-click context menu on a waveform — Pro Tools style
+function ctxMenuEl(){ let m=document.getElementById("ctxmenu"); if(!m){ m=document.createElement("div"); m.id="ctxmenu"; m.className="ctxmenu"; document.body.appendChild(m); } return m; }
+function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classList.remove("on"); }
+function showWaveMenu(t, wv, e){
+  e.preventDefault();
+  const frac = Math.max(0, Math.min(1, e.offsetX / wv.clientWidth));
+  const hasSel = SEL && SEL.trackId===t.id && Math.abs(SEL.a-SEL.b)>0.002;
+  const m = ctxMenuEl(); m.innerHTML="";
+  const add = (label, fn, enabled=true) => { const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
+  const sep = () => { const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
+  add("✂  Separate here", ()=>splitTrack(t,frac));
+  sep();
+  add("Cut selection", ()=>applyEdit(t,false), hasSel);
+  add("Trim to selection", ()=>applyEdit(t,true), hasSel);
+  add("Silence selection", ()=>silenceSel(t), hasSel);
+  sep();
+  add("↶  Undo", ()=>undoTrack(t));
+  m.style.left = Math.min(e.clientX, window.innerWidth-210)+"px";
+  m.style.top  = Math.min(e.clientY, window.innerHeight-250)+"px";
+  m.classList.add("on");
+}
+document.addEventListener("click", hideMenu);
+document.addEventListener("scroll", hideMenu, true);
 let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
 
 /* ── plugin registry — B's own format ──
@@ -1415,6 +1475,7 @@ function laneUi(t) {
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (!moved) { SEL = null; seek(f0 * maxDur()); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
+  wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
   d.querySelectorAll(".strip input[type=range]").forEach(inp => {
     inp.oninput = () => {
       const k = inp.dataset.k, v = parseFloat(inp.value);
