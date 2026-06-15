@@ -53,8 +53,12 @@ No coding. No typing commands. Just clicking buttons.
   - Browser didn't open?  Wait 20 seconds, then type this into
     your browser:   http://localhost:7777
   - "Python isn't installed"?  Redo STEP 1 and CHECK THE BOX.
-  - Tiff won't answer?  Open LM Studio and make sure the
-    gemma model finished downloading (Step 2).
+  - Tiff won't answer?  Open LM Studio and:
+       (a) make sure the gemma model finished downloading (Step 2), AND
+       (b) click the "Developer" (or "Local Server") tab on the left side,
+           and press "Start Server" if the button isn't already green.
+       Then refresh your browser. (The launcher tries to do this for you,
+       but on a brand-new LM Studio install you may have to flip it on once.)
   - Still stuck?  Text Bryan. He's got you.
 
 
