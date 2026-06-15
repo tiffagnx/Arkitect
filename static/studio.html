@@ -134,6 +134,33 @@
   .ins-btn:hover { border-color:rgba(233,30,140,.5); color:var(--text); }
   .ins-btn.rm { margin-left:auto; color:#FF7A93; }
   .ins-params { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:6px 14px; }
+  /* Pro Tools-style insert slots: a tidy named list; click a slot to open the plugin window */
+  .ins-slot { display:flex; align-items:center; gap:8px; padding:7px 10px; margin-bottom:5px; border-radius:8px; cursor:pointer;
+    background:rgba(255,255,255,.04); border:1px solid var(--hairline); transition:border-color .12s, background .12s; }
+  .ins-slot:hover { border-color:rgba(233,30,140,.5); background:rgba(233,30,140,.07); }
+  .ins-slot.byp { opacity:.5; }
+  .ins-slot.miss { border-color:rgba(245,166,35,.55); }
+  .ins-power { width:13px; height:13px; border-radius:50%; flex:none; border:1px solid var(--hairline); cursor:pointer; padding:0;
+    background:#34D399; box-shadow:0 0 7px rgba(52,211,153,.55); }
+  .ins-slot.byp .ins-power { background:#5a5a66; box-shadow:none; }
+  .ins-sname { font:600 11.5px Inter; color:#FFD6EA; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ins-mini { background:none; border:none; color:var(--dim); cursor:pointer; font-size:12px; padding:1px 3px; line-height:1; }
+  .ins-mini:hover { color:#FFD6EA; } .ins-mini.rm:hover { color:#FF7A93; }
+  /* floating plugin window */
+  .plugwin { position:fixed; z-index:300; min-width:268px; max-width:360px;
+    background:#160e1e; border:1px solid rgba(233,30,140,.4); border-radius:13px; box-shadow:0 18px 64px rgba(0,0,0,.7); overflow:hidden; }
+  .pw-bar { display:flex; align-items:center; gap:9px; padding:9px 12px; cursor:move; user-select:none;
+    background:linear-gradient(120deg,rgba(233,30,140,.24),rgba(139,92,246,.16)); border-bottom:1px solid var(--hairline); }
+  .pw-title { font:700 12px Oxanium; letter-spacing:.06em; color:#FFE3F4; }
+  .pw-track { font:400 9.5px 'Space Mono'; color:var(--dim); margin-left:auto; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pw-x { background:rgba(0,0,0,.28); border:none; color:#FFB3C2; width:21px; height:21px; border-radius:6px; cursor:pointer; font-size:12px; }
+  .pw-x:hover { background:var(--pink); color:#fff; }
+  .pw-body { padding:13px 15px; max-height:62vh; overflow-y:auto; }
+  .pw-row { display:flex; align-items:center; gap:11px; margin-bottom:10px; }
+  .pw-row:last-child { margin-bottom:0; }
+  .pw-row label { font:500 10.5px Inter; color:var(--dim); width:66px; flex:none; }
+  .pw-row input[type=range] { flex:1; accent-color:var(--pink); height:4px; cursor:pointer; }
+  .pw-row output { font:500 10px 'Space Mono'; color:var(--teal); width:44px; text-align:right; }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -1514,43 +1541,56 @@ function renderInserts(t, laneEl) {
   host.innerHTML = "";
   (t.inserts || []).forEach((ins, i) => {
     const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
-    if (!def) {
-      // a saved insert whose plugin isn't loaded this session — don't vanish it
-      // silently (that loses the effect with no trace). Show a placeholder so B
-      // knows it's there and can load the plugin's .js or remove it.
-      const miss = document.createElement("div");
-      miss.className = "ins";
-      miss.style.borderColor = "rgba(245,166,35,.6)";
-      miss.innerHTML = `<div class="ins-h"><span class="ins-name">⚠ ${ins.name}</span>
-        <button class="ins-btn rm" title="remove">✕</button></div>
-        <div class="ins-params" style="font:500 10px Inter;color:var(--dim);padding:4px 2px;">plugin not loaded — load its .js to restore, or remove</div>`;
-      miss.querySelector(".rm").onclick = () => { t.inserts.splice(i, 1); renderInserts(t, laneEl); if (playing) restartPlayback(); };
-      host.appendChild(miss);
-      return;
-    }
-    const card = document.createElement("div");
-    card.className = "ins";
-    card.innerHTML = `<div class="ins-h"><span class="ins-name">${ins.name}</span>
-      <button class="ins-btn up" title="move earlier in chain">↑</button>
-      <button class="ins-btn dn" title="move later in chain">↓</button>
-      <button class="ins-btn rm" title="remove">✕</button></div>
-      <div class="ins-params"></div>`;
-    const pbox = card.querySelector(".ins-params");
-    def.params.forEach(p => {
-      const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
-      const w = document.createElement("div");
-      w.className = "pp";
-      w.innerHTML = `<label>${p.label}</label><input type="range" min="${p.min}" max="${p.max}" step="${_step(p)}" value="${cur}" /><output>${_fmt(cur)}</output>`;
-      const inp = w.querySelector("input"), out = w.querySelector("output");
-      inp.oninput = () => { const v = parseFloat(inp.value); ins.params[p.id] = v; out.textContent = _fmt(v); t.live?.insertNodes?.[i]?.set(p.id, v); };
-      pbox.appendChild(w);
-    });
-    const swap = (a, b) => { [t.inserts[a], t.inserts[b]] = [t.inserts[b], t.inserts[a]]; renderInserts(t, laneEl); if (playing) restartPlayback(); };
-    card.querySelector(".rm").onclick = () => { t.inserts.splice(i, 1); renderInserts(t, laneEl); if (playing) restartPlayback(); };
-    card.querySelector(".up").onclick = () => { if (i > 0) swap(i, i - 1); };
-    card.querySelector(".dn").onclick = () => { if (i < t.inserts.length - 1) swap(i, i + 1); };
-    host.appendChild(card);
+    const slot = document.createElement("div");
+    slot.className = "ins-slot" + (ins.bypassed ? " byp" : "") + (def ? "" : " miss");
+    slot.innerHTML = `<button class="ins-power" title="bypass on / off"></button>
+      <span class="ins-sname">${def ? ins.name : "⚠ " + ins.name}</span>
+      <button class="ins-mini up" title="move earlier in chain">↑</button>
+      <button class="ins-mini dn" title="move later in chain">↓</button>
+      <button class="ins-mini rm" title="remove">✕</button>`;
+    slot.onclick = (e) => { if (e.target.closest(".ins-mini,.ins-power")) return;
+      if (def) openPluginWindow(t, i); else flash(`"${ins.name}" isn't loaded — load its .js or remove it`); };
+    slot.querySelector(".ins-power").onclick = (e) => { e.stopPropagation(); ins.bypassed = !ins.bypassed; renderInserts(t, laneEl); if (playing) restartPlayback(); };
+    const swap = (a, b) => { closeTrackWindows(t); [t.inserts[a], t.inserts[b]] = [t.inserts[b], t.inserts[a]]; renderInserts(t, laneEl); if (playing) restartPlayback(); };
+    slot.querySelector(".up").onclick = (e) => { e.stopPropagation(); if (i > 0) swap(i, i - 1); };
+    slot.querySelector(".dn").onclick = (e) => { e.stopPropagation(); if (i < t.inserts.length - 1) swap(i, i + 1); };
+    slot.querySelector(".rm").onclick = (e) => { e.stopPropagation(); closeTrackWindows(t); t.inserts.splice(i, 1); renderInserts(t, laneEl); if (playing) restartPlayback(); };
+    host.appendChild(slot);
   });
+}
+// floating plugin window — opens a plugin's controls in its own draggable window (Pro Tools style)
+let _pwZ = 300;
+function bringFront(w){ w.style.zIndex = ++_pwZ; }
+function closeTrackWindows(t){ document.querySelectorAll(`[id^="pw-${t.id}-"]`).forEach(w => w.remove()); }
+function makeDraggable(win, handle){
+  handle.onmousedown = (e) => { if (e.target.closest(".pw-x")) return; e.preventDefault(); bringFront(win);
+    const sx=e.clientX, sy=e.clientY, ox=win.offsetLeft, oy=win.offsetTop;
+    const mv=(ev)=>{ win.style.left=Math.max(0,Math.min(window.innerWidth-90, ox+ev.clientX-sx))+"px"; win.style.top=Math.max(0,Math.min(window.innerHeight-40, oy+ev.clientY-sy))+"px"; };
+    const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
+  };
+}
+function openPluginWindow(t, i){
+  const ins = t.inserts[i]; if(!ins) return;
+  const def = TIFF_PLUGINS.list.find(p => p.name === ins.name); if(!def) return;
+  const id = `pw-${t.id}-${i}`;
+  let w = document.getElementById(id);
+  if (w){ w.style.display="block"; bringFront(w); return; }
+  w = document.createElement("div"); w.className="plugwin"; w.id=id;
+  w.innerHTML = `<div class="pw-bar"><span class="pw-title">${ins.name}</span><span class="pw-track">${t.name}</span><button class="pw-x" title="close">✕</button></div><div class="pw-body"></div>`;
+  const body = w.querySelector(".pw-body");
+  def.params.forEach(p => {
+    const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
+    const row = document.createElement("div"); row.className="pw-row";
+    row.innerHTML = `<label>${p.label}</label><input type="range" min="${p.min}" max="${p.max}" step="${_step(p)}" value="${cur}"><output>${_fmt(cur)}</output>`;
+    const inp = row.querySelector("input"), out = row.querySelector("output");
+    inp.oninput = () => { const v=parseFloat(inp.value); ins.params[p.id]=v; out.textContent=_fmt(v); t.live?.insertNodes?.[i]?.set(p.id, v); };
+    body.appendChild(row);
+  });
+  w.querySelector(".pw-x").onclick = () => w.remove();
+  const n = (_pwZ % 7); w.style.left = (130 + n*28) + "px"; w.style.top = (96 + n*26) + "px";
+  document.body.appendChild(w);
+  makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
 }
 /* =========================================================================
    TRUTHFUL AUTO-MIX LAYER  (vanilla JS, Web Audio)
@@ -2125,13 +2165,13 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   const insertNodes = [];
   for (const ins of (t.inserts || [])) {
     const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
-    if (!def) continue;
+    if (!def || ins.bypassed) { insertNodes.push(null); continue; }  // bypassed/missing → null keeps index aligned with t.inserts
     try {
       const node = def.create(c);
       tail.connect(node.input); tail = node.output;
       def.params.forEach(pp => node.set(pp.id, ins.params[pp.id] ?? pp.value));
       insertNodes.push(node);
-    } catch { /* skip a plugin that fails to build, keep the chain intact */ }
+    } catch { insertNodes.push(null); }
   }
   tail.connect(comp); comp.connect(pan); pan.connect(fader);
   const dest = isOffline ? c._masterGain : master.gain;
@@ -2193,7 +2233,7 @@ async function playAll() {
   playing = true;
   $("play").textContent = "❚❚ Pause";
 }
-function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n.dispose?.()); } catch {} try { t.live?.src.stop(); } catch {} t.live = null; }); }
+function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.src.stop(); } catch {} t.live = null; }); }
 function pauseAll() { playGen++; startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
 function stopAll() { playGen++; stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
 function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
