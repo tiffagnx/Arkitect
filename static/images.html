@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Images — Tiff’s Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --bg0:#07050C; --bg1:#16111E; --panel:rgba(14,10,20,0.72);
+          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1200px 700px at 30% -10%, #221330 0%, var(--bg1) 45%, var(--bg0) 100%); }
+  .top { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--hairline); }
+  .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,#8B5CF6); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .top select { margin-left:auto; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.045);
+    color:var(--text); border:1px solid var(--hairline); font:500 12px Inter; outline:none; }
+  .top select option { background:var(--bg1); }
+  .wrap { max-width:980px; margin:0 auto; padding:20px 18px 40px; }
+  .modes { display:inline-flex; gap:4px; padding:4px; margin-bottom:12px; background:var(--panel);
+    backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:14px; }
+  .modes button { border:none; background:transparent; color:var(--dim); cursor:pointer; padding:7px 16px;
+    border-radius:10px; font:600 11.5px Oxanium; letter-spacing:.1em; transition:all .14s; }
+  .modes button:hover { color:var(--text); }
+  .modes button.on { color:#14040E; background:linear-gradient(135deg,#FF73BE,var(--pink));
+    box-shadow:0 0 14px rgba(233,30,140,.4); }
+  .modeHint { font:400 11px 'Space Mono'; color:var(--dim); margin:0 0 12px 4px; min-height:15px; }
+  .bar { display:flex; gap:10px; align-items:flex-end; padding:10px; background:var(--panel);
+    backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:20px; }
+  .bar:focus-within { border-color:rgba(233,30,140,.5); }
+  textarea { flex:1; border:none; outline:none; resize:none; background:transparent; color:var(--text);
+    font:400 14.5px Inter; line-height:1.5; max-height:120px; padding:8px 6px; }
+  .go { width:46px; height:46px; min-width:46px; border:none; border-radius:50%; cursor:pointer; font-size:18px;
+    color:#14040E; background:linear-gradient(135deg,#FF73BE,var(--pink)); box-shadow:0 0 16px rgba(233,30,140,.45); }
+  .go:disabled { opacity:.5; }
+  .polish { height:46px; padding:0 14px; border:1px solid rgba(0,209,196,.5); border-radius:23px; cursor:pointer;
+    background:rgba(0,209,196,.08); color:#00D1C4; font:600 11.5px Oxanium; letter-spacing:.06em; white-space:nowrap; transition:all .14s; }
+  .polish:hover { background:rgba(0,209,196,.18); border-color:#00D1C4; box-shadow:0 0 14px rgba(0,209,196,.3); }
+  .polish:disabled { opacity:.5; cursor:default; }
+  .status { font:400 11.5px 'Space Mono'; color:var(--dim); min-height:18px; padding:8px 4px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:8px; }
+  .tile { position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); transition:transform .12s, border-color .12s; }
+  .tile:hover { transform:translateY(-2px); border-color:rgba(233,30,140,.5); }
+  .tile a { display:block; }
+  .grid img { width:100%; display:block; aspect-ratio:1; object-fit:cover; }
+  .fresh { border-color:var(--pink) !important; box-shadow:0 0 22px rgba(233,30,140,.35); }
+  .tileBtns { position:absolute; bottom:0; left:0; right:0; display:flex; gap:6px; padding:8px;
+    background:linear-gradient(0deg, rgba(7,5,12,.82), rgba(7,5,12,0)); opacity:0; transition:opacity .14s; pointer-events:none; }
+  .tile:hover .tileBtns { opacity:1; pointer-events:auto; }
+  .tileBtns button { flex:1; border:1px solid rgba(233,30,140,.4); background:rgba(20,4,14,.6); backdrop-filter:blur(6px);
+    color:var(--text); cursor:pointer; padding:6px 8px; border-radius:999px; font:600 10.5px Oxanium; letter-spacing:.06em; transition:all .12s; }
+  .tileBtns button:hover { background:linear-gradient(135deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent; }
+  .tileBtns button:disabled { opacity:.45; cursor:default; }
+  .tileBtns button.del { flex:0 0 34px; border-color:rgba(255,90,90,.5); font-size:13px; }
+  .tileBtns button.del:hover { background:linear-gradient(135deg,#FF6B6B,#E0245E); color:#fff; border-color:transparent; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/">← Pink Room</a>
+  <h1>🎨 IMAGES</h1>
+  <select id="size" title="Aspect ratio. FLUX renders ~1 megapixel; photo mode then upscales ~2x, so finals land well above 1080p.">
+    <option value="1024x1024">1:1 Square · 1024</option>
+    <option value="1344x768">16:9 Wide · 1344×768</option>
+    <option value="768x1344">9:16 Tall (Reels/TikTok) · 768×1344</option>
+    <option value="896x1120">4:5 Portrait (IG) · 896×1120</option>
+    <option value="1216x832">3:2 Landscape · 1216×832</option>
+    <option value="832x1216">2:3 Portrait · 832×1216</option>
+    <option value="768x768">Fast draft · 768</option>
+  </select>
+  <label id="realismWrap" title="Realism LoRA — adds real-camera skin texture + grain on Photo mode. Uncheck for the base Krea look." style="display:flex; align-items:center; gap:5px; color:var(--dim); font:600 11px Inter; cursor:pointer; white-space:nowrap;">
+    <input type="checkbox" id="realism" checked /> ✨ Realism
+  </label>
+</div>
+<div class="wrap">
+  <div class="modes" id="modes">
+    <button data-mode="draft" title="Fast throwaway iterations — schnell. Quick but painterly.">DRAFT</button>
+    <button data-mode="photo" class="on" title="Photoreal text-to-image — Krea-dev. Slowest, max detail.">PHOTO</button>
+    <button data-mode="zimage" title="Fast photoreal — Z-Image Turbo. Realistic like Photo but ~3x faster.">Z-IMAGE</button>
+    <button data-mode="edit" title="Instruction edit — Kontext. Attach a photo, tell her what to change.">EDIT</button>
+  </div>
+  <div class="modeHint" id="modeHint">PHOTO — photoreal text-to-image. Describe the picture; she handles the camera.</div>
+  <div class="bar">
+    <label title="Attach a reference image — she starts FROM it (image-to-image)" style="cursor:pointer; display:flex; align-items:center; padding:0 4px; font-size:18px;">📎<input type="file" id="ref" accept="image/*" hidden /></label>
+    <textarea id="prompt" rows="2" placeholder="Describe the picture — be specific: light, place, mood, what the camera sees…"></textarea>
+    <button class="polish" id="polish" title="Tiff rewrites your rough idea into a strong, pro prompt — tuned for the mode. You can edit it before generating.">✨ Polish</button>
+    <button class="go" id="go">✦</button>
+  </div>
+  <div id="polishRow" style="display:none; align-items:center; gap:10px; padding:6px 4px 0;">
+    <span style="font:400 11px 'Space Mono'; color:#00D1C4;">✨ polished — tweak it or hit ✦</span>
+    <button id="polishUndo" style="border:none; background:none; color:var(--dim); cursor:pointer; font:500 11px Inter; text-decoration:underline;">↩ undo</button>
+  </div>
+  <div id="refRow" style="display:none; align-items:center; gap:10px; padding:8px 4px;">
+    <img id="refThumb" style="width:54px; height:54px; object-fit:cover; border-radius:10px; border:1px solid rgba(233,30,140,.5);" alt="" />
+    <div id="strengthCtl" style="display:flex; align-items:center; gap:10px; flex:1;">
+      <span style="font:400 11px 'Space Mono'; color:var(--dim);">starting from this image · change:</span>
+      <input type="range" id="strength" min="0.3" max="0.9" step="0.05" value="0.6" style="flex:1; max-width:180px; accent-color:#E91E8C;" />
+      <span id="strengthLabel" style="font:400 11px 'Space Mono'; color:var(--teal); width:54px;">medium</span>
+    </div>
+    <button id="refClear" style="border:none; background:none; color:#FF7A93; cursor:pointer; font-size:13px;">✕ remove</button>
+  </div>
+  <div class="status" id="status">free · unlimited · runs on YOUR graphics card — the engine wakes itself (first image after a cold start takes ~2 min)
+    <button id="freeBtn" title="Done making images? This releases the engine's memory so your computer stops lagging." style="margin-left:10px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); border-radius:8px; padding:3px 10px; cursor:pointer; font:500 10.5px Inter;">🧹 free memory</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let busy = false;
+let refData = ""; // data URL of the attached reference (img2img / edit)
+let mode = "photo"; // draft · photo · edit — default PHOTO
+
+const PLACEHOLDER = {
+  draft: "Describe the picture — be specific: light, place, mood, what the camera sees…",
+  photo: "Describe the picture — be specific: light, place, mood, what the camera sees…",
+  zimage: "Describe the picture — Z-Image is fast + photoreal. Light, place, mood, what the camera sees…",
+  edit:  "Tell her what to change — 'make him run', 'remove the hat', 'turn his head left'…",
+};
+const HINT = {
+  draft: "DRAFT — fast throwaway iterations. Quick, but painterly.",
+  photo: "PHOTO — most realistic (Krea). Slowest. Describe the picture; she handles the camera.",
+  zimage: "Z-IMAGE — fast photoreal (Z-Image Turbo). Realistic like Photo, ~3× quicker.",
+  edit:  "EDIT — instruction edit. Attach a photo, then tell her the one thing to change.",
+};
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll("#modes button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("modeHint").textContent = HINT[m];
+  $("prompt").placeholder = PLACEHOLDER[m];
+  // strength slider is meaningless in EDIT (Kontext denoise is fixed) — hide it
+  $("strengthCtl").style.display = (m === "edit") ? "none" : "flex";
+  // Realism LoRA only applies to PHOTO (Krea) — hide the toggle elsewhere
+  if ($("realismWrap")) $("realismWrap").style.display = (m === "photo") ? "flex" : "none";
+}
+document.querySelectorAll("#modes button").forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
+
+$("ref").onchange = (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    refData = rd.result;
+    $("refThumb").src = refData;
+    $("refRow").style.display = "flex";
+    setMode("edit"); // attaching a photo auto-selects EDIT (B can override)
+  };
+  rd.readAsDataURL(f);
+  e.target.value = "";
+};
+$("refClear").onclick = () => { refData = ""; $("refRow").style.display = "none"; if (mode === "edit") setMode("photo"); };
+$("strength").oninput = () => {
+  const v = parseFloat($("strength").value);
+  $("strengthLabel").textContent = v <= 0.4 ? "subtle" : v <= 0.65 ? "medium" : "wild";
+};
+$("freeBtn").onclick = async () => {
+  $("status").textContent = "releasing the engine's memory…";
+  const r = await fetch("/api/image/free", { method: "POST" }).then(r => r.json()).catch(() => ({}));
+  $("status").textContent = r.ok ? "memory released — your computer thanks you. next image takes ~40s extra to warm up." : "engine isn't running — nothing to release.";
+};
+
+async function loadGallery(freshFirst) {
+  const r = await fetch("/api/image/gallery").then(r => r.json()).catch(() => ({images:[]}));
+  // Prefer the metadata-rich `items` array; fall back to the bare `images` list.
+  const list = (r.items && r.items.length)
+    ? r.items
+    : (r.images || []).map(name => ({ name }));
+  const g = $("grid"); g.innerHTML = "";
+  list.forEach((it, i) => {
+    const name = it.name;
+    const tile = document.createElement("div");
+    tile.className = "tile" + (freshFirst && i === 0 ? " fresh" : "");
+
+    const a = document.createElement("a");
+    a.href = `/api/image/file/${name}`; a.target = "_blank";
+    a.innerHTML = `<img loading="lazy" src="/api/image/file/${name}" alt="" />`;
+    tile.appendChild(a);
+
+    const btns = document.createElement("div");
+    btns.className = "tileBtns";
+
+    // Remix/Re-roll only when we have the prompt to reproduce it.
+    if (it.prompt) {
+      const m = it.mode || "photo";
+      const size = it.size || "1024x1024";
+      const seed = (typeof it.seed === "number") ? it.seed : null;
+
+      const remix = document.createElement("button");
+      remix.textContent = "🔀 Remix";
+      remix.title = "Drop this prompt back in the box so you can tweak it, then hit generate.";
+      remix.onclick = () => remixFrom(it.prompt, m, size);
+
+      const reroll = document.createElement("button");
+      reroll.textContent = "🎲 Re-roll";
+      reroll.title = "Generate again — same prompt, same settings, new seed.";
+      if (seed === null) { reroll.disabled = true; reroll.title = "No saved seed for this one — Remix it and generate instead."; }
+      else reroll.onclick = () => generate({ prompt: it.prompt, mode: m, size, seed: seed + 1 });
+
+      btns.appendChild(remix);
+      btns.appendChild(reroll);
+    }
+
+    // Delete is always available, on every image.
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "🗑";
+    del.title = "Delete this image for good.";
+    del.onclick = (e) => { e.preventDefault(); e.stopPropagation(); deleteImg(name, tile); };
+    btns.appendChild(del);
+
+    tile.appendChild(btns);
+    g.appendChild(tile);
+  });
+}
+
+// Delete one image for good (PNG + its saved metadata). Removes the tile on success.
+async function deleteImg(name, tile) {
+  if (!confirm("Delete this image for good?")) return;
+  try {
+    const r = await fetch("/api/image/delete", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }) }).then(r => r.json());
+    if (r.ok) { tile.remove(); $("status").textContent = "deleted."; }
+    else $("status").textContent = "⚠ " + (r.error || "couldn't delete");
+  } catch (e) { $("status").textContent = "⚠ " + e.message; }
+}
+
+// Remix: refill the prompt box + sync mode/size, focus it. Does NOT generate.
+function remixFrom(prompt, m, size) {
+  $("prompt").value = prompt;
+  if (m && PLACEHOLDER[m]) setMode(m);
+  if (size) $("size").value = size;
+  $("prompt").focus();
+  $("prompt").setSelectionRange($("prompt").value.length, $("prompt").value.length);
+  $("prompt").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+setMode("photo"); // sync initial UI (placeholder, hint, strength visibility)
+
+// (model picker removed — the 4 mode pills ARE the model choice now: DRAFT=schnell,
+// PHOTO=Krea, Z-IMAGE=Z-Image Turbo, EDIT=Kontext. One control, no overlap.)
+loadGallery(false);
+
+// `over` (optional): { prompt, mode, size, seed } from a gallery Re-roll.
+// When absent, reads the live UI as before — the normal generate flow.
+async function generate(over) {
+  const reroll = over && typeof over === "object";
+  const p = reroll ? (over.prompt || "").trim() : $("prompt").value.trim();
+  const m = reroll ? (over.mode || "photo") : mode;
+  const size = reroll ? (over.size || "768x768") : $("size").value;
+  // Re-roll never carries the attached reference (it reproduces a finished image, not the current edit).
+  const useRef = reroll ? "" : refData;
+  if (busy) return;
+  if (!p) { $("status").textContent = "✍️ write an idea first, then hit generate."; return; }
+  if (m === "edit" && !useRef) { $("status").textContent = "⚠ edit mode needs a photo — attach one with 📎 first."; return; }
+  busy = true; $("go").disabled = true;
+  const slow = (m === "photo" || m === "edit");
+  $("status").textContent = reroll
+    ? `re-rolling (${m})… same prompt, new seed`
+    : slow
+      ? `she's painting (${m})… photoreal/edit models are slower — 1–4 min, longer on a cold start`
+      : "she's painting… (30–90s; up to ~2 min if the engine was asleep)";
+  try {
+    const body = { prompt: p, mode: m, size, ref: useRef, strength: parseFloat($("strength").value),
+                   realism: ($("realism") ? $("realism").checked : true) };
+    if (reroll && typeof over.seed === "number") body.seed = over.seed;
+    const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body) }).then(r => r.json());
+    if (r.error) $("status").textContent = "⚠ " + r.error;
+    else {
+      const tail = r.note ? " · " + r.note : "";
+      $("status").textContent = "done — top-left, glowing. tap it for full size." + tail;
+      await loadGallery(true);
+    }
+  } catch (e) { $("status").textContent = "⚠ " + e.message; }
+  busy = false; $("go").disabled = false;
+}
+$("go").onclick = () => generate();
+$("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); generate(); } });
+
+/* ── ✨ POLISH — Tiff rewrites the rough idea into a pro prompt before you spend a render ── */
+let prePolish = "";   // B's original words, so ↩ undo restores them
+$("polish").onclick = async () => {
+  const rough = $("prompt").value.trim();
+  if (!rough || busy) return;
+  busy = true; $("polish").disabled = true; $("go").disabled = true;
+  $("status").textContent = "✨ Tiff's tightening up your prompt…";
+  try {
+    const r = await fetch("/api/image/polish", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: rough, mode, ref: refData }) }).then(r => r.json());
+    if (r.error) { $("status").textContent = "⚠ " + r.error; }
+    else {
+      prePolish = rough;
+      $("prompt").value = r.prompt;
+      $("polishRow").style.display = "flex";
+      $("status").textContent = "✨ polished — tweak it if you want, then hit ✦ to generate.";
+      $("prompt").focus(); $("prompt").setSelectionRange(r.prompt.length, r.prompt.length);
+    }
+  } catch (e) { $("status").textContent = "⚠ " + e.message; }
+  busy = false; $("polish").disabled = false; $("go").disabled = false;
+};
+$("polishUndo").onclick = () => {
+  if (prePolish) { $("prompt").value = prePolish; prePolish = ""; }
+  $("polishRow").style.display = "none"; $("prompt").focus();
+};
+// wrap generate (hoisted, reassignable) so the stale "polished" affordance hides on every generate path
+const _genOrig = generate;
+generate = async (over) => { $("polishRow").style.display = "none"; return _genOrig(over); };
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

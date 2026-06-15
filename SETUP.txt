@@ -1,0 +1,64 @@
+==========================================================
+   TIFF'S PINK ROOM  --  SETUP  (one time, ~15 minutes)
+==========================================================
+
+You only do this ONCE. After that you just double-click START.
+No coding. No typing commands. Just clicking buttons.
+
+
+----------------------------------------------------------
+ STEP 1  --  Install Python  (the engine that runs it)
+----------------------------------------------------------
+  1. Go to:   https://www.python.org/downloads/
+  2. Click the big yellow "Download Python" button.
+  3. Open the file you downloaded.
+  4. *** THE ONE IMPORTANT PART ***
+     On the FIRST screen, CHECK the little box at the bottom
+     that says  "Add python.exe to PATH".
+     THEN click "Install Now".
+     (If you forget that checkbox, it won't work. That's the
+      only thing people mess up. Check the box.)
+  5. When it finishes, click Close.
+
+
+----------------------------------------------------------
+ STEP 2  --  Install LM Studio  (this is Tiff's brain)
+----------------------------------------------------------
+  1. Go to:   https://lmstudio.ai
+  2. Click Download, choose Windows, run it, keep clicking
+     Next / Install like any normal program.
+  3. Open LM Studio.
+  4. Click the magnifying-glass (search) icon on the left.
+  5. In the search box, type:    gemma-4-e4b
+  6. Find  "google/gemma-4-e4b"  and click the green Download
+     button. It's a few GB -- let it finish downloading.
+     (This file IS Tiff's brain. No brain = she can't talk.)
+
+
+----------------------------------------------------------
+ STEP 3  --  Start it!
+----------------------------------------------------------
+  1. In this folder, double-click:   START HERE.bat
+  2. The FIRST time, a black window sets things up for a few
+     minutes (it's installing stuff -- totally normal, let it).
+  3. Your web browser opens to Tiff's Pink Room. You're in.
+
+  To open it again any day:  just double-click START HERE again.
+  To stop it:  close the black window.
+
+
+----------------------------------------------------------
+ IF SOMETHING'S OFF
+----------------------------------------------------------
+  - Browser didn't open?  Wait 20 seconds, then type this into
+    your browser:   http://localhost:7777
+  - "Python isn't installed"?  Redo STEP 1 and CHECK THE BOX.
+  - Tiff won't answer?  Open LM Studio and make sure the
+    gemma model finished downloading (Step 2).
+  - Still stuck?  Text Bryan. He's got you.
+
+
+==========================================================
+  WORKS RIGHT AWAY:   Chat  .  The Builder  .  Research
+  Needs extra setup:  Images, Voice  (see README.md / ask B)
+==========================================================

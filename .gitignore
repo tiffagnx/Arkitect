@@ -1,0 +1,22 @@
+# Python environment (each machine builds its own — never share this)
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Local runtime + PERSONAL data (sessions, builds, memory) — per-machine, private
+data/
+
+# Backups, scratch, test artifacts
+*.bak
+*.tmp
+studio-research/
+verify-*.png
+
+# Build output ZIPs
+*.zip
+
+# OS junk
+Thumbs.db
+.DS_Store
+desktop.ini

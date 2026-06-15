@@ -1,0 +1,2806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Studio — Tiff’s Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --amber:#F5A623;
+          --bg0:#07050C; --bg1:#14101C; --panel:rgba(16,11,22,0.8);
+          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { height:100vh; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1100px 600px at 50% -15%, #1E1228 0%, var(--bg1) 50%, var(--bg0) 100%); }
+
+  .top { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); }
+  .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .clock { font:600 13px 'Space Mono'; color:var(--teal); margin-left:8px; min-width:86px; }
+  .tbtn { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 12.5px Inter; transition:all .12s; }
+  .tbtn:hover { border-color:rgba(233,30,140,.5); }
+  .tbtn.hot { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent;
+    box-shadow:0 3px 14px rgba(233,30,140,.4); }
+  .tbtn.teal { color:#9BF0E8; } .tbtn.teal.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); }
+  .tbtn.rec { color:#FF8FA8; } .tbtn.rec.armed { border-color:rgba(255,90,110,.6); color:#FFB3C2; }
+  .tbtn.rec.live { background:linear-gradient(120deg,#FF5C7A,#E91E8C); color:#1A0410; border-color:transparent;
+    box-shadow:0 0 0 0 rgba(255,90,110,.5); animation:recpulse 1s infinite; }
+  @keyframes recpulse { 0%{box-shadow:0 0 0 0 rgba(255,90,110,.55)} 100%{box-shadow:0 0 0 9px rgba(255,90,110,0)} }
+  .countin { font:700 22px 'Space Mono'; color:#FFB3C2; min-width:30px; text-align:center; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .rec-warn { font:500 10px Inter; color:#FFC46B; line-height:1.45; margin-top:6px; }
+  .rec-warn.bad { color:#FF8FA8; }
+  .lat-grid { display:grid; grid-template-columns:1fr auto; gap:3px 8px; font:500 10px 'Space Mono'; }
+  .lat-grid .v { color:var(--teal); text-align:right; }
+  .lat-grid .lbl { color:var(--dim); }
+  .lat-grid .tot { color:#FF9DCE; } .lat-grid .tot .v { color:#FF9DCE; }
+  .ibtn { width:100%; padding:7px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 10.5px Inter; transition:all .12s; }
+  .ibtn:hover { border-color:rgba(233,30,140,.5); }
+  .ibtn.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); color:#9BF0E8; }
+  .devsel { width:100%; padding:6px 8px; border-radius:9px; outline:none; cursor:pointer; margin-top:6px;
+    background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline); font:500 10.5px Inter; }
+  .devsel option { background:var(--bg1); }
+  .devlbl { font:600 9px 'Space Mono'; letter-spacing:.16em; color:var(--dim); text-transform:uppercase; margin-top:8px; }
+  .dev-note { font:400 9px 'Space Mono'; color:var(--dim); line-height:1.5; margin-top:5px; }
+  .lane.recording { border-color:rgba(255,90,110,.6); box-shadow:0 0 18px rgba(255,90,110,.18); }
+  .inmeter { height:7px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); margin-top:8px; }
+  .inmeter i { display:block; height:100%; width:0%; transition:width .04s linear;
+    background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 60%, var(--amber) 82%, #FF5C7A 95%); }
+
+  .body { display:flex; height:calc(100vh - 53px); }
+  /* console rail: master + verb */
+  .rail { width:240px; min-width:240px; border-right:1px solid var(--hairline); background:var(--panel);
+    backdrop-filter:blur(22px); padding:14px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+  .module { border:1px solid var(--hairline); border-radius:14px; padding:12px; background:rgba(255,255,255,.02); }
+  .module h3 { font:700 10px 'Space Mono'; letter-spacing:.22em; color:var(--dim); margin-bottom:10px; text-transform:uppercase; }
+  .module h3.pink { color:#FF9DCE; }
+  .krow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .krow label { font:500 10.5px Inter; color:var(--dim); width:54px; }
+  .krow input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:4px; }
+  .krow output { font:500 10px 'Space Mono'; color:var(--teal); width:38px; text-align:right; }
+  .meter { height:10px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); }
+  .meter i { display:block; height:100%; width:0%;
+    background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 55%, var(--amber) 75%, #FF5C7A 92%); transition:width .05s linear; }
+
+  /* tracks */
+  .tracks { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .drop { border:2px dashed rgba(233,30,140,.35); border-radius:18px; padding:38px 20px; text-align:center;
+    color:var(--dim); font-size:13.5px; cursor:pointer; transition:all .15s; }
+  .drop:hover, .drop.over { border-color:var(--pink); color:var(--text); background:rgba(233,30,140,.05); }
+  .lane { border:1px solid var(--hairline); border-radius:16px; background:var(--panel); backdrop-filter:blur(18px);
+    padding:10px 12px; animation:rise .25s ease-out; }
+  @keyframes rise { from { opacity:0; transform:translateY(8px); } }
+  .lane.muted { opacity:.45; }
+  .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip { padding:4px 10px; border-radius:8px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; transition:all .1s; }
+  .chip.m.on { background:rgba(255,90,110,.18); color:#FF9DAB; border-color:rgba(255,90,110,.5); }
+  .chip.s.on { background:rgba(245,166,35,.18); color:#FFD79B; border-color:rgba(245,166,35,.5); }
+  .chip.x { margin-left:auto; color:#FF7A93; }
+  .chip.ai { color:#E6CBFF; border-color:rgba(139,92,246,.45);
+    background:linear-gradient(120deg,rgba(233,30,140,.16),rgba(139,92,246,.18)); }
+  .chip.ai:hover { border-color:rgba(233,30,140,.6); color:#FFE3F4; box-shadow:0 0 12px rgba(139,92,246,.3); }
+  .chip.ai.busy { opacity:.7; cursor:progress; animation:aipulse 1s ease-in-out infinite; }
+  @keyframes aipulse { 0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.45)} 50%{box-shadow:0 0 0 6px rgba(139,92,246,0)} }
+  .ai-summary { margin-top:8px; padding:9px 11px; border-radius:11px; animation:rise .18s ease-out;
+    border:1px solid rgba(139,92,246,.32);
+    background:linear-gradient(120deg,rgba(233,30,140,.06),rgba(139,92,246,.07)); }
+  .ai-summary-h { display:flex; align-items:center; gap:8px; margin-bottom:6px;
+    font:700 9px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:#E6CBFF; }
+  .ai-summary-x { margin-left:auto; background:rgba(255,255,255,.05); border:1px solid var(--hairline);
+    color:var(--dim); border-radius:7px; font:700 9px 'Space Mono'; padding:2px 7px; cursor:pointer; }
+  .ai-summary-x:hover { color:#FF9DCE; border-color:rgba(233,30,140,.5); }
+  .ai-summary-body { font:400 11px Inter; line-height:1.55; color:var(--text); white-space:pre-wrap; }
+  .wave { width:100%; height:54px; border-radius:10px; background:rgba(0,0,0,.4); cursor:pointer; display:block; }
+  .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
+  .knob { display:flex; align-items:center; gap:6px; }
+  .knob label { font:500 9.5px 'Space Mono'; color:var(--dim); width:34px; letter-spacing:.04em; }
+  .knob input[type=range] { flex:1; accent-color:var(--teal); cursor:pointer; height:3px; }
+  .knob.pink input { accent-color:var(--pink); }
+  .knob select { flex:1; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline);
+    border-radius:7px; font:500 10px Inter; padding:3px 5px; outline:none; min-width:0; }
+  .knob select option { background:var(--bg1); }
+  /* INSERT RACK — chain of effects per track, each with its own live knobs */
+  .ins-rack { margin-top:8px; padding-top:8px; border-top:1px solid var(--hairline); }
+  .ins-bar { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .ins-title { font:700 9px 'Space Mono'; letter-spacing:.18em; color:var(--dim); text-transform:uppercase; }
+  .ins-add { margin-left:auto; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline);
+    border-radius:7px; font:500 10px Inter; padding:3px 7px; outline:none; cursor:pointer; }
+  .ins-add option { background:var(--bg1); }
+  .ins { border:1px solid var(--hairline); border-radius:11px; padding:8px 10px; margin-bottom:6px;
+    background:rgba(233,30,140,.045); animation:rise .18s ease-out; }
+  .ins-h { display:flex; align-items:center; gap:6px; margin-bottom:7px; }
+  .ins-name { font:600 11.5px Inter; color:#FFD6EA; }
+  .ins-btn { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:var(--dim);
+    border-radius:6px; font:700 10px 'Space Mono'; padding:2px 7px; cursor:pointer; transition:all .1s; }
+  .ins-btn:hover { border-color:rgba(233,30,140,.5); color:var(--text); }
+  .ins-btn.rm { margin-left:auto; color:#FF7A93; }
+  .ins-params { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:6px 14px; }
+  .pp { display:flex; align-items:center; gap:6px; }
+  .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
+  .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
+  .pp output { font:500 9px 'Space Mono'; color:var(--teal); width:36px; text-align:right; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+
+  /* SAVE / LOAD project menu — glass + pink, matches the board */
+  .load-menu { position:fixed; z-index:60; width:330px; max-height:62vh; overflow-y:auto;
+    background:rgba(20,14,28,0.96); border:1px solid rgba(233,30,140,.4); border-radius:14px;
+    backdrop-filter:blur(22px); box-shadow:0 14px 44px rgba(0,0,0,.55), 0 0 0 1px var(--hairline);
+    padding:8px; animation:rise .14s ease-out; }
+  .load-menu-h { font:700 9px 'Space Mono'; letter-spacing:.2em; text-transform:uppercase; color:#FF9DCE;
+    padding:6px 8px 8px; border-bottom:1px solid var(--hairline); margin-bottom:6px; }
+  .load-empty { font:400 11px Inter; color:var(--dim); padding:12px 8px; }
+  .load-row { display:flex; align-items:center; gap:8px; padding:8px 9px; border-radius:10px; cursor:pointer;
+    transition:background .1s; }
+  .load-row:hover { background:rgba(233,30,140,.1); }
+  .load-name { flex:1; font:600 12px Inter; color:#FFD6EA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .load-when { font:500 9px 'Space Mono'; color:var(--dim); white-space:nowrap; }
+  .load-del { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FF7A93;
+    border-radius:7px; font:700 10px 'Space Mono'; padding:3px 8px; cursor:pointer; transition:all .1s; }
+  .load-del:hover { border-color:rgba(255,90,110,.6); background:rgba(255,90,110,.14); }
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/">← Pink Room</a>
+  <h1>🎚 THE STUDIO</h1>
+  <span class="clock" id="clock">0:00.0</span>
+  <button class="tbtn hot" id="play">▶ Play</button>
+  <button class="tbtn" id="stop">■ Stop</button>
+  <button class="tbtn teal" id="loop">↻ Loop</button>
+  <button class="tbtn rec" id="rec">● Record</button>
+  <span class="countin" id="countin"></span>
+  <div class="right">
+    <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
+    <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
+    <button class="tbtn" id="saveBtn" title="Save this mix (survives a refresh)">💾 Save</button>
+    <button class="tbtn" id="loadBtn" title="Load a saved mix">📂 Load</button>
+    <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
+  </div>
+</div>
+<span id="saveNote" style="position:fixed;bottom:12px;right:16px;font:500 11px 'Space Mono';color:var(--teal);z-index:50;pointer-events:none"></span>
+
+<div class="body">
+  <div class="rail">
+    <div class="module">
+      <h3>Master</h3>
+      <div class="krow"><label>Volume</label><input type="range" id="mGain" min="0" max="1.4" step="0.01" value="0.9" /><output id="mGainO">0.90</output></div>
+      <div class="krow"><label>Limiter</label><input type="range" id="mLim" min="-12" max="0" step="0.5" value="-1" /><output id="mLimO">-1.0</output></div>
+      <div style="margin-top:10px"><div class="meter"><i id="meterL"></i></div><div style="height:4px"></div><div class="meter"><i id="meterR"></i></div></div>
+      <div class="devlbl">Output → device</div>
+      <select class="devsel" id="outDev"><option value="">System default</option></select>
+      <button class="ibtn" id="scanDev" style="margin-top:6px">🔍 Detect my devices</button>
+      <div class="dev-note" id="outNote">Routes through your OS (WASAPI) to any device — Apollo, interface, or speakers. Great for mixing & listening. ASIO isn't reachable from a browser; for zero-latency tracking use your interface's Direct Monitoring. Hit "Detect my devices" to see real names (asks mic permission once).</div>
+    </div>
+    <div class="module">
+      <h3>Record</h3>
+      <button class="ibtn" id="inputBtn" style="margin-bottom:8px">🎤 Pick mic / input</button>
+      <select class="devsel" id="inDev" style="margin-top:0;margin-bottom:8px"><option value="">Default input</option></select>
+      <div class="krow"><label>Monitor</label><input type="range" id="monGain" min="0" max="1.2" step="0.01" value="0" /><output id="monGainO">off</output></div>
+      <button class="ibtn" id="monBtn" style="margin-bottom:8px">🎧 Headphone monitor: OFF</button>
+      <div class="inmeter"><i id="inMeter"></i></div>
+      <div class="krow" style="margin-top:10px"><label>Count-in</label><input type="range" id="countBars" min="0" max="2" step="1" value="1" /><output id="countBarsO">1 bar</output></div>
+      <div class="krow"><label>Tempo</label><input type="range" id="recBpm" min="60" max="180" step="1" value="120" /><output id="recBpmO">120</output></div>
+      <button class="ibtn" id="punchBtn" style="margin:8px 0">⊏⊐ Punch-in: OFF</button>
+      <div style="font:700 9px 'Space Mono';letter-spacing:.18em;color:var(--dim);margin:6px 0 4px">LATENCY COMP</div>
+      <div class="lat-grid" id="latGrid">
+        <span class="lbl">output</span><span class="v" id="latOut">—</span>
+        <span class="lbl">input</span><span class="v" id="latIn">—</span>
+        <span class="lbl tot">round-trip</span><span class="v tot" id="latTot">—</span>
+      </div>
+      <button class="ibtn" id="calibBtn" style="margin-top:8px">⟳ Calibrate (loopback)</button>
+      <div class="rec-warn" id="recWarn">Pick an input to begin. Use headphones — speaker monitoring causes feedback + bleed.</div>
+    </div>
+    <div class="module">
+      <h3 class="pink">TIFF VERB</h3>
+      <div class="krow"><label>Size</label><input type="range" id="vSize" min="0.4" max="6" step="0.1" value="2.2" /><output id="vSizeO">2.2s</output></div>
+      <div class="krow"><label>Tone</label><input type="range" id="vTone" min="800" max="14000" step="100" value="6000" /><output id="vToneO">6.0k</output></div>
+      <div class="krow"><label>Pre-dly</label><input type="range" id="vPre" min="0" max="0.12" step="0.005" value="0.02" /><output id="vPreO">20ms</output></div>
+      <div class="krow"><label>Return</label><input type="range" id="vRet" min="0" max="1.5" step="0.01" value="0.8" /><output id="vRetO">0.80</output></div>
+      <div style="font:400 9.5px 'Space Mono'; color:var(--dim); margin-top:6px">your reverb. each track has a SEND.</div>
+    </div>
+    <div class="module">
+      <h3>Plugins loaded</h3>
+      <div id="plugList" style="font:400 11px Inter; color:var(--dim); line-height:1.8">TIFF VERB (bus) · Telephone · Crush · Wide</div>
+    </div>
+  </div>
+
+  <div class="tracks" id="tracks">
+    <div class="drop" id="drop">Drop your stems here — vocals, beat, anything (MP3 / WAV)<br/><span style="font:400 11px 'Space Mono';color:var(--dim)">each file becomes a lane on the board</span></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════ TIFF'S STUDIO ENGINE — Web Audio, all local, $0 ═══════════ */
+const $ = (id) => document.getElementById(id);
+let ctx = null;                 // AudioContext (created on first interaction)
+const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
+let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
+let verb = null;                // {convolver, predelay, ret}
+let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
+
+/* ── plugin registry — B's own format ──
+   TIFF_PLUGINS.register({ name, params:[{id,label,min,max,value}],
+     create(ctx){ return {input, output, set(id,val)} } })            */
+window.TIFF_PLUGINS = {
+  list: [],
+  register(p) { this.list.push(p); refreshPlugUi(); },
+};
+/* built-ins */
+TIFF_PLUGINS.list.push(
+  { name: "Telephone", params: [{ id:"amt", label:"AMT", min:0, max:1, value:1 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 600;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200;
+      const dry = c.createGain(), wet = c.createGain(); dry.gain.value = 0; wet.gain.value = 1;
+      i.connect(hp); hp.connect(lp); lp.connect(wet); wet.connect(o); i.connect(dry); dry.connect(o);
+      return { input: i, output: o, set(id, v) { wet.gain.value = v; dry.gain.value = 1 - v; } };
+    } },
+  { name: "Crush", params: [{ id:"amt", label:"AMT", min:0, max:1, value:0.4 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const ws = c.createWaveShaper();
+      const setCurve = (a) => { const k = a * 60 + 1, n = 256, curve = new Float32Array(n);
+        for (let j = 0; j < n; j++) { const x = (j / (n - 1)) * 2 - 1; curve[j] = Math.tanh(x * k) / Math.tanh(k); }
+        ws.curve = curve; };
+      setCurve(0.4);
+      i.connect(ws); ws.connect(o);
+      return { input: i, output: o, set(id, v) { setCurve(v); } };
+    } },
+  { name: "Wide", params: [{ id:"amt", label:"AMT", min:0, max:1, value:0.5 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const split = c.createChannelSplitter(2), merge = c.createChannelMerger(2);
+      const dly = c.createDelay(0.05); dly.delayTime.value = 0.012;
+      i.connect(split);
+      split.connect(merge, 0, 0);
+      split.connect(dly, 1); dly.connect(merge, 0, 1);
+      merge.connect(o);
+      return { input: i, output: o, set(id, v) { dly.delayTime.value = v * 0.025; } };
+    } },
+  /* ── EQ-6 — full parametric (native biquad chain), surgical EQ per track ── */
+  { name: "EQ-6", params: [
+      { id:"hpf", label:"HP Hz", min:20, max:400, value:35 },
+      { id:"loG", label:"Low dB", min:-12, max:12, value:0 },
+      { id:"mF", label:"LoMid Hz", min:80, max:800, value:350 },
+      { id:"mG", label:"LoMid dB", min:-12, max:12, value:0 },
+      { id:"mQ", label:"LoMid Q", min:0.3, max:6, value:0.9 },
+      { id:"pF", label:"Pres Hz", min:800, max:6000, value:2000 },
+      { id:"pG", label:"Pres dB", min:-12, max:12, value:0 },
+      { id:"pQ", label:"Pres Q", min:0.3, max:6, value:1.0 },
+      { id:"air", label:"Air dB", min:-12, max:12, value:0 },
+      { id:"lpf", label:"LP Hz", min:2000, max:20000, value:20000 },
+    ],
+    create(c) {
+      const mk = (type, f, Q, g) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = Q; b.gain.value = g; return b; };
+      const hp = mk("highpass",35,0.707,0), lo = mk("lowshelf",100,0.707,0),
+            m = mk("peaking",350,0.9,0), p = mk("peaking",2000,1.0,0),
+            air = mk("highshelf",10000,0.707,0), lp = mk("lowpass",20000,0.707,0);
+      [hp,lo,m,p,air].forEach((n,idx) => n.connect([lo,m,p,air,lp][idx]));
+      const ramp = (prm,v) => prm.setTargetAtTime(v, c.currentTime, 0.01);
+      return { input: hp, output: lp, set(id,v) { ({
+        hpf:()=>ramp(hp.frequency,v), loG:()=>ramp(lo.gain,v),
+        mF:()=>ramp(m.frequency,v), mG:()=>ramp(m.gain,v), mQ:()=>ramp(m.Q,v),
+        pF:()=>ramp(p.frequency,v), pG:()=>ramp(p.gain,v), pQ:()=>ramp(p.Q,v),
+        air:()=>ramp(air.gain,v), lpf:()=>ramp(lp.frequency,v),
+      })[id]?.(); } };
+    } },
+  /* ── De-Ess — split-band sibilance tamer (native), for vocals ── */
+  { name: "De-Ess", params: [
+      { id:"x", label:"Freq Hz", min:4000, max:9000, value:6000 },
+      { id:"thr", label:"Thresh", min:-40, max:-6, value:-28 },
+      { id:"ratio", label:"Ratio", min:1, max:10, value:4 },
+      { id:"rel", label:"Rel ms", min:20, max:120, value:50 },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const lp1 = c.createBiquadFilter(), lp2 = c.createBiquadFilter();
+      const hp1 = c.createBiquadFilter(), hp2 = c.createBiquadFilter();
+      lp1.type = lp2.type = "lowpass"; hp1.type = hp2.type = "highpass";
+      [lp1,lp2,hp1,hp2].forEach(f => { f.frequency.value = 6000; f.Q.value = 0.7071; });
+      const comp = c.createDynamicsCompressor();
+      comp.threshold.value = -28; comp.ratio.value = 4; comp.attack.value = 0.001; comp.release.value = 0.05; comp.knee.value = 6;
+      i.connect(lp1); lp1.connect(lp2); lp2.connect(o);
+      i.connect(hp1); hp1.connect(hp2); hp2.connect(comp); comp.connect(o);
+      const ramp = (prm,v) => prm.setTargetAtTime(v, c.currentTime, 0.01);
+      return { input: i, output: o, set(id,v) { ({
+        x:()=>[lp1,lp2,hp1,hp2].forEach(f=>ramp(f.frequency,v)),
+        thr:()=>ramp(comp.threshold,v), ratio:()=>ramp(comp.ratio,v), rel:()=>ramp(comp.release,v/1000),
+      })[id]?.(); } };
+    } },
+  /* ── Saturator — tape/tube/transistor, 4x oversampled, even-harmonic warmth (the house tone) ── */
+  { name: "Saturator", params: [
+      { id:"mode", label:"Mode", min:0, max:2, value:1 },
+      { id:"drive", label:"Drive", min:1, max:25, value:6 },
+      { id:"bias", label:"Bias", min:0, max:0.4, value:0.18 },
+      { id:"emph", label:"Emph Hz", min:1500, max:5000, value:3000 },
+      { id:"mix", label:"Mix", min:0, max:1, value:0.4 },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const pre = c.createBiquadFilter(); pre.type = "highshelf"; pre.frequency.value = 3000; pre.gain.value = 6;
+      const dc = c.createBiquadFilter(); dc.type = "highpass"; dc.frequency.value = 18;
+      const shaper = c.createWaveShaper(); shaper.oversample = "4x";
+      const de = c.createBiquadFilter(); de.type = "highshelf"; de.frequency.value = 3000; de.gain.value = -6;
+      const trim = c.createGain(); trim.gain.value = 0.85;
+      const wet = c.createGain(), dry = c.createGain(); wet.gain.value = 0.4; dry.gain.value = 0.6;
+      i.connect(pre); pre.connect(dc); dc.connect(shaper); shaper.connect(de); de.connect(trim); trim.connect(wet); wet.connect(o);
+      i.connect(dry); dry.connect(o);
+      let mode = 1, drive = 6, bias = 0.18;
+      const tube = (k,b,n=4096) => { const cu = new Float32Array(n), nrm = Math.tanh(k*(1+Math.abs(b))); for (let j=0;j<n;j++){ const x=(j/(n-1))*2-1; cu[j]=Math.tanh(k*(x+b))/nrm; } return cu; };
+      const tape = (k,n=4096) => { const cu = new Float32Array(n); for (let j=0;j<n;j++){ const x=(j/(n-1))*2-1; cu[j]=(k*x)/(1+Math.abs(k*x)); } return cu; };
+      const tran = (k,n=4096) => { const cu = new Float32Array(n); k=Math.max(1,k); for (let j=0;j<n;j++){ let x=((j/(n-1))*2-1)*k,y; if(x<=-1)y=-2/3; else if(x>=1)y=2/3; else y=x-x*x*x/3; cu[j]=y/(2/3); } return cu; };
+      const rebuild = () => { shaper.curve = mode<0.5 ? tape(drive) : (mode<1.5 ? tube(drive,bias) : tran(drive)); };
+      rebuild();
+      const ramp = (prm,v) => prm.setTargetAtTime(v, c.currentTime, 0.01);
+      return { input: i, output: o, set(id,v) {
+        if (id==="mode") { mode=v; rebuild(); }
+        else if (id==="drive") { drive=v; rebuild(); }
+        else if (id==="bias") { bias=v; rebuild(); }
+        else if (id==="emph") { ramp(pre.frequency,v); ramp(de.frequency,v); }
+        else if (id==="mix") { ramp(wet.gain,v); ramp(dry.gain,1-v); }
+      } };
+    } },
+  /* ── Ensemble — 3-voice decorrelated chorus, lows kept mono (the TIFF width) ── */
+  { name: "Ensemble", params: [
+      { id:"rate", label:"Rate Hz", min:0.1, max:2.0, value:0.5 },
+      { id:"depth", label:"Depth ms", min:0, max:7, value:4 },
+      { id:"width", label:"Width", min:0, max:1, value:0.7 },
+      { id:"mix", label:"Mix", min:0, max:1, value:0.25 },
+      { id:"hpf", label:"HP Hz", min:60, max:400, value:160 },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dry = c.createGain(); dry.gain.value = 1;
+      const wet = c.createGain(); wet.gain.value = 0.25;
+      const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 160;
+      i.connect(dry); dry.connect(o);
+      const base = 0.022, rates = [0.5,0.565,0.63], pans = [-1,0,1], rmul = [1,1.13,1.26];
+      const voices = [];
+      for (let v=0; v<3; v++) {
+        const dl = c.createDelay(0.1); dl.delayTime.value = base;
+        const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = rates[v];
+        const lg = c.createGain(); lg.gain.value = 0.004;
+        const pan = c.createStereoPanner(); pan.pan.value = pans[v]*0.7;
+        lfo.connect(lg); lg.connect(dl.delayTime);
+        i.connect(dl); dl.connect(pan); pan.connect(hp);
+        try { lfo.start(); } catch {}
+        voices.push({ dl, lfo, lg, pan });
+      }
+      hp.connect(wet); wet.connect(o);
+      const ramp = (prm,v) => prm.setTargetAtTime(v, c.currentTime, 0.02);
+      return { input: i, output: o,
+        set(id,v) {
+          if (id==="rate") voices.forEach((vc,idx)=>ramp(vc.lfo.frequency, v*rmul[idx]));
+          else if (id==="depth") voices.forEach(vc=>ramp(vc.lg.gain, v/1000));
+          else if (id==="width") voices.forEach((vc,idx)=>ramp(vc.pan.pan, pans[idx]*v));
+          else if (id==="mix") ramp(wet.gain, v);
+          else if (id==="hpf") ramp(hp.frequency, v);
+        },
+        dispose() { voices.forEach(vc=>{ try { vc.lfo.stop(); } catch {} }); } };
+    } },
+);
+
+/* ── Compressor — worklet dynamics processor (peak/RMS detector, soft knee,
+   makeup, parallel mix, optional sidechain on input #1) ── */
+TIFF_PLUGINS.register({
+  name: 'Compressor',
+  params: [
+    {id:'threshold', label:'Threshold', min:-60, max:0,   value:-24},
+    {id:'ratio',     label:'Ratio',     min:1,   max:20,  value:4},
+    {id:'knee',      label:'Knee',      min:0,   max:24,  value:12},
+    {id:'attack',    label:'Attack',    min:0.1, max:100, value:10},
+    {id:'release',   label:'Release',   min:20,  max:800, value:150},
+    {id:'makeup',    label:'Makeup',    min:-12, max:24,  value:0},
+    {id:'mix',       label:'Mix',       min:0,   max:1,   value:1},
+    {id:'detector',  label:'Detector',  min:0,   max:1,   value:1}  // 0 = peak / 1 = rms
+  ],
+  create(c){
+    const node = new AudioWorkletNode(c, 'tiff-compressor', {
+      numberOfInputs: 2,            // 0 = signal, 1 = optional sidechain key
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'speakers'
+    });
+    node._gr = 0;
+    node.port.onmessage = e => {
+      if(e.data && typeof e.data.gr === 'number') node._gr = e.data.gr;
+    };
+
+    // STEPPED params must be hard-set (no setTargetAtTime glide). 'detector' is a binary
+    // mode flag — gliding 0->1 would smear it through 0.5 and flip peak/rms mid-render.
+    const STEPPED = { detector: true };
+
+    return {
+      input: node,
+      output: node,
+      // expose input #1 so a host can wire a sidechain key: keySrc.connect(node, 0, 1)
+      sidechainInput: node,
+      sidechainInputIndex: 1,
+      meter: () => node._gr,
+      set(id, val){
+        const p = node.parameters.get(id);
+        if(!p) return;
+        if(STEPPED[id]){
+          // cancel any in-flight ramp, then hard-step at the next safe time
+          try{ p.cancelScheduledValues(c.currentTime); }catch(e){}
+          p.setValueAtTime(val, c.currentTime);
+        }else{
+          p.setTargetAtTime(val, c.currentTime, 0.01);
+        }
+      },
+      dispose(){
+        try{ node.port.onmessage = null; }catch(e){}
+        try{ node.disconnect(); }catch(e){}
+      }
+    };
+  }
+});
+
+/* ── Lo-Fi — bitcrush + decimate (worklet) wrapped with saturation, tone, HPF,
+   wow/flutter, and a vinyl hiss bed ── */
+TIFF_PLUGINS.register({
+  name: 'Lo-Fi',
+  params: [
+    { id: 'bits',       label: 'Bit Depth',  min: 4,    max: 16,    value: 10 },
+    { id: 'downsample', label: 'Decimate',   min: 1,    max: 32,    value: 4  },
+    { id: 'saturation', label: 'Saturation', min: 0,    max: 1,     value: 0.3 },
+    { id: 'tone',       label: 'Tone (LPF)', min: 1000, max: 18000, value: 8000 },
+    { id: 'hpf',        label: 'HPF',        min: 20,   max: 400,   value: 60 },
+    { id: 'wowRate',    label: 'Wow Rate',   min: 0.1,  max: 6,     value: 0.8 },
+    { id: 'wowDepth',   label: 'Wow Depth',  min: 0,    max: 0.02,  value: 0.0025 },
+    { id: 'noise',      label: 'Vinyl Hiss', min: 0,    max: 1,     value: 0.12 },
+  ],
+  create(c) {
+    const input  = c.createGain();
+    const output = c.createGain();
+
+    const hpf = c.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.value = 60;
+    hpf.Q.value = 0.707;
+
+    // tanh saturation @ 4x oversample
+    const sat = c.createWaveShaper();
+    sat.oversample = '4x';
+    let satAmount = 0.3;
+    const buildSatCurve = (amt) => {
+      const k = 1 + amt * 24;
+      const N = 2048, curve = new Float32Array(N);
+      const norm = Math.tanh(k);
+      for (let i = 0; i < N; i++) {
+        const x = (i / (N - 1)) * 2 - 1;
+        curve[i] = Math.tanh(k * x) / norm;
+      }
+      return curve;
+    };
+    sat.curve = buildSatCurve(satAmount);
+
+    const crush = new AudioWorkletNode(c, 'lofi-crush', {
+      numberOfInputs: 1, numberOfOutputs: 1,
+      outputChannelCount: [2],
+      channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'speakers',
+    });
+
+    const tone = c.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 8000;
+    tone.Q.value = 0.707;
+
+    // wow/flutter: LFO -> delayTime.
+    // Base offset MUST be >= max wow depth or the delay clamps to 0 and the
+    // pitch modulation distorts asymmetrically. Max depth = 0.02s, so base 0.025s,
+    // worst-case excursion 0.025 +/- 0.02 = [0.005 .. 0.045], all inside delay max.
+    const WOW_BASE = 0.025;
+    const delay = c.createDelay(0.06); // > WOW_BASE + maxDepth
+    delay.delayTime.value = WOW_BASE;
+    const wowLFO = c.createOscillator();
+    wowLFO.type = 'sine';
+    wowLFO.frequency.value = 0.8;
+    const wowGain = c.createGain();
+    wowGain.gain.value = 0.0025;
+    wowLFO.connect(wowGain).connect(delay.delayTime);
+    wowLFO.start();
+
+    // vinyl noise bed: 2s looping noise -> bandpass@3k -> noiseGain -> output
+    const noiseBuf = c.createBuffer(1, Math.floor(c.sampleRate * 2), c.sampleRate);
+    const ndata = noiseBuf.getChannelData(0);
+    for (let i = 0; i < ndata.length; i++) ndata[i] = Math.random() * 2 - 1;
+    const noiseSrc = c.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    noiseSrc.loop = true;
+    const noiseBP = c.createBiquadFilter();
+    noiseBP.type = 'bandpass';
+    noiseBP.frequency.value = 3000;
+    noiseBP.Q.value = 0.8;
+    const noiseGain = c.createGain();
+    noiseGain.gain.value = 0.12 * 0.05; // param 0..1 -> small bed level
+    noiseSrc.connect(noiseBP).connect(noiseGain).connect(output);
+    noiseSrc.start();
+
+    // chain: in -> HPF -> saturate -> crush -> tone(LPF) -> wow delay -> out
+    input.connect(hpf);
+    hpf.connect(sat);
+    sat.connect(crush);
+    crush.connect(tone);
+    tone.connect(delay);
+    delay.connect(output);
+
+    const set = (id, val) => {
+      const v = +val;
+      if (!Number.isFinite(v)) return;
+      const t = c.currentTime;
+      switch (id) {
+        case 'bits':
+          crush.parameters.get('bits').setValueAtTime(Math.round(v), t);
+          break;
+        case 'downsample':
+          crush.parameters.get('downsample').setValueAtTime(Math.round(v), t);
+          break;
+        case 'saturation':
+          satAmount = v;
+          sat.curve = buildSatCurve(satAmount); // rebuild (zippers slightly on drag)
+          break;
+        case 'tone':
+          tone.frequency.setTargetAtTime(v, t, 0.01);
+          break;
+        case 'hpf':
+          hpf.frequency.setTargetAtTime(v, t, 0.01);
+          break;
+        case 'wowRate':
+          wowLFO.frequency.setTargetAtTime(v, t, 0.01);
+          break;
+        case 'wowDepth': {
+          // clamp depth so excursion stays inside [0, delay max]
+          const d = Math.max(0, Math.min(WOW_BASE, v));
+          wowGain.gain.setTargetAtTime(d, t, 0.01);
+          break;
+        }
+        case 'noise':
+          noiseGain.gain.setTargetAtTime(v * 0.05, t, 0.01);
+          break;
+      }
+    };
+
+    const dispose = () => {
+      try { wowLFO.stop(); } catch (e) {}
+      try { noiseSrc.stop(); } catch (e) {}
+      try { input.disconnect(); hpf.disconnect(); sat.disconnect(); } catch (e) {}
+      try { crush.disconnect(); tone.disconnect(); delay.disconnect(); } catch (e) {}
+      try { wowLFO.disconnect(); wowGain.disconnect(); noiseBP.disconnect(); noiseGain.disconnect(); } catch (e) {}
+    };
+
+    return { input, output, set, dispose };
+  },
+});
+
+/* ── Gate / Expander — worklet downward expander with hysteresis, hold, soft
+   knee, range floor, and an HPF'd detector so rumble won't false-open ── */
+TIFF_PLUGINS.register({
+  name: 'Gate / Expander',
+  params: [
+    {id:'threshold', label:'Threshold (dB)', min:-80, max:0,   value:-45},
+    {id:'hysteresis',label:'Hysteresis (dB)',min:0,   max:12,  value:6},
+    {id:'range',     label:'Range (dB)',     min:-90, max:0,   value:-80},
+    {id:'ratio',     label:'Ratio',          min:1,   max:10,  value:4},
+    {id:'attack',    label:'Attack (ms)',    min:0.5, max:5,   value:1},
+    {id:'hold',      label:'Hold (ms)',      min:0,   max:200, value:60},
+    {id:'release',   label:'Release (ms)',   min:50,  max:500, value:180},
+    {id:'knee',      label:'Knee (dB)',      min:0,   max:12,  value:3}
+  ],
+  create(c){
+    const node = new AudioWorkletNode(c, 'tiff-gate', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'speakers',
+      outputChannelCount: [2]
+    });
+    return {
+      input: node,
+      output: node,
+      set(id, val){
+        const p = node.parameters.get(id);
+        if(!p) return;
+        const t = c.currentTime;
+        // Decision boundaries / discrete curve params → setValueAtTime (must land EXACTLY
+        // on the requested value; setTargetAtTime asymptotes and never arrives).
+        // Time-constant params (attack/hold/release) → setTargetAtTime to de-zipper drags;
+        // they only feed coefficient math, so smooth glide is safe and click-free.
+        if(id === 'threshold' || id === 'ratio' || id === 'hysteresis' || id === 'knee' || id === 'range'){
+          p.setValueAtTime(val, t);
+        } else { // attack, hold, release
+          p.setTargetAtTime(val, t, 0.01);
+        }
+      },
+      dispose(){
+        try{ node.disconnect(); }catch(e){}
+      }
+    };
+  }
+});
+
+/* ── Transient Shaper — worklet attack/sustain shaper (fast vs body envelope
+   followers), wet/dry mix ── */
+TIFF_PLUGINS.register({
+  name: 'Transient Shaper',
+  params: [
+    { id: 'attack',  label: 'Attack',  min: -1, max: 1, value: 0 },
+    { id: 'sustain', label: 'Sustain', min: -1, max: 1, value: 0 },
+    { id: 'mix',     label: 'Mix',     min: 0,  max: 1, value: 1 }
+  ],
+  create(c) {
+    const node = new AudioWorkletNode(c, 'transient-shaper', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      // 'max' (not 'explicit' + channelCount:2) so the node adapts to the real
+      // source channel count — mono stays mono, stereo stays stereo, and the
+      // per-channel state logic already handles either.
+      channelCountMode: 'max',
+      channelInterpretation: 'speakers'
+    });
+
+    // snap params to their value at t=0 with setValueAtTime so an
+    // OfflineAudioContext render starts deterministically (no 10ms ramp at head).
+    const snap = (id, val) => {
+      const p = node.parameters.get(id);
+      if (p) { try { p.cancelScheduledValues(c.currentTime); } catch (e) {}
+               p.setValueAtTime(val, c.currentTime); }
+    };
+
+    return {
+      input: node,
+      output: node,
+      // smooth set for live, continuous knob moves (zipper-free)
+      set(id, val) {
+        const p = node.parameters.get(id);
+        if (p) p.setTargetAtTime(val, c.currentTime, 0.01);
+      },
+      // initial / preset / offline-render set — instantaneous & deterministic
+      setImmediate(id, val) { snap(id, val); },
+      dispose() { try { node.disconnect(); } catch (e) {} }
+    };
+  }
+});
+
+/* ── Tape Delay (native) — the analog trait: filtering + soft saturation INSIDE
+   the feedback loop (each repeat re-darkens) and ping-pong CROSS-feed (L's
+   repeat feeds R and vice-versa). Wow/flutter via a slow LFO on delay time. ── */
+TIFF_PLUGINS.register({
+  name: "Tape Delay",
+  params: [
+    { id:"time", label:"Time ms", min:40, max:900, value:320 },
+    { id:"feedback", label:"Feedback", min:0, max:0.92, value:0.5 },
+    { id:"tone", label:"Tone Hz", min:1200, max:8000, value:3500 },
+    { id:"mix", label:"Mix", min:0, max:0.6, value:0.28 },
+  ],
+  create(c) {
+    const i = c.createGain(), o = c.createGain();
+    const dry = c.createGain(); dry.gain.value = 1;
+    const wet = c.createGain(); wet.gain.value = 0.28;
+    i.connect(dry); dry.connect(o);
+    const line = () => {
+      const dl = c.createDelay(1.2); dl.delayTime.value = 0.32;
+      const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 120;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3500;
+      const sat = c.createWaveShaper(); { const nn = 1024, cu = new Float32Array(nn); for (let j = 0; j < nn; j++) { const x = (j/(nn-1))*2-1; cu[j] = Math.tanh(x*1.5); } sat.curve = cu; sat.oversample = "2x"; }
+      const fb = c.createGain(); fb.gain.value = 0.5;
+      dl.connect(hp); hp.connect(lp); lp.connect(sat); sat.connect(fb);   // in-loop filter + saturate
+      return { dl, hp, lp, sat, fb };
+    };
+    const L = line(), R = line();
+    const panL = c.createStereoPanner(); panL.pan.value = -0.85;
+    const panR = c.createStereoPanner(); panR.pan.value = 0.85;
+    i.connect(L.dl); i.connect(R.dl);
+    L.fb.connect(R.dl); R.fb.connect(L.dl);   // ping-pong cross-feed
+    L.dl.connect(panL); panL.connect(wet);
+    R.dl.connect(panR); panR.connect(wet);
+    wet.connect(o);
+    const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.7;
+    const lg = c.createGain(); lg.gain.value = 0.0015;   // wow/flutter depth (seconds)
+    lfo.connect(lg); lg.connect(L.dl.delayTime); lg.connect(R.dl.delayTime);
+    try { lfo.start(); } catch {}
+    const ramp = (p, v, tc=0.04) => p.setTargetAtTime(v, c.currentTime, tc);
+    return {
+      input: i, output: o,
+      set(id, v) {
+        if (id === "time") { ramp(L.dl.delayTime, v/1000, 0.08); ramp(R.dl.delayTime, (v/1000)*1.5, 0.08); }  // R longer = wider bounce
+        else if (id === "feedback") { ramp(L.fb.gain, v); ramp(R.fb.gain, v); }
+        else if (id === "tone") { ramp(L.lp.frequency, v); ramp(R.lp.frequency, v); }
+        else if (id === "mix") ramp(wet.gain, v);
+      },
+      dispose() { try { lfo.stop(); } catch {} },
+    };
+  }
+});
+
+function refreshPlugUi() {
+  $("plugList").textContent = "TIFF VERB (bus) · " + TIFF_PLUGINS.list.map(p => p.name).join(" · ");
+  tracks.forEach(t => fillAddSelect(t));
+}
+refreshPlugUi();  // list all built-in plugins in the sidebar at load
+$("plugfile").onchange = async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  try { (new Function(await f.text()))(); } catch (err) { alert("Plugin error: " + err.message); }
+  e.target.value = "";
+};
+
+/* ── TIFF VERB v2 — generated stereo IR: early reflections + velvet-noise
+   diffuse tail + HF damping, independent per channel = real space, true
+   stereo. Signature preserved (c, seconds, tone) so call sites don't change.
+   Pre-delay stays on the existing predelay DelayNode — NOT baked here. ── */
+function makeIR(c, seconds, tone) {
+  const rate = c.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
+  const ir = c.createBuffer(2, len, rate);
+  const T60 = Math.max(0.2, seconds);
+  const damp = Math.min(0.98, Math.max(0.05, (tone / (rate / 2)) * 2.2)); // tone -> HF damping
+  const ER_TAPS = 14, DENSITY = 2200;                  // diffuse pulses/sec
+  const step = Math.max(1, Math.floor(rate / DENSITY));
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    // Stage A — early reflections: sparse taps, spacing grows, geometric decay,
+    // alternating sign, per-channel jitter = stereo spread.
+    let pos = Math.floor(rate * 0.005), g = 1;
+    for (let k = 0; k < ER_TAPS && pos < len; k++) {
+      const jitter = 1 + (Math.random() * 2 - 1) * 0.22 * (ch ? 1 : -1);
+      const idx = Math.min(len - 1, Math.floor(pos * jitter));
+      d[idx] += g * (k % 2 ? -1 : 1);
+      g *= 0.78;
+      pos = Math.floor(pos * 1.6) + Math.floor(rate * 0.003);
+    }
+    // Stage B — diffuse tail: velvet noise (sparse impulses) through a one-pole
+    // (HF damping darkens the tail over time), RT60 envelope, own seed per ch.
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      const s = (i % step === 0) ? (Math.random() * 2 - 1) : 0;
+      lp = lp + damp * (s - lp);
+      d[i] += lp * Math.exp(-6.908 * i / (T60 * rate));
+    }
+  }
+  // normalize to 0.5 peak
+  let peak = 0;
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a; } }
+  if (peak > 0) { const n = 0.5 / peak; for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] *= n; } }
+  return ir;
+}
+
+/* ── AudioWorklet harness — all processors live in ONE Blob module, loaded
+   once per context (the promise is cached so concurrent callers share it).
+   ensureWorklets(c) is awaited before ANY graph is built — live AND every
+   OfflineAudioContext used for export (skip offline = export bypasses them).
+   Worklet plugins can then construct their AudioWorkletNode synchronously. ── */
+let WORKLET_SRC = `
+class PassThroughProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0];
+    if (inp && inp.length) { for (let ch = 0; ch < out.length; ch++) { const i = inp[ch] || inp[0]; if (i) out[ch].set(i); } }
+    return true;
+  }
+}
+registerProcessor('passthrough', PassThroughProcessor);
+
+registerProcessor('tiff-compressor', class extends AudioWorkletProcessor {
+  static get parameterDescriptors(){
+    return [
+      {name:'threshold', defaultValue:-24, minValue:-60, maxValue:0,   automationRate:'a-rate'},
+      {name:'ratio',     defaultValue:4,   minValue:1,   maxValue:20,  automationRate:'a-rate'},
+      {name:'knee',      defaultValue:12,  minValue:0,   maxValue:24,  automationRate:'a-rate'},
+      {name:'attack',    defaultValue:10,  minValue:0.1, maxValue:100, automationRate:'a-rate'},
+      {name:'release',   defaultValue:150, minValue:20,  maxValue:800, automationRate:'a-rate'},
+      {name:'makeup',    defaultValue:0,   minValue:-12, maxValue:24,  automationRate:'a-rate'},
+      {name:'mix',       defaultValue:1,   minValue:0,   maxValue:1,   automationRate:'a-rate'},
+      // binary mode flag — read once per block, MUST stay stepped (never glide)
+      {name:'detector',  defaultValue:1,   minValue:0,   maxValue:1,   automationRate:'k-rate'}
+    ];
+  }
+  constructor(){
+    super();
+    this._det = 0;           // detector one-pole state (linear key signal / squared for RMS)
+    this._envDb = 0;         // smoothed gain-reduction envelope in dB (>=0 = amount of reduction)
+    this._meterPeakGr = 0;   // max GR (dB) since last post
+    this._postCtr = 0;       // post-throttle counter (blocks), so meter holds a few quanta
+  }
+  process(inputs, outputs, params){
+    const input = inputs[0];
+    const sidechain = inputs[1];
+    const output = outputs[0];
+    if(!input || input.length === 0 || !output || output.length === 0) return true;
+
+    const nch = input.length;
+    const len = output[0].length;            // typically 128
+    if(len === 0) return true;
+
+    // Key source: explicit sidechain if connected & non-empty, else self-key the main input.
+    const key = (sidechain && sidechain.length > 0 && sidechain[0] && sidechain[0].length) ? sidechain : input;
+    const keyCh = key.length;
+
+    const thrA = params.threshold, ratA = params.ratio, kneeA = params.knee;
+    const atkA = params.attack,    relA = params.release;
+    const mkA  = params.makeup,    mixA = params.mix;
+    const useRms = params.detector[0] >= 0.5;
+
+    // Per-sample one-pole coefficient from a time-constant in ms.
+    const tc = ms => Math.exp(-1 / (sampleRate * (Math.max(ms, 0.01) / 1000)));
+    const LOG2DB = 20 / Math.LN10;           // multiply by ln(level) -> dB  (== 20*log10)
+    const DB2LIN = Math.LN10 / 20;           // multiply dB then exp() -> linear
+
+    // RMS energy-averaging window (only used in RMS mode), fixed ~5ms.
+    const rmsCoef = Math.exp(-1 / (sampleRate * 0.005));
+
+    const DENORM = 1e-20;                    // flush-to-zero floor
+
+    let env = this._envDb;
+    let det = this._det;
+    let meterPeak = this._meterPeakGr;
+
+    for(let i = 0; i < len; i++){
+      // --- aggregate key across channels (stereo-linked: max-of-channels) ---
+      let kmax = 0;
+      for(let c = 0; c < keyCh; c++){
+        const kc = key[c];
+        if(!kc) continue;
+        const s = kc[i];
+        const v = useRms ? (s * s) : Math.abs(s);
+        if(v > kmax) kmax = v;
+      }
+
+      // --- detector ---
+      let level;
+      if(useRms){
+        // smooth the squared signal (energy), then sqrt -> RMS level
+        det = kmax + rmsCoef * (det - kmax);
+        if(det < DENORM) det = 0;
+        level = Math.sqrt(det);
+      }else{
+        // PEAK: true instantaneous follower. Ballistics live on the GR envelope below,
+        // so the detector must NOT add its own release smoothing (that double-smooths recovery).
+        det = kmax;
+        level = det;
+      }
+
+      // --- level in dB (guard the log against 0/denormal) ---
+      const L = (level > 1e-9) ? (Math.log(level) * LOG2DB) : -180;
+
+      // --- static curve: gain-reduction magnitude in dB (>=0) ---
+      const thr   = thrA.length  > 1 ? thrA[i]  : thrA[0];
+      let   ratio = ratA.length  > 1 ? ratA[i]  : ratA[0];
+      const knee  = kneeA.length > 1 ? kneeA[i] : kneeA[0];
+      if(ratio < 1) ratio = 1;                 // clamp; slope=0 at ratio=1 => no compression
+      const slope = 1 - 1 / ratio;
+      const o = L - thr;
+      let gr;
+      if(knee <= 0){
+        // hard knee (avoids /0 in the soft-knee quadratic)
+        gr = o > 0 ? slope * o : 0;
+      }else if(o <= -knee / 2){
+        gr = 0;                                // below the knee
+      }else if(o >= knee / 2){
+        gr = slope * o;                        // above the knee
+      }else{
+        const t = o + knee / 2;                // 0..knee inside the knee region
+        gr = slope * (t * t) / (2 * knee);
+      }
+      if(gr < 0) gr = 0;
+      if(gr !== gr) gr = 0;                     // NaN guard on the static curve itself
+
+      // --- ballistics on the GR envelope: fast attack toward more GR, release toward less ---
+      const atk = atkA.length > 1 ? atkA[i] : atkA[0];
+      const rel = relA.length > 1 ? relA[i] : relA[0];
+      const coef = (gr > env) ? tc(atk) : tc(rel);
+      env = gr + coef * (env - gr);
+      if(env < DENORM) env = 0;                 // flush denormals + clamp >=0
+      if(env !== env) env = 0;                  // NaN guard
+
+      if(env > meterPeak) meterPeak = env;
+
+      // --- apply: linear gain = 10^((-env + makeup)/20), with dry/wet blend ---
+      const mk  = mkA.length  > 1 ? mkA[i]  : mkA[0];
+      let   mix = mixA.length > 1 ? mixA[i] : mixA[0];
+      if(mix < 0) mix = 0; else if(mix > 1) mix = 1;
+      const gainLin = Math.exp((-env + mk) * DB2LIN);
+
+      for(let c = 0; c < nch; c++){
+        const ic = input[c];
+        const oc = output[c];
+        if(!oc) continue;
+        const dry = ic ? ic[i] : 0;
+        let wet = dry * gainLin;
+        if(wet !== wet) wet = 0;                // NaN guard
+        oc[i] = dry + mix * (wet - dry);        // mix=0 -> dry, mix=1 -> fully compressed+makeup
+      }
+    }
+
+    this._envDb = env;
+    this._det = det;
+    this._meterPeakGr = meterPeak;
+
+    // --- GR meter: post a held peak roughly every ~8 quanta (~21ms @48k), then reset hold ---
+    this._postCtr++;
+    if(this._postCtr >= 8){
+      this._postCtr = 0;
+      this.port.postMessage({ gr: meterPeak });   // dB of reduction, >=0
+      this._meterPeakGr = 0;
+    }
+    return true;
+  }
+});
+
+registerProcessor('lofi-crush', class extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'bits',       defaultValue: 10, minValue: 1, maxValue: 16, automationRate: 'k-rate' },
+      { name: 'downsample', defaultValue: 4,  minValue: 1, maxValue: 64, automationRate: 'k-rate' },
+    ];
+  }
+  constructor() {
+    super();
+    this._hold  = [];  // per-channel sample&hold value
+    this._phase = [];  // per-channel decimation phase counter
+  }
+  process(inputs, outputs, parameters) {
+    const input  = inputs[0];
+    const output = outputs[0];
+    // Always keep the node alive even if upstream is momentarily absent.
+    if (!output || output.length === 0) return true;
+
+    const bitsP = parameters.bits;
+    const dsP   = parameters.downsample;
+    const bits = Math.max(1, Math.min(16, Math.round(bitsP.length ? bitsP[0] : 10)));
+    const ds   = Math.max(1, Math.min(64, Math.round(dsP.length ? dsP[0] : 4)));
+
+    const levels    = Math.pow(2, bits) - 1; // quantization steps
+    const invLevels = 1 / levels;
+
+    // Drive the loop over the OUTPUT channel count (node is explicit-stereo).
+    const outCh = output.length;
+    const inCh  = input ? input.length : 0;
+
+    // Grow per-channel state to whatever we actually touch.
+    const need = Math.max(outCh, inCh);
+    while (this._hold.length  < need) this._hold.push(0);
+    while (this._phase.length < need) this._phase.push(0);
+
+    for (let c = 0; c < outCh; c++) {
+      const outB = output[c];
+      // Pull input channel; if mono input feeds stereo output, reuse last input channel.
+      const inB = inCh > 0 ? (input[c] || input[inCh - 1]) : null;
+
+      if (!inB) { outB.fill(0); continue; }
+
+      let hold  = this._hold[c];
+      let phase = this._phase[c];
+      const n = outB.length; // 128
+
+      for (let i = 0; i < n; i++) {
+        if (phase <= 0) {
+          let s = inB[i];
+          if (!Number.isFinite(s)) s = 0;
+          // bit quantize: clamp -> [0,1] -> round to grid -> back to [-1,1]
+          let x = s < -1 ? -1 : (s > 1 ? 1 : s);
+          x = (x + 1) * 0.5;
+          x = Math.round(x * levels) * invLevels;
+          hold = x * 2 - 1;
+          phase = ds;
+        }
+        phase--;
+        let o = hold;
+        if (!Number.isFinite(o)) o = 0;
+        if (o > -1e-30 && o < 1e-30) o = 0; // flush denormals
+        outB[i] = o;
+      }
+      this._hold[c]  = hold;
+      this._phase[c] = phase;
+    }
+    return true;
+  }
+});
+
+registerProcessor('tiff-gate', class extends AudioWorkletProcessor {
+  static get parameterDescriptors(){
+    return [
+      {name:'threshold', defaultValue:-45, minValue:-80, maxValue:0,   automationRate:'k-rate'},
+      {name:'hysteresis',defaultValue:6,   minValue:0,   maxValue:12,  automationRate:'k-rate'},
+      {name:'range',     defaultValue:-80, minValue:-90, maxValue:0,   automationRate:'k-rate'},
+      {name:'ratio',     defaultValue:4,   minValue:1,   maxValue:10,  automationRate:'k-rate'},
+      {name:'attack',    defaultValue:1,   minValue:0.5, maxValue:5,   automationRate:'k-rate'},
+      {name:'hold',      defaultValue:60,  minValue:0,   maxValue:200, automationRate:'k-rate'},
+      {name:'release',   defaultValue:180, minValue:50,  maxValue:500, automationRate:'k-rate'},
+      {name:'knee',      defaultValue:3,   minValue:0,   maxValue:12,  automationRate:'k-rate'}
+    ];
+  }
+  constructor(){
+    super();
+    // per-channel state (grown lazily to channel count) — NO shared scalar state
+    this._env  = [];   // peak-detector envelope (linear), per channel
+    this._gain = [];   // smoothed gain (linear), per channel — sentinel -1 = "init to open"
+    this._hold = [];   // hold-counter in samples, per channel
+    this._hp   = [];   // HPF detector state {x1,y1} per channel
+    this._open = [];   // hysteresis open/closed boolean, per channel
+    // detector peak ballistics: near-instant attack, ~20ms release
+    this._detA = Math.exp(-1 / (sampleRate * 0.0005)); // 0.5ms attack TC
+    this._detR = Math.exp(-1 / (sampleRate * 0.020));  // 20ms  release TC
+    // one-pole HPF coeff for ~120Hz rumble rejection on the detector copy
+    const fc = 120;
+    this._hpC = Math.exp(-2 * Math.PI * fc / sampleRate);
+  }
+  _grow(n){
+    while(this._env.length < n){
+      this._env.push(0);
+      this._gain.push(-1);            // sentinel: first block snaps to its target, no fade-from-0 click
+      this._hold.push(0);
+      this._hp.push({x1:0,y1:0});
+      this._open.push(false);
+    }
+  }
+  process(inputs, outputs, params){
+    const input = inputs[0], output = outputs[0];
+    if(!input || input.length === 0){ return true; }
+    const ch = input.length;
+    this._grow(ch);
+
+    // k-rate params (index 0)
+    const thrDb = params.threshold[0];
+    const hyst  = Math.max(0, params.hysteresis[0]);
+    const rngDb = params.range[0];
+    const ratio = Math.max(1, params.ratio[0]);
+    const atkMs = params.attack[0];
+    const holdMs= params.hold[0];
+    const relMs = params.release[0];
+    const kneeDb= Math.max(0, params.knee[0]);
+
+    const openThr  = thrDb;            // open at/above threshold
+    const closeThr = thrDb - hyst;     // close below (threshold - hysteresis)
+    const floorLin = Math.pow(10, rngDb/20); // min gain (range floor), linear
+    const holdSamp = Math.max(0, (holdMs/1000) * sampleRate)|0;
+
+    // gain ramp ballistics (separate from detector)
+    const gA = Math.exp(-1 / (sampleRate * Math.max(0.00005, atkMs/1000)));
+    const gR = Math.exp(-1 / (sampleRate * Math.max(0.00005, relMs/1000)));
+    const detA = this._detA, detR = this._detR, hpC = this._hpC;
+
+    const halfKnee = kneeDb * 0.5;
+    // EXPANSION slope below threshold: for ratio R, output drops (R-1) dB per dB of undershoot.
+    const expSlope = (ratio - 1);
+
+    for(let c=0; c<ch; c++){
+      const inCh = input[c];
+      const outCh = output[c];
+      if(!outCh) continue;
+      if(!inCh){ outCh.fill(0); continue; }
+      const n = inCh.length;
+
+      let env  = this._env[c];
+      let gain = this._gain[c];
+      let hold = this._hold[c];
+      let open = this._open[c];
+      const hp = this._hp[c];
+
+      for(let i=0; i<n; i++){
+        let s = inCh[i];
+        if(!Number.isFinite(s)) s = 0; // NaN/Inf guard
+
+        // --- detector: HPF'd copy so rumble/plosives don't false-open ---
+        // one-pole high-pass: y = c*(y1 + x - x1)
+        const y = hpC * (hp.y1 + s - hp.x1);
+        hp.x1 = s; hp.y1 = y;
+        const det = Math.abs(y);
+
+        // peak detector envelope: near-instant attack, slow release.
+        // Coefficient is applied to the OLD value; new value blends toward det.
+        if(det > env) env = det + detA * (env - det); // fast (detA small TC ⇒ jumps to det)
+        else          env = det + detR * (env - det); // slow decay
+        if(env < 1e-12) env = 0; // denormal flush
+
+        const envDb = env > 1e-9 ? 20 * Math.log10(env) : -200;
+
+        // --- hysteresis open/close ---
+        if(open){
+          if(envDb < closeThr) open = false;
+        } else {
+          if(envDb > openThr) open = true;
+        }
+
+        // hold bridges intra-word dips: while held, treat as open
+        let effectiveOpen = open;
+        if(open){
+          hold = holdSamp;          // re-arm hold whenever genuinely open
+        } else if(hold > 0){
+          hold--;
+          effectiveOpen = true;     // still held open
+        }
+
+        // --- target gain: downward EXPANDER with soft knee, referenced to closeThr ---
+        let targetGain;
+        if(effectiveOpen){
+          targetGain = 1;
+        } else {
+          // how far below the (close) threshold is the detector?  >0 when under
+          const below = closeThr - envDb;
+          let reductionDb;
+          if(below <= -halfKnee){
+            reductionDb = 0;                          // fully above knee → no reduction
+          } else if(below >= halfKnee || kneeDb === 0){
+            reductionDb = below * expSlope;           // hard region: (R-1) dB per dB
+          } else {
+            // quadratic knee blend, continuous in value AND slope at both edges
+            const x = below + halfKnee;               // 0..knee
+            reductionDb = expSlope * (x * x) / (2 * kneeDb);
+          }
+          if(reductionDb < 0) reductionDb = 0;
+          let gDb = -reductionDb;
+          if(gDb < rngDb) gDb = rngDb;                // clamp to range floor (dB)
+          targetGain = Math.pow(10, gDb / 20);
+          if(targetGain < floorLin) targetGain = floorLin;
+        }
+
+        // --- gain ramp (attack when opening up, release when closing down) ---
+        if(gain < 0){
+          gain = targetGain;                          // first sample: snap, no click
+        } else {
+          const coef = (targetGain > gain) ? gA : gR;
+          gain = targetGain + coef * (gain - targetGain);
+        }
+        if(gain < 1e-12) gain = 0; // denormal flush
+
+        let out = s * gain;
+        if(!Number.isFinite(out)) out = 0;
+        outCh[i] = out;
+      }
+
+      this._env[c]  = env;
+      this._gain[c] = gain;
+      this._hold[c] = hold;
+      this._open[c] = open;
+    }
+    return true;
+  }
+});
+
+registerProcessor('transient-shaper', class extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'attack',  defaultValue: 0, minValue: -1, maxValue: 1, automationRate: 'a-rate' },
+      { name: 'sustain', defaultValue: 0, minValue: -1, maxValue: 1, automationRate: 'a-rate' },
+      { name: 'mix',     defaultValue: 1, minValue: 0,  maxValue: 1, automationRate: 'a-rate' }
+    ];
+  }
+  constructor() {
+    super();
+    // one-pole coefficients from time constants — ALL derived from sampleRate,
+    // so the constructor auto-adapts to the offline render rate (parity-safe).
+    const tc = ms => Math.exp(-1 / (sampleRate * (ms / 1000)));
+    this.aFastAtt = tc(0.5);   // fast follower attack ~0.5ms
+    this.aFastRel = tc(50);    // fast follower release
+    this.aSlowAtt = tc(35);    // slow (body) follower attack ~35ms
+    this.aSlowRel = tc(80);    // slow follower release
+    // gain anti-click smoothing must be sample-rate-derived (was the fixed
+    // 0.999 = ~21ms @48k / ~23ms @44.1k — both rate-dependent AND far too slow,
+    // smearing the very transients this plugin shapes). 1.5ms preserves attacks.
+    this.gSmooth  = tc(1.5);
+    // per-channel state (grown lazily to match channel count)
+    this.fast = [];   // fast envelope per channel
+    this.slow = [];   // slow envelope per channel
+    this.gain = [];   // smoothed linear gain per channel
+  }
+  _ensure(ch) {
+    while (this.fast.length < ch) { this.fast.push(0); this.slow.push(0); this.gain.push(1); }
+  }
+  process(inputs, outputs, params) {
+    const input = inputs[0];
+    const output = outputs[0];
+    if (!input || input.length === 0) {
+      // no input bus yet — keep alive, don't leave output undefined-filled
+      if (output) for (let c = 0; c < output.length; c++) if (output[c]) output[c].fill(0);
+      return true;
+    }
+    const ch = input.length;
+    this._ensure(ch);
+
+    const atkP = params.attack, susP = params.sustain, mixP = params.mix;
+    const atkConst = atkP.length === 1, susConst = susP.length === 1, mixConst = mixP.length === 1;
+
+    const aFastAtt = this.aFastAtt, aFastRel = this.aFastRel;
+    const aSlowAtt = this.aSlowAtt, aSlowRel = this.aSlowRel;
+    const gSmooth = this.gSmooth, gSmoothInv = 1 - gSmooth;
+
+    for (let c = 0; c < ch; c++) {
+      const inCh = input[c];
+      const outCh = output[c];
+      if (!outCh) continue;
+      if (!inCh) { outCh.fill(0); continue; }
+      const n = inCh.length;
+      let fast = this.fast[c], slow = this.slow[c], gain = this.gain[c];
+
+      for (let i = 0; i < n; i++) {
+        const x = inCh[i];
+        const rect = x < 0 ? -x : x;
+
+        // fast envelope follower (transient detector)
+        fast = rect > fast ? aFastAtt * (fast - rect) + rect
+                           : aFastRel * (fast - rect) + rect;
+        // slow envelope follower (body reference)
+        slow = rect > slow ? aSlowAtt * (slow - rect) + rect
+                           : aSlowRel * (slow - rect) + rect;
+
+        // diff = (fast - slow)/slow : >0 attack phase, <0 sustain phase
+        const denom = slow > 1e-7 ? slow : 1e-7;
+        let diff = (fast - slow) / denom;
+        if (diff !== diff) diff = 0; // NaN guard
+
+        const attackDrive  = atkConst ? atkP[0] : atkP[i];
+        const sustainDrive = susConst ? susP[0] : susP[i];
+        const attackPhase  = diff > 0 ? diff : 0;
+        const sustainPhase = diff < 0 ? -diff : 0;
+
+        // level-independent gain in dB; only one phase is nonzero per sample
+        const gainDb = (attackDrive * attackPhase + sustainDrive * sustainPhase) * 24;
+        let targetGain = Math.pow(10, gainDb / 20);
+        if (targetGain !== targetGain) targetGain = 1; // NaN guard
+
+        // short sample-rate-derived one-pole on gain to kill zipper noise
+        gain = gSmooth * gain + gSmoothInv * targetGain;
+
+        const mix = mixConst ? mixP[0] : mixP[i];
+        const y = x * gain;
+        let out = x + (y - x) * mix;
+        if (out !== out) out = 0; // NaN guard
+        outCh[i] = out;
+      }
+      // flush denormals back into state (include gain)
+      this.fast[c] = Math.abs(fast) < 1e-20 ? 0 : fast;
+      this.slow[c] = Math.abs(slow) < 1e-20 ? 0 : slow;
+      this.gain[c] = (gain > -1e-20 && gain < 1e-20) ? 0 : gain;
+    }
+    // zero any extra output channels (output wider than input)
+    for (let c = ch; c < output.length; c++) if (output[c]) output[c].fill(0);
+    return true;
+  }
+});
+`;
+function ensureWorklets(c) {
+  if (!c._wlPromise) {
+    c._wlPromise = c.audioWorklet
+      .addModule(URL.createObjectURL(new Blob([WORKLET_SRC], { type: "application/javascript" })))
+      .catch((e) => { console.warn("worklet module load failed:", e); });
+  }
+  return c._wlPromise;
+}
+
+function ensureCtx() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  ensureWorklets(ctx);   // start loading the worklet module as soon as the ctx exists
+  buildBus(ctx);
+  requestAnimationFrame(tickUi);
+  return ctx;
+}
+// Browsers gate audio behind a user gesture — ANY first touch unlocks it.
+["pointerdown", "keydown"].forEach(evt =>
+  document.addEventListener(evt, () => { if (ctx?.state === "suspended") ctx.resume(); }, true));
+function buildBus(c) {
+  master = { gain: c.createGain(), limiter: c.createDynamicsCompressor(),
+             splitter: c.createChannelSplitter(2), aL: c.createAnalyser(), aR: c.createAnalyser() };
+  master.gain.gain.value = parseFloat($("mGain").value);
+  const lim = master.limiter;
+  lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
+  lim.attack.value = 0.002; lim.release.value = 0.12;
+  master.gain.connect(lim); lim.connect(c.destination);
+  lim.connect(master.splitter);
+  master.aL.fftSize = 512; master.aR.fftSize = 512;
+  master.splitter.connect(master.aL, 0); master.splitter.connect(master.aR, 1);
+
+  verb = { convolver: c.createConvolver(), predelay: c.createDelay(0.2), ret: c.createGain() };
+  verb.convolver.buffer = makeIR(c, parseFloat($("vSize").value), parseFloat($("vTone").value));
+  verb.predelay.delayTime.value = parseFloat($("vPre").value);
+  verb.ret.gain.value = parseFloat($("vRet").value);
+  verb.predelay.connect(verb.convolver); verb.convolver.connect(verb.ret); verb.ret.connect(master.gain);
+}
+
+/* ── tracks ── */
+async function addFiles(files) {
+  const c = ensureCtx();
+  for (const f of files) {
+    if (!f.type.startsWith("audio") && !/\.(mp3|wav|m4a|ogg|flac)$/i.test(f.name)) continue;
+    let buf;
+    try { buf = await c.decodeAudioData(await f.arrayBuffer()); }
+    catch { alert(`Couldn't read ${f.name}`); continue; }
+    const t = {
+      id: Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ""),
+      buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
+      send: 0, inserts: [], muted: false, solo: false, src: null, live: null,
+    };
+    tracks.push(t);
+    laneUi(t);
+  }
+  $("drop").style.display = tracks.length ? "none" : "block";
+  if (playing) restartPlayback();
+}
+
+function laneUi(t) {
+  const d = document.createElement("div");
+  d.className = "lane"; d.id = "lane-" + t.id;
+  d.innerHTML = `
+    <div class="lhead">
+      <span class="name">${t.name}</span>
+      <button class="chip ai" title="Auto-mix: analyze this track and propose bounded EQ/comp/de-ess moves">✨ Auto</button>
+      <button class="chip m">M</button><button class="chip s">S</button>
+      <button class="chip x">✕</button>
+    </div>
+    <canvas class="wave" width="1200" height="54"></canvas>
+    <div class="strip">
+      <div class="knob pink"><label>VOL</label><input type="range" data-k="gain" min="0" max="1.4" step="0.01" value="${t.gain}" /></div>
+      <div class="knob"><label>PAN</label><input type="range" data-k="pan" min="-1" max="1" step="0.01" value="0" /></div>
+      <div class="knob"><label>LOW</label><input type="range" data-k="lo" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>MID</label><input type="range" data-k="mid" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>HIGH</label><input type="range" data-k="hi" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>COMP</label><input type="range" data-k="comp" min="0" max="1" step="0.01" value="0" /></div>
+      <div class="knob pink"><label>VERB</label><input type="range" data-k="send" min="0" max="1" step="0.01" value="0" /></div>
+    </div>
+    <div class="ins-rack" id="rack-${t.id}">
+      <div class="ins-bar"><span class="ins-title">Inserts</span><select class="ins-add"><option value="">+ add effect…</option></select></div>
+      <div class="ins-list" id="inslist-${t.id}"></div>
+    </div>`;
+  $("tracks").appendChild(d);
+  drawWave(d.querySelector(".wave"), t.buffer);
+  fillAddSelect(t);
+  renderInserts(t, d);
+  d.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value = ""; };
+
+  d.querySelector(".chip.ai").onclick = (e) => { runAutoMix(t, e.currentTarget); };
+  d.querySelector(".chip.m").onclick = (e) => { t.muted = !t.muted; e.target.classList.toggle("on", t.muted);
+    d.classList.toggle("muted", t.muted); applyMix(); };
+  d.querySelector(".chip.s").onclick = (e) => { t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
+  d.querySelector(".chip.x").onclick = () => { stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
+    $("drop").style.display = tracks.length ? "none" : "block"; };
+  d.querySelector(".wave").onclick = (e) => {
+    const frac = e.offsetX / e.target.clientWidth;
+    seek(frac * maxDur());
+  };
+  d.querySelectorAll(".strip input[type=range]").forEach(inp => {
+    inp.oninput = () => {
+      const k = inp.dataset.k, v = parseFloat(inp.value);
+      if (k === "gain") t.gain = v; if (k === "pan") t.pan = v;
+      if (k === "lo") t.eq.lo = v; if (k === "mid") t.eq.mid = v; if (k === "hi") t.eq.hi = v;
+      if (k === "comp") t.comp = v; if (k === "send") t.send = v;
+      applyTrack(t);
+    };
+  });
+}
+/* ── INSERT RACK — a track holds a CHAIN of effects (t.inserts), each an
+   {name, params} pair. The UI builds itself from each plugin's params[]:
+   a card per insert with its live knobs + move-up/down + remove. AI can fill
+   the values later, but a human can grab any knob and move it. ── */
+const _fmt = (v) => Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 100) / 100;
+const _step = (p) => p.id === "mode" ? 1 : ((p.max - p.min) > 100 ? 1 : ((p.max - p.min) >= 4 ? 0.1 : 0.01));
+
+function fillAddSelect(t) {
+  const sel = document.querySelector(`#rack-${t.id} .ins-add`);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">+ add effect…</option>` +
+    TIFF_PLUGINS.list.map(p => `<option value="${p.name}">${p.name}</option>`).join("");
+}
+
+function addInsert(t, name) {
+  if (!name) return;
+  t.inserts = t.inserts || [];
+  t.inserts.push({ name, params: {} });
+  renderInserts(t, $("lane-" + t.id));
+  if (playing) restartPlayback();
+}
+
+function renderInserts(t, laneEl) {
+  const host = laneEl.querySelector(`#inslist-${t.id}`);
+  if (!host) return;
+  host.innerHTML = "";
+  (t.inserts || []).forEach((ins, i) => {
+    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    if (!def) {
+      // a saved insert whose plugin isn't loaded this session — don't vanish it
+      // silently (that loses the effect with no trace). Show a placeholder so B
+      // knows it's there and can load the plugin's .js or remove it.
+      const miss = document.createElement("div");
+      miss.className = "ins";
+      miss.style.borderColor = "rgba(245,166,35,.6)";
+      miss.innerHTML = `<div class="ins-h"><span class="ins-name">⚠ ${ins.name}</span>
+        <button class="ins-btn rm" title="remove">✕</button></div>
+        <div class="ins-params" style="font:500 10px Inter;color:var(--dim);padding:4px 2px;">plugin not loaded — load its .js to restore, or remove</div>`;
+      miss.querySelector(".rm").onclick = () => { t.inserts.splice(i, 1); renderInserts(t, laneEl); if (playing) restartPlayback(); };
+      host.appendChild(miss);
+      return;
+    }
+    const card = document.createElement("div");
+    card.className = "ins";
+    card.innerHTML = `<div class="ins-h"><span class="ins-name">${ins.name}</span>
+      <button class="ins-btn up" title="move earlier in chain">↑</button>
+      <button class="ins-btn dn" title="move later in chain">↓</button>
+      <button class="ins-btn rm" title="remove">✕</button></div>
+      <div class="ins-params"></div>`;
+    const pbox = card.querySelector(".ins-params");
+    def.params.forEach(p => {
+      const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
+      const w = document.createElement("div");
+      w.className = "pp";
+      w.innerHTML = `<label>${p.label}</label><input type="range" min="${p.min}" max="${p.max}" step="${_step(p)}" value="${cur}" /><output>${_fmt(cur)}</output>`;
+      const inp = w.querySelector("input"), out = w.querySelector("output");
+      inp.oninput = () => { const v = parseFloat(inp.value); ins.params[p.id] = v; out.textContent = _fmt(v); t.live?.insertNodes?.[i]?.set(p.id, v); };
+      pbox.appendChild(w);
+    });
+    const swap = (a, b) => { [t.inserts[a], t.inserts[b]] = [t.inserts[b], t.inserts[a]]; renderInserts(t, laneEl); if (playing) restartPlayback(); };
+    card.querySelector(".rm").onclick = () => { t.inserts.splice(i, 1); renderInserts(t, laneEl); if (playing) restartPlayback(); };
+    card.querySelector(".up").onclick = () => { if (i > 0) swap(i, i - 1); };
+    card.querySelector(".dn").onclick = () => { if (i < t.inserts.length - 1) swap(i, i + 1); };
+    host.appendChild(card);
+  });
+}
+/* =========================================================================
+   TRUTHFUL AUTO-MIX LAYER  (vanilla JS, Web Audio)
+   measure() -> detectType() -> autoMix(track) -> applyMoves(track)
+   Honesty contract: we report ONLY what FFT/time-domain math can support.
+   We NEVER assert vocal gender, exact BPM, or instrument identity from a
+   spectrum — those are flagged as guesses, never as facts.
+
+   v2 (adversarial-review fixes):
+   - Spectrum is a DETERMINISTIC Hann-windowed radix-2 FFT over the mono buffer.
+     No OfflineAudioContext suspend() race, IDENTICAL offline and online.
+   - detectType() defaults to 'mix' (not 'vocal') when no signal dominates.
+   - All dB conversions floored -> no -Infinity / NaN can leak to UI.
+   - Makeup gain is a real GR-based estimate, not an incoherent formula.
+   - Centroid computed from averaged MAGNITUDE, not sqrt(avg power).
+   ========================================================================= */
+
+/* ---- tunables (all bounds live here so nothing can "wreck a mix") ------- */
+const AM = {
+  FFT: 8192,                 // power of two. freq res ~ sr/FFT (~5.4 Hz @ 44.1k)
+  HOP_FRAMES: 4096,          // hop between analysis windows (50% overlap-ish)
+  DB_FLOOR: -180,            // any log10(0) clamps here, never -Infinity
+  // band edges (Hz)
+  BANDS: {
+    sub:      [20,   60],
+    low:      [60,   250],
+    mud:      [250,  500],
+    body:     [500,  2000],
+    presence: [2000, 6000],
+    air:      [6000, 20000],
+  },
+  SIB_BAND: [5000, 9000],    // sibilance / de-ess search range
+  // clamps for every move (dB / ratio etc.)
+  MAX_EQ_CUT_DB:   -4.0,
+  MAX_EQ_BOOST_DB:  3.0,
+  MAX_HPF_HZ:      120,
+  COMP_MIN_RATIO:  1.5,
+  COMP_MAX_RATIO:  4.0,
+  COMP_MIN_THRESH_DB: -28,
+  COMP_MAX_THRESH_DB: -10,
+  DEESS_MAX_RATIO: 4.0,
+};
+
+/* ---- tiny safe-math helpers --------------------------------------------- */
+const _clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function _safeDb(linear) {
+  // 20*log10(amp) with a hard floor so silence -> AM.DB_FLOOR, never -Inf/NaN
+  if (!(linear > 0) || !isFinite(linear)) return AM.DB_FLOOR;
+  return Math.max(AM.DB_FLOOR, 20 * Math.log10(linear));
+}
+function _safePowDb(power) {
+  if (!(power > 0) || !isFinite(power)) return AM.DB_FLOOR;
+  return Math.max(AM.DB_FLOOR, 10 * Math.log10(power));
+}
+
+/* =========================================================================
+   1. measure(source)  ->  REAL features
+   source may be an AudioBuffer OR { buffer: AudioBuffer }.
+   Returns { ok, features, notes:[] } — notes flag anything not measurable.
+   ========================================================================= */
+async function measure(source) {
+  const notes = [];
+  let buffer = source;
+  if (source && source.buffer instanceof AudioBuffer) buffer = source.buffer;
+  if (!(buffer instanceof AudioBuffer)) {
+    return { ok: false, features: null, notes: ['No AudioBuffer to analyse — cannot measure.'] };
+  }
+
+  const sr = buffer.sampleRate;
+  const N  = buffer.length;
+  if (N === 0) {
+    return { ok: false, features: null, notes: ['Empty buffer (0 samples) — cannot measure.'] };
+  }
+  if (N < AM.FFT) notes.push('Clip shorter than one FFT window — spectral numbers are low-confidence.');
+
+  /* ---- mono-sum the channels (energy is what we want, not stereo image) - */
+  const ch = buffer.numberOfChannels;
+  const mono = new Float32Array(N);
+  for (let c = 0; c < ch; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < N; i++) mono[i] += d[i] / ch;
+  }
+
+  /* ---- TIME DOMAIN: RMS, sample-peak, ~true-peak, crest ----------------- */
+  let sumSq = 0, peak = 0;
+  for (let i = 0; i < N; i++) {
+    const x = mono[i];
+    sumSq += x * x;
+    const a = Math.abs(x);
+    if (a > peak) peak = a;
+  }
+  const rms = Math.sqrt(sumSq / N);                  // may be 0 for silence
+  // ~true peak: 4x linear-interp inter-sample maxima (cheap, flagged below)
+  let truePeak = peak;
+  for (let i = 0; i < N - 1; i++) {
+    const a = mono[i], b = mono[i + 1];
+    for (let k = 1; k < 4; k++) {
+      const v = Math.abs(a + (b - a) * (k / 4));
+      if (v > truePeak) truePeak = v;
+    }
+  }
+  const rmsDb      = _safeDb(rms);
+  const peakDb     = _safeDb(peak);
+  const truePeakDb = _safeDb(truePeak);
+  // crest in dB = peakDb - rmsDb (subtraction avoids divide-by-zero blowup)
+  const crestDb    = (rms > 0 && peak > 0) ? (peakDb - rmsDb) : 0;
+  const crest      = Math.pow(10, crestDb / 20);
+  notes.push('truePeak is a 4x-interp approximation, not a certified ITU-R true-peak.');
+
+  /* ---- FREQUENCY DOMAIN: deterministic Hann-windowed FFT average -------
+     We slide an FFT.size Hann window across the mono buffer, take |X|^2 per
+     bin, and average across windows. Pure math -> identical online/offline,
+     no AudioContext, no suspend() race. ---------------------------------- */
+  const half  = AM.FFT >> 1;
+  const accPow = new Float64Array(half);   // averaged power per bin
+  const accMag = new Float64Array(half);   // averaged magnitude per bin
+  const re = new Float64Array(AM.FFT);
+  const im = new Float64Array(AM.FFT);
+  const win = _hann(AM.FFT);
+  // Hann coherent-gain normalization so band energy is window-independent.
+  let winSum = 0;
+  for (let i = 0; i < AM.FFT; i++) winSum += win[i];
+  const winNorm = winSum > 0 ? (2 / winSum) : 1;     // *2 for one-sided spectrum
+
+  let windows = 0;
+  const maxStart = Math.max(0, N - AM.FFT);
+  const step = Math.max(1, AM.HOP_FRAMES);
+  // If clip < FFT, do a single zero-padded window so we still get a spectrum.
+  for (let start = 0; start <= maxStart; start += step) {
+    for (let i = 0; i < AM.FFT; i++) {
+      const s = (start + i < N) ? mono[start + i] : 0;
+      re[i] = s * win[i];
+      im[i] = 0;
+    }
+    _fftRadix2(re, im);
+    for (let k = 0; k < half; k++) {
+      const mag = Math.hypot(re[k], im[k]) * winNorm;
+      accMag[k] += mag;
+      accPow[k] += mag * mag;
+    }
+    windows++;
+    if (maxStart === 0) break;                        // clip shorter than FFT
+    if (windows >= 64) break;                         // cap work on long clips
+  }
+  if (windows === 0) {                                // N < FFT path
+    for (let i = 0; i < AM.FFT; i++) { re[i] = (i < N ? mono[i] : 0) * win[i]; im[i] = 0; }
+    _fftRadix2(re, im);
+    for (let k = 0; k < half; k++) {
+      const mag = Math.hypot(re[k], im[k]) * winNorm;
+      accMag[k] = mag; accPow[k] = mag * mag;
+    }
+    windows = 1;
+  }
+
+  const binHz = sr / AM.FFT;
+  const binPow = new Float32Array(half);   // averaged power
+  const binMag = new Float32Array(half);   // averaged magnitude
+  for (let k = 0; k < half; k++) {
+    binPow[k] = accPow[k] / windows;
+    binMag[k] = accMag[k] / windows;
+  }
+
+  /* ---- per-band energy as SHARE of total (level-independent) ----------- */
+  const bandPow = {};
+  let totalPow = 0;
+  for (const [name, [lo, hi]] of Object.entries(AM.BANDS)) {
+    bandPow[name] = _sumBand(binPow, binHz, lo, hi);
+    totalPow += bandPow[name];
+  }
+  totalPow = totalPow || 1e-12;
+  const bandPct = {}, bandDb = {};
+  for (const name of Object.keys(AM.BANDS)) {
+    bandPct[name] = bandPow[name] / totalPow;          // 0..1 share
+    bandDb[name]  = _safePowDb(bandPow[name] / totalPow);
+  }
+
+  /* ---- spectral centroid (Hz) from averaged MAGNITUDE ------------------ */
+  let cNum = 0, cDen = 0;
+  for (let i = 1; i < half; i++) {
+    const mag = binMag[i];
+    cNum += (i * binHz) * mag;
+    cDen += mag;
+  }
+  const centroid = cDen > 0 ? cNum / cDen : 0;
+
+  /* ---- spectral tilt (dB/octave) via least-squares on log2(f) vs dB ---- */
+  const tilt = _spectralTiltDbPerOct(binPow, binHz);
+
+  /* ---- sibilance share + peak bin freq in 5-9k ------------------------- */
+  const sibPow   = _sumBand(binPow, binHz, AM.SIB_BAND[0], AM.SIB_BAND[1]);
+  const sibRef   = bandPow.presence + bandPow.air + 1e-12;
+  const sibRatio = sibPow / sibRef;
+  const sibPeakHz = _peakBinFreq(binPow, binHz, AM.SIB_BAND[0], AM.SIB_BAND[1]);
+
+  const lowConcentration = bandPct.sub + bandPct.low;
+
+  const features = {
+    sr, durationSec: N / sr,
+    rms, rmsDb, peak, peakDb, truePeak, truePeakDb,
+    crest, crestDb,
+    bandPow, bandPct, bandDb,
+    centroid, tilt,
+    sibRatio, sibPeakHz,
+    lowConcentration,
+    analysisWindows: windows,
+  };
+  return { ok: true, features, notes };
+}
+
+/* ---- Hann window ------------------------------------------------------- */
+function _hann(n) {
+  const w = new Float64Array(n);
+  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+  return w;
+}
+
+/* ---- in-place iterative radix-2 FFT (n must be a power of two) --------- */
+function _fftRadix2(re, im) {
+  const n = re.length;
+  // bit-reversal permutation
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      const tr = re[i]; re[i] = re[j]; re[j] = tr;
+      const ti = im[i]; im[i] = im[j]; im[j] = ti;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let curR = 1, curI = 0;
+      for (let k = 0; k < (len >> 1); k++) {
+        const aR = re[i + k],            aI = im[i + k];
+        const bR = re[i + k + (len >> 1)], bI = im[i + k + (len >> 1)];
+        const tR = bR * curR - bI * curI;
+        const tI = bR * curI + bI * curR;
+        re[i + k] = aR + tR;             im[i + k] = aI + tI;
+        re[i + k + (len >> 1)] = aR - tR; im[i + k + (len >> 1)] = aI - tI;
+        const nR = curR * wr - curI * wi;
+        curI = curR * wi + curI * wr;
+        curR = nR;
+      }
+    }
+  }
+}
+
+function _sumBand(binPow, binHz, lo, hi) {
+  const i0 = Math.max(1, Math.floor(lo / binHz));
+  const i1 = Math.min(binPow.length - 1, Math.ceil(hi / binHz));
+  let s = 0;
+  for (let i = i0; i <= i1; i++) s += binPow[i];
+  return s;
+}
+
+function _peakBinFreq(binPow, binHz, lo, hi) {
+  const i0 = Math.max(1, Math.floor(lo / binHz));
+  const i1 = Math.min(binPow.length - 1, Math.ceil(hi / binHz));
+  let bi = i0, bv = -1;
+  for (let i = i0; i <= i1; i++) if (binPow[i] > bv) { bv = binPow[i]; bi = i; }
+  return bi * binHz;
+}
+
+function _spectralTiltDbPerOct(binPow, binHz) {
+  // least-squares slope of dB(power) vs log2(freq), 50Hz..16kHz
+  let n = 0, sx = 0, sy = 0, sxy = 0, sxx = 0;
+  for (let i = 1; i < binPow.length; i++) {
+    const f = i * binHz;
+    if (f < 50 || f > 16000) continue;
+    const db = _safePowDb(binPow[i]);
+    if (db <= AM.DB_FLOOR + 1) continue;              // skip empty bins
+    const x = Math.log2(f);
+    n++; sx += x; sy += db; sxy += x * db; sxx += x * x;
+  }
+  if (n < 8) return 0;
+  const denom = (n * sxx - sx * sx) || 1e-9;
+  const slope = (n * sxy - sx * sy) / denom;
+  return isFinite(slope) ? slope : 0;
+}
+
+/* =========================================================================
+   2. detectType(features) -> 'vocal' | 'beat' | 'mix' (+ confidence/why)
+   Pure measurement rules. No instrument naming, no BPM, no gender.
+   ========================================================================= */
+function detectType(features) {
+  const f = features;
+  const why = [];
+  let scoreVocal = 0, scoreBeat = 0, scoreMix = 0;
+
+  // BEAT: bottom-heavy energy AND sharp transients
+  if (f.lowConcentration > 0.45) { scoreBeat += 2; why.push(`sub+low hold ${(f.lowConcentration*100|0)}% of energy (bottom-heavy)`); }
+  if (f.crestDb > 12)            { scoreBeat += 1; why.push(`crest ${f.crestDb.toFixed(1)}dB (sharp transients)`); }
+  if (f.tilt < -3)               { scoreBeat += 1; why.push(`steep dark tilt ${f.tilt.toFixed(1)}dB/oct`); }
+
+  // VOCAL: mid-forward energy + real sibilance
+  const midShare = f.bandPct.body + f.bandPct.presence;
+  if (midShare > 0.45)           { scoreVocal += 2; why.push(`body+presence hold ${(midShare*100|0)}% of energy (mid-forward)`); }
+  if (f.sibRatio > 0.18)         { scoreVocal += 2; why.push(`sibilance band is ${(f.sibRatio*100|0)}% of presence+air`); }
+  if (f.centroid > 800 && f.centroid < 3500) { scoreVocal += 1; why.push(`centroid ${f.centroid|0}Hz (speech-ish brightness)`); }
+  if (f.lowConcentration < 0.25) { scoreVocal += 1; why.push(`little sub energy (${(f.lowConcentration*100|0)}%)`); }
+
+  // MIX: energy spread evenly across many bands (full-range)
+  const shares = Object.values(f.bandPct);
+  const spread = 1 - _gini(shares);
+  if (spread > 0.62)             { scoreMix += 2; why.push(`energy spread evenly across all bands (full-range)`); }
+  if (f.lowConcentration > 0.25 && f.lowConcentration < 0.5 && midShare > 0.3) {
+    scoreMix += 1; why.push(`both real low-end AND mids present`);
+  }
+
+  const scores = { vocal: scoreVocal, beat: scoreBeat, mix: scoreMix };
+  const sortedKeys = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+  const top = scores[sortedKeys[0]];
+  const runnerUp = scores[sortedKeys[1]];
+
+  // FIX (B2): no dominant signal -> default to 'mix', not whatever key sorts first.
+  let type, confidence;
+  if (top === 0) {
+    type = 'mix';
+    confidence = 0;
+    why.push('no spectral feature dominated — defaulting to full-mix (low confidence)');
+  } else {
+    type = sortedKeys[0];
+    confidence = +((top - runnerUp) / top).toFixed(2);
+  }
+
+  return {
+    type,
+    confidence,
+    scores,
+    why,
+    disclaimer: 'Type is inferred from spectral shape only. It is NOT an instrument ID, BPM, or vocal-gender claim — those are not measurable from a spectrum.',
+  };
+}
+
+function _gini(arr) {
+  const a = arr.slice().sort((x, y) => x - y);
+  const n = a.length; if (!n) return 0;
+  let cum = 0, weighted = 0;
+  for (let i = 0; i < n; i++) { cum += a[i]; weighted += (i + 1) * a[i]; }
+  if (cum === 0) return 0;
+  return (2 * weighted) / (n * cum) - (n + 1) / n;
+}
+
+/* =========================================================================
+   3. autoMix(track) -> { moves:[{insert,param,value,reason}], summary, ... }
+   Every value is CLAMPED. Reasons cite the measured number.
+   ========================================================================= */
+async function autoMix(track) {
+  const m = await measure(track && track.buffer ? track.buffer : track);
+  if (!m.ok) {
+    return { moves: [], summary: `Could not measure this track (${m.notes.join(' ')}). No moves made.`, notes: m.notes };
+  }
+  const f = m.features;
+  const det = detectType(f);
+  const moves = [];
+
+  const TARGET = {
+    vocal: { tilt: -1.0, tameMud: true,  deEss: true,  hpf: 90 },
+    beat:  { tilt: -4.0, tameMud: false, deEss: false, hpf: 30 },
+    mix:   { tilt: -3.0, tameMud: true,  deEss: false, hpf: 24 },
+  }[det.type];
+
+  /* ---- (a) HPF: rumble cleanup on non-beat tracks with negligible sub --- */
+  if (det.type !== 'beat' && f.bandPct.sub < 0.06) {
+    const hpf = _clamp(TARGET.hpf, 20, AM.MAX_HPF_HZ);
+    moves.push({
+      insert: 'EQ-6', param: 'hpf', value: hpf,
+      reason: `Sub (20-60Hz) is only ${(f.bandPct.sub*100).toFixed(1)}% of energy — likely rumble, not musical low-end. HPF at ${hpf}Hz to clean it.`,
+    });
+  }
+
+  /* ---- (b) MUD 250-500Hz control -------------------------------------- */
+  if (TARGET.tameMud) {
+    const mudVsBody = f.bandPct.mud / (f.bandPct.body + 1e-9);
+    if (mudVsBody > 0.6) {
+      const over = mudVsBody - 0.6;
+      const cut = _clamp(-(over * 8), AM.MAX_EQ_CUT_DB, 0);
+      if (cut <= -0.7) {
+        moves.push({ insert: 'EQ-6', param: 'mF', value: 350,
+          reason: `Mud band (250-500Hz) is ${(mudVsBody*100|0)}% of body energy — boxy. Center mid bell at 350Hz.` });
+        moves.push({ insert: 'EQ-6', param: 'mG', value: +cut.toFixed(2),
+          reason: `Cut mud ${cut.toFixed(1)}dB (clamped to ${AM.MAX_EQ_CUT_DB}dB max) to open up the low-mids.` });
+        moves.push({ insert: 'EQ-6', param: 'mQ', value: 1.2,
+          reason: `Moderate Q (1.2) so the mud cut stays musical, not surgical.` });
+      }
+    }
+  }
+
+  /* ---- (c) TILT correction via shelves -------------------------------- */
+  const tiltErr = f.tilt - TARGET.tilt;               // + = brighter than target
+  if (Math.abs(tiltErr) > 1.0) {
+    if (tiltErr > 0) {
+      const airCut = _clamp(-(tiltErr * 0.8), AM.MAX_EQ_CUT_DB, 0);
+      if (airCut <= -0.7) moves.push({ insert: 'EQ-6', param: 'air', value: +airCut.toFixed(2),
+        reason: `Spectral tilt ${f.tilt.toFixed(1)}dB/oct is brighter than the ${TARGET.tilt}dB/oct target for a ${det.type}. Dip air shelf ${airCut.toFixed(1)}dB.` });
+    } else {
+      const loCut = _clamp(-(Math.abs(tiltErr) * 0.8), AM.MAX_EQ_CUT_DB, 0);
+      if (loCut <= -0.7) moves.push({ insert: 'EQ-6', param: 'loG', value: +loCut.toFixed(2),
+        reason: `Spectral tilt ${f.tilt.toFixed(1)}dB/oct is darker than the ${TARGET.tilt}dB/oct target. Trim low shelf ${loCut.toFixed(1)}dB rather than boosting air (boosting air raises hiss).` });
+    }
+  }
+
+  /* ---- (d) DE-ESS: vocal-only, measured peak freq --------------------- */
+  if (TARGET.deEss && f.sibRatio > 0.18) {
+    const over  = f.sibRatio - 0.18;
+    const ratio = _clamp(2 + over * 12, 2, AM.DEESS_MAX_RATIO);
+    const fHz   = Math.round(_clamp(f.sibPeakHz, 5000, 9000));
+    moves.push({ insert: 'De-Ess', param: 'x', value: fHz,
+      reason: `Sibilance is ${(f.sibRatio*100|0)}% of presence+air energy. Peak energy in the 5-9k band sits at ${fHz}Hz — set de-esser there.` });
+    moves.push({ insert: 'De-Ess', param: 'thr', value: +_clamp(f.rmsDb + 6, -30, -6).toFixed(1),
+      reason: `Threshold set ~6dB over track RMS (${f.rmsDb.toFixed(1)}dB) so it only grabs the loud "ess", not the whole vocal.` });
+    moves.push({ insert: 'De-Ess', param: 'ratio', value: +ratio.toFixed(1),
+      reason: `Ratio ${ratio.toFixed(1)}:1 (clamped to ${AM.DEESS_MAX_RATIO}:1) — heavier sibilance gets a touch more, but never crushed.` });
+    moves.push({ insert: 'De-Ess', param: 'rel', value: 80,
+      reason: `Fast-ish 80ms release so it lets go between syllables.` });
+  }
+
+  /* ---- (e) COMPRESSION driven by crest factor ------------------------- */
+  if (f.crestDb > 10) {
+    const over   = f.crestDb - 10;
+    const ratio  = _clamp(1.5 + over * 0.25, AM.COMP_MIN_RATIO, AM.COMP_MAX_RATIO);
+    const thresh = _clamp(f.rmsDb + 3, AM.COMP_MIN_THRESH_DB, AM.COMP_MAX_THRESH_DB);
+    const attack  = det.type === 'beat' ? 5  : 15;
+    const release = det.type === 'beat' ? 120 : 200;
+    // FIX (B4): real makeup estimate. Gain reduction at RMS level:
+    //   GR ≈ max(0, rmsDb - thresh) * (1 - 1/ratio).  Restore ~half of it.
+    const grAtRms = Math.max(0, f.rmsDb - thresh) * (1 - 1 / ratio);
+    const makeup  = +_clamp(grAtRms * 0.5, 0, 4).toFixed(1);
+    moves.push({ insert: 'Compressor', param: 'threshold', value: +thresh.toFixed(1),
+      reason: `Crest factor ${f.crestDb.toFixed(1)}dB (peak ${f.peakDb.toFixed(1)} over RMS ${f.rmsDb.toFixed(1)}) = wide dynamics. Threshold just above RMS to catch peaks only.` });
+    moves.push({ insert: 'Compressor', param: 'ratio', value: +ratio.toFixed(1),
+      reason: `Ratio ${ratio.toFixed(1)}:1 (clamped ${AM.COMP_MIN_RATIO}-${AM.COMP_MAX_RATIO}) — scaled to how far crest exceeds 10dB. Conservative glue, not squashing.` });
+    moves.push({ insert: 'Compressor', param: 'knee', value: 6,
+      reason: `Soft 6dB knee so compression eases in instead of clamping hard.` });
+    moves.push({ insert: 'Compressor', param: 'attack', value: attack,
+      reason: `${attack}ms attack — ${det.type === 'beat' ? 'fast to catch drum transients' : 'slow enough to preserve attack/punch'}.` });
+    moves.push({ insert: 'Compressor', param: 'release', value: release,
+      reason: `${release}ms release tuned for a ${det.type}.` });
+    moves.push({ insert: 'Compressor', param: 'makeup', value: makeup,
+      reason: `~${makeup}dB makeup ≈ half the estimated ${grAtRms.toFixed(1)}dB gain reduction at RMS (review by ear).` });
+    moves.push({ insert: 'Compressor', param: 'mix', value: 0.8,
+      reason: `80% wet / 20% dry parallel blend keeps natural dynamics underneath the glue.` });
+  }
+
+  /* ---- (f) clip / true-peak safety notes (no auto-limiter) ------------ */
+  const safety = [];
+  if (f.truePeakDb > -0.3) safety.push(`Approx true-peak ${f.truePeakDb.toFixed(2)}dBFS is near/over 0 — risk of inter-sample clipping. Pull the track fader down or add a limiter on the master.`);
+  if (f.peakDb >= -0.01)   safety.push(`Sample peak is at full scale (${f.peakDb.toFixed(2)}dBFS) — already clipped or normalized to ceiling.`);
+
+  const summary =
+    `Detected: ${det.type.toUpperCase()} (confidence ${det.confidence}). ` +
+    `Why: ${det.why.join('; ')}. ` +
+    `Measured — RMS ${f.rmsDb.toFixed(1)}dB, sample-peak ${f.peakDb.toFixed(1)}dB, ` +
+    `~true-peak ${f.truePeakDb.toFixed(1)}dB, crest ${f.crestDb.toFixed(1)}dB, ` +
+    `centroid ${f.centroid|0}Hz, tilt ${f.tilt.toFixed(1)}dB/oct, ` +
+    `sibilance ${(f.sibRatio*100|0)}% of presence+air. ` +
+    `Band energy share — ` +
+    Object.entries(f.bandPct).map(([k,v]) => `${k} ${(v*100).toFixed(0)}%`).join(', ') + '. ' +
+    `${moves.length} bounded move(s) proposed. ` +
+    (safety.length ? `SAFETY: ${safety.join(' ')} ` : '') +
+    `HONESTY: ${det.disclaimer} truePeak is a 4x-interp estimate. ` +
+    `Every move is clamped (EQ cuts ≤${AM.MAX_EQ_CUT_DB}dB, comp ratio ≤${AM.COMP_MAX_RATIO}:1) and is a starting point — review and override.`;
+
+  return { moves, summary, type: det.type, confidence: det.confidence, features: f, notes: m.notes, safety };
+}
+
+/* =========================================================================
+   4. runAutoMix(t, btn) — the ✨ Auto button handler.
+   Analyzes t.buffer, applies bounded moves into t.inserts (clamped to each
+   plugin param's declared min/max), rebuilds the rack, and shows the
+   plain-English "what I measured + why" summary under the lane.
+   ========================================================================= */
+async function runAutoMix(t, btn) {
+  const lane = $("lane-" + t.id);
+  if (!lane) return;
+  ensureCtx();                                  // unlock audio / build bus
+  const prevLabel = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.classList.add("busy"); btn.textContent = "analyzing…"; }
+  let result;
+  try {
+    result = await autoMix(t);                  // analyzes t.buffer (pure math)
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.classList.remove("busy"); btn.textContent = prevLabel; }
+    showAiSummary(lane, t, "Auto-mix couldn't analyze this track — the audio may be unreadable. Nothing was changed.");
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.classList.remove("busy"); btn.textContent = prevLabel; }
+
+  if (!result || !result.moves || !result.moves.length) {
+    showAiSummary(lane, t, (result && result.summary) || "No moves proposed — the track already sits inside the targets.");
+    return;
+  }
+
+  t.inserts = t.inserts || [];
+  for (const mv of result.moves) {
+    // ensure the named insert exists in the chain
+    let idx = t.inserts.findIndex(ins => ins.name === mv.insert);
+    if (idx === -1) {
+      t.inserts.push({ name: mv.insert, params: {} });
+      idx = t.inserts.length - 1;
+    }
+    if (!t.inserts[idx].params) t.inserts[idx].params = {};
+    // clamp the value to the plugin's declared min/max before storing
+    const def = TIFF_PLUGINS.list.find(p => p.name === mv.insert);
+    const pdef = def && def.params.find(p => p.id === mv.param);
+    let val = mv.value;
+    if (pdef && typeof val === "number") val = _clamp(val, pdef.min, pdef.max);
+    t.inserts[idx].params[mv.param] = val;
+  }
+
+  renderInserts(t, lane);
+  if (playing) restartPlayback();               // rebuild live graph with new params
+  showAiSummary(lane, t, result.summary);
+}
+
+/* render / replace the plain-English reasoning panel under a lane */
+function showAiSummary(lane, t, text) {
+  let panel = lane.querySelector(".ai-summary");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.className = "ai-summary";
+    lane.appendChild(panel);
+  }
+  panel.innerHTML = `<div class="ai-summary-h">✨ Auto-mix — what I measured &amp; why
+      <button class="ai-summary-x" title="dismiss">✕</button></div>
+    <div class="ai-summary-body"></div>`;
+  panel.querySelector(".ai-summary-body").textContent = text;
+  panel.querySelector(".ai-summary-x").onclick = () => panel.remove();
+}
+
+function drawWave(cv, buf) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  const drawCh = (data, top, h, color) => {
+    const step = Math.ceil(data.length / W), mid = top + h / 2;
+    g.strokeStyle = color; g.lineWidth = 1; g.beginPath();
+    for (let x = 0; x < W; x++) {
+      let mn = 1, mx = -1;
+      for (let j = 0; j < step; j++) { const v = data[x * step + j] || 0; if (v < mn) mn = v; if (v > mx) mx = v; }
+      g.moveTo(x, mid - (mx * h) / 2); g.lineTo(x, mid - (mn * h) / 2);
+    }
+    g.stroke();
+  };
+  if (buf.numberOfChannels >= 2) {
+    // real stereo: L (pink) top half, R (teal) bottom half, faint divider
+    drawCh(buf.getChannelData(0), 0, H / 2, "rgba(233,30,140,0.8)");
+    drawCh(buf.getChannelData(1), H / 2, H / 2, "rgba(0,209,196,0.7)");
+    g.strokeStyle = "rgba(255,255,255,0.08)"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  } else {
+    drawCh(buf.getChannelData(0), 0, H, "rgba(233,30,140,0.75)");  // mono = honest single trace
+  }
+}
+
+/* ── live graph per track ── */
+function buildTrackGraph(c, t, when, offset, isOffline) {
+  const src = c.createBufferSource(); src.buffer = t.buffer;
+  const inG = c.createGain();
+  const lo = c.createBiquadFilter(); lo.type = "lowshelf"; lo.frequency.value = 120;
+  const mid = c.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.9;
+  const hi = c.createBiquadFilter(); hi.type = "highshelf"; hi.frequency.value = 8000;
+  const comp = c.createDynamicsCompressor();
+  const pan = c.createStereoPanner();
+  const fader = c.createGain();
+  const send = c.createGain();
+
+  src.connect(inG); inG.connect(lo); lo.connect(mid); mid.connect(hi);
+  let tail = hi;
+  const insertNodes = [];
+  for (const ins of (t.inserts || [])) {
+    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    if (!def) continue;
+    try {
+      const node = def.create(c);
+      tail.connect(node.input); tail = node.output;
+      def.params.forEach(pp => node.set(pp.id, ins.params[pp.id] ?? pp.value));
+      insertNodes.push(node);
+    } catch { /* skip a plugin that fails to build, keep the chain intact */ }
+  }
+  tail.connect(comp); comp.connect(pan); pan.connect(fader);
+  const dest = isOffline ? c._masterGain : master.gain;
+  const vdest = isOffline ? c._verbPre : verb.predelay;
+  fader.connect(dest);
+  fader.connect(send); send.connect(vdest);
+
+  const live = { src, inG, lo, mid, hi, comp, pan, fader, send, insertNodes };
+  applyTrackTo(t, live);
+  // `when` is the ctx time the transport position `offset` maps to.
+  // `t.offset` (recorded takes) is where this clip SITS on the timeline; full
+  // stems default to 0 = play from the top.
+  const clipPos = t.offset || 0;
+  const transportZeroCtx = when - offset;            // ctx time of transport pos 0
+  const clipStartCtx = transportZeroCtx + clipPos;   // ctx time this clip should sound
+  if (clipStartCtx >= when) {
+    // clip hasn't begun yet — start it in the future at sample 0
+    src.start(clipStartCtx, 0);
+  } else {
+    // transport is already past the clip start — start now, partway in
+    const into = (when - clipStartCtx);
+    if (into < t.buffer.duration - 0.01) {
+      src.start(when, Math.max(0, Math.min(into, t.buffer.duration - 0.01)));
+    } // else: clip already finished, don't start it
+  }
+  return live;
+}
+function applyTrackTo(t, n) {
+  const anySolo = tracks.some(x => x.solo);
+  const audible = !t.muted && (!anySolo || t.solo);
+  n.fader.gain.value = audible ? t.gain : 0;
+  n.pan.pan.value = t.pan;
+  n.lo.gain.value = t.eq.lo; n.mid.gain.value = t.eq.mid; n.hi.gain.value = t.eq.hi;
+  n.comp.threshold.value = -8 - t.comp * 28; n.comp.ratio.value = 1 + t.comp * 9;
+  n.comp.knee.value = 12; n.comp.attack.value = 0.004; n.comp.release.value = 0.18;
+  n.send.gain.value = t.send;
+}
+function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
+function applyMix() { tracks.forEach(applyTrack); }
+
+/* ── transport ── */
+function maxDur() { return Math.max(0.01, ...tracks.map(t => (t.offset || 0) + t.buffer.duration)); }
+function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
+let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet module);
+                   // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
+async function playAll() {
+  const c = ensureCtx();
+  if (c.state === "suspended") c.resume();
+  if (!tracks.length) return;
+  const myGen = ++playGen;
+  await ensureWorklets(c);   // worklet plugins need their module present before build
+  if (myGen !== playGen) return;   // a newer playAll() superseded this one — bail (no doubled audio)
+  stopSources();
+  // a pause can land past the end (loop wrap / tail) — wrap to the top,
+  // otherwise sources start beyond their audio and play silence
+  if (startOffset >= maxDur() - 0.02) startOffset = 0;
+  startCtxTime = c.currentTime + 0.05;
+  tracks.forEach(t => { t.live = buildTrackGraph(c, t, startCtxTime, startOffset, false); });
+  playing = true;
+  $("play").textContent = "❚❚ Pause";
+}
+function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n.dispose?.()); } catch {} try { t.live?.src.stop(); } catch {} t.live = null; }); }
+function pauseAll() { playGen++; startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
+function stopAll() { playGen++; stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
+function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
+function restartPlayback() { const p = pos(); startOffset = p; playAll(); }
+$("play").onclick = () => playing ? pauseAll() : playAll();
+$("stop").onclick = stopAll;
+$("loop").onclick = (e) => { loop = !loop; e.target.classList.toggle("on", loop); };
+
+/* ── ui tick: clock, playheads, meters, loop ── */
+function tickUi() {
+  requestAnimationFrame(tickUi);
+  const p = pos(), dur = maxDur();
+  $("clock").textContent = `${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
+  if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
+  // playheads — a take's wave spans only ITS buffer starting at t.offset, so
+  // map the transport playhead into the clip's local time.
+  tracks.forEach(t => {
+    const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
+    drawWave(cv, t.buffer);
+    const g = cv.getContext("2d");
+    const local = p - (t.offset || 0);                 // transport pos inside this clip
+    if (local < 0 || local > t.buffer.duration) return; // playhead not over this clip
+    const x = (local / t.buffer.duration) * cv.width;
+    g.strokeStyle = "rgba(0,209,196,0.9)"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
+  });
+  // meters
+  const lvlOf = (a) => { const d = new Uint8Array(a.fftSize); a.getByteTimeDomainData(d);
+    let mx = 0; for (const v of d) mx = Math.max(mx, Math.abs(v - 128) / 128); return mx; };
+  if (master) {
+    $("meterL").style.width = (lvlOf(master.aL) * 100) + "%";
+    $("meterR").style.width = (lvlOf(master.aR) * 100) + "%";
+  }
+  // input meter + runaway-feedback watch
+  if (REC.inAnalyser) { const il = lvlOf(REC.inAnalyser); $("inMeter").style.width = (il * 100) + "%"; feedbackWatch(il); }
+}
+
+/* ── master + verb controls ── */
+const bindOut = (id, fmt) => { const el = $(id); el.oninput = () => { $(id + "O").textContent = fmt(parseFloat(el.value)); el.dispatchEvent(new Event("change")); }; };
+bindOut("mGain", v => v.toFixed(2)); bindOut("mLim", v => v.toFixed(1));
+bindOut("vSize", v => v.toFixed(1) + "s"); bindOut("vTone", v => (v / 1000).toFixed(1) + "k");
+bindOut("vPre", v => Math.round(v * 1000) + "ms"); bindOut("vRet", v => v.toFixed(2));
+$("mGain").addEventListener("change", () => master && (master.gain.gain.value = parseFloat($("mGain").value)));
+$("mLim").addEventListener("change", () => master && (master.limiter.threshold.value = parseFloat($("mLim").value)));
+$("vRet").addEventListener("change", () => verb && (verb.ret.gain.value = parseFloat($("vRet").value)));
+$("vPre").addEventListener("change", () => verb && (verb.predelay.delayTime.value = parseFloat($("vPre").value)));
+let irTimer = null;
+const reIR = () => { if (!verb) return; clearTimeout(irTimer);
+  irTimer = setTimeout(() => { verb.convolver.buffer = makeIR(ctx, parseFloat($("vSize").value), parseFloat($("vTone").value)); }, 200); };
+$("vSize").addEventListener("change", reIR); $("vTone").addEventListener("change", reIR);
+
+/* ── files in ── */
+$("addfiles").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
+$("drop").onclick = () => $("addfiles").click();
+document.body.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+document.body.addEventListener("dragleave", () => $("drop").classList.remove("over"));
+document.body.addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("over");
+  addFiles(Array.from(e.dataTransfer.files || [])); });
+
+/* ── WAV ENCODER — 16-bit PCM, interleaved. Handles mono OR stereo (and clamps
+   higher channel counts to 2) so the SAME helper encodes the offline-rendered
+   stereo mix on EXPORT and each track's source AudioBuffer on SAVE. ── */
+function bufferToWavBlob(audioBuffer) {
+  const nch = Math.min(2, audioBuffer.numberOfChannels);
+  const len = audioBuffer.length, rate = audioBuffer.sampleRate;
+  const bytesPerFrame = nch * 2;                 // 16-bit
+  const ab = new ArrayBuffer(44 + len * bytesPerFrame), v = new DataView(ab);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, "RIFF"); v.setUint32(4, 36 + len * bytesPerFrame, true); ws(8, "WAVE"); ws(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, nch, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * bytesPerFrame, true);
+  v.setUint16(32, bytesPerFrame, true); v.setUint16(34, 16, true); ws(36, "data"); v.setUint32(40, len * bytesPerFrame, true);
+  const chans = [];
+  for (let c = 0; c < nch; c++) chans.push(audioBuffer.getChannelData(c));
+  let off = 44;
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < nch; c++) {
+      v.setInt16(off, Math.max(-32768, Math.min(32767, chans[c][i] * 32767)), true); off += 2;
+    }
+  }
+  return new Blob([ab], { type: "audio/wav" });
+}
+
+/* ── EXPORT — render the whole board offline to a WAV ── */
+$("exportBtn").onclick = async () => {
+  if (!tracks.length) return;
+  ensureCtx();
+  $("exportBtn").textContent = "rendering…"; $("exportBtn").disabled = true;
+  try {
+    const dur = maxDur() + parseFloat($("vSize").value); // verb tail
+    const oc = new OfflineAudioContext(2, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+    await ensureWorklets(oc);   // worklet plugins must exist on the offline ctx or export bypasses them
+    // offline bus
+    oc._masterGain = oc.createGain(); oc._masterGain.gain.value = parseFloat($("mGain").value);
+    const lim = oc.createDynamicsCompressor();
+    lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.002; lim.release.value = 0.12;
+    oc._masterGain.connect(lim); lim.connect(oc.destination);
+    const conv = oc.createConvolver(); conv.buffer = makeIR(oc, parseFloat($("vSize").value), parseFloat($("vTone").value));
+    oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
+    const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
+    oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterGain);
+    tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
+    const rendered = await oc.startRendering();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(bufferToWavBlob(rendered));
+    a.download = "pink-room-mix.wav"; a.click();
+  } catch (e) { alert("Export failed: " + e.message); }
+  $("exportBtn").textContent = "⬇ Export WAV"; $("exportBtn").disabled = false;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SAVE / LOAD PROJECT — a mix survives a refresh. Audio fully restores: each
+   track's source AudioBuffer is encoded to WAV (via bufferToWavBlob, shared
+   with EXPORT) then base64'd into the project JSON. Backend stores plain JSON.
+   ADDITIVE — never touches the transport / live graph mid-save (state snapshot).
+   ═══════════════════════════════════════════════════════════════════════════ */
+function studioStatus(msg, bad) {
+  if (typeof setWarn === "function") { setWarn(msg, bad); return; }
+  let n = $("saveNote"); if (n) { n.textContent = msg; n.style.color = bad ? "#FF8FA8" : "var(--teal)"; }
+}
+
+// blob -> "data:audio/wav;base64,..." without choking on big buffers (chunked btoa)
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error("read failed"));
+    r.readAsDataURL(blob);
+  });
+}
+
+// "data:audio/wav;base64,XXXX" -> ArrayBuffer
+function dataUrlToArrayBuffer(dataUrl) {
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+let currentProjectId = null;   // set after first save / after a load → re-saves UPDATE in place instead of duplicating
+async function buildProjectPayload(title) {
+  const trackData = [];
+  for (const t of tracks) {
+    const wavUrl = await blobToDataUrl(bufferToWavBlob(t.buffer));
+    trackData.push({
+      name: t.name,
+      gain: t.gain, pan: t.pan,
+      eq: { lo: t.eq.lo, mid: t.eq.mid, hi: t.eq.hi },
+      comp: t.comp, send: t.send,
+      inserts: (t.inserts || []).map(ins => ({ name: ins.name, params: { ...ins.params } })),
+      muted: !!t.muted, solo: !!t.solo,
+      offset: t.offset || 0,
+      wav: wavUrl,
+    });
+  }
+  return {
+    id: currentProjectId,   // null on first save → backend mints one; reused after → updates the same project
+    title,
+    master: { mGain: parseFloat($("mGain").value), mLim: parseFloat($("mLim").value) },
+    verb: {
+      vSize: parseFloat($("vSize").value), vTone: parseFloat($("vTone").value),
+      vPre: parseFloat($("vPre").value), vRet: parseFloat($("vRet").value),
+    },
+    tracks: trackData,
+  };
+}
+
+async function saveProject() {
+  if (!tracks.length) { studioStatus("Nothing to save — add a track first.", true); return; }
+  const title = (prompt("Save project as:", "mix") || "").trim();
+  if (!title) return;
+  ensureCtx();
+  studioStatus("Saving “" + title + "”…");
+  $("saveBtn").disabled = true;
+  try {
+    const payload = await buildProjectPayload(title);
+    const res = await fetch("/api/studio/projects", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || "save rejected");
+    currentProjectId = j.id;   // next save updates THIS project instead of spawning a duplicate
+    studioStatus("Saved “" + title + "” ✓");
+  } catch (e) { studioStatus("Save failed: " + e.message, true); }
+  $("saveBtn").disabled = false;
+}
+
+/* LOAD — fetch a project, restore master/verb, then rebuild every track THROUGH
+   the existing track-creation path (laneUi/renderInserts/applyTrack). */
+async function loadProject(id) {
+  closeLoadMenu();
+  studioStatus("Loading…");
+  try {
+    const res = await fetch("/api/studio/projects/" + encodeURIComponent(id));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const proj = await res.json();
+    currentProjectId = id;   // re-saving a loaded project updates it, not duplicates it
+    const c = ensureCtx();
+
+    // wipe the current board first — don't leave the old mix mixed in
+    stopAll();
+    while (tracks.length) {
+      const t = tracks.pop();
+      const lane = $("lane-" + t.id); if (lane) lane.remove();
+    }
+
+    // restore master + verb sliders, then fire change events so the live bus updates
+    if (proj.master) {
+      if (proj.master.mGain != null) $("mGain").value = proj.master.mGain;
+      if (proj.master.mLim  != null) $("mLim").value  = proj.master.mLim;
+    }
+    if (proj.verb) {
+      if (proj.verb.vSize != null) $("vSize").value = proj.verb.vSize;
+      if (proj.verb.vTone != null) $("vTone").value = proj.verb.vTone;
+      if (proj.verb.vPre  != null) $("vPre").value  = proj.verb.vPre;
+      if (proj.verb.vRet  != null) $("vRet").value  = proj.verb.vRet;
+    }
+    ["mGain", "mLim", "vSize", "vTone", "vPre", "vRet"].forEach(id => {
+      const el = $(id);
+      el.dispatchEvent(new Event("input"));   // refreshes the readout
+      el.dispatchEvent(new Event("change"));  // applies to the live bus / re-bakes IR
+    });
+
+    // rebuild each saved track through the real track path
+    for (const td of (proj.tracks || [])) {
+      let buf;
+      try { buf = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); }
+      catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
+      const t = {
+        id: Math.random().toString(36).slice(2),
+        name: td.name || "track",
+        buffer: buf,
+        gain: td.gain != null ? td.gain : 0.9,
+        pan: td.pan != null ? td.pan : 0,
+        eq: { lo: td.eq?.lo || 0, mid: td.eq?.mid || 0, hi: td.eq?.hi || 0 },
+        comp: td.comp != null ? td.comp : 0,
+        send: td.send != null ? td.send : 0,
+        inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params || {}) } })),
+        muted: !!td.muted, solo: !!td.solo,
+        offset: td.offset || 0,
+        src: null, live: null,
+      };
+      tracks.push(t);
+      laneUi(t);                       // builds the lane + binds knobs + draws wave
+      // sync the freshly-built lane's controls to the saved values
+      const lane = $("lane-" + t.id);
+      lane.querySelectorAll(".strip input[type=range]").forEach(inp => {
+        const k = inp.dataset.k;
+        const val = k === "gain" ? t.gain : k === "pan" ? t.pan
+          : k === "lo" ? t.eq.lo : k === "mid" ? t.eq.mid : k === "hi" ? t.eq.hi
+          : k === "comp" ? t.comp : k === "send" ? t.send : null;
+        if (val != null) inp.value = val;
+      });
+      lane.querySelector(".chip.m")?.classList.toggle("on", t.muted);
+      lane.querySelector(".chip.s")?.classList.toggle("on", t.solo);
+      lane.classList.toggle("muted", t.muted);
+      renderInserts(t, lane);          // show the insert rack with its values
+      applyTrack(t);
+    }
+    $("drop").style.display = tracks.length ? "none" : "block";
+    studioStatus("Loaded “" + (proj.title || id) + "” ✓");
+  } catch (e) { studioStatus("Load failed: " + e.message, true); }
+}
+
+async function deleteProject(id, title, ev) {
+  ev?.stopPropagation();
+  if (!confirm("Delete project “" + (title || id) + "”? This can't be undone.")) return;
+  try {
+    const res = await fetch("/api/studio/projects/" + encodeURIComponent(id), { method: "DELETE" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    studioStatus("Deleted “" + (title || id) + "”");
+    openLoadMenu();   // refresh the list in place
+  } catch (e) { studioStatus("Delete failed: " + e.message, true); }
+}
+
+function closeLoadMenu() { const m = $("loadMenu"); if (m) m.remove(); }
+
+async function openLoadMenu() {
+  closeLoadMenu();
+  const menu = document.createElement("div");
+  menu.id = "loadMenu";
+  menu.className = "load-menu";
+  menu.innerHTML = `<div class="load-menu-h">Saved projects</div><div class="load-menu-body">loading…</div>`;
+  // anchor under the Load button
+  const r = $("loadBtn").getBoundingClientRect();
+  menu.style.top = (r.bottom + 6) + "px";
+  menu.style.right = (window.innerWidth - r.right) + "px";
+  document.body.appendChild(menu);
+  // dismiss on outside click
+  setTimeout(() => document.addEventListener("pointerdown", onLoadMenuOutside, true), 0);
+  try {
+    const res = await fetch("/api/studio/projects");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json();
+    const list = (j.projects || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const body = menu.querySelector(".load-menu-body");
+    if (!list.length) { body.innerHTML = `<div class="load-empty">No saved projects yet.</div>`; return; }
+    body.innerHTML = "";
+    list.forEach(p => {
+      const row = document.createElement("div");
+      row.className = "load-row";
+      const when = p.ts ? new Date(p.ts * 1000).toLocaleString() : "";
+      row.innerHTML = `<span class="load-name"></span><span class="load-when"></span><button class="load-del" title="delete">✕</button>`;
+      row.querySelector(".load-name").textContent = p.title || p.id;
+      row.querySelector(".load-when").textContent = when;
+      row.querySelector(".load-name").onclick = () => loadProject(p.id);
+      row.querySelector(".load-when").onclick = () => loadProject(p.id);
+      row.querySelector(".load-del").onclick = (e) => deleteProject(p.id, p.title, e);
+      body.appendChild(row);
+    });
+  } catch (e) {
+    menu.querySelector(".load-menu-body").innerHTML = `<div class="load-empty">Couldn't load list: ${e.message}</div>`;
+  }
+}
+function onLoadMenuOutside(e) {
+  const m = $("loadMenu");
+  if (m && !m.contains(e.target) && e.target !== $("loadBtn")) {
+    closeLoadMenu(); document.removeEventListener("pointerdown", onLoadMenuOutside, true);
+  }
+}
+
+$("saveBtn").onclick = saveProject;
+$("loadBtn").onclick = () => { $("loadMenu") ? closeLoadMenu() : openLoadMenu(); };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RECORDING — low-latency monitor · feedback avoidance · latency compensation
+   ═══════════════════════════════════════════════════════════════════════════
+   THE PROBLEM. When you sing/play over the beat, two delays stack:
+     • OUTPUT latency  — the beat leaves the buffer at transport time T but
+       doesn't hit the air until T + outputLatency (DAC + driver buffer).
+     • INPUT latency   — the mic captures sound, but those samples don't reach
+       the graph until inputLatency later (ADC + capture buffer).
+   The performer reacts to what they HEAR, so a note hit "on the beat" lands in
+   the recording late by ~ (outputLatency + inputLatency) — the ROUND TRIP.
+   FIX: shift the captured take EARLIER by the round trip when we place it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const REC = {
+  stream: null, srcNode: null, monGain: null, monHP: null, inAnalyser: null,
+  worklet: null, recProc: null, capturing: false, chunks: [], capRate: 0,
+  capStartCtxTime: 0,                 // ctx.currentTime when the FIRST sample landed
+  capTransportStart: 0,               // transport pos at that same instant
+  inputLatencyEst: 0.012,             // refined by device + calibration
+  calibrated: null,                   // measured round-trip from loopback, or null
+  monitorOn: false, punchOn: false, deviceId: null,
+};
+
+/* ── latency numbers (real, from the live context) ──
+   baseLatency  = AudioContext processing buffer (render quantum + ScriptProcessor).
+   outputLatency = full path to the speaker (DAC + OS), Chrome-reported.        */
+function outputLatency() {
+  if (!ctx) return 0;
+  // outputLatency is the honest one; fall back to baseLatency*2 if unavailable.
+  return ctx.outputLatency || (ctx.baseLatency ? ctx.baseLatency * 2 : 0.02);
+}
+function inputLatency() {
+  // If we ran a loopback calibration, that single number already contains the
+  // FULL round trip (out+in) — return it whole and skip adding output again.
+  if (REC.calibrated != null) return REC.calibrated - outputLatency();
+  return REC.inputLatencyEst;
+}
+function roundTrip() {
+  return REC.calibrated != null ? REC.calibrated : (outputLatency() + inputLatency());
+}
+function refreshLatencyUi() {
+  if (!ctx) return;
+  $("latOut").textContent = (outputLatency() * 1000).toFixed(1) + " ms";
+  $("latIn").textContent  = (inputLatency() * 1000).toFixed(1) + " ms" + (REC.calibrated != null ? " *" : "");
+  $("latTot").textContent = (roundTrip() * 1000).toFixed(1) + " ms";
+}
+
+/* ── pick / open an input with RAW capture (no phone-call DSP) ── */
+async function openInput() {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  // FEEDBACK AVOIDANCE, layer 1: kill the phone-call processing. echoCancellation,
+  // noiseSuppression and autoGainControl are tuned for voice calls — they pump,
+  // gate transients, and (echoCancel) actively chase the monitor signal, which
+  // both colors the take AND fights our latency math. A recording wants RAW.
+  const constraints = { audio: {
+    echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+    channelCount: 1, ...(REC.deviceId ? { deviceId: { exact: REC.deviceId } } : {}),
+  } };
+  try {
+    if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
+    REC.stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) { setWarn("Mic blocked: " + e.message, true); return false; }
+
+  // pull the true input latency the device reports, if any
+  const tr = REC.stream.getAudioTracks()[0];
+  const s = tr.getSettings ? tr.getSettings() : {};
+  if (s.latency) REC.inputLatencyEst = s.latency;          // seconds, when present
+  REC.deviceId = s.deviceId || REC.deviceId;
+
+  REC.srcNode = c.createMediaStreamSource(REC.stream);
+  REC.inAnalyser = c.createAnalyser(); REC.inAnalyser.fftSize = 512;
+  REC.srcNode.connect(REC.inAnalyser);
+
+  // MONITOR PATH — the SHORTEST possible route to the cans. Straight to
+  // destination, bypassing master.gain → limiter (the limiter's lookahead adds
+  // delay and we want monitoring as immediate as the hardware allows).
+  REC.monGain = c.createGain(); REC.monGain.gain.value = 0;
+  REC.monHP = c.createBiquadFilter(); REC.monHP.type = "highpass"; REC.monHP.frequency.value = 60; // trim rumble in the cans only
+  REC.srcNode.connect(REC.monHP); REC.monHP.connect(REC.monGain); REC.monGain.connect(c.destination);
+
+  refreshLatencyUi();
+  $("inputBtn").classList.add("on");
+  $("inputBtn").textContent = "🎤 " + (tr.label ? tr.label.slice(0, 22) : "input ready");
+  setWarn(headphoneAdvice(), false);
+  await populateDevices();                         // permission granted → real labels now show
+  if (REC.deviceId && $("inDev")) { if ([...$("inDev").options].some(o => o.value === REC.deviceId)) $("inDev").value = REC.deviceId; }
+  return true;
+}
+$("inputBtn").onclick = openInput;
+
+/* ── DEVICE ROUTING — output via AudioContext.setSinkId, input via getUserMedia
+   deviceId. The full device list + labels (incl. an Apollo/interface) only
+   appear AFTER mic permission (Chrome rule) — so we populate on load (defaults),
+   again after openInput, and whenever devices change. */
+const CAN_PICK_OUTPUT = "setSinkId" in (window.AudioContext || window.webkitAudioContext).prototype;
+// Chrome hides device NAMES (and the full list, incl. an interface) until the
+// origin has a mic grant. Grab the mic + immediately release it — permission
+// only, no recording. If the recorder already ran, this resolves instantly.
+async function unlockDeviceLabels() {
+  try { const p = await navigator.mediaDevices.getUserMedia({ audio: true }); p.getTracks().forEach(t => t.stop()); return true; }
+  catch (e) { setWarn("Mic permission needed to list device names: " + e.message, true); return false; }
+}
+async function populateDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  let list = [];
+  try { list = await navigator.mediaDevices.enumerateDevices(); } catch { return; }
+  const fill = (sel, kind, defLabel, tail) => {
+    if (!sel) return;
+    const cur = sel.value;
+    const devs = list.filter(d => d.kind === kind && d.deviceId !== "default");
+    sel.innerHTML = `<option value="">${defLabel}</option>` +
+      devs.map((d, n) => `<option value="${d.deviceId}">${(d.label || (kind + " " + (n + 1))).replace(/[<>]/g, "")}</option>`).join("") + (tail || "");
+    if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  };
+  fill($("outDev"), "audiooutput", "System default", `<option value="none">— None (silent) —</option>`);
+  fill($("inDev"), "audioinput", "Default input", "");
+}
+// any device switch invalidates the loopback latency calibration (it measured
+// the OLD path) — clear it so a stale number can't misalign a recorded take.
+function onDeviceChanged() { REC.calibrated = null; if (typeof refreshLatencyUi === "function") refreshLatencyUi(); }
+if ($("scanDev")) $("scanDev").onclick = async () => { await unlockDeviceLabels(); await populateDevices(); setWarn("Devices detected — pick your output (and input) above.", false); };
+if (!CAN_PICK_OUTPUT) {
+  if ($("outDev")) $("outDev").disabled = true;
+  if ($("scanDev")) $("scanDev").style.display = "none";
+  if ($("outNote")) $("outNote").textContent = "This browser can't route output to a specific device — it uses the system default. (Chrome/Edge support device routing.)";
+} else {
+  $("outDev").onchange = async () => {
+    const c = ensureCtx();
+    const id = $("outDev").value, name = $("outDev").selectedOptions[0]?.textContent || "device";
+    try {
+      await c.setSinkId(id === "none" ? { type: "none" } : id);
+      onDeviceChanged();
+      setWarn(id === "none" ? "Output muted (None)" : (id ? "Output → " + name : "Output → system default"), false);
+    } catch (e) { setWarn("Couldn't switch output: " + e.message, true); }
+  };
+}
+$("inDev").onchange = async () => {
+  REC.deviceId = $("inDev").value || null;
+  onDeviceChanged();
+  if (REC.stream) await openInput();               // re-open recording on the chosen input
+};
+populateDevices();
+navigator.mediaDevices?.addEventListener?.("devicechange", populateDevices);
+
+function headphoneAdvice() {
+  return "Input ready. HEADPHONES strongly recommended — monitoring on open speakers will feed back into the mic. Monitor stays OFF until you turn it on.";
+}
+function setWarn(msg, bad) { const w = $("recWarn"); w.textContent = msg; w.classList.toggle("bad", !!bad); }
+
+/* ── MONITOR control + FEEDBACK AVOIDANCE layer 2 (runaway detector) ── */
+function setMonitor(on) {
+  REC.monitorOn = on && !!REC.monGain;
+  const val = parseFloat($("monGain").value);
+  if (REC.monGain) REC.monGain.gain.setTargetAtTime(REC.monitorOn ? val : 0, ctx.currentTime, 0.01);
+  $("monBtn").classList.toggle("on", REC.monitorOn);
+  $("monBtn").textContent = "🎧 Headphone monitor: " + (REC.monitorOn ? "ON" : "OFF");
+}
+$("monBtn").onclick = () => { if (!REC.monGain) { openInput().then(() => setMonitor(true)); } else setMonitor(!REC.monitorOn); };
+$("monGain").oninput = () => {
+  $("monGainO").textContent = parseFloat($("monGain").value) === 0 ? "off" : parseFloat($("monGain").value).toFixed(2);
+  if (REC.monGain && REC.monitorOn) REC.monGain.gain.setTargetAtTime(parseFloat($("monGain").value), ctx.currentTime, 0.01);
+};
+
+/* runaway-feedback kill: if input level pins for ~250ms straight, drop the
+   monitor. This is the safety net for "I forgot I'm on speakers". */
+let pinFrames = 0;
+function feedbackWatch(level) {
+  if (REC.monitorOn && level > 0.92) { if (++pinFrames > 15) { setMonitor(false); setWarn("⚠ Feedback detected — monitor killed. Use headphones.", true); pinFrames = 0; } }
+  else pinFrames = 0;
+}
+
+/* ── count-in / tempo ── */
+$("countBars").oninput = () => { const n = +$("countBars").value; $("countBarsO").textContent = n === 0 ? "off" : n + (n === 1 ? " bar" : " bars"); };
+$("recBpm").oninput = () => $("recBpmO").textContent = $("recBpm").value;
+$("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
+
+/* a short metronome click via oscillator — for count-in only */
+function click(c, when, accent) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = accent ? 1600 : 1000;
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.32, when + 0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+  o.connect(g); g.connect(c.destination);   // click also bypasses the limiter
+  o.start(when); o.stop(when + 0.08);
+}
+
+/* ── THE RECORD BUTTON ── */
+$("rec").onclick = async () => {
+  if (REC.capturing) { stopRecording(); return; }
+  if (!REC.stream && !(await openInput())) return;
+  armAndRecord();
+};
+
+async function armAndRecord() {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  $("rec").classList.add("armed");
+
+  const bpm = +$("recBpm").value, bars = +$("countBars").value;
+  const beat = 60 / bpm, barLen = beat * 4;
+  const countDur = bars * barLen;
+
+  // PUNCH-IN: keep the current playhead; otherwise drop to the top so the take
+  // sits against the start of the beat. Either way the transport rolls during
+  // the count-in so the performer can feel the groove before the punch.
+  if (!REC.punchOn) startOffset = 0;
+  const punchTransportPos = startOffset;       // where the recorded audio will LAND
+
+  // schedule count-in clicks, then start the beat in sync with the downbeat
+  const t0 = c.currentTime + 0.12;             // small safety lead
+  for (let b = 0; b < bars * 4; b++) click(c, t0 + b * beat, b % 4 === 0);
+  showCountin(bars * 4, t0, beat);
+
+  // transport (the beat) begins AT the downbeat after the count
+  const beatStartCtxTime = t0 + countDur;
+  // arm the actual capture to begin at that same instant
+  REC.capTransportStart = punchTransportPos;
+  REC.capStartCtxTime = beatStartCtxTime;
+
+  // start playback locked to beatStartCtxTime (reuse the engine, but with our clock)
+  scheduleTransportAt(beatStartCtxTime, punchTransportPos);
+  beginCapture();                              // capture starts NOW; we tag samples by ctx time
+}
+
+/* like playAll() but starts every source at an explicit ctx time + offset,
+   so the recording can be perfectly phase-locked to the transport. */
+function scheduleTransportAt(atCtxTime, offset) {
+  const c = ctx;
+  stopSources();
+  if (offset >= maxDur() - 0.02) offset = 0;
+  startCtxTime = atCtxTime; startOffset = offset;
+  tracks.forEach(t => { t.live = buildTrackGraph(c, t, atCtxTime, offset, false); });
+  playing = true; $("play").textContent = "❚❚ Pause";
+}
+
+function showCountin(beats, t0, beat) {
+  let shown = -1;
+  const id = setInterval(() => {
+    const now = ctx.currentTime;
+    const i = Math.floor((now - t0) / beat);
+    if (i >= beats) { $("countin").textContent = ""; clearInterval(id); return; }
+    if (i >= 0 && i !== shown) { shown = i; $("countin").textContent = String(beats - i); }
+  }, 30);
+}
+
+/* ── CAPTURE — ScriptProcessor grabs raw float samples + the ctx time of the
+   FIRST block, which is what the latency math hangs on. ── */
+function beginCapture() {
+  const c = ctx;
+  REC.chunks = []; REC.capRate = c.sampleRate; REC.capturing = true;
+  REC.captureFirstCtxTime = null;
+  const proc = c.createScriptProcessor(2048, 1, 1);
+  REC.recProc = proc;
+  proc.onaudioprocess = (e) => {
+    if (!REC.capturing) return;
+    // the block we're handed was captured BEFORE this callback fired; its first
+    // sample's arrival time ≈ now minus one block. We record the arrival time of
+    // the very first block to anchor the take.
+    if (REC.captureFirstCtxTime == null) {
+      REC.captureFirstCtxTime = c.currentTime - (2048 / c.sampleRate);
+    }
+    REC.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  // ScriptProcessor must be pulled by the graph to fire; route through a muted
+  // gain to destination so it ticks WITHOUT adding the mic to the output (that
+  // would be a feedback path). Monitoring is the SEPARATE monGain route.
+  const sink = c.createGain(); sink.gain.value = 0;
+  REC.srcNode.connect(proc); proc.connect(sink); sink.connect(c.destination);
+  REC.captureSink = sink;
+  REC.capturing = true;
+  $("rec").classList.remove("armed"); $("rec").classList.add("live");
+  $("rec").textContent = "■ Stop rec";
+}
+
+function stopRecording() {
+  if (!REC.capturing) return;
+  REC.capturing = false;
+  try { REC.srcNode.disconnect(REC.recProc); } catch {}
+  try { REC.recProc.disconnect(); REC.captureSink.disconnect(); } catch {}
+  REC.recProc.onaudioprocess = null; REC.recProc = null;
+  $("rec").classList.remove("live", "armed"); $("rec").textContent = "● Record";
+  $("countin").textContent = "";
+
+  // assemble
+  const total = REC.chunks.reduce((n, c) => n + c.length, 0);
+  if (total < REC.capRate * 0.1) { setWarn("Take too short — nothing captured.", true); return; }
+  const flat = new Float32Array(total);
+  let o = 0; for (const ch of REC.chunks) { flat.set(ch, o); o += ch.length; }
+
+  // ── LATENCY COMPENSATION ──────────────────────────────────────────────────
+  // arrival-time of first captured sample, in transport coordinates:
+  //   transportPosAtArrival = (firstCtxTime - startCtxTime) + startOffsetAtRecStart
+  // but we recorded against capStartCtxTime/capTransportStart, so:
+  const arrival = REC.captureFirstCtxTime ?? REC.capStartCtxTime;
+  const transportPosAtArrival = (arrival - REC.capStartCtxTime) + REC.capTransportStart;
+  // shift EARLIER by the full round trip so a note performed on the beat the
+  // singer HEARD lands on that beat in the timeline:
+  const compensated = transportPosAtArrival - roundTrip();
+  let placeAt = compensated;
+
+  // trim/pad so the buffer's sample 0 corresponds to placeAt >= 0
+  const rate = REC.capRate;
+  let buf;
+  if (placeAt < 0) {
+    // the comp pushed us before t=0: drop the leading samples instead of
+    // negative-offsetting (which the engine can't do).
+    const drop = Math.min(flat.length - 1, Math.round(-placeAt * rate));
+    buf = ctx.createBuffer(1, flat.length - drop, rate);
+    buf.copyToChannel(flat.subarray(drop), 0);
+    placeAt = 0;
+  } else {
+    buf = ctx.createBuffer(1, flat.length, rate);
+    buf.copyToChannel(flat, 0);
+  }
+
+  // make it a stereo-friendly track buffer (mono → both channels handled by panner)
+  const t = {
+    id: Math.random().toString(36).slice(2),
+    name: "TAKE " + (tracks.filter(x => x.isTake).length + 1) + ` (+${(roundTrip() * 1000).toFixed(0)}ms comp)`,
+    buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
+    send: 0, inserts: [], muted: false, solo: false, src: null, live: null,
+    isTake: true, offset: placeAt,
+  };
+  tracks.push(t);
+  laneUiTake(t, placeAt);
+  $("drop").style.display = "none";
+  setWarn(`Take landed at ${placeAt.toFixed(3)}s, compensated ${(roundTrip() * 1000).toFixed(1)}ms for round-trip latency.`, false);
+}
+
+/* ── LOOPBACK CALIBRATION — the honest way to measure round trip ──
+   We emit a sharp click out the speaker/headphone, listen on the mic, and
+   measure how long until it comes back. That delta IS the real round-trip
+   (output + acoustic + input). Hold the mic to the cans or sit in a quiet room.
+   This beats any reported number because it measures THIS rig. ── */
+$("calibBtn").onclick = async () => {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  if (!REC.stream && !(await openInput())) return;
+  setWarn("Calibrating… emitting a click, listening for the return. Hold mic near the speaker.", false);
+  $("calibBtn").disabled = true; $("calibBtn").textContent = "listening…";
+
+  // record a short window
+  const rate = c.sampleRate, winSec = 0.4;
+  const chunks = []; let firstCtx = null;
+  const proc = c.createScriptProcessor(1024, 1, 1);
+  proc.onaudioprocess = (e) => { if (firstCtx == null) firstCtx = c.currentTime - 1024 / rate; chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  const sink = c.createGain(); sink.gain.value = 0;
+  REC.srcNode.connect(proc); proc.connect(sink); sink.connect(c.destination);
+
+  const clickAt = c.currentTime + 0.1;
+  click(c, clickAt, true);
+
+  await new Promise(r => setTimeout(r, (clickAt - c.currentTime + winSec) * 1000 + 120));
+  REC.srcNode.disconnect(proc); proc.disconnect(); sink.disconnect(); proc.onaudioprocess = null;
+
+  const total = chunks.reduce((n, x) => n + x.length, 0);
+  const flat = new Float32Array(total); let o = 0; for (const x of chunks) { flat.set(x, o); o += x.length; }
+  // find the click's return: first sample whose |amp| crosses a noise-relative threshold
+  let peak = 0; for (let i = 0; i < flat.length; i++) peak = Math.max(peak, Math.abs(flat[i]));
+  const thr = Math.max(0.06, peak * 0.4);
+  let idx = -1; for (let i = 0; i < flat.length; i++) { if (Math.abs(flat[i]) >= thr) { idx = i; break; } }
+
+  if (idx < 0 || peak < 0.04) {
+    setWarn("Calibration failed — no click heard. Turn up output / hold mic to the speaker, then retry.", true);
+  } else {
+    // arrival-in-ctx-time of the detected sample:
+    const detectedCtx = firstCtx + idx / rate;
+    const measured = detectedCtx - clickAt;            // FULL round trip, seconds
+    if (measured > 0.003 && measured < 0.5) {
+      REC.calibrated = measured;
+      refreshLatencyUi();
+      setWarn(`Calibrated: round-trip = ${(measured * 1000).toFixed(1)} ms (measured on your rig). Takes will use this.`, false);
+    } else setWarn(`Calibration gave an odd value (${(measured * 1000).toFixed(0)}ms) — ignored. Try again in a quiet spot.`, true);
+  }
+  $("calibBtn").disabled = false; $("calibBtn").textContent = "⟳ Calibrate (loopback)";
+};
+
+/* ── lane for a recorded take: needs the offset (where on the timeline it sits) ── */
+function laneUiTake(t, placeAt) {
+  laneUi(t);
+  const d = $("lane-" + t.id);
+  d.classList.add("recording");
+  setTimeout(() => d.classList.remove("recording"), 1200);
+  // tag the lane with its timeline offset so the user can nudge it
+  const head = d.querySelector(".lhead");
+  const nudge = document.createElement("span");
+  nudge.style.cssText = "font:600 9.5px 'Space Mono';color:var(--teal);margin-left:6px";
+  nudge.textContent = `@${placeAt.toFixed(2)}s`;
+  head.insertBefore(nudge, head.querySelector(".chip.m"));
+}
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

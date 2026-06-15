@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The 16-Bit Room — Tiff’s Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800;900&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --amber:#F5A623;
+          --bg0:#07050C; --bg1:#14101C; --panel:rgba(16,11,22,0.8);
+          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { height:100vh; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1100px 600px at 50% -15%, #1E1228 0%, var(--bg1) 50%, var(--bg0) 100%); }
+  .aura { position:fixed; inset:-20%; pointer-events:none; z-index:0; filter:blur(90px); opacity:.45; }
+  .aura div { position:absolute; width:44vw; height:44vw; border-radius:50%; }
+  .aura .a1 { background:radial-gradient(circle, rgba(233,30,140,.16), transparent 65%); animation:drift1 26s ease-in-out infinite alternate; left:4%; top:8%; }
+  .aura .a2 { background:radial-gradient(circle, rgba(139,92,246,.13), transparent 65%); animation:drift2 32s ease-in-out infinite alternate; right:2%; top:30%; }
+  .aura .a3 { background:radial-gradient(circle, rgba(0,209,196,.08), transparent 65%); animation:drift1 38s ease-in-out infinite alternate-reverse; left:36%; bottom:-6%; }
+  @keyframes drift1 { to { transform:translate(7vw,5vh) scale(1.15); } }
+  @keyframes drift2 { to { transform:translate(-6vw,-4vh) scale(0.9); } }
+  .grain { position:fixed; inset:0; pointer-events:none; z-index:50; opacity:.05; mix-blend-mode:soft-light;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+  .top { position:relative; z-index:2; display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); flex-wrap:wrap; }
+  .top a.home { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a.home:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:800 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .steps { display:flex; gap:6px; margin-left:6px; }
+  .step { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer; position:relative;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 12.5px Inter; transition:all .12s; display:flex; align-items:center; gap:7px; }
+  .step:hover { border-color:rgba(233,30,140,.5); }
+  .step.hot { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent; box-shadow:0 3px 14px rgba(233,30,140,.4); }
+  .step .n { font:800 10px 'Space Mono'; width:18px; height:18px; border-radius:50%; display:grid; place-items:center;
+    background:rgba(255,255,255,.12); }
+  .step.done .n { background:var(--teal); color:#04201d; }
+  .step.hot .n { background:#14040E; color:#FF9DCE; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .playbtn { padding:10px 22px; border-radius:12px; border:none; cursor:pointer; font:900 14px Oxanium; letter-spacing:.14em;
+    background:linear-gradient(120deg,#37FFB0,var(--teal)); color:#04201d; box-shadow:0 4px 18px rgba(0,209,196,.4); transition:all .12s; }
+  .playbtn:hover { transform:translateY(-1px); }
+  .playbtn:disabled { opacity:.4; cursor:default; box-shadow:none; transform:none; }
+
+  .stage { position:relative; z-index:1; height:calc(100vh - 56px); overflow-y:auto; display:flex; align-items:flex-start; justify-content:center; padding:28px 18px 60px; }
+  .panel { width:100%; max-width:760px; }
+  .panel.hide { display:none; }
+  .hd { font:800 22px Oxanium; letter-spacing:.04em; margin-bottom:4px; }
+  .hd .sub { font:500 12px Inter; color:var(--dim); margin-top:4px; letter-spacing:0; }
+  .card { border:1px solid var(--hairline); border-radius:16px; padding:18px; background:var(--panel); backdrop-filter:blur(22px); margin-top:16px; }
+  .drop { border:1.5px dashed rgba(233,30,140,.4); border-radius:14px; padding:30px; text-align:center; cursor:pointer; transition:all .12s; color:var(--dim); font:500 13px Inter; }
+  .drop:hover, .drop.over { border-color:var(--pink); background:rgba(233,30,140,.06); color:var(--text); }
+  .drop b { color:var(--text); }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .row label { font:500 11px Inter; color:var(--dim); }
+  input[type=range] { accent-color:var(--pink); cursor:pointer; flex:1; min-width:120px; }
+  input[type=text], input[type=url] { background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline); border-radius:9px; font:500 12px Inter; padding:9px 11px; outline:none; flex:1; min-width:0; }
+  input:focus { border-color:rgba(233,30,140,.5); }
+  .btn { padding:9px 15px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer; background:rgba(255,255,255,.05); color:var(--text); font:600 12px Inter; transition:all .12s; }
+  .btn:hover { border-color:rgba(233,30,140,.5); }
+  .btn.pink { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent; font-weight:800; }
+  .btn.teal { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); color:#9BF0E8; }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .frames { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .frames canvas { width:54px; height:auto; image-rendering:pixelated; background:rgba(255,255,255,.04); border:1px solid var(--hairline); border-radius:8px; }
+  .prev { width:100%; max-height:240px; object-fit:contain; border-radius:12px; image-rendering:pixelated; background:#0a0710; border:1px solid var(--hairline); margin-top:12px; display:block; }
+  .ok { color:var(--teal); font:600 11px 'Space Mono'; }
+  .warn { color:var(--amber); font:600 11px 'Space Mono'; }
+  .muted { color:var(--dim); font:500 11.5px Inter; line-height:1.5; }
+  .chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .chip { flex:1; min-width:200px; border:1px solid var(--hairline); border-radius:14px; padding:14px; background:rgba(255,255,255,.02); }
+  .chip h4 { font:700 10px 'Space Mono'; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; margin-bottom:8px; }
+  .chip .state { font:600 12px Inter; }
+  .chip .state.set { color:var(--teal); } .chip .state.unset { color:var(--amber); }
+
+  /* PLAY overlay */
+  #play { position:fixed; inset:0; z-index:300; background:#000; display:none; }
+  #play canvas { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
+  .hud { position:absolute; top:12px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:center; z-index:5;
+    padding:6px 10px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.1); backdrop-filter:blur(8px); border-radius:10px; }
+  .hud .keys { font:600 9px 'Space Mono'; color:#6f6a85; letter-spacing:.14em; }
+  .hud .ttl { font:900 10px Oxanium; color:var(--teal); letter-spacing:.24em; }
+  .hbtn { padding:5px 11px; background:transparent; border:1px solid #ff70bd; color:#ff70bd; font:800 10px Oxanium; letter-spacing:.18em; cursor:pointer; border-radius:8px; display:inline-flex; align-items:center; gap:5px; }
+  .hbtn.rec { color:#37FFB0; border-color:#37FFB0; } .hbtn.recon { color:#ff5050; border-color:#ff5050; }
+  #progress { position:absolute; bottom:0; left:0; right:0; height:3px; background:rgba(255,255,255,.1); z-index:5; }
+  #progressFill { height:100%; width:0; background:linear-gradient(90deg,#FF1B8D,#00ffd0); transition:width 80ms linear; }
+  .attract { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,.82); z-index:9; cursor:pointer; }
+  .attract .pre { font:800 12px Oxanium; letter-spacing:.4em; color:var(--pink); margin-bottom:10px; }
+  .attract .big { font:900 50px Oxanium; letter-spacing:.14em; color:#fff; text-align:center; text-shadow:0 0 24px rgba(255,27,141,.5); }
+  .attract .start { margin-top:26px; font:800 16px Oxanium; letter-spacing:.3em; color:#00ffd0; animation:blink 1.1s steps(1) infinite; }
+  .attract .ctl { margin-top:14px; font:600 10px 'Space Mono'; color:#6f6a85; letter-spacing:.18em; }
+  @keyframes blink { 0%,60%{opacity:1;} 61%,100%{opacity:0;} }
+  .banner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; z-index:11; pointer-events:none; }
+  .banner .s { font:800 12px Oxanium; letter-spacing:.3em; color:#00ffd0; margin-bottom:6px; }
+  .banner .b { font:900 46px Oxanium; letter-spacing:.18em; }
+  .take { position:absolute; bottom:18px; right:14px; z-index:8; display:flex; gap:8px; align-items:center; background:rgba(0,0,0,.7); border:1px solid #37FFB0; padding:8px 10px; border-radius:8px; }
+  .take a { color:#37FFB0; border:1px solid #37FFB0; padding:5px 11px; font:800 10px Oxanium; letter-spacing:.18em; text-decoration:none; border-radius:8px; }
+</style>
+</head>
+<body>
+<div class="aura"><div class="a1"></div><div class="a2"></div><div class="a3"></div></div>
+<div class="grain"></div>
+
+<div class="top">
+  <a class="home" href="/">← Pink Room</a>
+  <h1>👾 16-BIT</h1>
+  <div class="steps" id="steps">
+    <div class="step hot" data-step="cast"><span class="n">1</span> CAST</div>
+    <div class="step" data-step="world"><span class="n">2</span> WORLD</div>
+    <div class="step" data-step="stage"><span class="n">3</span> STAGE</div>
+  </div>
+  <div class="right">
+    <button class="playbtn" id="playBtn" disabled title="Set a character first">▶ PLAY</button>
+  </div>
+</div>
+
+<div class="stage">
+  <!-- STEP 1: CAST -->
+  <div class="panel" id="p-cast">
+    <div class="hd">Pick your character<div class="sub">Step 1 — drop a sprite (a sheet of poses works best). She'll cut it into game frames.</div></div>
+    <div class="card">
+      <div class="drop" id="castDrop">Drop a <b>sprite image</b> here, or click to browse<br><span class="muted">PNG with a transparent or solid-color background. A wide sheet of poses side-by-side = a walk cycle.</span></div>
+      <input type="file" id="castFile" accept="image/*" hidden />
+      <div id="castAfter" style="display:none;">
+        <div class="muted" style="margin-top:14px;">She auto-finds each pose. If a box below looks cut wrong, set the grid by hand (Rows × Cols) and hit Slice.</div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn teal" id="castAuto">↻ Auto-detect</button>
+          <label>Rows</label><input type="number" id="castRows" min="1" max="6" value="1" style="width:58px; flex:none;" />
+          <label>Cols</label><input type="number" id="castColsN" min="1" max="8" value="3" style="width:58px; flex:none;" />
+          <button class="btn" id="castGrid">Slice grid</button>
+        </div>
+        <div class="frames" id="castFrames"></div>
+        <div class="row" style="margin-top:14px;">
+          <span class="ok" id="castStatus"></span>
+          <button class="btn pink" id="castNext" style="margin-left:auto;">Next: World →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: WORLD -->
+  <div class="panel hide" id="p-world">
+    <div class="hd">Build the world<div class="sub">Step 2 — the background your character runs through. Upload one, or have Tiff paint a 16-bit world.</div></div>
+    <div class="card">
+      <div class="drop" id="worldDrop">Drop a <b>background image</b> here, or click to browse<br><span class="muted">Any wide image works — a city, a street, a sky. It tiles + scrolls behind you.</span></div>
+      <input type="file" id="worldFile" accept="image/*" hidden />
+      <div style="margin-top:16px; border-top:1px solid var(--hairline); padding-top:16px;">
+        <div class="muted" style="margin-bottom:8px;">…or paint one with Tiff (16-bit pixel-art background):</div>
+        <div class="row">
+          <input type="text" id="worldPrompt" placeholder="neon city street at night / spooky forest / desert highway…" />
+          <button class="btn teal" id="worldGen">✨ Paint it</button>
+        </div>
+        <div class="muted" id="worldGenStatus" style="margin-top:8px;"></div>
+      </div>
+      <img class="prev" id="worldPrev" style="display:none;" alt="" />
+      <div class="row" style="margin-top:12px;">
+        <span class="ok" id="worldStatus"></span>
+        <button class="btn pink" id="worldNext" style="margin-left:auto;" disabled>Next: Stage →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: STAGE -->
+  <div class="panel hide" id="p-stage">
+    <div class="hd">Stage it + drop a track<div class="sub">Step 3 — your run becomes the music video. Add a song, then hit PLAY and record it.</div></div>
+    <div class="chips">
+      <div class="chip"><h4>Character</h4><div class="state unset" id="sCast">none yet</div></div>
+      <div class="chip"><h4>World</h4><div class="state unset" id="sWorld">none yet</div></div>
+    </div>
+    <div class="card">
+      <div class="drop" id="songDrop" style="padding:20px;">Drop a <b>song</b> (MP3/WAV) here, or click to browse<br><span class="muted">Plays under your run + gets baked into the recorded video. Optional — you can play silent.</span></div>
+      <input type="file" id="songFile" accept="audio/*" hidden />
+      <div class="row" style="margin-top:10px;">
+        <input type="text" id="songName" placeholder="track name (also seeds the level layout)" />
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <span class="ok" id="songStatus"></span>
+        <button class="playbtn" id="stagePlay" style="margin-left:auto;" disabled>▶ PLAY</button>
+      </div>
+      <div class="muted" style="margin-top:12px;">In-game: <b>←→</b> run · <b>SHIFT</b> sprint · <b>SPACE</b> jump · <b>X</b> pose · hit <b>REC</b> to capture · reach the <b>pipe</b> to clear · <b>ESC</b> to exit.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAY OVERLAY -->
+<div id="play">
+  <canvas id="gc"></canvas>
+  <div class="hud">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="ttl">▶ 16-BIT</span>
+      <span style="font:700 10px Oxanium; color:#fff; letter-spacing:.18em;" id="hudSong"></span>
+      <span class="warn" id="hudSilent" style="display:none;">♪ no song — playing silent</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="keys">←→ RUN · SHIFT SPRINT · SPACE JUMP · X POSE · ESC EXIT</span>
+      <button class="hbtn rec" id="recBtn">● REC</button>
+      <button class="hbtn" id="exitBtn">✕ EXIT</button>
+    </div>
+  </div>
+  <div id="progress"><div id="progressFill"></div></div>
+  <div class="attract" id="attract">
+    <div class="pre">16-BIT PRESENTS</div>
+    <div class="big" id="attractTitle">THE RUN</div>
+    <div class="start">PRESS START</div>
+    <div class="ctl">←→ RUN · SPACE JUMP · REACH THE PIPE · ANY KEY TO BEGIN</div>
+  </div>
+  <div class="banner" id="banner" style="display:none;"><div class="s" id="bannerS"></div><div class="b" id="bannerB"></div></div>
+  <div class="take" id="take" style="display:none;"><span style="color:#37FFB0; font:800 10px Oxanium; letter-spacing:.14em;">TAKE SAVED</span><a id="takeDl" download="">⬇ DOWNLOAD</a></div>
+  <audio id="song" preload="auto" style="display:none;"></audio>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ───────────────────────── STATE ───────────────────────── */
+const G_STATE = {
+  cast: null,    // { canvas, cellW, cellH, count }
+  castSrc: null, // source Image (for re-slicing)
+  world: null,   // Image
+  songUrl: "",
+  songName: "",
+};
+
+/* ───────────────────────── STEP NAV ───────────────────────── */
+function goStep(s) {
+  ["cast","world","stage"].forEach(k => {
+    $("p-" + k).classList.toggle("hide", k !== s);
+    const el = document.querySelector(`.step[data-step="${k}"]`);
+    el.classList.toggle("hot", k === s);
+  });
+  if (s === "stage") refreshStage();
+}
+document.querySelectorAll(".step").forEach(el => el.onclick = () => goStep(el.dataset.step));
+function markDone(s, done) { document.querySelector(`.step[data-step="${s}"]`).classList.toggle("done", done); }
+
+/* ───────────────────────── CAST: load + chroma-key + slice ───────────────────────── */
+function fileToImage(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+// Make the background transparent: sample the top-left corner; if it's already
+// transparent, leave it; otherwise key out pixels close to that corner color.
+function chromaKey(img) {
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+  let d;
+  try { d = x.getImageData(0, 0, c.width, c.height); } catch (e) { return c; }
+  const p = d.data;
+  const cr = p[0], cg = p[1], cb = p[2], ca = p[3];
+  if (ca < 12) return c;                       // already transparent — leave it
+  const TH = 4200;                              // squared-distance threshold
+  for (let i = 0; i < p.length; i += 4) {
+    const dr = p[i]-cr, dg = p[i+1]-cg, db = p[i+2]-cb;
+    if (dr*dr + dg*dg + db*db < TH) p[i+3] = 0;
+  }
+  x.putImageData(d, 0, 0);
+  return c;
+}
+// ── SMART SPRITE EXTRACTION ──────────────────────────────────────────────
+// Find each pose by the transparent GUTTERS between sprites (works for a single
+// row, a grid, or scattered poses) — not dumb equal-width strips that cut
+// characters in half. Then crop each tight + pack into a uniform horizontal atlas.
+function occupancy(ctx, W, H) {
+  const d = ctx.getImageData(0, 0, W, H).data;
+  const col = new Array(W).fill(false), row = new Array(H).fill(false);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (d[(y*W + x)*4 + 3] > 24) { col[x] = true; row[y] = true; }
+  }
+  return { col, row };
+}
+// runs of "occupied", bridging gaps smaller than minGap (those are inside a sprite)
+function segments(arr, minGap) {
+  const segs = []; let i = 0, n = arr.length;
+  while (i < n) {
+    if (!arr[i]) { i++; continue; }
+    let start = i, last = i, gap = 0, j = i;
+    while (j < n && (arr[j] || gap < minGap)) { if (arr[j]) { last = j; gap = 0; } else gap++; j++; }
+    segs.push([start, last]); i = last + 1;
+  }
+  return segs;
+}
+// auto grid: cross every detected column-band with every row-band
+function autoCells(keyed) {
+  const ctx = keyed.getContext("2d"), W = keyed.width, H = keyed.height;
+  const { col, row } = occupancy(ctx, W, H);
+  const cs = segments(col, Math.max(6, Math.round(W*0.022)));
+  const rs = segments(row, Math.max(6, Math.round(H*0.05)));
+  const cells = [];
+  for (const [y0, y1] of rs) for (const [x0, x1] of cs) cells.push({ x:x0, y:y0, w:x1-x0+1, h:y1-y0+1 });
+  return cells;
+}
+// manual equal grid (fallback)
+function gridCells(keyed, rows, cols) {
+  const W = keyed.width, H = keyed.height, cw = Math.floor(W/cols), ch = Math.floor(H/rows), out = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) out.push({ x:c*cw, y:r*ch, w:cw, h:ch });
+  return out;
+}
+// tight content bbox inside a region (null if the region is empty)
+function tightBbox(ctx, c) {
+  const d = ctx.getImageData(c.x, c.y, c.w, c.h).data;
+  let minx = c.w, miny = c.h, maxx = -1, maxy = -1;
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
+    if (d[(y*c.w + x)*4 + 3] > 24) { if (x<minx)minx=x; if (x>maxx)maxx=x; if (y<miny)miny=y; if (y>maxy)maxy=y; }
+  }
+  if (maxx < 0) return null;
+  return { x: c.x+minx, y: c.y+miny, w: maxx-minx+1, h: maxy-miny+1 };
+}
+// crop each cell tight, drop empties, pack into a uniform horizontal strip
+// (bottom-aligned + h-centered so feet line up across poses in the game)
+function packFromCells(keyed, cells) {
+  const ctx = keyed.getContext("2d");
+  const sp = cells.map(c => tightBbox(ctx, c)).filter(Boolean)
+    .filter(s => s.w > keyed.width*0.02 && s.h > keyed.height*0.08);   // drop specks
+  if (!sp.length) return null;
+  const cw = Math.max(...sp.map(s=>s.w)), ch = Math.max(...sp.map(s=>s.h));
+  const out = document.createElement("canvas"); out.width = cw*sp.length; out.height = ch;
+  const o = out.getContext("2d");
+  sp.forEach((s, i) => o.drawImage(keyed, s.x, s.y, s.w, s.h, i*cw + (cw-s.w)/2, ch-s.h, s.w, s.h));
+  return { canvas: out, cellW: cw, cellH: ch, count: sp.length };
+}
+function renderCastFrames(how) {
+  const atlas = G_STATE.cast; const host = $("castFrames"); host.innerHTML = "";
+  for (let i = 0; i < atlas.count; i++) {
+    const c = document.createElement("canvas");
+    c.width = atlas.cellW; c.height = atlas.cellH;
+    c.getContext("2d").drawImage(atlas.canvas, i*atlas.cellW, 0, atlas.cellW, atlas.cellH, 0, 0, atlas.cellW, atlas.cellH);
+    host.appendChild(c);
+  }
+  $("castStatus").textContent = `✓ ${atlas.count} pose${atlas.count>1?"s":""} ${how || "ready"}`;
+  markDone("cast", true);
+  $("playBtn").disabled = false;
+}
+function autoCast() {
+  const k = G_STATE.keyed; if (!k) return;
+  G_STATE.cast = packFromCells(k, autoCells(k)) || { canvas:k, cellW:k.width, cellH:k.height, count:1 };
+  renderCastFrames("found");
+}
+function manualGrid() {
+  const k = G_STATE.keyed; if (!k) return;
+  const rows = Math.max(1, parseInt($("castRows").value,10)||1), cols = Math.max(1, parseInt($("castColsN").value,10)||1);
+  G_STATE.cast = packFromCells(k, gridCells(k, rows, cols)) || { canvas:k, cellW:k.width, cellH:k.height, count:1 };
+  renderCastFrames(`(grid ${rows}×${cols})`);
+}
+async function loadCast(file) {
+  const img = await fileToImage(file);
+  G_STATE.keyed = chromaKey(img);
+  $("castAfter").style.display = "block";
+  autoCast();
+}
+$("castDrop").onclick = () => $("castFile").click();
+$("castFile").onchange = e => { if (e.target.files[0]) loadCast(e.target.files[0]); };
+$("castAuto").onclick = autoCast;
+$("castGrid").onclick = manualGrid;
+$("castNext").onclick = () => goStep("world");
+wireDrop($("castDrop"), f => loadCast(f), "image");
+
+/* ───────────────────────── WORLD: upload or generate ───────────────────────── */
+async function setWorld(img) {
+  G_STATE.world = img;
+  $("worldPrev").src = img.src; $("worldPrev").style.display = "block";
+  $("worldStatus").textContent = "✓ world set";
+  $("worldNext").disabled = false; markDone("world", true);
+}
+$("worldDrop").onclick = () => $("worldFile").click();
+$("worldFile").onchange = async e => { if (e.target.files[0]) setWorld(await fileToImage(e.target.files[0])); };
+wireDrop($("worldDrop"), async f => setWorld(await fileToImage(f)), "image");
+$("worldNext").onclick = () => goStep("stage");
+$("worldGen").onclick = async () => {
+  const idea = $("worldPrompt").value.trim();
+  if (!idea) { $("worldGenStatus").textContent = "type what the world looks like first"; return; }
+  $("worldGen").disabled = true;
+  $("worldGenStatus").textContent = "🎨 Tiff's painting your world… (~30-60s)";
+  try {
+    const body = { prompt: "16-bit pixel art side-scrolling video game background, " + idea + ", retro game world, parallax layers, crisp pixels", mode: "draft", size: "1344x768" };
+    const r = await fetch("/api/image", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(r=>r.json());
+    if (r.error || !r.filename) { $("worldGenStatus").textContent = "⚠ " + (r.error || "couldn't paint it — upload one instead"); }
+    else {
+      const img = new Image();
+      img.onload = () => { setWorld(img); $("worldGenStatus").textContent = "✓ painted"; };
+      img.src = "/api/image/file/" + r.filename;
+    }
+  } catch (e) { $("worldGenStatus").textContent = "⚠ " + e.message; }
+  $("worldGen").disabled = false;
+};
+
+/* ───────────────────────── STAGE: song + play ───────────────────────── */
+function refreshStage() {
+  $("sCast").textContent = G_STATE.cast ? `✓ ${G_STATE.cast.count} frame(s)` : "none yet";
+  $("sCast").className = "state " + (G_STATE.cast ? "set" : "unset");
+  $("sWorld").textContent = G_STATE.world ? "✓ set" : "none yet";
+  $("sWorld").className = "state " + (G_STATE.world ? "set" : "unset");
+  const ready = !!G_STATE.cast;   // world optional (falls back to a default sky)
+  $("stagePlay").disabled = !ready;
+}
+$("songDrop").onclick = () => $("songFile").click();
+$("songFile").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  G_STATE.songUrl = URL.createObjectURL(f);
+  G_STATE.songName = f.name.replace(/\.[^.]+$/, "");
+  if (!$("songName").value) $("songName").value = G_STATE.songName;
+  $("songStatus").textContent = "✓ " + f.name;
+};
+wireDrop($("songDrop"), f => { G_STATE.songUrl = URL.createObjectURL(f); G_STATE.songName = f.name.replace(/\.[^.]+$/,""); if(!$("songName").value)$("songName").value=G_STATE.songName; $("songStatus").textContent="✓ "+f.name; }, "audio");
+$("songName").oninput = () => { G_STATE.songName = $("songName").value.trim(); };
+$("stagePlay").onclick = startGame;
+$("playBtn").onclick = () => { if (G_STATE.cast) startGame(); else goStep("cast"); };
+
+/* shared drag-drop wiring */
+function wireDrop(el, onFile, kind) {
+  el.addEventListener("dragover", e => { e.preventDefault(); el.classList.add("over"); });
+  el.addEventListener("dragleave", () => el.classList.remove("over"));
+  el.addEventListener("drop", e => {
+    e.preventDefault(); el.classList.remove("over");
+    const f = e.dataTransfer.files[0]; if (!f) return;
+    if (kind === "image" && !f.type.startsWith("image")) return;
+    if (kind === "audio" && !f.type.startsWith("audio")) return;
+    onFile(f);
+  });
+}
+
+/* ════════════════════════ THE GAME (ported from heytiff PlayMode → Canvas 2D) ════════════════════════ */
+// Deterministic RNG so the same track always builds the same level.
+function mulberry32(seed){ return () => { seed|=0; seed=(seed+0x6D2B79F5)|0; let t=Math.imul(seed^(seed>>>15),1|seed); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+
+let GAME = null;  // active game instance
+
+function startGame() {
+  if (!G_STATE.cast) { goStep("cast"); return; }
+  if (GAME) endGame();              // never stack two games / two key-listener sets
+  $("play").style.display = "block";
+  const cv = $("gc");
+  cv.width = window.innerWidth; cv.height = window.innerHeight;
+  const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  const W = cv.width, H = cv.height, unit = H / 720;
+
+  const atlas = G_STATE.cast, world = G_STATE.world;
+  const floorY = H * 0.88;
+  const LEVEL_LEN = W * 4;                         // single image looped = ~4 screens
+  const bgScale = world ? H / world.naturalHeight : 1;
+  const bgTileW = world ? world.naturalWidth * bgScale : 0;
+
+  // platforms — seeded per track
+  const rng = mulberry32(hashStr(G_STATE.songName || "level"));
+  const plats = [];
+  let px = W * 0.9;
+  while (px < LEVEL_LEN - W * 0.8) {
+    const w = (120 + rng()*160) * unit;
+    const y = floorY - (110 + rng()*150) * unit;
+    plats.push({ x: px, y, w });
+    if (rng() < 0.35) plats.push({ x: px + w*0.55 + 60*unit, y: y - (95 + rng()*60)*unit, w: (100 + rng()*120)*unit });
+    px += w + (260 + rng()*320) * unit;
+  }
+  const PLAT_H = 18 * unit;
+  const exitX = LEVEL_LEN - W * 0.25;
+
+  // physics constants (the SNES feel — exact from PlayMode)
+  const GRA = 3000*unit, JUMP_V = -1080*unit, RUN_V = 320*unit, SPRINT_V = 470*unit, COYOTE = 0.09, BUFFER = 0.11;
+  const player = { x: W*0.3, y: floorY, vx:0, vy:0, onGround:true, facing:1, coyote:0, buffer:0, jumping:false };
+  let camX = 0, finished = false, started = false, levelT = 0, raf = 0, last = performance.now();
+  let frameTimer = 0, frameI = 0, poseUntil = 0;
+  const charScale = (H * 0.42) / atlas.cellH;
+  const keys = new Set();
+
+  const F = (...idx) => { const ok = idx.filter(i => i < atlas.count); return ok.length ? ok : [0]; };
+  const sets = { idle:F(0), walk:F(1,0), run:F(2,1), jump:F(3), pose:F(6,4) };
+
+  // audio
+  const song = $("song");
+  let silent = !G_STATE.songUrl;
+  $("hudSong").textContent = (G_STATE.songName || "").toUpperCase();
+  $("hudSilent").style.display = silent ? "inline" : "none";
+  $("attractTitle").textContent = (G_STATE.songName || "THE RUN").toUpperCase();
+
+  // attract screen
+  $("attract").style.display = "flex";
+  $("banner").style.display = "none";
+  $("take").style.display = "none";
+  $("progressFill").style.width = "0%";
+
+  function draw() {
+    ctx.fillStyle = "#050309"; ctx.fillRect(0,0,W,H);
+    // parallax background (tiled, scrolls at 1x)
+    if (world && bgTileW > 0) {
+      let startX = -((camX % bgTileW) + bgTileW) % bgTileW;
+      for (let x = startX; x < W; x += bgTileW) ctx.drawImage(world, x, 0, bgTileW, H);
+    } else {
+      // default gradient sky if no world
+      const g = ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#1a0f2e"); g.addColorStop(1,"#0a0714");
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    }
+    // floor strip
+    ctx.fillStyle = "#0B0818"; ctx.fillRect(0, floorY, W, H - floorY);
+    ctx.fillStyle = "#1B1430"; ctx.fillRect(0, floorY, W, 5*unit);
+    ctx.fillStyle = "#00ffd0"; ctx.fillRect(0, floorY, W, 2*unit);
+    // platforms (world space → screen via -camX)
+    for (const p of plats) {
+      const sx = p.x - camX; if (sx > W || sx + p.w < 0) continue;
+      ctx.fillStyle = "#1B1430"; ctx.fillRect(sx, p.y, p.w, PLAT_H);
+      ctx.fillStyle = "#00ffd0"; ctx.fillRect(sx, p.y, p.w, 4*unit);
+      ctx.fillStyle = "#0B0818"; ctx.fillRect(sx, p.y + PLAT_H - 3*unit, p.w, 3*unit);
+    }
+    // exit pipe
+    const pipeSx = exitX - camX;
+    if (pipeSx < W + 120 && pipeSx > -120) {
+      const py = floorY - 150*unit;
+      ctx.fillStyle = "#123326"; ctx.fillRect(pipeSx, py, 86*unit, 150*unit);
+      ctx.fillStyle = "#1B4D38"; ctx.fillRect(pipeSx - 8*unit, py - 26*unit, 102*unit, 30*unit);
+      ctx.fillStyle = "#37FFB0"; ctx.fillRect(pipeSx - 8*unit, py - 26*unit, 102*unit, 6*unit);
+      ctx.fillStyle = "rgba(55,255,176,0.16)"; ctx.fillRect(pipeSx + 18*unit, py + 6*unit, 50*unit, 110*unit);
+    }
+    // character
+    const moving = Math.abs(player.vx) > 20, posing = performance.now() < poseUntil, sprint = keys.has("ShiftLeft")||keys.has("ShiftRight");
+    let set = sets.idle;
+    if (posing) set = sets.pose; else if (!player.onGround) set = sets.jump; else if (moving) set = sprint ? sets.run : sets.walk;
+    const fr = set[frameI % set.length];
+    const dw = atlas.cellW * charScale, dh = atlas.cellH * charScale;
+    const cxp = player.x - camX, cyp = player.y;
+    ctx.save();
+    ctx.translate(cxp, cyp);                 // foot point (player.y = feet)
+    if (player.facing < 0) ctx.scale(-1, 1); // mirror around center for left-facing
+    ctx.drawImage(atlas.canvas, fr*atlas.cellW, 0, atlas.cellW, atlas.cellH, -dw/2, -dh, dw, dh);
+    ctx.restore();
+    // title card
+    if (started && levelT < 2.3) {
+      const a = levelT < 1.6 ? 1 : Math.max(0, 1 - (levelT-1.6)/0.7);
+      ctx.fillStyle = `rgba(0,0,0,${a})`; ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha = a; ctx.textAlign = "center";
+      ctx.fillStyle = "#00ffd0"; ctx.font = `800 ${Math.min(W*0.025,22)}px Oxanium`; ctx.fillText("STAGE 01", W/2, H/2 - 30);
+      ctx.fillStyle = "#fff"; ctx.font = `900 ${Math.min(W*0.055,60)}px Oxanium`; ctx.fillText((G_STATE.songName||"THE RUN").toUpperCase(), W/2, H/2 + 24);
+      ctx.globalAlpha = 1; ctx.textAlign = "left";
+    }
+  }
+
+  function step(dt) {
+    if (!started) return;
+    levelT += dt;
+    const left = keys.has("ArrowLeft")||keys.has("KeyA"), right = keys.has("ArrowRight")||keys.has("KeyD");
+    const sprint = keys.has("ShiftLeft")||keys.has("ShiftRight"), speed = sprint ? SPRINT_V : RUN_V;
+    const target = (right?1:0) - (left?1:0);
+    if (target !== 0) { player.vx += (target*speed - player.vx) * Math.min(1, 14*dt); player.facing = target; }
+    else { player.vx *= Math.max(0, 1 - 10*dt); if (Math.abs(player.vx) < 6) player.vx = 0; }
+    player.vy += GRA * dt;
+    if (player.jumping && !keys.has("Space") && player.vy < 0) { player.vy *= 0.55; player.jumping = false; }
+    const prevY = player.y;
+    player.x = Math.max(40*unit, Math.min(LEVEL_LEN - 20*unit, player.x + player.vx*dt));
+    player.y += player.vy * dt;
+    player.coyote = Math.max(0, player.coyote - dt);
+    player.buffer = Math.max(0, player.buffer - dt);
+    let grounded = false;
+    if (player.y >= floorY) { player.y = floorY; player.vy = 0; grounded = true; }
+    else if (player.vy >= 0) {
+      for (const p of plats) {
+        if (player.x > p.x - 6 && player.x < p.x + p.w + 6 && prevY <= p.y + 2 && player.y >= p.y) { player.y = p.y; player.vy = 0; grounded = true; break; }
+      }
+    }
+    if (grounded) { player.coyote = COYOTE; player.jumping = false; }
+    player.onGround = grounded;
+    if (player.buffer > 0 && player.coyote > 0) { player.vy = JUMP_V; player.jumping = true; player.buffer = 0; player.coyote = 0; }
+    if (!finished && player.x > exitX + 20*unit) { finished = true; winLevel(); }
+    const lookAhead = player.facing * W * 0.12;
+    const camTarget = Math.max(0, Math.min(LEVEL_LEN - W, player.x - W*0.42 + lookAhead));
+    camX += (camTarget - camX) * Math.min(1, 6*dt);
+    $("progressFill").style.width = Math.min(100, player.x / Math.max(1, exitX) * 100) + "%";
+    // anim frame advance
+    frameTimer += dt;
+    const moving = Math.abs(player.vx) > 20, hold = (moving && sprint) ? 0.085 : 0.12;
+    if (frameTimer >= hold) { frameTimer = 0; frameI++; }
+  }
+
+  function loop(now) {
+    const dt = Math.min((now - last)/1000, 0.05); last = now;
+    step(dt); draw();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function begin() {
+    if (started) return;
+    started = true; levelT = 0; last = performance.now();
+    $("attract").style.display = "none";
+    if (!silent) { song.src = G_STATE.songUrl; song.load(); song.play().then(()=>{ silent=false; }).catch(()=>{ silent=true; $("hudSilent").style.display="inline"; }); }
+  }
+  function winLevel() {
+    $("banner").style.display = "flex"; $("bannerS").textContent = "STAGE CLEAR"; $("bannerB").textContent = "◇ GAME CLEAR ◇";
+    try { song.pause(); } catch(e){}
+  }
+
+  // input
+  function kd(e){ if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(e.code)) e.preventDefault();
+    if (!started) { begin(); return; }
+    keys.add(e.code); if (e.code==="Space") player.buffer = BUFFER; if (e.code==="KeyX") poseUntil = performance.now()+800; if (e.code==="Escape") endGame(); }
+  function ku(e){ keys.delete(e.code); }
+  window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
+  $("attract").onclick = begin;
+  song.onended = () => { if (!finished) { finished = true; winLevel(); } };
+
+  GAME = { cv, song, kd, ku, raf: () => raf };
+  raf = requestAnimationFrame(loop);
+}
+
+function endGame() {
+  if (!GAME) return;
+  cancelAnimationFrame(GAME.raf());
+  window.removeEventListener("keydown", GAME.kd); window.removeEventListener("keyup", GAME.ku);
+  try { GAME.song.pause(); GAME.song.src = ""; } catch(e){}
+  stopRec();
+  $("play").style.display = "none";
+  GAME = null;
+}
+$("exitBtn").onclick = endGame;
+
+/* ───────────────────────── RECORD: gameplay → WebM ───────────────────────── */
+let REC = null, recChunks = [];
+function startRec() {
+  if (!GAME) return;
+  try {
+    const stream = GAME.cv.captureStream(30);
+    const sEl = GAME.song;
+    if (sEl && sEl.captureStream) { try { sEl.captureStream().getAudioTracks().forEach(t => stream.addTrack(t)); } catch(e){} }
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+    REC = new MediaRecorder(stream, { mimeType: mime }); recChunks = [];
+    REC.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    REC.onstop = () => {
+      const blob = new Blob(recChunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      $("takeDl").href = url; $("takeDl").download = (G_STATE.songName||"bit16").replace(/\W+/g,"_") + "_run.webm";
+      $("take").style.display = "flex";
+      REC = null;
+    };
+    REC.start(1000);
+    $("recBtn").textContent = "■ STOP"; $("recBtn").classList.add("recon");
+  } catch (e) { console.error("rec failed", e); }
+}
+function stopRec() { if (REC) { try { REC.stop(); } catch(e){} } $("recBtn").textContent = "● REC"; $("recBtn").classList.remove("recon"); }
+$("recBtn").onclick = () => { if (REC) stopRec(); else startRec(); };
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>
