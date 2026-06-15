@@ -82,6 +82,11 @@
   .chip.m.on { background:rgba(255,90,110,.18); color:#FF9DAB; border-color:rgba(255,90,110,.5); }
   .chip.s.on { background:rgba(245,166,35,.18); color:#FFD79B; border-color:rgba(245,166,35,.5); }
   .chip.x { margin-left:auto; color:#FF7A93; }
+  .chip.cut { color:#FFB3C2; } .chip.trim { color:#9BF0E8; } .chip.undo { color:#E6CBFF; font-size:12px; }
+  .wave { cursor:crosshair; }
+  .toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:99; opacity:0; transition:opacity .18s; pointer-events:none;
+    background:rgba(20,8,20,.94); border:1px solid var(--hairline); color:#FFD6EA; font:500 12px Inter; padding:9px 16px; border-radius:11px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  .toast.on { opacity:1; }
   .chip.ai { color:#E6CBFF; border-color:rgba(139,92,246,.45);
     background:linear-gradient(120deg,rgba(233,30,140,.16),rgba(139,92,246,.18)); }
   .chip.ai:hover { border-color:rgba(233,30,140,.6); color:#FFE3F4; box-shadow:0 0 12px rgba(139,92,246,.3); }
@@ -228,6 +233,34 @@ const STEM_COLORS = ["#E91E8C","#00D1C4","#8B5CF6","#F5A623","#34D399","#60A5FA"
 let colorN = 0;
 function nextStemColor(){ return STEM_COLORS[colorN++ % STEM_COLORS.length]; }
 function hexA(hex, a){ const m = (hex||"#E91E8C").replace("#",""); return `rgba(${parseInt(m.slice(0,2),16)},${parseInt(m.slice(2,4),16)},${parseInt(m.slice(4,6),16)},${a})`; }
+// ── clip editing: drag-select on a wave, then CUT a slice out / TRIM to it (per-stem undo) ──
+let SEL = null;            // {trackId, a, b} — selection as fractions [0,1] of the track's buffer
+const UNDO = [];           // [{trackId, buffer, offset}] snapshots for undo
+let _toastT;
+function flash(m){ let e=document.getElementById("toast"); if(!e){ e=document.createElement("div"); e.id="toast"; e.className="toast"; document.body.appendChild(e); } e.textContent=m; e.classList.add("on"); clearTimeout(_toastT); _toastT=setTimeout(()=>e.classList.remove("on"),1800); }
+function pushUndo(t){ UNDO.push({trackId:t.id, buffer:t.buffer, offset:t.offset||0}); if(UNDO.length>40) UNDO.shift(); }
+function bufSlice(buf, f1, f2, keepInside){
+  const sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
+  const a=Math.max(0,Math.min(N,Math.floor(Math.min(f1,f2)*N))), b=Math.max(0,Math.min(N,Math.floor(Math.max(f1,f2)*N)));
+  const newLen=Math.max(1, keepInside ? (b-a) : (N-(b-a)));
+  const out=ctx.createBuffer(ch,newLen,sr);
+  for(let k=0;k<ch;k++){ const s=buf.getChannelData(k), d=out.getChannelData(k);
+    if(keepInside){ for(let i=0;i<newLen;i++) d[i]=s[a+i]; }
+    else { let j=0; for(let i=0;i<a;i++) d[j++]=s[i]; for(let i=b;i<N;i++) d[j++]=s[i]; } }
+  return out;
+}
+function applyEdit(t, keepInside){
+  if(!SEL || SEL.trackId!==t.id || Math.abs(SEL.a-SEL.b)<0.002){ flash("Drag across the wave to pick a region first"); return; }
+  pushUndo(t);
+  t.buffer=bufSlice(t.buffer, SEL.a, SEL.b, keepInside);
+  SEL=null;
+  if(playing) restartPlayback();
+  flash(keepInside ? "Trimmed to selection" : "Cut the selection out");
+}
+function undoTrack(t){
+  for(let i=UNDO.length-1;i>=0;i--){ if(UNDO[i].trackId===t.id){ const u=UNDO.splice(i,1)[0]; t.buffer=u.buffer; t.offset=u.offset; SEL=null; if(playing) restartPlayback(); flash("Undone"); return; } }
+  flash("Nothing to undo on this stem");
+}
 let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
 
 /* ── plugin registry — B's own format ──
@@ -1339,6 +1372,9 @@ function laneUi(t) {
     <div class="lhead">
       <span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span>
       <button class="chip ai" title="Auto-mix: analyze this track and propose bounded EQ/comp/de-ess moves">✨ Auto</button>
+      <button class="chip cut" title="Drag across the wave to select, then Cut the selected region out">✂ Cut</button>
+      <button class="chip trim" title="Trim — keep ONLY the selected region">Trim</button>
+      <button class="chip undo" title="Undo the last edit on this stem">↶</button>
       <button class="chip m">M</button><button class="chip s">S</button>
       <button class="chip x">✕</button>
     </div>
@@ -1368,9 +1404,16 @@ function laneUi(t) {
   d.querySelector(".chip.s").onclick = (e) => { t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
   d.querySelector(".chip.x").onclick = () => { stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     $("drop").style.display = tracks.length ? "none" : "block"; };
-  d.querySelector(".wave").onclick = (e) => {
-    const frac = e.offsetX / e.target.clientWidth;
-    seek(frac * maxDur());
+  d.querySelector(".chip.cut").onclick = () => applyEdit(t, false);
+  d.querySelector(".chip.trim").onclick = () => applyEdit(t, true);
+  d.querySelector(".chip.undo").onclick = () => undoTrack(t);
+  const wv = d.querySelector(".wave");
+  wv.onmousedown = (e) => {
+    const f0 = Math.max(0, Math.min(1, e.offsetX / wv.clientWidth));
+    SEL = { trackId: t.id, a: f0, b: f0 }; let moved = false;
+    const mv = (ev) => { const r = wv.getBoundingClientRect(); SEL.b = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); if (Math.abs(SEL.b - f0) > 0.004) moved = true; };
+    const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (!moved) { SEL = null; seek(f0 * maxDur()); } };
+    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   d.querySelectorAll(".strip input[type=range]").forEach(inp => {
     inp.oninput = () => {
@@ -2110,6 +2153,12 @@ function tickUi() {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
     drawWave(cv, t.buffer, t.color);
     const g = cv.getContext("2d");
+    if (SEL && SEL.trackId === t.id) {                 // cut/trim selection overlay
+      const x1 = Math.min(SEL.a, SEL.b) * cv.width, x2 = Math.max(SEL.a, SEL.b) * cv.width;
+      g.fillStyle = "rgba(255,255,255,0.16)"; g.fillRect(x1, 0, x2 - x1, cv.height);
+      g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x1, 0); g.lineTo(x1, cv.height); g.moveTo(x2, 0); g.lineTo(x2, cv.height); g.stroke();
+    }
     const local = p - (t.offset || 0);                 // transport pos inside this clip
     if (local < 0 || local > t.buffer.duration) return; // playhead not over this clip
     const x = (local / t.buffer.duration) * cv.width;
