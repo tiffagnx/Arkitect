@@ -75,6 +75,7 @@
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
   .lane.muted { opacity:.45; }
   .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .lhead .cdot { width:11px; height:11px; border-radius:3px; flex:none; margin-right:8px; box-shadow:0 0 7px rgba(0,0,0,.4) inset; }
   .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .chip { padding:4px 10px; border-radius:8px; border:1px solid var(--hairline); cursor:pointer;
     background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; transition:all .1s; }
@@ -221,6 +222,12 @@ let ctx = null;                 // AudioContext (created on first interaction)
 const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
 let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
 let verb = null;                // {convolver, predelay, ret}
+// per-stem color: ONE color per track/stem (stereo = same color both channels), distinct per stem
+const STEM_COLORS = ["#E91E8C","#00D1C4","#8B5CF6","#F5A623","#34D399","#60A5FA",
+                     "#FF6B6B","#A3E635","#22D3EE","#FB923C","#FB7185","#818CF8"];
+let colorN = 0;
+function nextStemColor(){ return STEM_COLORS[colorN++ % STEM_COLORS.length]; }
+function hexA(hex, a){ const m = (hex||"#E91E8C").replace("#",""); return `rgba(${parseInt(m.slice(0,2),16)},${parseInt(m.slice(2,4),16)},${parseInt(m.slice(4,6),16)},${a})`; }
 let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
 
 /* ── plugin registry — B's own format ──
@@ -1325,11 +1332,12 @@ async function addFiles(files) {
 }
 
 function laneUi(t) {
+  if (!t.color) t.color = nextStemColor();
   const d = document.createElement("div");
   d.className = "lane"; d.id = "lane-" + t.id;
   d.innerHTML = `
     <div class="lhead">
-      <span class="name">${t.name}</span>
+      <span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span>
       <button class="chip ai" title="Auto-mix: analyze this track and propose bounded EQ/comp/de-ess moves">✨ Auto</button>
       <button class="chip m">M</button><button class="chip s">S</button>
       <button class="chip x">✕</button>
@@ -1349,7 +1357,7 @@ function laneUi(t) {
       <div class="ins-list" id="inslist-${t.id}"></div>
     </div>`;
   $("tracks").appendChild(d);
-  drawWave(d.querySelector(".wave"), t.buffer);
+  drawWave(d.querySelector(".wave"), t.buffer, t.color);
   fillAddSelect(t);
   renderInserts(t, d);
   d.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value = ""; };
@@ -1971,12 +1979,13 @@ function showAiSummary(lane, t, text) {
   panel.querySelector(".ai-summary-x").onclick = () => panel.remove();
 }
 
-function drawWave(cv, buf) {
+function drawWave(cv, buf, color) {
+  color = color || "#E91E8C";
   const g = cv.getContext("2d"), W = cv.width, H = cv.height;
   g.clearRect(0, 0, W, H);
-  const drawCh = (data, top, h, color) => {
+  const drawCh = (data, top, h, alpha) => {
     const step = Math.ceil(data.length / W), mid = top + h / 2;
-    g.strokeStyle = color; g.lineWidth = 1; g.beginPath();
+    g.strokeStyle = hexA(color, alpha); g.lineWidth = 1; g.beginPath();
     for (let x = 0; x < W; x++) {
       let mn = 1, mx = -1;
       for (let j = 0; j < step; j++) { const v = data[x * step + j] || 0; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -1985,13 +1994,13 @@ function drawWave(cv, buf) {
     g.stroke();
   };
   if (buf.numberOfChannels >= 2) {
-    // real stereo: L (pink) top half, R (teal) bottom half, faint divider
-    drawCh(buf.getChannelData(0), 0, H / 2, "rgba(233,30,140,0.8)");
-    drawCh(buf.getChannelData(1), H / 2, H / 2, "rgba(0,209,196,0.7)");
-    g.strokeStyle = "rgba(255,255,255,0.08)"; g.lineWidth = 1;
+    // stereo = ONE stem color: L top (brighter), R bottom (a touch dimmer so L/R still read), faint divider
+    drawCh(buf.getChannelData(0), 0, H / 2, 0.85);
+    drawCh(buf.getChannelData(1), H / 2, H / 2, 0.6);
+    g.strokeStyle = "rgba(255,255,255,0.07)"; g.lineWidth = 1;
     g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
   } else {
-    drawCh(buf.getChannelData(0), 0, H, "rgba(233,30,140,0.75)");  // mono = honest single trace
+    drawCh(buf.getChannelData(0), 0, H, 0.8);  // mono = single trace, same stem color
   }
 }
 
@@ -2099,12 +2108,12 @@ function tickUi() {
   // map the transport playhead into the clip's local time.
   tracks.forEach(t => {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
-    drawWave(cv, t.buffer);
+    drawWave(cv, t.buffer, t.color);
     const g = cv.getContext("2d");
     const local = p - (t.offset || 0);                 // transport pos inside this clip
     if (local < 0 || local > t.buffer.duration) return; // playhead not over this clip
     const x = (local / t.buffer.duration) * cv.width;
-    g.strokeStyle = "rgba(0,209,196,0.9)"; g.lineWidth = 2;
+    g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;  // white playhead — shows over any stem color
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
   // meters
