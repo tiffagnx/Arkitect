@@ -237,7 +237,7 @@
       <div class="inputrow" id="inputrow">
         <button class="attach" id="attach" title="Attach images, PDFs, Word docs, text or code — she sees images, reads the rest">＋</button>
         <textarea id="input" rows="1" placeholder="Talk to Tiff…"></textarea>
-        <button class="send" id="mic" title="Hold nothing — tap, talk, it sends when you stop"
+        <button class="send" id="mic" title="Tap to talk · pause all you want · tap again when you're done · then press ➤"
           style="background:rgba(255,255,255,.07); color:#D8CCE4; box-shadow:none; border:1px solid var(--hairline); font-size:15px;">🎙</button>
         <button class="send" id="send">➤</button>
       </div>
@@ -490,35 +490,43 @@ $("modeChat").onclick = () => setMode("chat");
 $("modeWrite").onclick = () => setMode("write");
 $("modeResearch").onclick = () => setMode("research");
 
-/* ── mic: tap, talk, silence sends (Web Speech API — free) ── */
+/* ── mic: tap to talk, PAUSE freely, tap again when done — YOU press send (never auto-sends) ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false;
+let rec = null, listening = false, wantStop = false, finalText = "";
+function micActive(on){
+  $("mic").style.background = on ? "linear-gradient(135deg,#FF73BE,var(--pink))" : "rgba(255,255,255,.07)";
+  $("mic").style.color = on ? "#14040E" : "#D8CCE4";
+}
+function growInput(){ const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }
+function stopMic(){ if (listening) { wantStop = true; try { rec?.stop(); } catch(_){} } }
 $("mic").onclick = () => {
   if (!SR) { setStatus("this browser has no speech engine — Chrome does", true); return; }
-  if (listening) { rec?.stop(); return; }
+  if (listening) { stopMic(); return; }                                 // tap again = stop; your text stays in the box
+  wantStop = false;
+  finalText = $("input").value ? $("input").value.replace(/\s+$/,"") + " " : "";   // keep anything already typed
   rec = new SR();
-  rec.lang = "en-US"; rec.interimResults = true; rec.continuous = false;
-  let final = "";
-  rec.onstart = () => { listening = true; $("mic").style.background = "linear-gradient(135deg,#FF73BE,var(--pink))";
-    $("mic").style.color = "#14040E"; setStatus("listening…"); };
+  rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;  // keep listening through pauses
+  rec.onstart = () => { listening = true; micActive(true); setStatus("listening… take your time — tap 🎙 again when you're done"); };
   rec.onresult = (e) => {
     let interim = "";
-    for (const r of e.results) { if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript; }
-    $("input").value = (final + " " + interim).trim();
+    for (let i = e.resultIndex; i < e.results.length; i++) {             // only NEW results (no double-counting)
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript + " "; else interim += r[0].transcript;
+    }
+    $("input").value = (finalText + interim).replace(/\s{2,}/g, " ").replace(/^\s+/, "");
+    growInput();
   };
+  rec.onerror = (e) => { if (e.error === "no-speech" || e.error === "aborted") return; setStatus("mic: " + e.error, true); };
   rec.onend = () => {
-    listening = false;
-    $("mic").style.background = "rgba(255,255,255,.07)"; $("mic").style.color = "#D8CCE4";
-    setStatus("ready");
-    if ($("input").value.trim()) send();
+    if (!wantStop) { try { rec.start(); return; } catch(_){} }           // a pause isn't "done" — restart, keep going
+    listening = false; micActive(false); setStatus("ready — press ➤ when you're done");
   };
-  rec.onerror = (e) => { setStatus("mic: " + e.error, true); };
   rec.start();
 };
 const ta = $("input");
 ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; });
-ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
-$("send").onclick = send;
+ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); stopMic(); send(); } });
+$("send").onclick = () => { stopMic(); send(); };
 
 /* ── attachments: she SEES images, READS files (pdf/word/text/code) ── */
 function escapeHtml(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
