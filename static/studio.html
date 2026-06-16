@@ -120,6 +120,18 @@
   .zb.on { background:rgba(0,209,196,.16); color:var(--teal); border-color:rgba(0,209,196,.4); }
   #zoomLbl { font:600 10px 'Space Mono'; color:var(--dim); min-width:36px; text-align:center; }
   #hscroll { width:100%; margin:0 0 10px; accent-color:var(--pink); cursor:pointer; }
+  /* tempo / key / count-in (no sliders) */
+  .tk { display:flex; flex-direction:column; gap:7px; margin:10px 0 4px; }
+  .tk-row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .tk-lbl { font:700 8px 'Space Mono'; letter-spacing:.14em; color:var(--dim); width:52px; flex:none; }
+  .tk-num { width:52px; padding:5px 6px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FFD6EA; font:700 13px 'Space Mono'; text-align:center; }
+  .tk-unit { font:600 9px 'Space Mono'; color:var(--dim); }
+  .tk-btn { padding:5px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--teal); font:700 9px 'Space Mono'; letter-spacing:.06em; cursor:pointer; }
+  .tk-btn:hover { border-color:rgba(0,209,196,.5); background:rgba(0,209,196,.1); }
+  .tk-key { font:700 14px Oxanium; color:#FFD6EA; letter-spacing:.04em; flex:1; }
+  .tk-seg { display:inline-flex; border:1px solid var(--hairline); border-radius:7px; overflow:hidden; }
+  .tk-seg button { padding:5px 11px; background:transparent; border:none; color:var(--dim); font:700 10px 'Space Mono'; cursor:pointer; }
+  .tk-seg button.on { background:rgba(233,30,140,.22); color:#FFD6EA; }
   /* MIX WINDOW — console strips */
   .mixwin { flex:1; display:flex; gap:10px; padding:16px; overflow-x:auto; align-items:flex-start; }
   .mstrip { width:128px; flex:none; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.025);
@@ -365,8 +377,25 @@
       <div class="krow"><label>Monitor</label><input type="range" id="monGain" min="0" max="1.2" step="0.01" value="0" /><output id="monGainO">off</output></div>
       <button class="ibtn" id="monBtn" style="margin-bottom:8px">🎧 Headphone monitor: OFF</button>
       <div class="inmeter"><i id="inMeter"></i></div>
-      <div class="krow" style="margin-top:10px"><label>Count-in</label><input type="range" id="countBars" min="0" max="2" step="1" value="1" /><output id="countBarsO">1 bar</output></div>
-      <div class="krow"><label>Tempo</label><input type="range" id="recBpm" min="60" max="180" step="1" value="120" /><output id="recBpmO">120</output></div>
+      <div class="tk">
+        <div class="tk-row">
+          <span class="tk-lbl">TEMPO</span>
+          <input type="number" id="recBpm" min="40" max="240" step="1" value="120" class="tk-num" />
+          <span class="tk-unit">BPM</span>
+          <button class="tk-btn" id="tapBtn" title="tap the beat 4+ times in time">TAP</button>
+          <button class="tk-btn" id="autoBpmBtn" title="auto-detect tempo from the selected clip">AUTO</button>
+        </div>
+        <div class="tk-row">
+          <span class="tk-lbl">KEY</span>
+          <span class="tk-key" id="keyVal">—</span>
+          <button class="tk-btn" id="autoKeyBtn" title="detect the musical key of the selected clip">DETECT</button>
+        </div>
+        <div class="tk-row">
+          <span class="tk-lbl">COUNT-IN</span>
+          <span class="tk-seg" id="countSeg"><button data-n="0">0</button><button data-n="1" class="on">1</button><button data-n="2">2</button></span>
+          <input type="hidden" id="countBars" value="1" />
+        </div>
+      </div>
       <button class="ibtn" id="punchBtn" style="margin:8px 0">⊏⊐ Punch-in: OFF</button>
       <div style="font:700 9px 'Space Mono';letter-spacing:.18em;color:var(--dim);margin:6px 0 4px">LATENCY COMP</div>
       <div class="lat-grid" id="latGrid">
@@ -377,12 +406,7 @@
       <button class="ibtn" id="calibBtn" style="margin-top:8px">⟳ Calibrate (loopback)</button>
       <div class="rec-warn" id="recWarn">Pick an input to begin. Use headphones — speaker monitoring causes feedback + bleed.</div>
     </div>
-    <div class="module">
-      <h3 class="pink">TIFF VERB</h3>
-      <button class="verb-open" id="verbOpen">🌀 OPEN TIFF VERB</button>
-      <div style="font:400 9.5px 'Space Mono'; color:var(--dim); margin-top:7px">your reverb — each track has a VERB send.</div>
-    </div>
-    <!-- TIFF VERB faceplate: a real plugin window (hidden until opened; ids preserved so the audio wiring stays bound) -->
+    <!-- TIFF VERB faceplate: hidden window; ids preserved so the audio wiring + clip-print-verb stay bound (opened from the plugin chain on the right) -->
     <div class="verbwin" id="verbWin" style="display:none">
       <div class="vw-bar"><span class="vw-title">TIFF VERB</span><span class="vw-sub">convolution reverb</span><button class="vw-x" id="verbClose" title="close">✕</button></div>
       <div class="vw-body">
@@ -396,10 +420,6 @@
       <input type="range" id="vPre" min="0" max="0.12" step="0.005" value="0.02" style="display:none" />
       <input type="range" id="vRet" min="0" max="1.5" step="0.01" value="0.8" style="display:none" />
       <div class="vw-foot">your sound · drag a knob up / down · drag the top bar to move me</div>
-    </div>
-    <div class="module">
-      <h3>Plugins loaded</h3>
-      <div id="plugList" style="font:400 11px Inter; color:var(--dim); line-height:1.8">TIFF VERB (bus) · Telephone · Crush · Wide</div>
     </div>
   </div>
 
@@ -1147,7 +1167,7 @@ TIFF_PLUGINS.register({
 });
 
 function refreshPlugUi() {
-  $("plugList").textContent = "TIFF VERB (bus) · " + TIFF_PLUGINS.list.map(p => p.name).join(" · ");
+  const _pl = $("plugList"); if (_pl) _pl.textContent = TIFF_PLUGINS.list.map(p => p.name).join(" · ");
   tracks.forEach(t => fillAddSelect(t));
 }
 refreshPlugUi();  // list all built-in plugins in the sidebar at load
@@ -2869,7 +2889,7 @@ const reIR = () => { if (!verb) return; clearTimeout(irTimer);
 $("vSize").addEventListener("change", reIR); $("vTone").addEventListener("change", reIR);
 // TIFF VERB faceplate — open / close / drag (it's his plugin; give it a real window)
 document.body.appendChild($("verbWin"));   // out of the sidebar so position:fixed is viewport-relative (not clipped)
-$("verbOpen").onclick = () => { const w = $("verbWin"); w.style.display = "block"; bringFront(w); };
+{ const _vo = $("verbOpen"); if (_vo) _vo.onclick = () => { const w = $("verbWin"); w.style.display = "block"; bringFront(w); }; }
 $("verbClose").onclick = () => { $("verbWin").style.display = "none"; };
 makeDraggable($("verbWin"), $("verbWin").querySelector(".vw-bar"));
 // TIFF VERB rotary knobs — drag a knob up/down to drive its hidden input (audio wiring untouched)
@@ -3365,8 +3385,93 @@ function feedbackWatch(level) {
 }
 
 /* ── count-in / tempo ── */
-$("countBars").oninput = () => { const n = +$("countBars").value; $("countBarsO").textContent = n === 0 ? "off" : n + (n === 1 ? " bar" : " bars"); };
-$("recBpm").oninput = () => $("recBpmO").textContent = $("recBpm").value;
+// ── TEMPO / KEY / COUNT-IN — typed BPM + TAP + AUTO, key detect, segmented count-in ──
+$("recBpm").oninput  = () => relayoutAll();   // curTempo() reads recBpm live; redraw the grid
+$("recBpm").onchange = () => { const v = Math.max(40, Math.min(240, Math.round(+$("recBpm").value || 120))); $("recBpm").value = v; relayoutAll(); };
+$("countSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("countSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  $("countBars").value = b.dataset.n;
+});
+let _taps = [];
+$("tapBtn").onclick = () => {
+  const now = performance.now();
+  if (_taps.length && now - _taps[_taps.length - 1] > 2000) _taps = [];     // a 2s gap starts a fresh tap run
+  _taps.push(now); if (_taps.length > 8) _taps.shift();
+  if (_taps.length >= 4) {
+    let sum = 0; for (let i = 1; i < _taps.length; i++) sum += _taps[i] - _taps[i - 1];
+    const bpm = Math.round(60000 / (sum / (_taps.length - 1)));
+    if (bpm >= 40 && bpm <= 240) { $("recBpm").value = bpm; relayoutAll(); flash("Tempo: " + bpm + " BPM"); }
+  } else flash("keep tapping the beat… (" + _taps.length + "/4)");
+};
+function _focusClip() {
+  if (selClip) { const t = tracks.find(x => x.id === selClip.trackId); const c = t && clipsOf(t).find(c => c.id === selClip.clipId); if (c) return c; }
+  for (const t of tracks) { const cs = clipsOf(t); if (cs.length) return cs[0]; }
+  return null;
+}
+$("autoBpmBtn").onclick = () => {
+  const cl = _focusClip(); if (!cl) { flash("Drop or select a clip first"); return; }
+  flash("Detecting tempo…");
+  setTimeout(() => { const bpm = detectTempo(cl.buffer); if (bpm) { $("recBpm").value = bpm; relayoutAll(); flash("Detected: " + bpm + " BPM"); } else flash("Couldn't lock a tempo — tap it in"); }, 20);
+};
+$("autoKeyBtn").onclick = () => {
+  const cl = _focusClip(); if (!cl) { flash("Drop or select a clip first"); return; }
+  flash("Detecting key…");
+  setTimeout(() => { const k = detectKey(cl.buffer); $("keyVal").textContent = k || "—"; flash(k ? "Key: " + k : "Couldn't read the key"); }, 20);
+};
+// tempo: onset-energy envelope → autocorrelation (analyzes up to the first 30s)
+function detectTempo(buf) {
+  const sr = buf.sampleRate, data = buf.getChannelData(0), N = data.length, hop = 512;
+  const frames = Math.min(Math.floor(N / hop), Math.floor(sr * 30 / hop));
+  if (frames < 64) return 0;
+  const env = new Float32Array(frames); let prev = 0;
+  for (let f = 0; f < frames; f++) { let e = 0; const o = f * hop; for (let i = 0; i < hop && o + i < N; i++) { const v = data[o + i]; e += v * v; } const d = e - prev; env[f] = d > 0 ? d : 0; prev = e; }
+  let mean = 0; for (const v of env) mean += v; mean /= frames;
+  for (let f = 0; f < frames; f++) env[f] -= mean;
+  const fps = sr / hop, minLag = Math.max(1, Math.floor(fps * 60 / 180)), maxLag = Math.min(frames - 1, Math.ceil(fps * 60 / 70));
+  let bestLag = 0, bestVal = -Infinity;
+  for (let lag = minLag; lag <= maxLag; lag++) { let s = 0; for (let f = 0; f + lag < frames; f++) s += env[f] * env[f + lag]; if (s > bestVal) { bestVal = s; bestLag = lag; } }
+  if (!bestLag || bestVal <= 0) return 0;
+  let bpm = Math.round(fps * 60 / bestLag);
+  while (bpm < 70) bpm *= 2; while (bpm > 180) bpm = Math.round(bpm / 2);
+  return bpm;
+}
+// key: averaged chromagram → Krumhansl-Schmuckler major/minor profiles (uses _fftRadix2)
+const _KS_MAJ = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+const _KS_MIN = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+const _NOTE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function detectKey(buf) {
+  const sr = buf.sampleRate, data = buf.getChannelData(0), N = data.length, SZ = 4096, hop = 2048;
+  if (N < SZ) return null;
+  const chroma = new Float64Array(12), win = new Float32Array(SZ);
+  for (let i = 0; i < SZ; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (SZ - 1));
+  const re = new Float64Array(SZ), im = new Float64Array(SZ), limit = Math.min(N - SZ, sr * 30);
+  for (let o = 0; o <= limit; o += hop) {
+    for (let i = 0; i < SZ; i++) { re[i] = data[o + i] * win[i]; im[i] = 0; }
+    _fftRadix2(re, im);
+    for (let k = 1; k < SZ / 2; k++) {
+      const freq = k * sr / SZ; if (freq < 55 || freq > 5000) continue;
+      const mag = Math.sqrt(re[k] * re[k] + im[k] * im[k]) / (1 + freq / 500);   // mild root emphasis
+      const pc = ((Math.round(69 + 12 * Math.log2(freq / 440)) % 12) + 12) % 12;
+      chroma[pc] += mag;
+    }
+  }
+  let sum = 0; for (const v of chroma) sum += v; if (sum <= 0) return null;
+  for (let i = 0; i < 12; i++) chroma[i] /= sum;
+  // Krumhansl key-finding = PEARSON correlation between chroma and each rotated profile
+  const pearson = (prof, rot) => {
+    let mc = 0, mp = 0;
+    for (let i = 0; i < 12; i++) { mc += chroma[i]; mp += prof[i]; } mc /= 12; mp /= 12;
+    let num = 0, dc = 0, dp = 0;
+    for (let i = 0; i < 12; i++) { const x = chroma[i] - mc, y = prof[((i - rot) % 12 + 12) % 12] - mp; num += x * y; dc += x * x; dp += y * y; }
+    return (dc > 0 && dp > 0) ? num / Math.sqrt(dc * dp) : -1;
+  };
+  let best = -Infinity, name = null;
+  for (let r = 0; r < 12; r++) {
+    const cM = pearson(_KS_MAJ, r); if (cM > best) { best = cM; name = _NOTE[r] + " major"; }
+    const cm = pearson(_KS_MIN, r); if (cm > best) { best = cm; name = _NOTE[r] + " minor"; }
+  }
+  return name;
+}
 $("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
 
 /* a short metronome click via oscillator — for count-in only */
