@@ -1911,21 +1911,47 @@ function bindFxKnob(knobEl, outEl, p, getV, setV){
   knobEl.ondblclick=(e)=>{ e.stopPropagation(); setV(p.value); draw(); };
 }
 // every plugin opens as a faceplate: gradient title, rotary KNOBS w/ numbers (no more ugly sliders)
+// ── per-plugin identity color (cohesive desaturated set, ID-able at a glance) ──
+const PLUG_COLOR = {
+  "TIFF VERB": "#3E9CB8",        // house steel
+  "EQ-6":      "#4D8FB0",        // blue (control)
+  "Saturator": "#C8924A",        // amber (drive/warmth)
+  "De-Ess":    "#46B0A0",        // teal
+  "Tape Delay":"#5E9ED0",        // sky
+  "Ensemble":  "#7C8AA5",        // slate
+  "Telephone": "#8C8F98",        // gray (lo-fi)
+  "Crush":     "#C9633F",        // burnt orange (distortion)
+  "Wide":      "#6E7CC0",        // indigo (space)
+  "Compressor":"#4FA37A",        // green (control)
+  "Lo-Fi":     "#B89A52",        // muted gold
+  "Gate / Expander": "#59A06B",  // green
+  "Transient Shaper":"#C88A4A",  // orange (punch)
+};
+function pluginColor(name){ return PLUG_COLOR[name] || "#3E9CB8"; }
+function lighten(hex, a){ const m=hex.replace("#",""); const r=parseInt(m.slice(0,2),16),g=parseInt(m.slice(2,4),16),b=parseInt(m.slice(4,6),16);
+  const mx=(c)=>Math.round(c+(255-c)*a); return `rgb(${mx(r)},${mx(g)},${mx(b)})`; }
+
 function openPluginWindow(t, i){
   const ins = t.inserts[i]; if(!ins) return;
   const def = TIFF_PLUGINS.list.find(p => p.name === ins.name); if(!def) return;
   const id = `pw-${t.id}-${i}`;
   let w = document.getElementById(id);
   if (w){ w.style.display="block"; bringFront(w); return; }
+  const col = pluginColor(def.name);
   w = document.createElement("div"); w.className="plugwin fxface"; w.id=id;
-  w.innerHTML = `<div class="pw-bar"><span class="vw-title">${ins.name}</span><span class="pw-track">${def.subtitle || t.name}</span><button class="pw-x" title="close">✕</button></div><div class="fx-knobs"></div>${def.foot ? `<div class="fx-foot">${def.foot}</div>` : ""}`;
+  w.style.borderColor = hexA(col, 0.42); w.style.boxShadow = `0 18px 50px rgba(0,0,0,.55), 0 0 0 1px ${hexA(col,.15)}, 0 0 40px ${hexA(col,.10)}`;
+  w.innerHTML = `<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}"><span class="vw-title">${ins.name}</span><span class="pw-track">${def.subtitle || t.name}</span><button class="pw-x" title="close">✕</button></div><div class="fx-knobs"></div>${def.foot ? `<div class="fx-foot">${def.foot}</div>` : ""}`;
+  const tEl = w.querySelector(".vw-title"); tEl.style.background="none"; tEl.style.webkitTextFillColor=col; tEl.style.color=col;
   const body = w.querySelector(".fx-knobs");
   def.params.forEach(p => {
     const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
     if (ins.params[p.id] == null) ins.params[p.id] = cur;
     const cell = document.createElement("div"); cell.className="vw-knob";
     cell.innerHTML = `<output>${(p.fmt||_fmt)(cur)}</output><div class="vknob"><span class="vknob-ind"></span></div><label>${p.label}</label>`;
-    bindFxKnob(cell.querySelector(".vknob"), cell.querySelector("output"), p,
+    const kn=cell.querySelector(".vknob"), ind=cell.querySelector(".vknob-ind"), o=cell.querySelector("output");
+    kn.style.borderColor = hexA(col, 0.5); ind.style.background = `linear-gradient(${lighten(col,.55)}, ${col})`;
+    ind.style.boxShadow = `0 0 7px ${hexA(col,.9)}`; o.style.color = col;
+    bindFxKnob(kn, o, p,
       () => (ins.params[p.id] != null ? ins.params[p.id] : p.value),
       (v) => { ins.params[p.id]=v; t.live?.insertNodes?.[i]?.set(p.id, v); });
     body.appendChild(cell);
