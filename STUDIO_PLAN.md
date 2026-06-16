@@ -106,6 +106,12 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 
 ## 6. PROGRESS LOG (newest first)
 
+- **2026-06-16** — MASTER reworked into a TRACK in the edit window (B + research: the
+  master bus IS a track w/ its own inserts/fader). Removed from the left rail; a gold
+  MASTER lane sits at the bottom, the whole mix sums into it (master.sum → master chain
+  → volume → limiter → out, real-time + export). Channel = VOLUME + CEILING KNOBS +
+  a mastering insert chain. Added mastering plugins (Master EQ, Glue Comp, Maximizer)
+  in pro order. Verified: Maximizer drove the full mix 0.21→0.66 RMS; sound + play intact.
 - **2026-06-16** — Removed the pink nav orb from the studio (B: "should never have been
   there"). Started Phase C (Melodyne): YIN pitch detection + note segmentation (median +
   consolidation) — synthetic melodies detected exactly; piano-roll Tune view (🎵 Tune

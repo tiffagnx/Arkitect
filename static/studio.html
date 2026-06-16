@@ -77,6 +77,10 @@
     padding:10px 12px; animation:rise .25s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
   .lane.muted { opacity:.45; }
+  .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
+  .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
+  .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
+  .mbadge { font:700 8px 'Space Mono'; letter-spacing:.16em; color:#E6B878; background:rgba(200,146,74,.16); border:1px solid rgba(200,146,74,.42); border-radius:5px; padding:2px 7px; }
   .lane { cursor:pointer; }
   .lane.sel { border-color:rgba(62,156,184,.7); box-shadow:0 0 0 1px rgba(62,156,184,.35), 0 0 22px rgba(62,156,184,.1); }
   /* right-side CHANNEL panel — the selected track's mix controls live here, off the lanes */
@@ -375,11 +379,12 @@
 <div class="body">
   <div class="rail">
     <div class="module">
-      <h3>Master</h3>
-      <div class="krow"><label>Volume</label><input type="range" id="mGain" min="0" max="1.4" step="0.01" value="0.9" /><output id="mGainO">0.90</output></div>
-      <div class="krow"><label>Limiter</label><input type="range" id="mLim" min="-12" max="0" step="0.5" value="-1" /><output id="mLimO">-1.0</output></div>
-      <div style="margin-top:10px"><div class="meter"><i id="meterL"></i></div><div style="height:4px"></div><div class="meter"><i id="meterR"></i></div></div>
-      <div class="devlbl">Output → device</div>
+      <h3>Output</h3>
+      <!-- master VOLUME/CEILING/meters moved to the MASTER track at the bottom of the edit window; kept here hidden for save/load + the bus -->
+      <input type="hidden" id="mGain" value="0.9" /><input type="hidden" id="mLim" value="-1" />
+      <span id="mGainO" style="display:none"></span><span id="mLimO" style="display:none"></span>
+      <span id="meterL" style="display:none"></span><span id="meterR" style="display:none"></span>
+      <div class="devlbl" style="margin-top:0">Output → device</div>
       <select class="devsel" id="outDev"><option value="">System default</option></select>
       <button class="ibtn" id="scanDev" style="margin-top:6px">🔍 Detect my devices</button>
       <div class="dev-note" id="outNote">Routes through your OS (WASAPI) to any device — Apollo, interface, or speakers. Great for mixing & listening. ASIO isn't reachable from a browser; for zero-latency tracking use your interface's Direct Monitoring. Hit "Detect my devices" to see real names (asks mic permission once).</div>
@@ -1224,6 +1229,32 @@ TIFF_PLUGINS.register({
     } };
   }
 });
+/* ── MASTERING plugins (master:true) — tuned for the master bus, in pro chain
+   order: subtractive/broad EQ → glue compression → maximizer (loudness, last).
+   Research-backed (mastering chain order; -14 LUFS streaming target). ── */
+TIFF_PLUGINS.register({ name:"Master EQ", master:true, subtitle:"broad tone — gentle moves only",
+  params:[ {id:"low",label:"LOW",min:-6,max:6,step:0.1,value:0,fmt:v=>(v>0?'+':'')+v.toFixed(1)},
+           {id:"mid",label:"MID",min:-6,max:6,step:0.1,value:0,fmt:v=>(v>0?'+':'')+v.toFixed(1)},
+           {id:"air",label:"AIR",min:-6,max:6,step:0.1,value:0,fmt:v=>(v>0?'+':'')+v.toFixed(1)} ],
+  create(c){ const lo=c.createBiquadFilter(); lo.type="lowshelf"; lo.frequency.value=120;
+    const md=c.createBiquadFilter(); md.type="peaking"; md.frequency.value=1000; md.Q.value=0.7;
+    const hi=c.createBiquadFilter(); hi.type="highshelf"; hi.frequency.value=10000;
+    lo.connect(md); md.connect(hi);
+    return { input:lo, output:hi, set(id,v){ if(id==="low")lo.gain.value=v; else if(id==="mid")md.gain.value=v; else if(id==="air")hi.gain.value=v; } }; } });
+TIFF_PLUGINS.register({ name:"Glue Comp", master:true, subtitle:"bus glue — slow, low ratio",
+  params:[ {id:"thr",label:"THRESH",min:-30,max:0,step:0.5,value:-12,fmt:v=>v.toFixed(1)+'dB'},
+           {id:"ratio",label:"RATIO",min:1,max:6,step:0.1,value:2,fmt:v=>v.toFixed(1)+':1'},
+           {id:"makeup",label:"MAKEUP",min:0,max:12,step:0.1,value:0,fmt:v=>'+'+v.toFixed(1)} ],
+  create(c){ const cp=c.createDynamicsCompressor(); cp.knee.value=6; cp.attack.value=0.03; cp.release.value=0.25; cp.threshold.value=-12; cp.ratio.value=2;
+    const mk=c.createGain(); cp.connect(mk);
+    return { input:cp, output:mk, set(id,v){ if(id==="thr")cp.threshold.value=v; else if(id==="ratio")cp.ratio.value=v; else if(id==="makeup")mk.gain.value=Math.pow(10,v/20); } }; } });
+TIFF_PLUGINS.register({ name:"Maximizer", master:true, subtitle:"loudness — keep this last", foot:"push DRIVE for level · CEILING is the brickwall (-0.3 is safe)",
+  params:[ {id:"drive",label:"DRIVE",min:0,max:18,step:0.1,value:0,fmt:v=>'+'+v.toFixed(1)},
+           {id:"ceil",label:"CEILING",min:-3,max:0,step:0.1,value:-0.3,fmt:v=>v.toFixed(1)+'dB'} ],
+  create(c){ const inG=c.createGain(), ws=c.createWaveShaper(), out=c.createGain(); ws.oversample="4x";
+    const curve=(cl)=>{ const n=2048,cu=new Float32Array(n); for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; cu[i]=Math.tanh(x*1.6)*cl; } return cu; };
+    ws.curve=curve(Math.pow(10,-0.3/20)); inG.connect(ws); ws.connect(out);
+    return { input:inG, output:out, set(id,v){ if(id==="drive")inG.gain.value=Math.pow(10,v/20); else if(id==="ceil")ws.curve=curve(Math.pow(10,v/20)); } }; } });
 function makeIR(c, seconds, tone) {
   const rate = c.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
   const ir = c.createBuffer(2, len, rate);
@@ -1773,12 +1804,14 @@ function ensureCtx() {
 ["pointerdown", "keydown"].forEach(evt =>
   document.addEventListener(evt, () => { if (ctx?.state === "suspended") ctx.resume(); }, true));
 function buildBus(c) {
-  master = { gain: c.createGain(), limiter: c.createDynamicsCompressor(),
-             splitter: c.createChannelSplitter(2), aL: c.createAnalyser(), aR: c.createAnalyser() };
+  // SUM (everything lands here) -> [master mastering chain] -> GAIN (volume) -> LIMITER (ceiling) -> out
+  master = { sum: c.createGain(), gain: c.createGain(), limiter: c.createDynamicsCompressor(),
+             splitter: c.createChannelSplitter(2), aL: c.createAnalyser(), aR: c.createAnalyser(), _ins: [] };
   master.gain.gain.value = parseFloat($("mGain").value);
   const lim = master.limiter;
   lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
   lim.attack.value = 0.002; lim.release.value = 0.12;
+  master.sum.connect(master.gain);                 // default route (no master inserts) — buildMasterChain re-wires
   master.gain.connect(lim); lim.connect(c.destination);
   lim.connect(master.splitter);
   master.aL.fftSize = 512; master.aR.fftSize = 512;
@@ -1788,7 +1821,24 @@ function buildBus(c) {
   verb.convolver.buffer = makeIR(c, parseFloat($("vSize").value), parseFloat($("vTone").value));
   verb.predelay.delayTime.value = parseFloat($("vPre").value);
   verb.ret.gain.value = parseFloat($("vRet").value);
-  verb.predelay.connect(verb.convolver); verb.convolver.connect(verb.ret); verb.ret.connect(master.gain);
+  verb.predelay.connect(verb.convolver); verb.convolver.connect(verb.ret); verb.ret.connect(master.sum);
+}
+// the MASTER as a track: sums the whole mix, holds a mastering plugin chain. Knobs, not faders.
+const masterTrack = { id:'__master__', type:'master', name:'MASTER', gain:0.9, inserts:[], color:'#C8924A' };
+// (re)build the master insert chain between the sum bus and the volume gain (real-time or offline)
+function buildMasterChain(c, isOffline){
+  const sum = isOffline ? c._masterSum : master.sum, gain = isOffline ? c._masterGain : master.gain;
+  try { sum.disconnect(); } catch {}                 // drop sum's current outputs (chain or direct)
+  let tail = sum; const nodes = [];
+  for (const ins of (masterTrack.inserts || [])) {
+    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    if (!def || ins.bypassed) { nodes.push(null); continue; }
+    try { const node = def.create(c); tail.connect(node.input); tail = node.output; def.params.forEach(pp => node.set(pp.id, ins.params[pp.id] ?? pp.value)); nodes.push(node); }
+    catch { nodes.push(null); }
+  }
+  tail.connect(gain);
+  if (!isOffline) { master._ins = nodes; masterTrack.live = { insertNodes: nodes }; }   // live nodes so master plugin knobs respond
+  return nodes;
 }
 
 /* ── tracks ── */
@@ -1850,7 +1900,7 @@ function laneUi(t) {
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
-  selectTrack(t);
+  selectTrack(t); ensureMasterLane();
 }
 /* ── INSERT RACK — a track holds a CHAIN of effects (t.inserts), each an
    {name, params} pair. The UI builds itself from each plugin's params[]:
@@ -1937,6 +1987,9 @@ const PLUG_COLOR = {
   "Lo-Fi":     "#B89A52",        // muted gold
   "Gate / Expander": "#59A06B",  // green
   "Transient Shaper":"#C88A4A",  // orange (punch)
+  "Master EQ": "#C8924A",        // gold (mastering)
+  "Glue Comp": "#B89A52",        // muted gold
+  "Maximizer": "#C9633F",        // orange (loudness)
 };
 function pluginColor(name){ return PLUG_COLOR[name] || "#3E9CB8"; }
 function lighten(hex, a){ const m=hex.replace("#",""); const r=parseInt(m.slice(0,2),16),g=parseInt(m.slice(2,4),16),b=parseInt(m.slice(4,6),16);
@@ -1997,7 +2050,7 @@ function auxLaneUi(t){
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
     tracks.forEach(x => { if (x.output === t.id) x.output = 'master'; });   // stems routed here fall back to Master
     refreshSendMenus(); };
-  selectTrack(t);
+  selectTrack(t); ensureMasterLane();
 }
 function renderSends(t){
   const host = document.getElementById("sends-"+t.id); if(!host) return;
@@ -2021,6 +2074,50 @@ function renderSends(t){
 }
 function refreshSendMenus(){ tracks.filter(t => t.buffer).forEach(t => renderSends(t)); }
 $("addAuxBtn").onclick = addAux;
+
+// ── MASTER as a track in the edit window (bottom) — sums the mix, holds a mastering chain ──
+function ensureMasterLane(){
+  let d=document.getElementById("lane-__master__");
+  if(!d){ d=document.createElement("div"); d.className="lane masterlane"; d.id="lane-__master__";
+    d.innerHTML=`<div class="lhead"><span class="cdot" style="background:${masterTrack.color}"></span><span class="mbadge">MASTER</span><span class="name">the whole mix · click → drop a mastering chain</span></div>`;
+    d.onclick=()=>selectTrack(masterTrack);
+  }
+  $("tracks").appendChild(d);   // always keep it pinned to the bottom
+}
+function bindMasterKnob(knobId,outId,min,max,getV,setV,fmt,dflt){
+  const knob=document.getElementById(knobId), out=document.getElementById(outId); if(!knob) return;
+  const ind=knob.querySelector('.cknob-ind'), range=(max-min)||1;
+  const draw=()=>{ const v=getV(); ind.style.transform=`rotate(${(-135+((v-min)/range)*270).toFixed(1)}deg)`; out.textContent=fmt(v); };
+  draw();
+  knob.onmousedown=(e)=>{ e.preventDefault(); const sy=e.clientY, sv=getV();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/150*range; v=Math.max(min,Math.min(max,v)); setV(v); draw(); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
+  knob.ondblclick=()=>{ setV(dflt); draw(); };
+}
+function fillMasterAddSelect(){
+  const sel=document.querySelector("#chan .ins-add"); if(!sel) return;
+  const mast=TIFF_PLUGINS.list.filter(p=>p.master), other=TIFF_PLUGINS.list.filter(p=>!p.master);
+  sel.innerHTML=`<option value="">+ add mastering plugin…</option>`+
+    `<optgroup label="MASTERING">`+mast.map(p=>`<option value="${p.name}">${p.name}</option>`).join("")+`</optgroup>`+
+    `<optgroup label="OTHER">`+other.map(p=>`<option value="${p.name}">${p.name}</option>`).join("")+`</optgroup>`;
+}
+function renderMasterChannel(panel){
+  const t=masterTrack, col=t.color;
+  let html=`<div class="chan-head"><span class="cdot" style="background:${col}"></span><span class="mbadge">MASTER</span><span class="name">the whole mix</span></div>`;
+  html+=`<div class="chan-section" style="border-top:none;padding-top:2px">Master · double-click a knob to reset</div>`;
+  html+=`<div class="chan-knobs"><div class="cknob-wrap"><output id="cko-m-vol"></output><div class="cknob" id="ckn-m-vol"><span class="cknob-ind"></span></div><label>VOLUME</label></div>`+
+        `<div class="cknob-wrap"><output id="cko-m-ceil"></output><div class="cknob" id="ckn-m-ceil"><span class="cknob-ind"></span></div><label>CEILING</label></div></div>`;
+  html+=`<div class="chan-section">Mastering chain <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none">EQ → comp → maximizer</span></div>`;
+  html+=`<div class="ins-rack"><div class="ins-bar"><span class="ins-title">master inserts</span><select class="ins-add"></select></div><div class="ins-list" id="inslist-__master__"></div></div>`;
+  html+=`<div class="chan-hint">This is the final stage — everything sums here. Aim for the loudest point around −1 dB on the ceiling. Keep the Maximizer last.</div>`;
+  panel.innerHTML=html;
+  bindMasterKnob("ckn-m-vol","cko-m-vol", 0, 1.4, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), 0.9);
+  bindMasterKnob("ckn-m-ceil","cko-m-ceil", -12, 0, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1)+'dB', -1);
+  fillMasterAddSelect(); renderInserts(masterTrack);
+  panel.querySelector(".ins-add").onchange=(e)=>{ if(e.target.value){ addInsert(masterTrack, e.target.value); e.target.value=""; } };
+}
+ensureMasterLane();   // master track is always present at the bottom of the edit window
 
 // ── CHANNEL PANEL — the SELECTED track's mix controls (knobs w/ numbers + inserts + sends), off the lanes ──
 let selTrackId = null;
@@ -2052,7 +2149,9 @@ function selectTrack(t){
   renderChannel(t);
 }
 function renderChannel(t){
-  const panel = $("chan"); const isAux = t.type==='aux';
+  const panel = $("chan");
+  if(t.type==='master'){ renderMasterChannel(panel); return; }
+  const isAux = t.type==='aux';
   const params = isAux ? [['gain','VOL'],['pan','PAN']] : [['gain','VOL'],['pan','PAN'],['lo','LOW'],['mid','MID'],['hi','HIGH'],['comp','COMP'],['send','VERB']];
   const cl = (!isAux && selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
   let html = `<div class="chan-head"><span class="cdot" style="background:${t.color}"></span>`;
@@ -2728,7 +2827,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   }
   tail.connect(comp); comp.connect(pan); pan.connect(fader);
   const meter = c.createAnalyser(); meter.fftSize = 256; fader.connect(meter);   // post-fader VU tap for the Mix window
-  let dest = isOffline ? c._masterGain : master.gain;     // default output = Master
+  let dest = isOffline ? c._masterSum : master.sum;       // default output = Master sum bus
   if (!isAux && t.output && t.output !== 'master') {       // routed to an FX bus instead
     const ao = tracks.find(x => x.id === t.output && x.type === 'aux');
     if (ao && ao._in) dest = ao._in;
@@ -2857,10 +2956,12 @@ async function playAll() {
   startCtxTime = c.currentTime + 0.05;
   tracks.forEach(t => { if (t.type === 'aux') t._in = c.createGain(); });   // FX-bus inputs first, so stem sends can land on them
   tracks.forEach(t => { t.live = buildTrackGraph(c, t, startCtxTime, startOffset, false); });
+  buildMasterChain(c, false);                                               // mastering chain on the full mix
   playing = true;
   $("play").textContent = "❚❚ Pause";
 }
-function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.srcs?.forEach(s => { try { s.stop(); } catch {} }); } catch {} t.live = null; t._in = null; }); }
+function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.srcs?.forEach(s => { try { s.stop(); } catch {} }); } catch {} t.live = null; t._in = null; });
+  if (master) { try { master._ins?.forEach(n => n?.dispose?.()); } catch {} master._ins = []; masterTrack.live = null; try { master.sum.disconnect(); } catch {} try { master.sum.connect(master.gain); } catch {} } }
 function pauseAll() { playGen++; startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
 function stopAll() { playGen++; stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
 function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
@@ -2992,6 +3093,7 @@ $("exportBtn").onclick = async () => {
     await ensureWorklets(oc);   // worklet plugins must exist on the offline ctx or export bypasses them
     // offline bus
     oc._masterGain = oc.createGain(); oc._masterGain.gain.value = parseFloat($("mGain").value);
+    oc._masterSum = oc.createGain();                                  // sum -> master chain -> gain
     const lim = oc.createDynamicsCompressor();
     lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
     lim.attack.value = 0.002; lim.release.value = 0.12;
@@ -2999,9 +3101,10 @@ $("exportBtn").onclick = async () => {
     const conv = oc.createConvolver(); conv.buffer = makeIR(oc, parseFloat($("vSize").value), parseFloat($("vTone").value));
     oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
     const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
-    oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterGain);
+    oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterSum);
     tracks.forEach(t => { if (t.type === 'aux') t._in = oc.createGain(); });
     tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
+    buildMasterChain(oc, true);                                       // master mastering chain on the export
     const rendered = await oc.startRendering();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(bufferToWavBlob(rendered));
