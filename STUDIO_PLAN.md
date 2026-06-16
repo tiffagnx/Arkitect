@@ -55,12 +55,17 @@ buses + sends + output routing, AudioSuite, zoom/snap/resize, tap/auto-tempo, ke
 **Phase B — Pro re-skin.** 🔶 IN PROGRESS. Studio re-themed graphite+steel (done). NEXT:
 per-plugin faceplate colors; tighten spacing/typography to feel like real gear.
 
-**Phase C — The Melodyne.** ⬜ NEXT BIG ONE.
-  1. Mono pitch detection per frame (YIN/autocorrelation) → note segmentation.
-  2. Note "blobs" drawn on a pitch grid over the clip waveform.
-  3. Drag a blob → retune (PSOLA/granular pitch-shift), snap to the DETECTED KEY.
-  4. Whole-clip pitch + formant control. Instant on load.
-  5. Push retune quality toward transparent; A/B vs real Melodyne on the same vocal.
+**Phase C — The Melodyne.** 🔶 IN PROGRESS.
+  1. ✅ Mono pitch detection (YIN) + note segmentation (median-filter + consolidation).
+     Verified: synthetic melodies detected EXACTLY (note-for-note). `detectPitchTrack`,
+     `segmentNotes`, `keyFromNotes`.
+  2. ✅ Note blobs drawn on a piano-roll grid over the clip (key-scale shaded). "🎵 Tune"
+     button in the clip panel → `openTune`/`renderTune` (#tunewin).
+  3. ⬜ NEXT: drag a blob → retune (granular/PSOLA pitch-shift the segment), snap to key.
+     Add a KEY OVERRIDE dropdown (key auto-guess leans to the relative minor on bare
+     melodies — let the user set the scale, like real Melodyne).
+  4. ⬜ Whole-clip pitch + formant control. Apply writes back to the clip buffer.
+  5. ⬜ Push retune toward transparent; A/B vs real Melodyne.
 
 **Phase D — Generate-a-sound.** ⬜ Highlight empty spot → right-click → type → drops a
 clip. UX rides the clip model (easy). Engine fork: free-local model (Stable Audio Open /
@@ -101,6 +106,11 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 
 ## 6. PROGRESS LOG (newest first)
 
+- **2026-06-16** — Removed the pink nav orb from the studio (B: "should never have been
+  there"). Started Phase C (Melodyne): YIN pitch detection + note segmentation (median +
+  consolidation) — synthetic melodies detected exactly; piano-roll Tune view (🎵 Tune
+  button) draws the notes with key-scale shading. Per-plugin faceplate colors (each plugin
+  its own hue). Next: drag-to-retune + key override.
 - **2026-06-16** — Pro re-skin: ripped pink out of the whole Studio → graphite + steel-cyan
   (research-backed dark UI). Removed "Plugins loaded" clutter + orphan verb button; tempo/
   count-in sliders → typed BPM + TAP + AUTO-tempo + KEY detect. Created this plan doc.

@@ -310,6 +310,17 @@
   .as-render:hover { box-shadow:0 4px 18px rgba(62,156,184,.4); }
   .as-render:disabled { opacity:.6; cursor:progress; }
   .lane.rendering { box-shadow:0 0 0 1px rgba(0,209,196,.6), 0 0 22px rgba(0,209,196,.25); }
+  /* TUNE (Melodyne) window */
+  .tunewin { position:fixed; z-index:340; width:1130px; max-width:94vw; border-radius:14px; overflow:hidden;
+    background:rgba(18,19,23,.97); border:1px solid rgba(62,156,184,.35); box-shadow:0 22px 60px rgba(0,0,0,.6); }
+  .tw-bar { display:flex; align-items:baseline; gap:10px; padding:12px 16px; cursor:move; user-select:none; border-bottom:1px solid var(--hairline); background:rgba(255,255,255,.02); }
+  .tw-title { font:700 16px Oxanium; letter-spacing:.16em; color:#3E9CB8; }
+  .tw-sub { font:500 11px 'Space Mono'; color:var(--dim); }
+  .tw-x { margin-left:auto; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:var(--dim); width:26px; height:26px; border-radius:7px; cursor:pointer; }
+  .tw-x:hover { color:#9FCFDD; border-color:rgba(62,156,184,.5); }
+  .tw-roll { max-height:62vh; overflow:auto; padding:10px; background:rgba(0,0,0,.25); }
+  .tw-roll canvas { display:block; width:100%; }
+  .tw-foot { font:400 10px 'Space Mono'; color:var(--dim); padding:9px 16px; border-top:1px solid var(--hairline); }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#9FCFDD; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -2067,6 +2078,7 @@ function renderChannel(t){
         ['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']
       ].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("") + `</div>`;
       html += `<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
+      html += `<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 Tune — see the notes (Melodyne)</button>`;
     } else {
       html += `<div class="chan-hint">Right-click a clip (or click it) to grab one piece. Separate it, then print Reverse / Reverse-reverb / VERB / BPM-delay onto just that slice.</div>`;
     }
@@ -2095,6 +2107,7 @@ function renderChannel(t){
     document.getElementById("cf-fo").onclick=()=>clipFx_fade(t,cl,'out');
     document.getElementById("cf-del").onclick=()=>deleteClip(t,cl);
     document.getElementById("cf-as").onclick=()=>openAudioSuite(t);
+    document.getElementById("cf-tune").onclick=()=>openTune(t);
   }
 }
 // Ctrl+Z — global undo of the last clip edit (separate / move / reverse / verb / etc.)
@@ -3501,6 +3514,104 @@ function detectKey(buf) {
   }
   return name;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE MELODYNE (Phase C) — vocal pitch editor. Step 1: detect the pitch per
+   frame (YIN), segment into notes, draw them on a piano-roll over the clip.
+   Drag-to-retune + pitch-shift apply comes next.
+   ═══════════════════════════════════════════════════════════════════════ */
+// YIN monophonic pitch tracker → [{t, f0, conf}] per frame
+function detectPitchTrack(buf){
+  const sr=buf.sampleRate, data=buf.getChannelData(0), N=data.length;
+  const W=2048, hop=512, maxTau=Math.min(W-1, Math.floor(sr/70)), minTau=Math.max(2, Math.floor(sr/1000));
+  const diff=new Float32Array(maxTau+1), cmnd=new Float32Array(maxTau+1), frames=[];
+  for(let o=0; o+W<=N; o+=hop){
+    let e=0; for(let i=0;i<W;i++){ const v=data[o+i]; e+=v*v; } e=Math.sqrt(e/W);
+    if(e<0.008){ frames.push({t:o/sr,f0:0,conf:0}); continue; }                 // silence gate
+    for(let tau=1;tau<=maxTau;tau++){ let s=0; for(let i=0;i<W-tau;i++){ const d=data[o+i]-data[o+i+tau]; s+=d*d; } diff[tau]=s; }
+    cmnd[0]=1; let run=0;
+    for(let tau=1;tau<=maxTau;tau++){ run+=diff[tau]; cmnd[tau]=diff[tau]*tau/(run||1); }
+    let tau=-1; const THR=0.12;
+    for(let tt=minTau;tt<=maxTau;tt++){ if(cmnd[tt]<THR){ while(tt+1<=maxTau && cmnd[tt+1]<cmnd[tt]) tt++; tau=tt; break; } }
+    if(tau<0){ let bv=1e9,bt=minTau; for(let tt=minTau;tt<=maxTau;tt++){ if(cmnd[tt]<bv){bv=cmnd[tt];bt=tt;} } if(bv<0.45) tau=bt; }
+    if(tau<0){ frames.push({t:o/sr,f0:0,conf:0}); continue; }
+    let t0=tau; if(tau>minTau && tau<maxTau){ const a=cmnd[tau-1],b=cmnd[tau],cc=cmnd[tau+1], den=a+cc-2*b; if(Math.abs(den)>1e-9) t0=tau+(a-cc)/(2*den); }
+    frames.push({t:o/sr, f0:sr/t0, conf:1-cmnd[tau]});
+  }
+  return frames;
+}
+// round to semitone per frame → median-filter (kills boundary blips) → group equal runs into notes
+function segmentNotes(frames, hopSec){
+  const seq = frames.map(fr => (fr.f0>0 && fr.conf>0.42) ? Math.round(69+12*Math.log2(fr.f0/440)) : null);
+  const med = seq.slice(), R=2;                                  // median window 5
+  for(let i=0;i<seq.length;i++){ const win=[]; for(let j=-R;j<=R;j++){ const v=seq[i+j]; if(v!=null) win.push(v); }
+    if(win.length){ win.sort((a,b)=>a-b); med[i]=win[win.length>>1]; } else med[i]=null; }
+  let out=[]; let i=0;
+  while(i<med.length){ if(med[i]==null){ i++; continue; } let j=i; while(j<med.length && med[j]===med[i]) j++;
+    const start=frames[i].t, end=(j<frames.length?frames[j].t:frames[frames.length-1].t+hopSec);
+    if(end-start>=0.05) out.push({ start, end, midi:med[i], cents:0 }); i=j; }
+  // consolidate: absorb short segments (<0.13s) into a neighbor within 1 semitone (kills boundary/transition blips)
+  let changed=true;
+  while(changed){ changed=false;
+    for(let k=0;k<out.length;k++){ const n=out[k]; if(n.end-n.start>=0.13) continue;
+      const cand=[out[k-1],out[k+1]].filter(x=>x && Math.abs(x.midi-n.midi)<=1);
+      if(cand.length){ const into=cand.sort((a,b)=>(b.end-b.start)-(a.end-a.start))[0];
+        into.start=Math.min(into.start,n.start); into.end=Math.max(into.end,n.end); out.splice(k,1); changed=true; break; } } }
+  out.forEach(n=>{ let s=0,c=0; for(const fr of frames){ if(fr.t>=n.start && fr.t<n.end && fr.f0>0){ s+=69+12*Math.log2(fr.f0/440); c++; } }
+    if(c){ n.cents=Math.round(((s/c)-n.midi)*100); } });
+  return out;
+}
+// key from the DETECTED NOTES (duration-weighted) — more reliable than raw spectrum on a melody
+function keyFromNotes(notes){
+  if(!notes||!notes.length) return null;
+  const chroma=new Array(12).fill(0);
+  notes.forEach(n=>{ chroma[((n.midi%12)+12)%12] += Math.max(0.05, n.end-n.start); });
+  let sum=chroma.reduce((a,b)=>a+b,0); if(sum<=0) return null;
+  for(let i=0;i<12;i++) chroma[i]/=sum;
+  const pearson=(prof,rot)=>{ let mc=0,mp=0; for(let i=0;i<12;i++){mc+=chroma[i];mp+=prof[i];} mc/=12;mp/=12;
+    let num=0,dc=0,dp=0; for(let i=0;i<12;i++){const x=chroma[i]-mc,y=prof[((i-rot)%12+12)%12]-mp; num+=x*y;dc+=x*x;dp+=y*y;} return (dc>0&&dp>0)?num/Math.sqrt(dc*dp):-1; };
+  let best=-Infinity,name=null;
+  for(let r=0;r<12;r++){ const cM=pearson(_KS_MAJ,r); if(cM>best){best=cM;name=_NOTE[r]+" major";} const cm=pearson(_KS_MIN,r); if(cm>best){best=cm;name=_NOTE[r]+" minor";} }
+  return name;
+}
+function _scaleOfKey(key){ if(!key||key==="—") return null;
+  const p=key.split(" "), root=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"].indexOf(p[0]); if(root<0) return null;
+  const iv=(p[1]==="minor")?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11]; return new Set(iv.map(s=>(root+s)%12)); }
+function _twRR(g,x,y,wd,ht,r){ r=Math.min(r,wd/2,ht/2); g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+wd,y,x+wd,y+ht,r); g.arcTo(x+wd,y+ht,x,y+ht,r); g.arcTo(x,y+ht,x,y,r); g.arcTo(x,y,x+wd,y,r); g.closePath(); }
+function openTune(t){
+  const cl = (selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : clipsOf(t)[0];
+  if(!cl){ flash("Pick a clip first"); return; }
+  flash("Analyzing pitch…");
+  setTimeout(()=>{ try{
+    const frames=detectPitchTrack(cl.buffer), notes=segmentNotes(frames, 512/cl.buffer.sampleRate);
+    const key=keyFromNotes(notes)||detectKey(cl.buffer)||"—";
+    renderTune(t, cl, notes, key);
+  }catch(e){ flash("Pitch analysis failed: "+e.message); } }, 25);
+}
+function renderTune(t, cl, notes, key){
+  let w=document.getElementById("tunewin"); if(!w){ w=document.createElement("div"); w.id="tunewin"; w.className="tunewin"; document.body.appendChild(w); }
+  let lo=127,hi=0; notes.forEach(n=>{ lo=Math.min(lo,n.midi); hi=Math.max(hi,n.midi); }); if(!notes.length){ lo=57; hi=69; }
+  lo-=2; hi+=2; const rows=hi-lo+1, dur=cl.buffer.duration, rowH=15, Hc=rows*rowH;
+  w.innerHTML=`<div class="tw-bar"><span class="tw-title">TUNE</span><span class="tw-sub">${t.name} · key ${key} · ${notes.length} notes</span><button class="tw-x" title="close">✕</button></div>
+    <div class="tw-roll"><canvas id="tuneCanvas" width="1100" height="${Hc}"></canvas></div>
+    <div class="tw-foot">detected notes on the grid (scale of ${key} shaded). Drag-to-retune is the next build.</div>`;
+  const cv=w.querySelector("#tuneCanvas"), g=cv.getContext("2d"), W=cv.width, NN=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"], scale=_scaleOfKey(key);
+  g.clearRect(0,0,W,Hc);
+  for(let r=0;r<rows;r++){ const midi=hi-r, pc=((midi%12)+12)%12, inS=scale?scale.has(pc):false, blk=NN[pc].includes("#");
+    g.fillStyle = inS ? "rgba(62,156,184,0.07)" : (blk?"rgba(0,0,0,0.22)":"rgba(255,255,255,0.012)"); g.fillRect(0,r*rowH,W,rowH);
+    g.strokeStyle="rgba(255,255,255,0.04)"; g.beginPath(); g.moveTo(0,r*rowH+rowH); g.lineTo(W,r*rowH+rowH); g.stroke();
+    g.fillStyle="rgba(200,205,212,0.4)"; g.font="600 8px 'Space Mono'"; g.fillText(NN[pc]+(pc===0?(Math.floor(midi/12)-1):''), 3, r*rowH+rowH-4);
+  }
+  const beat=60/curTempo(); if(beat>0 && dur/beat<200){ for(let s=0;s<dur;s+=beat){ const x=(s/dur)*W; g.strokeStyle="rgba(255,255,255,0.05)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,Hc); g.stroke(); } }
+  notes.forEach(n=>{ const r=hi-n.midi, x=(n.start/dur)*W, ww=Math.max(5,((n.end-n.start)/dur)*W), y=r*rowH+2, hh=rowH-4;
+    g.fillStyle="rgba(62,156,184,0.9)"; _twRR(g,x,y,ww,hh,4); g.fill();
+    if(Math.abs(n.cents)>10){ g.fillStyle=n.cents>0?"#E5A24A":"#5FB4CE"; g.fillRect(x,y-1,ww,2); }   // sharp/flat hint
+    g.fillStyle="#0C0D10"; g.font="700 9px 'Space Mono'"; if(ww>16) g.fillText(NN[((n.midi%12)+12)%12], x+4, y+hh-3);
+  });
+  w.querySelector(".tw-x").onclick=()=>w.remove(); makeDraggable(w, w.querySelector(".tw-bar"));
+  w.style.left="160px"; w.style.top="90px"; w.style.display="block"; bringFront(w);
+  flash(`Found ${notes.length} notes · key ${key}`);
+}
 $("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
 
 /* a short metronome click via oscillator — for count-in only */
@@ -3720,6 +3831,5 @@ function laneUiTake(t, placeAt) {
   head.insertBefore(nudge, head.querySelector(".chip.m"));
 }
 </script>
-<script src="/static/pinkroom-nav.js"></script>
 </body>
 </html>
