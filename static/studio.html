@@ -109,7 +109,11 @@
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
-  .lane.aux .lhead, .lane.masterlane .lhead { flex:1; padding:11px 14px; margin:0; }
+  .lane.aux .lhead { flex:1; padding:11px 14px; margin:0; }
+  .lane.masterlane { min-height:98px; }
+  .tstrip.masterstrip { border-right-color:rgba(200,146,74,.32); background:rgba(200,146,74,.045); }
+  .masterinfo { flex:1; padding:14px 18px; display:flex; flex-direction:column; justify-content:center; color:#E6B878; font:600 13px Inter; }
+  .masterinfo .mi-sub { color:var(--dim); font:400 11px 'Space Mono'; margin-top:5px; }
   select.zb.gridsel { -webkit-appearance:none; appearance:none; padding:6px 7px; color:var(--text); }
   .mbadge { font:700 8px 'Space Mono'; letter-spacing:.16em; color:#E6B878; background:rgba(200,146,74,.16); border:1px solid rgba(200,146,74,.42); border-radius:5px; padding:2px 7px; }
   .lane { cursor:pointer; }
@@ -1965,23 +1969,43 @@ function laneUi(t) {
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
   renderStripSlots(t, d.querySelector(".ts-slots"));
   const wv = d.querySelector(".wave");
+  // SMART TOOL: near a clip edge = trim that edge, middle = grab/move, empty = playhead
   wv.onmousedown = (e) => {
     if (e.button !== 0) return;
     selectTrack(t);
     const vd = viewDur(), r = wv.getBoundingClientRect();
     const atTime = scrollT + (e.clientX - r.left) / r.width * vd;
     const cl = clipAt(t, atTime);
-    if (!cl) { selClip = null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty space → just move playhead
-    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);           // grabbed a clip
-    const startStart = cl.start, sx = e.clientX; let moved = false;
+    if (!cl) { selClip = null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty space → move playhead
+    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);
+    const sx = e.clientX;
+    const leftX = r.left + ((cl.start - scrollT)/vd)*r.width, rightX = r.left + ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
+    const edge = (Math.abs(e.clientX-leftX)<=7) ? 'L' : (Math.abs(e.clientX-rightX)<=7) ? 'R' : null;
+    if (edge) {   // TRIM — shorten the clip from the grabbed edge (sample-accurate, undoable)
+      const oB=cl.buffer, oS=cl.start, oD=cl.buffer.duration; let trimmed=false;
+      const mv=(ev)=>{ if(!trimmed && Math.abs(ev.clientX-sx)>2){ trimmed=true; pushUndoClips(t); }
+        if(trimmed){ const dt=(ev.clientX-sx)/r.width*vd;
+          if(edge==='L'){ let cut=snapTime(oS+Math.max(0,dt))-oS; cut=Math.max(0,Math.min(oD-0.05,cut)); cl.start=oS+cut; cl.buffer=bufSlice(oB, cut/oD, 1); }
+          else { let keep=snapTime(oS+oD+Math.min(0,dt))-oS; keep=Math.max(0.05,Math.min(oD,keep)); cl.buffer=bufSlice(oB, 0, keep/oD); }
+          drawLane(t); } };
+      const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
+        if(trimmed){ syncPrimary(t); if(playing) restartPlayback(); flash("Trimmed clip"); } };
+      document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
+    }
+    const startStart = cl.start; let moved = false;   // GRAB / move
     const mv = (ev) => {
-      if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }    // snapshot once, on the first real drag
+      if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
       if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(startStart + dx); drawLane(t); }
     };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
-      if (!moved) seek(atTime);                                                            // tap (no drag) = move playhead here
+      if (!moved) seek(atTime);
       else { syncPrimary(t); if (playing) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+  };
+  wv.onmousemove = (e) => {   // smart-tool cursor feedback (trim near edges, grab on a clip)
+    if (e.buttons) return; const vd=viewDur(), r=wv.getBoundingClientRect(), cl=clipAt(t, scrollT+(e.clientX-r.left)/r.width*vd);
+    if (cl) { const lX=r.left+((cl.start-scrollT)/vd)*r.width, rX=r.left+((cl.start+cl.buffer.duration-scrollT)/vd)*r.width;
+      wv.style.cursor=(Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7)?'ew-resize':'grab'; } else wv.style.cursor='crosshair';
   };
   wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
   selectTrack(t); ensureMasterLane();
@@ -2160,11 +2184,56 @@ function refreshSendMenus(){ tracks.filter(t => t.buffer).forEach(t => renderSen
 $("addAuxBtn").onclick = addAux;
 
 // ── MASTER as a track in the edit window (bottom) — sums the mix, holds a mastering chain ──
+// master strip controls (generic press-drag widget with the pop-up fader)
+function bindMasterStripCtl(el, min, max, dflt, getV, setV, fmt, fill){
+  if(!el) return; const vEl=el.querySelector(".ts-v"), fEl=el.querySelector(".ts-fill"), range=(max-min)||1;
+  const draw=()=>{ const v=getV(); vEl.textContent=fmt(v); if(fill&&fEl) fEl.style.width=(((v-min)/range)*100).toFixed(1)+"%"; };
+  draw();
+  el.onmousedown=(e)=>{ e.stopPropagation(); e.preventDefault(); el.classList.add("drag"); const sy=e.clientY, sv=getV();
+    const pop=document.createElement("div"); pop.className="ts-pop"; const thumb=document.createElement("i"); pop.appendChild(thumb); el.appendChild(pop);
+    const place=()=>{ thumb.style.bottom=(((getV()-min)/range)*100).toFixed(1)+"%"; }; place();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/120*range; v=Math.max(min,Math.min(max,v)); setV(v); draw(); place(); };
+    const up=()=>{ el.classList.remove("drag"); pop.remove(); document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
+  el.ondblclick=(e)=>{ e.stopPropagation(); setV(dflt); draw(); };
+}
+// the master's inline insert slots (mastering plugins grouped first)
+function renderMasterSlots(host){
+  if(!host) return; host.innerHTML=""; masterTrack.inserts=masterTrack.inserts||[];
+  const n=Math.min(5, masterTrack.inserts.length+1);
+  for(let i=0;i<n;i++){ const ins=masterTrack.inserts[i];
+    if(ins){ const s=document.createElement("div"); s.className="ts-slot filled"+(ins.bypassed?" byp":"");
+      s.innerHTML=`<span class="ts-sn" title="open ${ins.name}">${ins.name}</span><span class="ts-sx" title="remove">✕</span>`;
+      s.querySelector(".ts-sn").onclick=(e)=>{ e.stopPropagation(); openPluginWindow(masterTrack,i); };
+      s.querySelector(".ts-sx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(masterTrack); masterTrack.inserts.splice(i,1); renderMasterSlots(host); if(playing) restartPlayback(); if(selTrackId==='__master__') renderChannel(masterTrack); };
+      host.appendChild(s);
+    } else {
+      const sel=document.createElement("select"); sel.className="ts-slot add"; sel.title="add a mastering plugin";
+      const mast=TIFF_PLUGINS.list.filter(p=>p.master), other=TIFF_PLUGINS.list.filter(p=>!p.master);
+      sel.innerHTML=`<option value="">＋ insert</option><optgroup label="MASTERING">${mast.map(p=>`<option>${p.name}</option>`).join("")}</optgroup><optgroup label="OTHER">${other.map(p=>`<option>${p.name}</option>`).join("")}</optgroup>`;
+      sel.onmousedown=(e)=>e.stopPropagation();
+      sel.onchange=(e)=>{ if(e.target.value){ masterTrack.inserts.push({name:e.target.value,params:{}}); renderMasterSlots(host); if(playing) restartPlayback(); if(selTrackId==='__master__') renderChannel(masterTrack); } };
+      host.appendChild(sel);
+    }
+  }
+}
 function ensureMasterLane(){
   let d=document.getElementById("lane-__master__");
   if(!d){ d=document.createElement("div"); d.className="lane masterlane"; d.id="lane-__master__";
-    d.innerHTML=`<div class="lhead"><span class="cdot" style="background:${masterTrack.color}"></span><span class="mbadge">MASTER</span><span class="name">the whole mix · click → drop a mastering chain</span></div>`;
-    d.onclick=()=>selectTrack(masterTrack);
+    d.innerHTML=`
+      <div class="tstrip masterstrip">
+        <div class="ts-top"><span class="cdot" style="background:${masterTrack.color}"></span><span class="mbadge">MASTER</span></div>
+        <div class="ts-row">
+          <div class="ts-ctl mvol" title="drag — master volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div>
+          <div class="ts-ctl mceil" title="drag — limiter ceiling"><span class="ts-k">CEIL</span><b class="ts-v"></b></div>
+        </div>
+        <div class="ts-slots" id="mslots"></div>
+      </div>
+      <div class="masterinfo">the whole mix — everything sums here<br><span class="mi-sub">drop a mastering chain · EQ → comp → maximizer (keep it last)</span></div>`;
+    bindMasterStripCtl(d.querySelector(".ts-ctl.mvol"), 0, 1.4, 0.9, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), true);
+    bindMasterStripCtl(d.querySelector(".ts-ctl.mceil"), -12, 0, -1, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1), false);
+    renderMasterSlots(d.querySelector("#mslots"));
+    d.onclick=(e)=>{ if(!e.target.closest(".ts-ctl,.ts-slot,.ts-slots")) selectTrack(masterTrack); };
   }
   $("tracks").appendChild(d);   // always keep it pinned to the bottom
 }

@@ -54,7 +54,7 @@ buses + sends + output routing, AudioSuite, zoom/snap/resize, tap/auto-tempo, ke
 
 **Phase B — Pro re-skin.** ✅ graphite+steel + per-plugin colors done.
 
-**Phase B2 — PRO TOOLS EDIT-WINDOW LAYOUT** ⬜ (B's locked spec, 2 PT screenshots). The
+**Phase B2 — PRO TOOLS EDIT-WINDOW LAYOUT** ✅ DONE (B's locked spec, 2 PT screenshots). The
 controls go on the LEFT of each lane, inline — NOT a shared right panel (that was the
 mistake; right panel = Mix-window idea). Each track = a row:
   - LEFT control strip, SAME HEIGHT as the lane (grows when you resize the lane taller):
@@ -119,6 +119,13 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 ---
 
 ## 6. PROGRESS LOG (newest first)
+
+- **2026-06-16** — Edit-window rebuild COMPLETE: MASTER lane -> strip format (VOL/CEIL
+  press-drag widgets + inline mastering insert slots, bindMasterStripCtl/renderMasterSlots
+  + masterinfo). SMART TOOL on the waveform: near a clip edge = TRIM that edge (sample-
+  accurate bufSlice, undoable), middle = grab/move, empty = playhead; cursor feedback
+  (ew-resize near edges, grab on a clip). Verified: master strip + vol drag + mastering
+  slot, trim shortened 4.0->3.65s. Phase B2 (Pro Tools edit window) = DONE.
 
 - **2026-06-16** — Edit-window cont'd (2): left rail -> a top ⚙ Setup DROPDOWN (rail is
   position:fixed, opens on the button, click-outside closes) so tracks get full width.
