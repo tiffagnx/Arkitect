@@ -233,6 +233,8 @@
   .fx-knobs { display:grid; grid-template-columns:repeat(3,82px); gap:18px 12px; padding:22px 20px 20px; justify-content:center; }
   .fx-knobs .vw-knob { gap:9px; }
   .fx-knobs .vw-knob label { text-transform:uppercase; }
+  .fx-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 16px 14px; }
+  .fxface .pw-track { font:500 10px 'Space Mono'; color:#9BF0E8; }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -999,27 +1001,32 @@ $("plugfile").onchange = async (e) => {
    diffuse tail + HF damping, independent per channel = real space, true
    stereo. Signature preserved (c, seconds, tone) so call sites don't change.
    Pre-delay stays on the existing predelay DelayNode — NOT baked here. ── */
-/* ── TIFF VERB — B's reverb, now a first-class INSERT so it lives in the same
-   plugin list as everything else (no more orphan on the left). Convolution
-   reverb with a baked impulse; Size/Tone rebake (debounced), Mix blends. ── */
+/* ── TIFF VERB — B's reverb, EXACTLY as he built it: 4 knobs (SIZE / TONE /
+   PRE-DLY / RETURN), reads "convolution reverb", pretty readouts (2.2s / 6.0k /
+   20ms / 0.80). Now a first-class INSERT in the chain — pre-delay → convolver →
+   return, parallel with the dry signal (same feel as his send verb). ── */
 TIFF_PLUGINS.register({
   name: "TIFF VERB",
+  subtitle: "convolution reverb",
+  foot: "your sound · drag a knob up / down · drag the top bar to move me",
   params: [
-    { id:"size", label:"Size s",  min:0.2, max:6,     value:2.2 },
-    { id:"tone", label:"Tone Hz", min:1000, max:12000, value:6000 },
-    { id:"mix",  label:"Mix",     min:0,   max:1,     value:0.35 },
+    { id:"size", label:"SIZE",    min:0.4, max:6,     step:0.1,   value:2.2,  fmt:v=>v.toFixed(1)+"s" },
+    { id:"tone", label:"TONE",    min:800, max:14000, step:100,   value:6000, fmt:v=>(v/1000).toFixed(1)+"k" },
+    { id:"pre",  label:"PRE-DLY", min:0,   max:0.12,  step:0.005, value:0.02, fmt:v=>Math.round(v*1000)+"ms" },
+    { id:"ret",  label:"RETURN",  min:0,   max:1.5,   step:0.01,  value:0.8,  fmt:v=>v.toFixed(2) },
   ],
   create(c) {
-    const i=c.createGain(), o=c.createGain(), dry=c.createGain(), wet=c.createGain(), cv=c.createConvolver();
+    const i=c.createGain(), o=c.createGain(), dry=c.createGain(), pre=c.createDelay(0.5), cv=c.createConvolver(), ret=c.createGain();
     let size=2.2, tone=6000, bt=null;
     const bake=()=>{ try { cv.buffer = makeIR(c, size, tone); } catch {} };
-    bake(); dry.gain.value=0.65; wet.gain.value=0.35;
-    i.connect(dry); dry.connect(o);
-    i.connect(cv); cv.connect(wet); wet.connect(o);
+    bake(); dry.gain.value=1; pre.delayTime.value=0.02; ret.gain.value=0.8;
+    i.connect(dry); dry.connect(o);                                       // dry pass-through
+    i.connect(pre); pre.connect(cv); cv.connect(ret); ret.connect(o);     // pre-delay → convolver → return
     return { input:i, output:o, set(id,v){
-      if(id==='mix'){ wet.gain.value=v; dry.gain.value=1-v*0.6; }
-      else if(id==='size'){ size=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+      if(id==='size'){ size=v; clearTimeout(bt); bt=setTimeout(bake,140); }
       else if(id==='tone'){ tone=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+      else if(id==='pre'){ pre.delayTime.value=v; }
+      else if(id==='ret'){ ret.gain.value=v; }
     } };
   }
 });
@@ -1710,8 +1717,8 @@ function makeDraggable(win, handle){
 }
 // bind a rotary knob to a plugin param (drag up/down, double-click = default)
 function bindFxKnob(knobEl, outEl, p, getV, setV){
-  const ind=knobEl.querySelector('.vknob-ind'), min=p.min, max=p.max, range=(max-min)||1, step=_step(p);
-  const draw=()=>{ const v=getV(); const f=(v-min)/range; ind.style.transform=`rotate(${(-135+f*270).toFixed(1)}deg)`; outEl.textContent=_fmt(v); };
+  const ind=knobEl.querySelector('.vknob-ind'), min=p.min, max=p.max, range=(max-min)||1, step=p.step||_step(p), fmt=p.fmt||_fmt;
+  const draw=()=>{ const v=getV(); const f=(v-min)/range; ind.style.transform=`rotate(${(-135+f*270).toFixed(1)}deg)`; outEl.textContent=fmt(v); };
   draw();
   knobEl.onmousedown=(e)=>{ e.preventDefault(); e.stopPropagation(); const sy=e.clientY, sv=getV();
     const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/150*range; v=Math.max(min,Math.min(max,v)); v=Math.round(v/step)*step; setV(v); draw(); };
@@ -1728,13 +1735,13 @@ function openPluginWindow(t, i){
   let w = document.getElementById(id);
   if (w){ w.style.display="block"; bringFront(w); return; }
   w = document.createElement("div"); w.className="plugwin fxface"; w.id=id;
-  w.innerHTML = `<div class="pw-bar"><span class="vw-title">${ins.name}</span><span class="pw-track">${t.name}</span><button class="pw-x" title="close">✕</button></div><div class="fx-knobs"></div>`;
+  w.innerHTML = `<div class="pw-bar"><span class="vw-title">${ins.name}</span><span class="pw-track">${def.subtitle || t.name}</span><button class="pw-x" title="close">✕</button></div><div class="fx-knobs"></div>${def.foot ? `<div class="fx-foot">${def.foot}</div>` : ""}`;
   const body = w.querySelector(".fx-knobs");
   def.params.forEach(p => {
     const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
     if (ins.params[p.id] == null) ins.params[p.id] = cur;
     const cell = document.createElement("div"); cell.className="vw-knob";
-    cell.innerHTML = `<output>${_fmt(cur)}</output><div class="vknob"><span class="vknob-ind"></span></div><label>${p.label}</label>`;
+    cell.innerHTML = `<output>${(p.fmt||_fmt)(cur)}</output><div class="vknob"><span class="vknob-ind"></span></div><label>${p.label}</label>`;
     bindFxKnob(cell.querySelector(".vknob"), cell.querySelector("output"), p,
       () => (ins.params[p.id] != null ? ins.params[p.id] : p.value),
       (v) => { ins.params[p.id]=v; t.live?.insertNodes?.[i]?.set(p.id, v); });
