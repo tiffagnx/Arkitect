@@ -86,16 +86,16 @@
   .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }
   .ts-name { font:600 12px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
   .ts-x { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E58A8E; width:20px; height:20px; border-radius:6px; cursor:pointer; font-size:11px; flex:none; }
-  .ts-row { display:flex; align-items:stretch; gap:5px; height:30px; }
+  .ts-row { display:flex; align-items:stretch; gap:5px; }
   .ts-btn { width:24px; flex:none; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; border-radius:6px; cursor:pointer; }
   .ts-btn.m.on { background:rgba(229,86,91,.2); color:#E58A8E; border-color:rgba(229,86,91,.55); }
   .ts-btn.s.on { background:rgba(217,164,65,.2); color:#E6B878; border-color:rgba(217,164,65,.55); }
-  .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:3px 7px; cursor:ns-resize; overflow:hidden; min-width:0; }
+  .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:5px 8px; cursor:ns-resize; overflow:hidden; min-width:0; min-height:40px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
   .ts-ctl.drag { border-color:rgba(62,156,184,.7); box-shadow:0 0 10px rgba(62,156,184,.25); }
   .ts-pop { position:absolute; right:5px; top:6px; bottom:6px; width:7px; background:rgba(0,0,0,.6); border:1px solid rgba(62,156,184,.45); border-radius:4px; z-index:3; }
   .ts-pop i { position:absolute; left:-3px; right:-3px; height:7px; border-radius:2px; background:var(--pink); box-shadow:0 0 8px var(--pink); transform:translateY(50%); }
-  .ts-k { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); display:block; position:relative; z-index:1; }
-  .ts-v { font:700 12px 'Space Mono'; color:var(--text); position:relative; z-index:1; }
+  .ts-k { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); position:relative; z-index:1; line-height:1; }
+  .ts-v { font:700 13px 'Space Mono'; color:var(--text); position:relative; z-index:1; line-height:1; white-space:nowrap; }
   .ts-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(62,156,184,.28), rgba(62,156,184,.10)); border-right:1px solid rgba(62,156,184,.55); z-index:0; }
   .ts-slots { display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1; min-height:0; }
   .ts-slot { font:600 9.5px 'Space Mono'; border-radius:5px; padding:3px 7px; display:flex; align-items:center; gap:6px; flex:none; }
