@@ -365,6 +365,14 @@
   .tw-roll { max-height:62vh; overflow:auto; padding:10px; background:rgba(0,0,0,.25); }
   .tw-roll canvas { display:block; width:100%; }
   .tw-foot { font:400 10px 'Space Mono'; color:var(--dim); padding:9px 16px; border-top:1px solid var(--hairline); }
+  /* generate-a-sound prompt */
+  .sfxprompt { position:fixed; z-index:400; width:300px; background:rgba(20,21,26,.98); border:1px solid rgba(62,156,184,.5); border-radius:12px; padding:13px; box-shadow:0 18px 50px rgba(0,0,0,.6); }
+  .sfx-h { font:700 11px 'Space Mono'; letter-spacing:.05em; color:#9FCFDD; margin-bottom:9px; }
+  .sfx-in { width:100%; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.06); border:1px solid var(--hairline); color:var(--text); font:500 12px Inter; outline:none; }
+  .sfx-in:focus { border-color:rgba(62,156,184,.6); }
+  .sfx-row { display:flex; align-items:center; gap:10px; margin-top:9px; }
+  .sfx-go { padding:7px 14px; border-radius:8px; border:1px solid rgba(62,156,184,.6); background:linear-gradient(100deg, rgba(62,156,184,.4), rgba(95,180,206,.3)); color:#fff; font:700 11px Oxanium; cursor:pointer; }
+  .sfx-hint { font:400 9px 'Space Mono'; color:var(--dim); }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#9FCFDD; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -721,7 +729,7 @@ function showWaveMenu(t, wv, e){
     add("◣  Fade out", ()=>clipFx_fade(t,cl,'out'));
     sep();
     add("⚙  AudioSuite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
-  } else add("click on a clip first", ()=>{}, false);
+  } else { const cx=e.clientX, cy=e.clientY; add("✨  Generate a sound here…", ()=>openSfxPrompt(t, atTime, cx, cy)); }
   sep();
   add("↶  Undo", undoLast);
   m.style.left = Math.min(e.clientX, window.innerWidth-220)+"px";
@@ -3927,6 +3935,64 @@ function applyRetune(t, cl, notes){
     cl.buffer=out; afterClipFx(t,cl,`Retuned ${edited.length} note${edited.length>1?'s':''}`);
     edited.forEach(n=>{ n.midi=n.targetMidi; n.cents=0; }); drawTune();
   }catch(e){ flash("Retune failed: "+e.message); } }, 25);
+}
+
+/* ═══ GENERATE A SOUND into an empty spot — type it, it drops a clip right there.
+   v1 is a LOCAL procedural synth (risers, impacts, subs, snares, hats, whooshes,
+   crackle, zaps, tones) — free + instant. A text-to-anything model (local Stable
+   Audio / cloud ElevenLabs) is the next engine swap. ═══ */
+async function generateSfx(text){
+  const lower=(text||"").toLowerCase(), has=(...ws)=>ws.some(w=>lower.includes(w));
+  let recipe="tone", dur=1.0;
+  if(has("riser","rise","uplift","sweep up","build up")){ recipe="riser"; dur=1.6; }
+  else if(has("downer","fall","drop down","reverse sweep")){ recipe="downer"; dur=1.2; }
+  else if(has("impact","boom","hit","slam","cinematic","trailer","explosion")){ recipe="impact"; dur=1.5; }
+  else if(has("sub","808","bass drop","sub drop")){ recipe="sub"; dur=0.9; }
+  else if(has("snare","clap","snap","rim")){ recipe="snare"; dur=0.4; }
+  else if(has("hat","cymbal","hi-hat","tick","shaker")){ recipe="hat"; dur=0.25; }
+  else if(has("vinyl","crackle","rain","static","texture","noise floor")){ recipe="crackle"; dur=1.6; }
+  else if(has("whoosh","wind","swoosh","transition","sweep")){ recipe="whoosh"; dur=1.1; }
+  else if(has("zap","laser","beep","sci-fi","glitch","arcade")){ recipe="zap"; dur=0.5; }
+  const sr=44100, len=Math.floor(sr*dur), oc=new OfflineAudioContext(2,len,sr), out=oc.createGain(); out.connect(oc.destination);
+  const noise=()=>{ const b=oc.createBuffer(1,len,sr), d=b.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1; const s=oc.createBufferSource(); s.buffer=b; return s; };
+  const g=(v)=>{ const x=oc.createGain(); x.gain.value=v; return x; };
+  if(recipe==="riser"||recipe==="downer"){ const up=recipe==="riser"; const n=noise(), bp=oc.createBiquadFilter(); bp.type="bandpass"; bp.Q.value=5;
+    bp.frequency.setValueAtTime(up?300:7000,0); bp.frequency.exponentialRampToValueAtTime(up?8000:300,dur);
+    const e=oc.createGain(); e.gain.setValueAtTime(0.001,0); e.gain.exponentialRampToValueAtTime(0.85,dur*0.9); e.gain.linearRampToValueAtTime(0,dur);
+    n.connect(bp); bp.connect(e); e.connect(out); n.start(0); }
+  else if(recipe==="impact"){ const o=oc.createOscillator(); o.frequency.setValueAtTime(120,0); o.frequency.exponentialRampToValueAtTime(38,0.6);
+    const og=oc.createGain(); og.gain.setValueAtTime(1,0); og.gain.exponentialRampToValueAtTime(0.001,1.0); o.connect(og); og.connect(out); o.start(0); o.stop(dur);
+    const n=noise(), lp=oc.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2500; const ng=oc.createGain(); ng.gain.setValueAtTime(0.8,0); ng.gain.exponentialRampToValueAtTime(0.001,0.5); n.connect(lp); lp.connect(ng); ng.connect(out); n.start(0);
+    const t2=noise(), bp=oc.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=900; const tg=oc.createGain(); tg.gain.setValueAtTime(0.0001,0); tg.gain.linearRampToValueAtTime(0.2,0.1); tg.gain.exponentialRampToValueAtTime(0.001,dur); t2.connect(bp); bp.connect(tg); tg.connect(out); t2.start(0); }
+  else if(recipe==="sub"){ const o=oc.createOscillator(); o.frequency.setValueAtTime(62,0); o.frequency.exponentialRampToValueAtTime(34,dur); const e=oc.createGain(); e.gain.setValueAtTime(0.9,0); e.gain.exponentialRampToValueAtTime(0.001,dur); o.connect(e); e.connect(out); o.start(0); o.stop(dur); }
+  else if(recipe==="snare"){ const n=noise(), bp=oc.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=1800; bp.Q.value=0.7; const e=oc.createGain(); e.gain.setValueAtTime(1,0); e.gain.exponentialRampToValueAtTime(0.001,0.18); n.connect(bp); bp.connect(e); e.connect(out); n.start(0);
+    const o=oc.createOscillator(); o.frequency.value=190; const og=oc.createGain(); og.gain.setValueAtTime(0.5,0); og.gain.exponentialRampToValueAtTime(0.001,0.1); o.connect(og); og.connect(out); o.start(0); o.stop(0.12); }
+  else if(recipe==="hat"){ const n=noise(), hp=oc.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=7000; const e=oc.createGain(); e.gain.setValueAtTime(0.7,0); e.gain.exponentialRampToValueAtTime(0.001,0.1); n.connect(hp); hp.connect(e); e.connect(out); n.start(0); }
+  else if(recipe==="crackle"){ const b=oc.createBuffer(1,len,sr), d=b.getChannelData(0); for(let i=0;i<len;i++) d[i]=(Math.random()<0.0035)?(Math.random()*2-1):0; const s=oc.createBufferSource(); s.buffer=b; const hp=oc.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=2200; s.connect(hp); hp.connect(g(0.6)).connect(out); s.start(0); }
+  else if(recipe==="whoosh"){ const n=noise(), bp=oc.createBiquadFilter(); bp.type="bandpass"; bp.Q.value=2.5; bp.frequency.setValueAtTime(400,0); bp.frequency.exponentialRampToValueAtTime(4500,dur*0.5); bp.frequency.exponentialRampToValueAtTime(400,dur);
+    const e=oc.createGain(); e.gain.setValueAtTime(0.001,0); e.gain.linearRampToValueAtTime(0.7,dur*0.5); e.gain.linearRampToValueAtTime(0,dur); n.connect(bp); bp.connect(e); e.connect(out); n.start(0); }
+  else if(recipe==="zap"){ const o=oc.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(2200,0); o.frequency.exponentialRampToValueAtTime(110,dur); const e=oc.createGain(); e.gain.setValueAtTime(0.55,0); e.gain.exponentialRampToValueAtTime(0.001,dur); o.connect(e); e.connect(out); o.start(0); o.stop(dur); }
+  else { const o=oc.createOscillator(); o.type="triangle"; o.frequency.value=440; const e=oc.createGain(); e.gain.setValueAtTime(0.0001,0); e.gain.exponentialRampToValueAtTime(0.5,0.05); e.gain.exponentialRampToValueAtTime(0.001,dur); o.connect(e); e.connect(out); o.start(0); o.stop(dur); }
+  const r=await oc.startRendering(); r._sfxName=text; return r;
+}
+async function dropSfx(t, atTime, text){
+  flash(`Generating “${text}”…`);
+  try{ const buf=await generateSfx(text); clipsOf(t); pushUndoClips(t);
+    t.clips.push({ id:rid(), buffer:buf, start:Math.max(0,atTime) }); syncPrimary(t);
+    drawLane(t); updateZoomUi(); if(playing) restartPlayback(); flash(`Dropped “${text}”`); if(selTrackId===t.id) renderChannel(t);
+  }catch(e){ flash("SFX failed: "+e.message); }
+}
+function openSfxPrompt(t, atTime, x, y){
+  document.getElementById("sfxprompt")?.remove();
+  const p=document.createElement("div"); p.id="sfxprompt"; p.className="sfxprompt";
+  p.innerHTML=`<div class="sfx-h">✨ Generate a sound here</div><input class="sfx-in" placeholder="riser · impact · sub drop · whoosh · snare · vinyl crackle · zap…" /><div class="sfx-row"><button class="sfx-go">Generate</button><span class="sfx-hint">local · free · instant</span></div>`;
+  document.body.appendChild(p);
+  p.style.left=Math.min(x, window.innerWidth-320)+"px"; p.style.top=Math.min(y, window.innerHeight-130)+"px";
+  const inp=p.querySelector(".sfx-in"); setTimeout(()=>inp.focus(),10);
+  const go=()=>{ const txt=inp.value.trim(); if(txt){ p.remove(); dropSfx(t, atTime, txt); } };
+  p.querySelector(".sfx-go").onclick=go;
+  inp.onkeydown=(e)=>{ if(e.key==="Enter") go(); else if(e.key==="Escape") p.remove(); };
+  setTimeout(()=>document.addEventListener("mousedown", function cl(ev){ if(!ev.target.closest("#sfxprompt")){ p.remove(); document.removeEventListener("mousedown",cl); } }),60);
 }
 $("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
 

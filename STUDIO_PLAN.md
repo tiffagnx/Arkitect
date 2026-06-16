@@ -81,7 +81,7 @@ mistake; right panel = Mix-window idea). Each track = a row:
   4. ⬜ Whole-clip pitch + formant control. Apply writes back to the clip buffer.
   5. ⬜ Push retune toward transparent; A/B vs real Melodyne.
 
-**Phase D — Generate-a-sound.** ⬜ Highlight empty spot → right-click → type → drops a
+**Phase D — Generate-a-sound.** 🔶 v1 (procedural local) Highlight empty spot → right-click → type → drops a
 clip. UX rides the clip model (easy). Engine fork: free-local model (Stable Audio Open /
 AudioGen) vs instant cloud API (ElevenLabs SFX). B to pick (cost-sensitive).
 
@@ -119,6 +119,14 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 ---
 
 ## 6. PROGRESS LOG (newest first)
+
+- **2026-06-16** — GENERATE-A-SOUND into an empty spot SHIPPED (v1): right-click empty lane
+  -> '✨ Generate a sound here' -> type -> drops a clip at that exact time. generateSfx =
+  LOCAL procedural synth (riser/downer/impact/sub/snare/hat/whoosh/crackle/zap/tone via
+  OfflineAudioContext osc+noise+filters+envelopes), dropSfx places the clip. Verified all
+  recipes non-silent + clip lands at the click time. LIMIT: arbitrary real-world sounds
+  ('glass shatter') fall to a tone -> needs a model (local Stable Audio / cloud ElevenLabs)
+  = the engine swap, B's cost choice.
 
 - **2026-06-16** — MELODYNE drag-to-retune SHIPPED: Tune notes are draggable (targetMidi),
   scale-snap to a KEY OVERRIDE dropdown, ghost+connector shows the move, Apply pitch-shifts
