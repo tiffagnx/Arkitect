@@ -109,6 +109,50 @@
   .chan-io { display:flex; align-items:center; gap:9px; margin:7px 0 2px; }
   .io-lbl { font:700 9px 'Space Mono'; letter-spacing:.12em; color:var(--dim); flex:none; }
   .io-out { flex:1; padding:6px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FFD6EA; font:600 11px Inter; cursor:pointer; }
+  /* EDIT / MIX toggle */
+  .vtoggle { display:inline-flex; border:1px solid var(--hairline); border-radius:9px; overflow:hidden; margin-left:6px; }
+  .vt { padding:7px 14px; background:transparent; border:none; cursor:pointer; color:var(--dim); font:700 10px 'Space Mono'; letter-spacing:.12em; }
+  .vt.on { background:rgba(233,30,140,.22); color:#FFD6EA; }
+  /* MIX WINDOW — console strips */
+  .mixwin { flex:1; display:flex; gap:10px; padding:16px; overflow-x:auto; align-items:flex-start; }
+  .mstrip { width:128px; flex:none; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.025);
+    border:1px solid var(--hairline); border-radius:12px; padding:11px 9px; }
+  .mstrip.muted { opacity:.5; }
+  .mstrip.master { background:linear-gradient(180deg, rgba(255,70,80,.10), rgba(255,255,255,.02)); border-color:rgba(255,90,100,.4); margin-left:8px; }
+  .ms-top { display:flex; align-items:center; gap:7px; }
+  .ms-top .cdot { width:11px; height:11px; border-radius:3px; flex:none; }
+  .ms-nm { font:600 12px Inter; color:#FFD6EA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
+  .ms-nm.master { font:700 13px Oxanium; letter-spacing:.14em; color:#FF8A8A; }
+  .ms-badge { font:700 8px 'Space Mono'; letter-spacing:.12em; color:var(--teal); }
+  .ms-lbl { font:700 8px 'Space Mono'; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; margin-top:3px; }
+  .ms-inlist { display:flex; flex-direction:column; gap:3px; }
+  .ms-in { font:600 9.5px 'Space Mono'; color:#C9B6E8; background:rgba(139,92,246,.12); border:1px solid rgba(139,92,246,.3);
+    border-radius:6px; padding:3px 6px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ms-in:hover { border-color:rgba(233,30,140,.6); color:#FFD6EA; }
+  .ms-in.byp { opacity:.45; text-decoration:line-through; }
+  .ms-add, .ms-out { width:100%; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E8D6E8; font:600 10px Inter; cursor:pointer; }
+  .ms-knobrow { display:flex; align-items:flex-end; justify-content:space-between; gap:6px; margin-top:4px; }
+  .ms-pan { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  .ms-pan label { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); }
+  .cknob.sm { width:38px; height:38px; }
+  .cknob.sm .cknob-ind { top:5px; height:13px; transform-origin:50% 14px; }
+  .ms-mscol { display:flex; flex-direction:column; gap:4px; }
+  .msbtn { width:30px; padding:4px 0; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; cursor:pointer; }
+  .msbtn.m.on { background:rgba(255,90,110,.2); color:#FF9DAB; border-color:rgba(255,90,110,.6); }
+  .msbtn.s.on { background:rgba(245,166,35,.2); color:#FFD79B; border-color:rgba(245,166,35,.6); }
+  .ms-spacer { flex:1; min-height:8px; }
+  .ms-fader { display:flex; gap:7px; justify-content:center; align-items:stretch; height:170px; margin-top:6px; }
+  .ms-meter { width:8px; background:rgba(0,0,0,.45); border:1px solid var(--hairline); border-radius:4px; position:relative; overflow:hidden; }
+  .ms-meter i { position:absolute; left:0; right:0; bottom:0; height:0%; background:linear-gradient(0deg,#34D399,#F5A623 70%,#FF5A6E); }
+  .ms-meter.master i { background:linear-gradient(0deg,#34D399,#F5A623 65%,#FF3B4E); }
+  .ms-slot { width:34px; background:rgba(0,0,0,.3); border:1px solid var(--hairline); border-radius:8px; position:relative; cursor:ns-resize; }
+  .ms-slot::before { content:""; position:absolute; left:50%; top:8px; bottom:8px; width:2px; margin-left:-1px; background:var(--hairline); border-radius:2px; }
+  .ms-cap { position:absolute; left:3px; right:3px; height:18px; bottom:0; border-radius:5px; cursor:grab;
+    background:linear-gradient(#FFC6E6,var(--pink)); box-shadow:0 2px 8px rgba(0,0,0,.5), 0 0 10px rgba(233,30,140,.4); }
+  .ms-cap.red { background:linear-gradient(#FFB0B0,#FF4757); box-shadow:0 2px 8px rgba(0,0,0,.5), 0 0 12px rgba(255,70,80,.5); }
+  .ms-db { text-align:center; font:600 11px 'Space Mono'; color:var(--teal); }
+  .mstrip.master .ms-db { color:#FFB3B3; }
+  .ms-lim { font:600 11px 'Space Mono'; color:#FFB3B3; text-align:center; }
   .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .lhead .cdot { width:11px; height:11px; border-radius:3px; flex:none; margin-right:8px; box-shadow:0 0 7px rgba(0,0,0,.4) inset; }
   .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -278,6 +322,7 @@
   <button class="tbtn teal" id="loop">↻ Loop</button>
   <button class="tbtn rec" id="rec">● Record</button>
   <span class="countin" id="countin"></span>
+  <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
   <div class="right">
     <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
     <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
@@ -351,6 +396,7 @@
   </div>
 
   <div class="chan" id="chan"><div class="empty">Click a track to mix it.<br>Its volume, pan, EQ, comp, inserts and sends show here — off the lane, so you can edit the wave.</div></div>
+  <div class="mixwin" id="mixwin" style="display:none"></div>
 </div>
 
 <script>
@@ -2590,6 +2636,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     } catch { insertNodes.push(null); }
   }
   tail.connect(comp); comp.connect(pan); pan.connect(fader);
+  const meter = c.createAnalyser(); meter.fftSize = 256; fader.connect(meter);   // post-fader VU tap for the Mix window
   let dest = isOffline ? c._masterGain : master.gain;     // default output = Master
   if (!isAux && t.output && t.output !== 'master') {       // routed to an FX bus instead
     const ao = tracks.find(x => x.id === t.output && x.type === 'aux');
@@ -2604,7 +2651,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux');
     if (aux && aux._in) { const sg = c.createGain(); sg.gain.value = (s.level != null ? s.level : 0.5); fader.connect(sg); sg.connect(aux._in); sendGains.push(sg); s._sg = sg; }
   }
-  const live = { srcs, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains };
+  const live = { srcs, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains, meter };
   applyTrackTo(t, live);
   return live;
 }
@@ -2620,6 +2667,85 @@ function applyTrackTo(t, n) {
 }
 function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
 function applyMix() { tracks.forEach(applyTrack); }
+
+/* ═══ MIX WINDOW — the Pro Tools console: vertical channel strips side-by-side,
+   Master Fader as a distinct RED strip on the far right. Toggled with EDIT/MIX;
+   the edit view (waveforms/clips) is untouched. ═══ */
+let viewMode = 'edit';
+function setView(mode){
+  viewMode = mode; const mix = mode==='mix';
+  document.getElementById("vEdit").classList.toggle("on", !mix);
+  document.getElementById("vMix").classList.toggle("on", mix);
+  $("tracks").style.display = mix ? 'none' : '';
+  $("chan").style.display   = mix ? 'none' : '';
+  $("mixwin").style.display = mix ? 'flex' : 'none';
+  if (mix) renderMixWindow();
+}
+function renderMixWindow(){
+  const win = $("mixwin"); win.innerHTML = "";
+  if (!tracks.length){ win.innerHTML = `<div class="empty" style="margin:auto">No tracks yet — drop stems in the Edit view.</div>`; win.appendChild(buildMasterStrip()); return; }
+  const auxes = tracks.filter(t=>t.type==='aux');
+  tracks.forEach(t => win.appendChild(buildStrip(t, auxes)));
+  win.appendChild(buildMasterStrip());
+}
+function renameTrack(t, span){ const n = prompt("Rename track:", t.name); if(n && n.trim()){ t.name=n.trim(); if(span) span.textContent=t.name;
+  const ln=document.querySelector("#lane-"+t.id+" .name"); if(ln) ln.textContent=t.name; if(selTrackId===t.id) renderChannel(t); } }
+function bindMiniPan(t, knob){ if(!knob) return; const ind=knob.querySelector('.cknob-ind');
+  const draw=()=>{ ind.style.transform=`rotate(${(-135+((t.pan+1)/2)*270).toFixed(1)}deg)`; };
+  draw();
+  knob.onmousedown=(e)=>{ e.preventDefault(); const sy=e.clientY, sv=t.pan;
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/130*2; v=Math.max(-1,Math.min(1,Math.round(v*100)/100)); t.pan=v; draw(); applyTrack(t); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
+  knob.ondblclick=()=>{ t.pan=0; draw(); applyTrack(t); };
+}
+function bindMixFader(slot, dbEl, getV, setV, min, max, dflt){ if(!slot) return; const cap=slot.querySelector('.ms-cap');
+  const H=()=>Math.max(1, slot.clientHeight-cap.clientHeight);
+  const draw=()=>{ const v=getV(); cap.style.bottom=(((v-min)/(max-min))*H())+'px'; if(dbEl) dbEl.textContent=v.toFixed(2); };
+  draw(); slot._draw=draw;
+  const grab=(e)=>{ e.preventDefault(); const r=slot.getBoundingClientRect();
+    const move=(ev)=>{ let f=1-(ev.clientY-r.top-cap.clientHeight/2)/H(); f=Math.max(0,Math.min(1,f)); setV(Math.round((min+f*(max-min))*100)/100); draw(); };
+    move(e); const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',move); document.addEventListener('mouseup',up); };
+  cap.onmousedown=grab; slot.onmousedown=grab;
+  slot.ondblclick=()=>{ setV(dflt); draw(); };
+}
+function buildStrip(t, auxes){
+  const isAux = t.type==='aux';
+  const el=document.createElement("div"); el.className="mstrip"+(isAux?" aux":"")+(t.muted?" muted":""); el.dataset.id=t.id;
+  el.innerHTML=`
+    <div class="ms-top"><span class="cdot" style="background:${t.color}"></span><span class="ms-nm" title="double-click to rename">${t.name}</span></div>
+    ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
+    <div class="ms-lbl">Inserts</div><div class="ms-inlist"></div>
+    <select class="ms-add"><option value="">+ fx</option>${TIFF_PLUGINS.list.map(p=>`<option>${p.name}</option>`).join("")}</select>
+    ${isAux?``:`<div class="ms-lbl">Output</div><select class="ms-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select>`}
+    <div class="ms-knobrow"><div class="ms-pan"><div class="cknob sm" id="msp-${t.id}"><span class="cknob-ind"></span></div><label>PAN</label></div>
+      <div class="ms-mscol"><button class="msbtn m${t.muted?' on':''}" data-a="m">M</button><button class="msbtn s${t.solo?' on':''}" data-a="s">S</button></div></div>
+    <div class="ms-fader"><div class="ms-meter"><i></i></div><div class="ms-slot" id="msf-${t.id}"><div class="ms-cap"></div></div></div>
+    <div class="ms-db" id="msdb-${t.id}"></div>`;
+  const inlist=el.querySelector(".ms-inlist");
+  (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":""); r.textContent=ins.name; r.title="open "+ins.name; r.onclick=()=>openPluginWindow(t,i); inlist.appendChild(r); });
+  el.querySelector(".ms-add").onchange=(e)=>{ if(e.target.value){ addInsert(t,e.target.value); renderMixWindow(); } };
+  const outSel=el.querySelector(".ms-out"); if(outSel) outSel.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); };
+  bindMiniPan(t, el.querySelector(`#msp-${t.id}`));
+  el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });
+  const nm=el.querySelector(".ms-nm"); nm.ondblclick=()=>renameTrack(t,nm);
+  bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 0.9);
+  el.onclick=(e)=>{ if(!e.target.closest("button,select,.cknob,.ms-slot,.ms-in")) { selectTrack(t); } };
+  return el;
+}
+function buildMasterStrip(){
+  const el=document.createElement("div"); el.className="mstrip master";
+  el.innerHTML=`
+    <div class="ms-top"><span class="ms-nm master">MASTER</span></div>
+    <div class="ms-lbl">Limiter</div><div class="ms-lim" id="msLim">${(+$("mLim").value).toFixed(1)} dB</div>
+    <div class="ms-spacer"></div>
+    <div class="ms-fader"><div class="ms-meter master"><i></i></div><div class="ms-slot" id="msf-master"><div class="ms-cap red"></div></div></div>
+    <div class="ms-db" id="msdb-master"></div>`;
+  bindMixFader(el.querySelector("#msf-master"), el.querySelector("#msdb-master"),
+    ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9);
+  return el;
+}
 
 /* ── transport ── */
 function maxDur() { let m=0.01; for(const t of tracks){ for(const cl of clipsOf(t)) m=Math.max(m, cl.start+cl.buffer.duration); } return m; }
@@ -2651,6 +2777,8 @@ function restartPlayback() { const p = pos(); startOffset = p; playAll(); }
 $("play").onclick = () => playing ? pauseAll() : playAll();
 $("stop").onclick = stopAll;
 $("loop").onclick = (e) => { loop = !loop; e.target.classList.toggle("on", loop); };
+$("vEdit").onclick = () => setView('edit');
+$("vMix").onclick  = () => setView('mix');
 
 /* ── ui tick: clock, playheads, meters, loop ── */
 function tickUi() {
@@ -2660,7 +2788,7 @@ function tickUi() {
   if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
   // playheads — a take's wave spans only ITS buffer starting at t.offset, so
   // map the transport playhead into the clip's local time.
-  tracks.forEach(t => {
+  if (viewMode !== 'mix') tracks.forEach(t => {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
     drawLane(t);
     const g = cv.getContext("2d");
@@ -2674,6 +2802,12 @@ function tickUi() {
   if (master) {
     $("meterL").style.width = (lvlOf(master.aL) * 100) + "%";
     $("meterR").style.width = (lvlOf(master.aR) * 100) + "%";
+  }
+  if (viewMode === 'mix') {                              // Mix-window VU meters (per strip + master)
+    const win = $("mixwin");
+    tracks.forEach(t => { const m = win.querySelector(`.mstrip[data-id="${t.id}"] .ms-meter i`);
+      if (m) m.style.height = ((t.live && t.live.meter ? lvlOf(t.live.meter) : 0) * 100) + "%"; });
+    const mm = win.querySelector('.mstrip.master .ms-meter i'); if (mm && master) mm.style.height = (lvlOf(master.aL) * 100) + "%";
   }
   // input meter + runaway-feedback watch
   if (REC.inAnalyser) { const il = lvlOf(REC.inAnalyser); $("inMeter").style.width = (il * 100) + "%"; feedbackWatch(il); }
