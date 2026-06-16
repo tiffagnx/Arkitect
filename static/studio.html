@@ -355,7 +355,12 @@
   .tw-bar { display:flex; align-items:baseline; gap:10px; padding:12px 16px; cursor:move; user-select:none; border-bottom:1px solid var(--hairline); background:rgba(255,255,255,.02); }
   .tw-title { font:700 16px Oxanium; letter-spacing:.16em; color:#3E9CB8; }
   .tw-sub { font:500 11px 'Space Mono'; color:var(--dim); }
-  .tw-x { margin-left:auto; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:var(--dim); width:26px; height:26px; border-radius:7px; cursor:pointer; }
+  .tw-ctls { display:flex; align-items:center; gap:7px; margin-left:auto; font:600 9px 'Space Mono'; color:var(--dim); }
+  #twKey { padding:4px 6px; border-radius:6px; background:rgba(255,255,255,.06); border:1px solid var(--hairline); color:var(--text); font:600 10px 'Space Mono'; }
+  .tw-btn { padding:5px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 9px 'Space Mono'; cursor:pointer; }
+  .tw-btn.on { background:rgba(62,156,184,.18); color:#9FCFDD; border-color:rgba(62,156,184,.5); }
+  .tw-btn.apply { background:linear-gradient(100deg, rgba(62,156,184,.38), rgba(95,180,206,.3)); color:#fff; border-color:rgba(62,156,184,.6); }
+  .tw-x { margin-left:10px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:var(--dim); width:26px; height:26px; border-radius:7px; cursor:pointer; }
   .tw-x:hover { color:#9FCFDD; border-color:rgba(62,156,184,.5); }
   .tw-roll { max-height:62vh; overflow:auto; padding:10px; background:rgba(0,0,0,.25); }
   .tw-roll canvas { display:block; width:100%; }
@@ -1233,7 +1238,13 @@ function refreshPlugUi() {
 refreshPlugUi();  // list all built-in plugins in the sidebar at load
 $("plugfile").onchange = async (e) => {
   const f = e.target.files?.[0]; if (!f) return;
-  try { (new Function(await f.text()))(); } catch (err) { alert("Plugin error: " + err.message); }
+  try {
+    (new Function(await f.text()))();
+    const seen = new Set();   // dedupe by name — re-loading the same plugin won't pile up duplicates
+    TIFF_PLUGINS.list = TIFF_PLUGINS.list.filter(p => !seen.has(p.name) && seen.add(p.name));
+    refreshPlugUi();
+    flash(`Plugin loaded · ${TIFF_PLUGINS.list.length} in the rack`);
+  } catch (err) { alert("Plugin error: " + err.message); }
   e.target.value = "";
 };
 
@@ -3842,29 +3853,80 @@ function openTune(t){
     renderTune(t, cl, notes, key);
   }catch(e){ flash("Pitch analysis failed: "+e.message); } }, 25);
 }
+let _tune=null;   // {t, cl, notes, key, lo, hi, scaleSnap}
+const _NNAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function _snapToScale(m, sc){ if(!sc) return m; for(let d=0;d<=6;d++){ if(sc.has((((m+d)%12)+12)%12)) return m+d; if(sc.has((((m-d)%12)+12)%12)) return m-d; } return m; }
 function renderTune(t, cl, notes, key){
+  notes.forEach(n=>{ if(n.targetMidi==null) n.targetMidi=n.midi; });
+  let lo=127,hi=0; notes.forEach(n=>{ lo=Math.min(lo,n.midi,n.targetMidi); hi=Math.max(hi,n.midi,n.targetMidi); }); if(!notes.length){ lo=57; hi=69; }
+  lo-=3; hi+=3; _tune={t,cl,notes,key,lo,hi,scaleSnap:true};
   let w=document.getElementById("tunewin"); if(!w){ w=document.createElement("div"); w.id="tunewin"; w.className="tunewin"; document.body.appendChild(w); }
-  let lo=127,hi=0; notes.forEach(n=>{ lo=Math.min(lo,n.midi); hi=Math.max(hi,n.midi); }); if(!notes.length){ lo=57; hi=69; }
-  lo-=2; hi+=2; const rows=hi-lo+1, dur=cl.buffer.duration, rowH=15, Hc=rows*rowH;
-  w.innerHTML=`<div class="tw-bar"><span class="tw-title">TUNE</span><span class="tw-sub">${t.name} · key ${key} · ${notes.length} notes</span><button class="tw-x" title="close">✕</button></div>
+  const rows=hi-lo+1, Hc=rows*15;
+  const keyOpts=["—"]; ["major","minor"].forEach(m=>_NNAMES.forEach(r=>keyOpts.push(r+" "+m)));
+  w.innerHTML=`<div class="tw-bar"><span class="tw-title">TUNE</span><span class="tw-sub">${t.name} · ${notes.length} notes</span>
+      <span class="tw-ctls">KEY <select id="twKey">${keyOpts.map(k=>`<option${k===key?' selected':''}>${k}</option>`).join("")}</select>
+      <button class="tw-btn on" id="twSnap" title="snap retuned notes to the key">⌗ Scale</button>
+      <button class="tw-btn apply" id="twApply">⤓ Apply retune</button></span>
+      <button class="tw-x" title="close">✕</button></div>
     <div class="tw-roll"><canvas id="tuneCanvas" width="1100" height="${Hc}"></canvas></div>
-    <div class="tw-foot">detected notes on the grid (scale of ${key} shaded). Drag-to-retune is the next build.</div>`;
-  const cv=w.querySelector("#tuneCanvas"), g=cv.getContext("2d"), W=cv.width, NN=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"], scale=_scaleOfKey(key);
-  g.clearRect(0,0,W,Hc);
-  for(let r=0;r<rows;r++){ const midi=hi-r, pc=((midi%12)+12)%12, inS=scale?scale.has(pc):false, blk=NN[pc].includes("#");
-    g.fillStyle = inS ? "rgba(62,156,184,0.07)" : (blk?"rgba(0,0,0,0.22)":"rgba(255,255,255,0.012)"); g.fillRect(0,r*rowH,W,rowH);
-    g.strokeStyle="rgba(255,255,255,0.04)"; g.beginPath(); g.moveTo(0,r*rowH+rowH); g.lineTo(W,r*rowH+rowH); g.stroke();
-    g.fillStyle="rgba(200,205,212,0.4)"; g.font="600 8px 'Space Mono'"; g.fillText(NN[pc]+(pc===0?(Math.floor(midi/12)-1):''), 3, r*rowH+rowH-4);
-  }
-  const beat=60/curTempo(); if(beat>0 && dur/beat<200){ for(let s=0;s<dur;s+=beat){ const x=(s/dur)*W; g.strokeStyle="rgba(255,255,255,0.05)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,Hc); g.stroke(); } }
-  notes.forEach(n=>{ const r=hi-n.midi, x=(n.start/dur)*W, ww=Math.max(5,((n.end-n.start)/dur)*W), y=r*rowH+2, hh=rowH-4;
-    g.fillStyle="rgba(62,156,184,0.9)"; _twRR(g,x,y,ww,hh,4); g.fill();
-    if(Math.abs(n.cents)>10){ g.fillStyle=n.cents>0?"#E5A24A":"#5FB4CE"; g.fillRect(x,y-1,ww,2); }   // sharp/flat hint
-    g.fillStyle="#0C0D10"; g.font="700 9px 'Space Mono'"; if(ww>16) g.fillText(NN[((n.midi%12)+12)%12], x+4, y+hh-3);
-  });
-  w.querySelector(".tw-x").onclick=()=>w.remove(); makeDraggable(w, w.querySelector(".tw-bar"));
-  w.style.left="160px"; w.style.top="90px"; w.style.display="block"; bringFront(w);
+    <div class="tw-foot">drag a note up / down to retune it · ⌗ Scale locks to the key · Apply prints it onto the clip · Ctrl+Z to undo</div>`;
+  const cv=w.querySelector("#tuneCanvas");
+  drawTune();
+  cv.onmousedown=(e)=>{
+    const r=cv.getBoundingClientRect(), tsec=((e.clientX-r.left)/r.width)*cl.buffer.duration;
+    const n=notes.find(nn=> tsec>=nn.start && tsec<=nn.end); if(!n) return; e.preventDefault();
+    const move=(ev)=>{ const ry=Math.max(0,Math.min(rows-1,Math.floor((ev.clientY-r.top)/r.height*rows))); let m=hi-ry;
+      if(_tune.scaleSnap) m=_snapToScale(m, _scaleOfKey(w.querySelector("#twKey").value));
+      m=Math.max(lo+1,Math.min(hi-1,m)); if(m!==n.targetMidi){ n.targetMidi=m; drawTune(); } };
+    const up=()=>{ document.removeEventListener("mousemove",move); document.removeEventListener("mouseup",up);
+      if(n.targetMidi!==n.midi) flash(`${_NNAMES[((n.midi%12)+12)%12]} → ${_NNAMES[((n.targetMidi%12)+12)%12]} (${(n.targetMidi-n.midi>0?'+':'')}${n.targetMidi-n.midi})`); };
+    document.addEventListener("mousemove",move); document.addEventListener("mouseup",up);
+  };
+  w.querySelector("#twKey").onchange=()=>drawTune();
+  const sb=w.querySelector("#twSnap"); sb.onclick=()=>{ _tune.scaleSnap=!_tune.scaleSnap; sb.classList.toggle("on",_tune.scaleSnap); };
+  w.querySelector("#twApply").onclick=()=>applyRetune(t,cl,notes);
+  w.querySelector(".tw-x").onclick=()=>{ w.remove(); _tune=null; };
+  makeDraggable(w, w.querySelector(".tw-bar"));
+  w.style.left="120px"; w.style.top="80px"; w.style.display="block"; bringFront(w);
   flash(`Found ${notes.length} notes · key ${key}`);
+}
+function drawTune(){
+  if(!_tune) return; const {cl,notes,key,lo,hi}=_tune; const w=document.getElementById("tunewin"), cv=w&&w.querySelector("#tuneCanvas"); if(!cv) return;
+  const g=cv.getContext("2d"), W=cv.width, rows=hi-lo+1, rowH=cv.height/rows, dur=cl.buffer.duration, scale=_scaleOfKey(w.querySelector("#twKey")?.value||key);
+  g.clearRect(0,0,W,cv.height);
+  for(let r=0;r<rows;r++){ const midi=hi-r, pc=((midi%12)+12)%12, inS=scale?scale.has(pc):false, blk=_NNAMES[pc].includes("#");
+    g.fillStyle = inS ? "rgba(62,156,184,0.09)" : (blk?"rgba(0,0,0,0.22)":"rgba(255,255,255,0.012)"); g.fillRect(0,r*rowH,W,rowH);
+    g.strokeStyle="rgba(255,255,255,0.04)"; g.beginPath(); g.moveTo(0,r*rowH+rowH); g.lineTo(W,r*rowH+rowH); g.stroke();
+    g.fillStyle="rgba(200,205,212,0.4)"; g.font="600 8px 'Space Mono'"; g.fillText(_NNAMES[pc]+(pc===0?(Math.floor(midi/12)-1):''),3,r*rowH+rowH-4);
+  }
+  const beat=60/curTempo(); if(beat>0 && dur/beat<200){ for(let s=0;s<dur;s+=beat){ const x=(s/dur)*W; g.strokeStyle="rgba(255,255,255,0.05)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,cv.height); g.stroke(); } }
+  notes.forEach(n=>{ const x=(n.start/dur)*W, ww=Math.max(5,((n.end-n.start)/dur)*W);
+    if(n.targetMidi!==n.midi){ const y0=(hi-n.midi)*rowH+2; g.setLineDash([3,3]); g.strokeStyle="rgba(255,255,255,0.28)"; g.strokeRect(x+0.5,y0+0.5,ww-1,rowH-5); g.setLineDash([]);
+      g.strokeStyle="rgba(95,180,206,0.45)"; g.beginPath(); g.moveTo(x+ww/2,y0+rowH/2); g.lineTo(x+ww/2,(hi-n.targetMidi)*rowH+rowH/2); g.stroke(); }
+    const y=(hi-n.targetMidi)*rowH+2, hh=rowH-4;
+    g.fillStyle=(n.targetMidi!==n.midi)?"rgba(95,180,206,0.95)":"rgba(62,156,184,0.9)"; _twRR(g,x,y,ww,hh,4); g.fill();
+    g.fillStyle="#0C0D10"; g.font="700 9px 'Space Mono'"; if(ww>16) g.fillText(_NNAMES[((n.targetMidi%12)+12)%12], x+4, y+hh-3);
+  });
+}
+// print the retune onto the clip: pitch-shift each moved note's segment, blend back in
+function applyRetune(t, cl, notes){
+  const edited=notes.filter(n=>n.targetMidi!==n.midi); if(!edited.length){ flash("Drag a note first"); return; }
+  flash("Retuning…");
+  setTimeout(()=>{ try{
+    pushUndoClips(t);
+    const buf=cl.buffer, sr=buf.sampleRate, N=buf.length, ch=buf.numberOfChannels, out=ctx.createBuffer(ch,N,sr);
+    for(let c=0;c<ch;c++) out.getChannelData(c).set(buf.getChannelData(c));   // start from the original (gaps stay)
+    const xf=Math.max(8, Math.floor(sr*0.006));
+    for(const n of edited){
+      const a=Math.max(0,Math.floor(n.start*sr)), b=Math.min(N,Math.floor(n.end*sr)); if(b-a<128) continue;
+      const seg=ctx.createBuffer(ch,b-a,sr); for(let c=0;c<ch;c++) seg.getChannelData(c).set(buf.getChannelData(c).subarray(a,b));
+      const sh=fxPitchBuf(seg, n.targetMidi-n.midi);
+      for(let c=0;c<ch;c++){ const d=out.getChannelData(c), s=sh.getChannelData(Math.min(c,sh.numberOfChannels-1)), len=Math.min(b-a,s.length);
+        for(let i=0;i<len;i++){ let gg=1; if(i<xf) gg=i/xf; else if(i>len-xf) gg=(len-i)/xf; d[a+i]=d[a+i]*(1-gg)+s[i]*gg; } }
+    }
+    cl.buffer=out; afterClipFx(t,cl,`Retuned ${edited.length} note${edited.length>1?'s':''}`);
+    edited.forEach(n=>{ n.midi=n.targetMidi; n.cents=0; }); drawTune();
+  }catch(e){ flash("Retune failed: "+e.message); } }, 25);
 }
 $("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
 

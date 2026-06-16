@@ -75,7 +75,7 @@ mistake; right panel = Mix-window idea). Each track = a row:
      `segmentNotes`, `keyFromNotes`.
   2. ✅ Note blobs drawn on a piano-roll grid over the clip (key-scale shaded). "🎵 Tune"
      button in the clip panel → `openTune`/`renderTune` (#tunewin).
-  3. ⬜ NEXT: drag a blob → retune (granular/PSOLA pitch-shift the segment), snap to key.
+  3. ✅ DONE: drag a blob → retune (granular/PSOLA pitch-shift the segment), snap to key.
      Add a KEY OVERRIDE dropdown (key auto-guess leans to the relative minor on bare
      melodies — let the user set the scale, like real Melodyne).
   4. ⬜ Whole-clip pitch + formant control. Apply writes back to the clip buffer.
@@ -119,6 +119,12 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 ---
 
 ## 6. PROGRESS LOG (newest first)
+
+- **2026-06-16** — MELODYNE drag-to-retune SHIPPED: Tune notes are draggable (targetMidi),
+  scale-snap to a KEY OVERRIDE dropdown, ghost+connector shows the move, Apply pitch-shifts
+  each moved note's segment (fxPitchBuf granular) + crossfades back into the clip, undoable.
+  Verified: dragged C->G (+7), re-detecting the rendered audio = [67,62,64] (real pitch moved).
+  Plus B's plugin-loader dedupe (re-loading a plugin won't pile up duplicates).
 
 - **2026-06-16** — Edit-window rebuild COMPLETE: MASTER lane -> strip format (VOL/CEIL
   press-drag widgets + inline mastering insert slots, bindMasterStripCtl/renderMasterSlots
