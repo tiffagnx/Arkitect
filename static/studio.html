@@ -235,6 +235,12 @@
   .fx-knobs .vw-knob label { text-transform:uppercase; }
   .fx-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 16px 14px; }
   .fxface .pw-track { font:500 10px 'Space Mono'; color:#9BF0E8; }
+  .as-proc { width:100%; padding:8px 10px; border-radius:9px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FFD6EA; font:600 12px Inter; cursor:pointer; }
+  .as-render { width:100%; padding:11px; border-radius:10px; cursor:pointer; font:700 12px Oxanium; letter-spacing:.06em; color:#fff;
+    border:1px solid rgba(233,30,140,.6); background:linear-gradient(100deg, rgba(233,30,140,.38), rgba(139,92,246,.32)); }
+  .as-render:hover { box-shadow:0 4px 18px rgba(233,30,140,.4); }
+  .as-render:disabled { opacity:.6; cursor:progress; }
+  .lane.rendering { box-shadow:0 0 0 1px rgba(0,209,196,.6), 0 0 22px rgba(0,209,196,.25); }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -453,6 +459,84 @@ async function clipFx_bpmDelay(t, cl){
     s.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(w); w.connect(off.destination); }, 2.4);
   pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,`BPM delay @ ${curTempo()}`); }
 
+/* ═══ AUDIOSUITE — offline destructive processes rendered onto ONE clip,
+   all LOCAL (no cloud). Gain/Normalize are exact; Pitch/Stretch use a Hann
+   overlap-add granular engine (musical, not transparent — good for FX/chops). ═══ */
+function fxGainBuf(buf, dB){ const g=Math.pow(10,dB/20), o=ctx.createBuffer(buf.numberOfChannels,buf.length,buf.sampleRate);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch),d=o.getChannelData(ch); for(let i=0;i<buf.length;i++) d[i]=Math.max(-1,Math.min(1,s[i]*g)); } return o; }
+function peakOf(buf){ let p=0; for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch); for(let i=0;i<s.length;i++){ const a=Math.abs(s[i]); if(a>p)p=a; } } return p; }
+function fxNormalizeBuf(buf, targetDb){ const peak=peakOf(buf)||1e-6, target=Math.pow(10,targetDb/20); return fxGainBuf(buf, 20*Math.log10(target/peak)); }
+function resampleBuf(buf, ratio){ // ratio>1 => shorter + higher pitch (varispeed)
+  const sr=buf.sampleRate, N=buf.length, M=Math.max(1,Math.floor(N/ratio)), o=ctx.createBuffer(buf.numberOfChannels,M,sr);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch),d=o.getChannelData(ch);
+    for(let i=0;i<M;i++){ const x=i*ratio, i0=Math.floor(x), f=x-i0; d[i]=(s[i0]||0)*(1-f)+(s[i0+1]||0)*f; } } return o; }
+function granularStretch(buf, S){ // output ≈ N*S samples, SAME pitch (Hann overlap-add)
+  if(Math.abs(S-1)<0.002) return buf;
+  const sr=buf.sampleRate, N=buf.length, grain=Math.max(512,Math.floor(sr*0.06)), Hs=Math.floor(grain/2), Ha=Math.max(1,Math.floor(Hs/S));
+  const outLen=Math.max(1,Math.floor(N*S)+grain), win=new Float32Array(grain);
+  for(let i=0;i<grain;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(grain-1));
+  const o=ctx.createBuffer(buf.numberOfChannels,outLen,sr);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch),d=o.getChannelData(ch);
+    let ana=0, syn=0;
+    while(ana<N && syn<outLen-grain){ const a0=Math.floor(ana); for(let i=0;i<grain;i++){ const a=a0+i; if(a<N) d[syn+i]+=s[a]*win[i]; } ana+=Ha; syn+=Hs; } }
+  return o; }
+function fxPitchBuf(buf, semis){ if(!semis) return buf; const P=Math.pow(2,semis/12); return resampleBuf(granularStretch(buf, P), P); }
+function fxStretchBuf(buf, S){ return granularStretch(buf, S); }
+
+const AUDIOSUITE = [
+  { id:'gain',    name:'Gain',        params:[{id:'db', label:'GAIN dB',  min:-24,max:24, step:0.5, value:0,  fmt:v=>(v>0?'+':'')+v.toFixed(1)+'dB'}],          run:(buf,p)=>fxGainBuf(buf,p.db) },
+  { id:'norm',    name:'Normalize',   params:[{id:'tgt',label:'PEAK dB',  min:-12,max:0,  step:0.5, value:-1, fmt:v=>v.toFixed(1)+'dB'}],                        run:(buf,p)=>fxNormalizeBuf(buf,p.tgt) },
+  { id:'pitch',   name:'Pitch Shift', params:[{id:'st', label:'SEMITONES',min:-12,max:12, step:1,   value:0,  fmt:v=>(v>0?'+':'')+v}],                            run:(buf,p)=>fxPitchBuf(buf,p.st) },
+  { id:'stretch', name:'Time Stretch',params:[{id:'rate',label:'LENGTH x',min:0.5,max:2,  step:0.01,value:1,  fmt:v=>v.toFixed(2)+'x'}],                          run:(buf,p)=>fxStretchBuf(buf,p.rate) },
+];
+let _asState = {};   // {procId, params:{}}
+function openAudioSuite(t){
+  const cl = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
+  if(!cl){ flash("Pick a clip first (click or right-click one)"); return; }
+  let w = document.getElementById("audiosuite");
+  if(!w){ w=document.createElement("div"); w.className="plugwin fxface"; w.id="audiosuite"; document.body.appendChild(w); }
+  if(!_asState.procId) _asState.procId='gain';
+  const draw=()=>{
+    const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
+    _asState.params = _asState.params || {};
+    proc.params.forEach(p=>{ if(_asState.params[p.id]==null) _asState.params[p.id]=p.value; });
+    w.innerHTML = `<div class="pw-bar"><span class="vw-title">AUDIOSUITE</span><span class="pw-track">${t.name} · clip</span><button class="pw-x" title="close">✕</button></div>
+      <div style="padding:13px 16px 4px"><select class="as-proc">${AUDIOSUITE.map(p=>`<option value="${p.id}"${p.id===_asState.procId?' selected':''}>${p.name}</option>`).join("")}</select></div>
+      <div class="fx-knobs"></div>
+      <div style="padding:4px 16px 16px"><button class="as-render">⏏ Render onto clip</button></div>
+      <div class="fx-foot">offline · local · prints onto the selected clip (Ctrl+Z to undo)</div>`;
+    const body=w.querySelector(".fx-knobs");
+    proc.params.forEach(p=>{
+      const cur=_asState.params[p.id];
+      const cell=document.createElement("div"); cell.className="vw-knob";
+      cell.innerHTML=`<output>${(p.fmt||_fmt)(cur)}</output><div class="vknob"><span class="vknob-ind"></span></div><label>${p.label}</label>`;
+      bindFxKnob(cell.querySelector(".vknob"), cell.querySelector("output"), p, ()=>_asState.params[p.id], v=>{ _asState.params[p.id]=v; });
+      body.appendChild(cell);
+    });
+    w.querySelector(".pw-x").onclick=()=>w.remove();
+    w.querySelector(".as-proc").onchange=e=>{ _asState.procId=e.target.value; _asState.params={}; draw(); };
+    w.querySelector(".as-render").onclick=()=>renderAudioSuite(t);
+    makeDraggable(w, w.querySelector(".pw-bar"));
+  };
+  draw();
+  w.style.left="150px"; w.style.top="120px"; w.style.display="block"; bringFront(w);
+}
+function renderAudioSuite(t){
+  const cl = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
+  if(!cl){ flash("Clip went away — pick another"); return; }
+  const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
+  const lane = document.getElementById("lane-"+t.id); lane?.classList.add("rendering");
+  const btn = document.querySelector("#audiosuite .as-render"); if(btn){ btn.disabled=true; btn.textContent="rendering…"; }
+  setTimeout(()=>{                                  // let the "rendering…" paint before the (sync) DSP
+    try{
+      const out = proc.run(cl.buffer, _asState.params);
+      pushUndoClips(t); cl.buffer = out; afterClipFx(t, cl, `${proc.name} rendered onto clip`);
+    }catch(e){ flash("Render failed: "+e.message); }
+    lane?.classList.remove("rendering");
+    if(btn){ btn.disabled=false; btn.textContent="⏏ Render onto clip"; }
+  }, 30);
+}
+
 // right-click context menu on a waveform — Pro Tools style
 function ctxMenuEl(){ let m=document.getElementById("ctxmenu"); if(!m){ m=document.createElement("div"); m.id="ctxmenu"; m.className="ctxmenu"; document.body.appendChild(m); } return m; }
 function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classList.remove("on"); }
@@ -476,6 +560,8 @@ function showWaveMenu(t, wv, e){
     add("⋮⋮  Chop (1/16)", ()=>clipFx_chop(t,cl));
     add("◢  Fade in", ()=>clipFx_fade(t,cl,'in'));
     add("◣  Fade out", ()=>clipFx_fade(t,cl,'out'));
+    sep();
+    add("⚙  AudioSuite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
   } else add("click on a clip first", ()=>{}, false);
   sep();
   add("↶  Undo", undoLast);
@@ -1853,6 +1939,7 @@ function renderChannel(t){
         ['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],
         ['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']
       ].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("") + `</div>`;
+      html += `<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
     } else {
       html += `<div class="chan-hint">Right-click a clip (or click it) to grab one piece. Separate it, then print Reverse / Reverse-reverb / VERB / BPM-delay onto just that slice.</div>`;
     }
@@ -1879,6 +1966,7 @@ function renderChannel(t){
     document.getElementById("cf-fi").onclick=()=>clipFx_fade(t,cl,'in');
     document.getElementById("cf-fo").onclick=()=>clipFx_fade(t,cl,'out');
     document.getElementById("cf-del").onclick=()=>deleteClip(t,cl);
+    document.getElementById("cf-as").onclick=()=>openAudioSuite(t);
   }
 }
 // Ctrl+Z — global undo of the last clip edit (separate / move / reverse / verb / etc.)
