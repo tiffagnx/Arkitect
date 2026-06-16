@@ -113,6 +113,13 @@
   .vtoggle { display:inline-flex; border:1px solid var(--hairline); border-radius:9px; overflow:hidden; margin-left:6px; }
   .vt { padding:7px 14px; background:transparent; border:none; cursor:pointer; color:var(--dim); font:700 10px 'Space Mono'; letter-spacing:.12em; }
   .vt.on { background:rgba(233,30,140,.22); color:#FFD6EA; }
+  /* zoom / snap controls */
+  .zoomctl { display:inline-flex; align-items:center; gap:4px; margin-left:8px; }
+  .zb { padding:6px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 11px 'Space Mono'; cursor:pointer; }
+  .zb:hover { border-color:rgba(233,30,140,.5); color:#FFD6EA; }
+  .zb.on { background:rgba(0,209,196,.16); color:var(--teal); border-color:rgba(0,209,196,.4); }
+  #zoomLbl { font:600 10px 'Space Mono'; color:var(--dim); min-width:36px; text-align:center; }
+  #hscroll { width:100%; margin:0 0 10px; accent-color:var(--pink); cursor:pointer; }
   /* MIX WINDOW — console strips */
   .mixwin { flex:1; display:flex; gap:10px; padding:16px; overflow-x:auto; align-items:flex-start; }
   .mstrip { width:128px; flex:none; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.025);
@@ -323,6 +330,11 @@
   <button class="tbtn rec" id="rec">● Record</button>
   <span class="countin" id="countin"></span>
   <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
+  <div class="zoomctl">
+    <button class="zb" id="zoomOut" title="zoom out">−</button><span id="zoomLbl">100%</span><button class="zb" id="zoomIn" title="zoom in (or Ctrl+wheel)">+</button>
+    <button class="zb" id="laneTall" title="taller lanes">↕</button>
+    <button class="zb on" id="snapBtn" title="snap clip moves to the beat grid">⌗ Snap</button>
+  </div>
   <div class="right">
     <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
     <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
@@ -392,6 +404,7 @@
   </div>
 
   <div class="tracks" id="tracks">
+    <input type="range" id="hscroll" min="0" max="1" step="0.001" value="0" style="display:none" title="scroll the timeline" />
     <div class="drop" id="drop">Drop your stems here — vocals, beat, anything (MP3 / WAV)<br/><span style="font:400 11px 'Space Mono';color:var(--dim)">each file becomes a lane on the board</span></div>
   </div>
 
@@ -460,6 +473,18 @@ async function renderBuf(buf, build, tailSec=0){
   return await off.startRendering();
 }
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
+
+// ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
+let zoom=1, scrollT=0, laneH=54, snapOn=true;
+function viewDur(){ return maxDur()/zoom; }
+function clampScroll(){ const room=Math.max(0, maxDur()-viewDur()); scrollT=Math.max(0, Math.min(scrollT, room)); }
+function snapTime(x){ x=Math.max(0,x); if(!snapOn) return x; const step=(60/curTempo())/4; return Math.round(x/step)*step; }  // snap to 1/16
+function t2x(time, W){ return ((time-scrollT)/viewDur())*W; }
+function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.textContent=Math.round(zoom*100)+"%";
+  const hs=document.getElementById("hscroll"); if(hs){ const room=Math.max(0, maxDur()-viewDur()); hs.max=room.toFixed(3); hs.value=Math.min(scrollT,room); hs.style.display=room>0.02?'block':'none'; } }
+function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); }
+function setZoom(z){ zoom=Math.max(1,Math.min(24,z)); relayoutAll(); }
+function setLaneH(h){ laneH=h; tracks.forEach(t=>{ const cv=document.querySelector('#lane-'+t.id+' .wave'); if(cv){ cv.height=h; cv.style.height=h+'px'; drawLane(t); } }); }
 
 // ── SEPARATE: split one clip at an absolute timeline second; both halves stay put ──
 function separateClip(t, cl, atTime){
@@ -592,7 +617,7 @@ function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classLi
 function clipAt(t, atTime){ return clipsOf(t).find(c => atTime>=c.start && atTime<=c.start+c.buffer.duration) || null; }
 function showWaveMenu(t, wv, e){
   e.preventDefault();
-  const dur=maxDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=frac*dur;
+  const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
   const cl=clipAt(t, atTime);
   selectTrack(t); selClip = cl ? {trackId:t.id, clipId:cl.id} : null; drawLane(t);
   const m=ctxMenuEl(); m.innerHTML="";
@@ -1764,9 +1789,9 @@ function laneUi(t) {
       <span style="font:600 9px 'Space Mono';color:var(--dim);margin-left:8px;letter-spacing:.04em">drag a clip · right-click: separate / fx</span>
       <button class="chip x" title="remove this track" style="margin-left:auto">✕</button>
     </div>
-    <canvas class="wave" width="1200" height="54"></canvas>`;
+    <canvas class="wave" width="1200" height="${laneH}" style="height:${laneH}px"></canvas>`;
   $("tracks").appendChild(d);
-  drawLane(t);
+  drawLane(t); updateZoomUi();
   d.onclick = (e) => { if (!e.target.closest(".chip,.wave")) selectTrack(t); };   // header click → mix this track
   d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
@@ -1775,15 +1800,15 @@ function laneUi(t) {
   wv.onmousedown = (e) => {
     if (e.button !== 0) return;
     selectTrack(t);
-    const dur = maxDur(), r = wv.getBoundingClientRect();
-    const atTime = (e.clientX - r.left) / r.width * dur;
+    const vd = viewDur(), r = wv.getBoundingClientRect();
+    const atTime = scrollT + (e.clientX - r.left) / r.width * vd;
     const cl = clipAt(t, atTime);
     if (!cl) { selClip = null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty space → just move playhead
     selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);           // grabbed a clip
     const startStart = cl.start, sx = e.clientX; let moved = false;
     const mv = (ev) => {
       if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }    // snapshot once, on the first real drag
-      if (moved) { const dx = (ev.clientX - sx) / r.width * dur; cl.start = Math.max(0, startStart + dx); drawLane(t); }
+      if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(startStart + dx); drawLane(t); }
     };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
       if (!moved) seek(atTime);                                                            // tap (no drag) = move playhead here
@@ -2561,20 +2586,22 @@ function showAiSummary(lane, t, text) {
   panel.querySelector(".ai-summary-x").onclick = () => panel.remove();
 }
 
-// faint beat grid across the lane — so clip moves read against the tempo
-function drawGrid(g, W, H, dur){
-  const beat = 60/curTempo(); if(beat<=0 || dur/beat>400) return;
+// faint beat grid across the VISIBLE window — so clip moves read against the tempo
+function drawGrid(g, W, H){
+  const beat = 60/curTempo(); if(beat<=0) return; const vd=viewDur(); if(vd/beat>300) return;
   g.lineWidth = 1;
-  for(let i=0, tsec=0; tsec<dur; i++, tsec+=beat){
+  for(let i=Math.floor(scrollT/beat); ; i++){
+    const x=t2x(i*beat, W); if(x>W) break; if(x<0) continue;
     g.strokeStyle = (i%4===0) ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.045)";
-    const x=(tsec/dur)*W; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
+    g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
   }
 }
-// one clip's waveform drawn inside its box [x0, x0+w]
+// one clip's waveform drawn inside its box [x0, x0+w], only the on-screen part
 function drawClipWave(g, buf, x0, w, H, color){
-  const data=buf.getChannelData(0), N=data.length, mid=H/2;
+  const data=buf.getChannelData(0), N=data.length, mid=H/2, W=g.canvas.width;
+  const pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0));
   g.strokeStyle=hexA(color,0.9); g.lineWidth=1; g.beginPath();
-  for(let px=0; px<w; px++){
+  for(let px=pa; px<pb; px++){
     const i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); let mn=1,mx=-1;
     for(let j=i0;j<i1;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
     if(mx<mn){ mn=0; mx=0; }
@@ -2582,19 +2609,21 @@ function drawClipWave(g, buf, x0, w, H, color){
   }
   g.stroke();
 }
-// draw a whole lane: every clip as a box on the shared [0,maxDur] timeline
+// draw a whole lane: clips on the [scrollT, scrollT+viewDur] timeline window
 function drawLane(t){
   const cv=document.querySelector(`#lane-${t.id} .wave`); if(!cv) return;
-  const g=cv.getContext("2d"), W=cv.width, H=cv.height, dur=maxDur();
+  const g=cv.getContext("2d"), W=cv.width, H=cv.height, vd=viewDur();
   g.clearRect(0,0,W,H);
-  drawGrid(g,W,H,dur);
+  drawGrid(g,W,H);
   for(const cl of clipsOf(t)){
-    const x=(cl.start/dur)*W, w=Math.max(2,(cl.buffer.duration/dur)*W);
+    const x=t2x(cl.start,W), w=Math.max(2,(cl.buffer.duration/vd)*W);
+    if(x+w<0 || x>W) continue;                                              // off-screen clip
     const seld = selClip && selClip.trackId===t.id && selClip.clipId===cl.id;
-    g.fillStyle=hexA(t.color, seld?0.22:0.11); g.fillRect(x,0,w,H);          // clip body tint
+    const fx=Math.max(0,x), fw=Math.min(W,x+w)-fx;
+    g.fillStyle=hexA(t.color, seld?0.22:0.11); g.fillRect(fx,0,fw,H);       // clip body tint
     drawClipWave(g, cl.buffer, x, w, H, t.color);
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
-    g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border
+    g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
   }
 }
 
@@ -2779,6 +2808,18 @@ $("stop").onclick = stopAll;
 $("loop").onclick = (e) => { loop = !loop; e.target.classList.toggle("on", loop); };
 $("vEdit").onclick = () => setView('edit');
 $("vMix").onclick  = () => setView('mix');
+// zoom / lane-height / snap / horizontal scroll
+$("zoomIn").onclick  = () => setZoom(zoom*1.5);
+$("zoomOut").onclick = () => setZoom(zoom/1.5);
+const _LANE_H = [54,92,140]; let _lhi = 0;
+$("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE_H[_lhi]); };
+$("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/16)" : "Snap: OFF"); };
+$("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
+$("tracks").addEventListener("wheel", (e) => {
+  if (viewMode === 'mix') return;
+  if (e.ctrlKey || e.metaKey) { setZoom(zoom * (e.deltaY < 0 ? 1.15 : 1/1.15)); e.preventDefault(); return; }   // Ctrl+wheel = zoom
+  if (zoom > 1) { scrollT += (e.deltaY || e.deltaX) * viewDur() / 700; clampScroll(); updateZoomUi(); tracks.forEach(t=>drawLane(t)); e.preventDefault(); }  // wheel = pan when zoomed
+}, { passive:false });
 
 /* ── ui tick: clock, playheads, meters, loop ── */
 function tickUi() {
@@ -2792,7 +2833,7 @@ function tickUi() {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
     drawLane(t);
     const g = cv.getContext("2d");
-    const x = (p / dur) * cv.width;                     // white playhead on the shared timeline
+    const x = t2x(p, cv.width); if (x < -2 || x > cv.width + 2) return;   // playhead off the visible window
     g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
