@@ -55,8 +55,11 @@
 
   .body { display:flex; height:calc(100vh - 53px); }
   /* console rail: master + verb */
-  .rail { width:240px; min-width:240px; border-right:1px solid var(--hairline); background:var(--panel);
-    backdrop-filter:blur(22px); padding:14px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+  /* left rail collapsed into a top "Setup" dropdown — frees the full width for tracks */
+  .rail { position:fixed; left:12px; top:54px; bottom:12px; width:250px; z-index:70; display:none; flex-direction:column; gap:14px;
+    border:1px solid var(--hairline); border-radius:14px; background:rgba(20,21,26,.97); backdrop-filter:blur(22px);
+    padding:14px; overflow-y:auto; box-shadow:0 22px 60px rgba(0,0,0,.6); }
+  .rail.open { display:flex; }
   .module { border:1px solid var(--hairline); border-radius:14px; padding:12px; background:rgba(255,255,255,.02); }
   .module h3 { font:700 10px 'Space Mono'; letter-spacing:.22em; color:var(--dim); margin-bottom:10px; text-transform:uppercase; }
   .module h3.pink { color:#9FCFDD; }
@@ -89,6 +92,8 @@
   .ts-btn.s.on { background:rgba(217,164,65,.2); color:#E6B878; border-color:rgba(217,164,65,.55); }
   .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:3px 7px; cursor:ns-resize; overflow:hidden; min-width:0; }
   .ts-ctl.drag { border-color:rgba(62,156,184,.7); box-shadow:0 0 10px rgba(62,156,184,.25); }
+  .ts-pop { position:absolute; right:5px; top:6px; bottom:6px; width:7px; background:rgba(0,0,0,.6); border:1px solid rgba(62,156,184,.45); border-radius:4px; z-index:3; }
+  .ts-pop i { position:absolute; left:-3px; right:-3px; height:7px; border-radius:2px; background:var(--pink); box-shadow:0 0 8px var(--pink); transform:translateY(50%); }
   .ts-k { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); display:block; position:relative; z-index:1; }
   .ts-v { font:700 12px 'Space Mono'; color:var(--text); position:relative; z-index:1; }
   .ts-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(62,156,184,.28), rgba(62,156,184,.10)); border-right:1px solid rgba(62,156,184,.55); z-index:0; }
@@ -396,6 +401,7 @@
     <button class="zb on" id="snapBtn" title="snap clip moves to the grid">⌗ Snap</button>
   </div>
   <div class="right">
+    <button class="tbtn" id="setupBtn" title="Output device · record · tempo · latency">⚙ Setup</button>
     <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
     <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
     <button class="tbtn" id="addAuxBtn" title="Add an FX bus — an aux track you stack plugins on and send stems to">+ FX Bus</button>
@@ -407,7 +413,7 @@
 <span id="saveNote" style="position:fixed;bottom:12px;right:16px;font:500 11px 'Space Mono';color:var(--teal);z-index:50;pointer-events:none"></span>
 
 <div class="body">
-  <div class="rail">
+  <div class="rail" id="rail">
     <div class="module">
       <h3>Output</h3>
       <!-- master VOLUME/CEILING/meters moved to the MASTER track at the bottom of the edit window; kept here hidden for save/load + the bus -->
@@ -1900,8 +1906,10 @@ function bindStripCtl(t, el, key, min, max, dflt, fmt, fill){
   const draw=()=>{ const v=getV(); vEl.textContent=fmt(v); if(fill&&fEl) fEl.style.width=(((v-min)/range)*100).toFixed(1)+"%"; };
   draw(); el._draw=draw;
   el.onmousedown=(e)=>{ e.stopPropagation(); e.preventDefault(); el.classList.add("drag"); const sy=e.clientY, sv=getV();
-    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/120*range; v=Math.max(min,Math.min(max,v)); setV(v); draw(); };
-    const up=()=>{ el.classList.remove("drag"); document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    const pop=document.createElement("div"); pop.className="ts-pop"; const thumb=document.createElement("i"); pop.appendChild(thumb); el.appendChild(pop);   // fader pops up on press
+    const place=()=>{ thumb.style.bottom=(((getV()-min)/range)*100).toFixed(1)+"%"; }; place();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/120*range; v=Math.max(min,Math.min(max,v)); setV(v); draw(); place(); };
+    const up=()=>{ el.classList.remove("drag"); pop.remove(); document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
   el.ondblclick=(e)=>{ e.stopPropagation(); setV(dflt); draw(); };
 }
@@ -3049,6 +3057,8 @@ $("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.togg
 $("gridSel").onchange = (e) => { gridNote = +e.target.value; tracks.forEach(t=>drawLane(t)); flash("Grid: 1/"+gridNote); };
 $("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>drawLane(t)); };
 $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
+$("setupBtn").onclick = (e) => { e.stopPropagation(); $("rail").classList.toggle("open"); $("setupBtn").classList.toggle("on", $("rail").classList.contains("open")); };
+document.addEventListener("mousedown", (e) => { const r=$("rail"); if(r.classList.contains("open") && !e.target.closest("#rail,#setupBtn")){ r.classList.remove("open"); $("setupBtn").classList.remove("on"); } });
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
 $("tracks").addEventListener("wheel", (e) => {
   if (viewMode === 'mix') return;

@@ -120,6 +120,11 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 
 ## 6. PROGRESS LOG (newest first)
 
+- **2026-06-16** — Edit-window cont'd (2): left rail -> a top ⚙ Setup DROPDOWN (rail is
+  position:fixed, opens on the button, click-outside closes) so tracks get full width.
+  Press-to-reveal FADER on the strip VOL/PAN (.ts-pop vertical fader appears on press,
+  drag w/ live number). Verified. Remaining: master lane -> strip format, smart tool.
+
 - **2026-06-16** — Edit-window cont'd: KILLED the confusing right Channel knob panel for
   stems (right side = Output + Sends + Clip tools; vol/pan/plugins live on the strip). Added
   GRID selector 1/4-1/64 (drawGrid bar/beat/sub emphasis + snapTime use gridStep) + AUDIO
