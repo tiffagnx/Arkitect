@@ -177,11 +177,11 @@
   .vw-knob { display:flex; flex-direction:column; align-items:center; gap:12px; }
   .vw-knob output { font:600 11px 'Space Mono'; color:var(--teal); min-height:14px; }
   .vw-knob label { font:700 8.5px 'Space Mono'; letter-spacing:.13em; color:var(--dim); }
-  .knob { width:58px; height:58px; border-radius:50%; cursor:ns-resize; position:relative;
+  .vknob { width:58px; height:58px; border-radius:50%; cursor:ns-resize; position:relative;
     background:radial-gradient(62% 62% at 50% 34%, #3a2440, #18101f 76%);
     border:1px solid rgba(233,30,140,.5); box-shadow:0 5px 16px rgba(0,0,0,.55), inset 0 1px 2px rgba(255,255,255,.09), 0 0 16px rgba(233,30,140,.16); }
-  .knob:hover { border-color:rgba(233,30,140,.85); }
-  .knob-ind { position:absolute; left:50%; top:7px; width:3px; height:19px; margin-left:-1.5px; border-radius:2px;
+  .vknob:hover { border-color:rgba(233,30,140,.85); }
+  .vknob-ind { position:absolute; left:50%; top:7px; width:3px; height:19px; margin-left:-1.5px; border-radius:2px;
     background:linear-gradient(#FFC6E6,var(--pink)); transform-origin:50% 22px; box-shadow:0 0 7px rgba(233,30,140,.9); }
   .vw-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 0 14px; }
   .pp { display:flex; align-items:center; gap:6px; }
@@ -268,10 +268,10 @@
     <div class="verbwin" id="verbWin" style="display:none">
       <div class="vw-bar"><span class="vw-title">TIFF VERB</span><span class="vw-sub">convolution reverb</span><button class="vw-x" id="verbClose" title="close">✕</button></div>
       <div class="vw-body">
-        <div class="vw-knob"><output id="vSizeO">2.2s</output><div class="knob" id="knob-vSize"><span class="knob-ind"></span></div><label>SIZE</label></div>
-        <div class="vw-knob"><output id="vToneO">6.0k</output><div class="knob" id="knob-vTone"><span class="knob-ind"></span></div><label>TONE</label></div>
-        <div class="vw-knob"><output id="vPreO">20ms</output><div class="knob" id="knob-vPre"><span class="knob-ind"></span></div><label>PRE-DLY</label></div>
-        <div class="vw-knob"><output id="vRetO">0.80</output><div class="knob" id="knob-vRet"><span class="knob-ind"></span></div><label>RETURN</label></div>
+        <div class="vw-knob"><output id="vSizeO">2.2s</output><div class="vknob" id="knob-vSize"><span class="vknob-ind"></span></div><label>SIZE</label></div>
+        <div class="vw-knob"><output id="vToneO">6.0k</output><div class="vknob" id="knob-vTone"><span class="vknob-ind"></span></div><label>TONE</label></div>
+        <div class="vw-knob"><output id="vPreO">20ms</output><div class="vknob" id="knob-vPre"><span class="vknob-ind"></span></div><label>PRE-DLY</label></div>
+        <div class="vw-knob"><output id="vRetO">0.80</output><div class="vknob" id="knob-vRet"><span class="vknob-ind"></span></div><label>RETURN</label></div>
       </div>
       <input type="range" id="vSize" min="0.4" max="6" step="0.1" value="2.2" style="display:none" />
       <input type="range" id="vTone" min="800" max="14000" step="100" value="6000" style="display:none" />
@@ -2333,7 +2333,7 @@ makeDraggable($("verbWin"), $("verbWin").querySelector(".vw-bar"));
 // TIFF VERB rotary knobs — drag a knob up/down to drive its hidden input (audio wiring untouched)
 function makeKnob(id){
   const inp = $(id), knob = document.getElementById("knob-"+id); if(!inp || !knob) return;
-  const ind = knob.querySelector(".knob-ind"), min=+inp.min, max=+inp.max, range=max-min, step=+inp.step||0.01;
+  const ind = knob.querySelector(".vknob-ind"), min=+inp.min, max=+inp.max, range=max-min, step=+inp.step||0.01;
   const rot = () => { const f=(+inp.value-min)/range; ind.style.transform = `rotate(${(-135 + f*270).toFixed(1)}deg)`; };
   rot();
   knob.onmousedown = (e) => { e.preventDefault(); const sy=e.clientY, sv=+inp.value;
