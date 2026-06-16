@@ -227,6 +227,12 @@
   .vknob-ind { position:absolute; left:50%; top:7px; width:3px; height:19px; margin-left:-1.5px; border-radius:2px;
     background:linear-gradient(#FFC6E6,var(--pink)); transform-origin:50% 22px; box-shadow:0 0 7px rgba(233,30,140,.9); }
   .vw-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 0 14px; }
+  /* plugin faceplate (knobs, not sliders) — same look as TIFF VERB for EVERY plugin */
+  .fxface { min-width:0; width:auto; }
+  .fxface .pw-bar { align-items:baseline; padding:13px 15px 11px; border-bottom:1px solid var(--hairline); }
+  .fx-knobs { display:grid; grid-template-columns:repeat(3,82px); gap:18px 12px; padding:22px 20px 20px; justify-content:center; }
+  .fx-knobs .vw-knob { gap:9px; }
+  .fx-knobs .vw-knob label { text-transform:uppercase; }
   .pp { display:flex; align-items:center; gap:6px; }
   .pp label { font:500 9.5px 'Space Mono'; color:#FF9DCE; min-width:46px; letter-spacing:.02em; }
   .pp input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:3px; min-width:0; }
@@ -1702,25 +1708,40 @@ function makeDraggable(win, handle){
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
   };
 }
+// bind a rotary knob to a plugin param (drag up/down, double-click = default)
+function bindFxKnob(knobEl, outEl, p, getV, setV){
+  const ind=knobEl.querySelector('.vknob-ind'), min=p.min, max=p.max, range=(max-min)||1, step=_step(p);
+  const draw=()=>{ const v=getV(); const f=(v-min)/range; ind.style.transform=`rotate(${(-135+f*270).toFixed(1)}deg)`; outEl.textContent=_fmt(v); };
+  draw();
+  knobEl.onmousedown=(e)=>{ e.preventDefault(); e.stopPropagation(); const sy=e.clientY, sv=getV();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/150*range; v=Math.max(min,Math.min(max,v)); v=Math.round(v/step)*step; setV(v); draw(); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  };
+  knobEl.ondblclick=(e)=>{ e.stopPropagation(); setV(p.value); draw(); };
+}
+// every plugin opens as a faceplate: gradient title, rotary KNOBS w/ numbers (no more ugly sliders)
 function openPluginWindow(t, i){
   const ins = t.inserts[i]; if(!ins) return;
   const def = TIFF_PLUGINS.list.find(p => p.name === ins.name); if(!def) return;
   const id = `pw-${t.id}-${i}`;
   let w = document.getElementById(id);
   if (w){ w.style.display="block"; bringFront(w); return; }
-  w = document.createElement("div"); w.className="plugwin"; w.id=id;
-  w.innerHTML = `<div class="pw-bar"><span class="pw-title">${ins.name}</span><span class="pw-track">${t.name}</span><button class="pw-x" title="close">✕</button></div><div class="pw-body"></div>`;
-  const body = w.querySelector(".pw-body");
+  w = document.createElement("div"); w.className="plugwin fxface"; w.id=id;
+  w.innerHTML = `<div class="pw-bar"><span class="vw-title">${ins.name}</span><span class="pw-track">${t.name}</span><button class="pw-x" title="close">✕</button></div><div class="fx-knobs"></div>`;
+  const body = w.querySelector(".fx-knobs");
   def.params.forEach(p => {
     const cur = (ins.params[p.id] != null) ? ins.params[p.id] : p.value;
-    const row = document.createElement("div"); row.className="pw-row";
-    row.innerHTML = `<label>${p.label}</label><input type="range" min="${p.min}" max="${p.max}" step="${_step(p)}" value="${cur}"><output>${_fmt(cur)}</output>`;
-    const inp = row.querySelector("input"), out = row.querySelector("output");
-    inp.oninput = () => { const v=parseFloat(inp.value); ins.params[p.id]=v; out.textContent=_fmt(v); t.live?.insertNodes?.[i]?.set(p.id, v); };
-    body.appendChild(row);
+    if (ins.params[p.id] == null) ins.params[p.id] = cur;
+    const cell = document.createElement("div"); cell.className="vw-knob";
+    cell.innerHTML = `<output>${_fmt(cur)}</output><div class="vknob"><span class="vknob-ind"></span></div><label>${p.label}</label>`;
+    bindFxKnob(cell.querySelector(".vknob"), cell.querySelector("output"), p,
+      () => (ins.params[p.id] != null ? ins.params[p.id] : p.value),
+      (v) => { ins.params[p.id]=v; t.live?.insertNodes?.[i]?.set(p.id, v); });
+    body.appendChild(cell);
   });
   w.querySelector(".pw-x").onclick = () => w.remove();
-  const n = (_pwZ % 7); w.style.left = (130 + n*28) + "px"; w.style.top = (96 + n*26) + "px";
+  const n = (_pwZ % 7); w.style.left = (150 + n*30) + "px"; w.style.top = (110 + n*28) + "px";
   document.body.appendChild(w);
   makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
 }
