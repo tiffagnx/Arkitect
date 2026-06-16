@@ -1,10 +1,14 @@
 # Tiff's Pink Room
 
-A private, **local** AI creative studio. Everything runs on your own PC — your
-own machine, your own model, nothing leaves the computer. Tiff is the AI you
-chat with, build with, and create with.
+A **fully local** AI creative studio. Everything runs on your own PC — your machine,
+your model, nothing leaves the computer, no API keys, no cloud bill. **Tiff** is the
+AI you chat, write, build, and make with.
 
-> **Not technical? Don't read this — open `SETUP.txt` instead.** It's 3 steps.
+> **Not technical? Don't read this — open `SETUP.txt` instead.** It's basically one
+> double-click.
+
+**License:** MIT — fork it, change it, ship it, sell it. PRs welcome. See
+[Contributing](#contributing).
 
 ---
 
@@ -12,69 +16,139 @@ chat with, build with, and create with.
 
 | Wing | File | What it does |
 |------|------|--------------|
-| **Chat** | `static/index.html` | Talk to Tiff. Chat / Write / Research modes. |
-| **The Builder** | `static/build.html` | Vibe-code single-file web apps with her. Talk it out, hit Build, keep stacking. Attach images/video, live preview, device frames, auto-fix runtime errors. |
-| **The Studio** | `static/studio.html` | Web-audio mixing console. |
-| **Images** | `static/images.html` | Local image gen (needs ComfyUI — see below). |
-| **Bit16 / Talk** | `static/bit16.html`, `talk.html` | Game + voice toys. |
+| **Chat** | `static/index.html` | Talk to Tiff. Chat / Write / Research modes. Streaming, voice-to-text, attach images/PDFs/docs. |
+| **The Builder** | `static/build.html` | Vibe-code single-file web apps with her. Talk it out, hit Build, keep stacking. Attach images/video (embedded as data-URIs), live preview, device frames, auto-fix runtime errors. |
+| **The Studio** | `static/studio.html` | A real **Web-Audio DAW** — see below. |
+| **Images** | `static/images.html` | Local image gen via ComfyUI + FLUX (optional). |
+| **Deep Research** | (in Chat) | She writes the queries, searches the web free (DuckDuckGo), reads pages, and synthesizes — every step visible. |
+| **Bit16 / Talk** | `static/bit16.html`, `talk.html` | A 16-bit game + a talking-avatar voice toy. |
 
-The whole backend is **one file: `app.py`** (FastAPI). No framework maze, no
-build step. Search for `@app.` to find every endpoint.
+### The Studio (`static/studio.html`) — a browser DAW, zero dependencies
+
+One self-contained HTML file, pure Web Audio API:
+
+- **Clip timeline** — drop stems, separate clips **in place** (nothing ripples, BPM stays sacred), drag them, zoom, snap to the grid, resize lane height.
+- **Per-clip FX** — Reverse, Reverse-Reverb, BPM Delay, Chop, Fades — printed onto one clip.
+- **AudioSuite** — offline render of Gain / Normalize / Pitch-shift / Time-stretch onto a clip.
+- **Channel strip** — VOL / PAN / 3-band EQ / Comp / a send, all knobs with numbers.
+- **Plugins** — a chain of inserts, each opening a draggable knob **faceplate**. Includes a convolution reverb (TIFF VERB). Write your own: `TIFF_PLUGINS.register({...})`.
+- **FX buses + sends + output routing** — route any track through a bus.
+- **Mix window** — a full Pro-Tools-style console: vertical channel strips + a red Master fader, live VU meters.
+- **Export** to WAV (offline render), save/load projects locally.
+
+The whole backend is **one file, `app.py`** (FastAPI). No framework maze, no build
+step. Search `@app.` to find every endpoint. The front-end wings are **vanilla
+HTML/CSS/JS** — no React, no bundler, view-source and go.
 
 ---
 
 ## How it runs
 
 ```
-your browser  ->  app.py (FastAPI, port 7777)  ->  LM Studio (port 1234)  ->  the model
+your browser  ->  app.py (FastAPI, :7777)  ->  LM Studio (:1234)  ->  your model
                         |
-                        +-> ComfyUI / FLUX (optional, for images)
+                        +-> ComfyUI / FLUX  (optional — local images)
+                        +-> XTTS voice server (optional — local TTS)
 ```
 
-- **The brain** is **LM Studio** serving a GGUF model on `localhost:1234` over the
-  OpenAI-compatible API. Any chat model works; `google/gemma-4-e4b` is the default.
-- **`data/`** holds local runtime state (chat sessions, saved builds, Tiff's
-  memory). It is **per-machine and private** — it's git-ignored and starts empty
-  on a fresh copy.
+- **The brain** is **LM Studio** serving any GGUF chat model on `localhost:1234`
+  (OpenAI-compatible API). `google/gemma-4-e4b` is a good small default; any chat
+  model works and the app auto-loads whatever you have installed.
+- **`data/`** holds all local state — chat sessions, saved builds, Tiff's memory,
+  and your personal `owner.md`. It is **git-ignored and private**: a fresh clone
+  starts empty. Nothing personal ships in the repo.
+
+---
+
+## Quick start
+
+**Easy path (Windows):** double-click **`START HERE.bat`**. First run auto-detects
+your GPU, installs Python + LM Studio if missing, downloads a model, and opens the
+browser. See `SETUP.txt`.
+
+**Manual path (any OS):**
+
+```bash
+python -m venv venv
+venv/Scripts/activate            # Windows:  venv\Scripts\activate
+pip install -r requirements.txt
+# start LM Studio, load a chat model, start its server on :1234
+python -m uvicorn app:app --port 7777
+# open http://localhost:7777
+```
+
+Out of the box you get **Chat, the Builder, the Studio, and Research** with just
+Python + LM Studio + a model. Images and Voice are optional add-ons.
+
+---
+
+## Make her yours (`data/owner.md`)
+
+Tiff ships with a generic owner persona. To make her know *you*, drop a
+**`data/owner.md`** file describing yourself — it's injected into her persona at
+startup and is **git-ignored**, so your personal details never end up in the repo
+or a shared copy. Example:
+
+```
+I'm Sam — I make lo-fi beats and short films. Talk to me like a collaborator,
+not a help desk. I hate corporate hedging. My dog's name is Biscuit.
+```
+
+She also remembers things you tell her over time (stored in `data/`, local only).
 
 ---
 
 ## Editing it
 
-It's plain **Python + plain HTML/CSS/JS**. To change something:
+Plain **Python + plain HTML/CSS/JS**:
 
-1. Edit `app.py` (backend / endpoints / Tiff's persona + prompts) or a
-   `static/*.html` (a wing's UI — they're self-contained).
-2. Restart: close the launcher window and double-click **START HERE.bat** again
-   (or, while developing, run `venv\Scripts\python -m uvicorn app:app --port 7777 --reload`).
-3. The static pages reload on browser refresh; `app.py` changes need a restart
-   (use `--reload` to skip that).
+1. Edit `app.py` (endpoints / persona / prompts) or a `static/*.html` (each wing is
+   self-contained).
+2. Restart the launcher, or dev with reload:
+   `venv\Scripts\python -m uvicorn app:app --port 7777 --reload`
+3. Static pages reload on browser refresh; `app.py` changes need a restart (or
+   `--reload`).
 
-Tiff's personality + the Builder's system prompts live in `app.py` near the top
-(`PERSONA`, `WRITER_PERSONA`, `BUILD_SYSTEM`, `BUILD_CHAT_SYSTEM`).
+Tiff's personality + the Builder prompts live near the top of `app.py` (`PERSONA`,
+`WRITER_PERSONA`, `BUILD_SYSTEM`, `BUILD_CHAT_SYSTEM`).
+
+---
+
+## Optional add-ons (env overrides)
+
+| Feature | How |
+|---------|-----|
+| **Local images** | Install ComfyUI + a FLUX GGUF, set `COMFY_DIR` to its folder (defaults to `D:\tiff-images\...`). Degrades gracefully if absent. |
+| **Local voice** | A local XTTS server; point `TIFF_VOICE_PY` / `TIFF_VOICE_SERVER` at it. Off unless set up. |
+| **Better web search** | Set `TAVILY_API_KEY` to use Tavily instead of scraping DuckDuckGo. |
 
 ---
 
 ## Requirements
 
-- **Python 3.10+** (with "Add to PATH" checked on install)
-- **LM Studio** + a GGUF chat model
-- `pip install -r requirements.txt` — the launcher does this automatically on
-  first run.
+- **Python 3.10+** (check "Add to PATH" on Windows)
+- **LM Studio** + any GGUF chat model
+- `pip install -r requirements.txt` (the launcher does this automatically)
 
 ---
 
-## Portability notes (reading this on a 2nd machine)
+## Contributing
 
-- **Model:** `DEFAULT_MODEL` in `app.py` is the original author's model. On any
-  other machine the app auto-loads **whatever chat model you have downloaded**, so
-  it boots regardless.
-- **Images:** the ComfyUI path (`COMFY_DIR` in `app.py`) is hardcoded to the
-  author's `D:\tiff-images\...`. It **degrades gracefully** if missing — image gen
-  just won't start until you install ComfyUI + FLUX and point `COMFY_DIR` at it.
-- **Voice:** same idea — optional local server, off unless set up.
-- **Memory:** starts empty on a fresh machine (privacy — the author's personal
-  knowledge base is not shared).
+This started as one person's tool and is now open for anyone to grow. The bar:
 
-So out of the box on a new machine you get: **Chat, the Builder, and Research**,
-fully working with just Python + LM Studio + a model.
+- **Local-first.** No feature should require a cloud account or send user data off
+  the machine. Optional, env-gated integrations are fine.
+- **Keep it simple.** One `app.py`, self-contained `static/*.html`, vanilla JS.
+  Resist frameworks and build steps — readability and "view source and learn" are
+  features.
+- **Don't commit personal data.** Anything under `data/` is private and git-ignored.
+
+To contribute: fork → branch → make the change → test it in the browser → open a PR
+describing what and why. Bug reports and ideas as issues are just as welcome.
+
+---
+
+## License
+
+[MIT](LICENSE). Do whatever you want with it — just keep the license notice. No
+warranty.

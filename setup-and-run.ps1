@@ -29,10 +29,10 @@ if ($LASTEXITCODE -eq 0 -and $smi) {
 }
 $ram = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB,0)
 $model = "google/gemma-4-e4b"
-if     ($vram -ge 16000) { $note = "Beast card - tons of headroom. gemma-4-e4b is the proven pick (ask Bryan about bigger models if you want more)." }
+if     ($vram -ge 16000) { $note = "Beast card - tons of headroom. gemma-4-e4b is the proven pick (try a bigger model if you want more)." }
 elseif ($vram -ge 8000)  { $note = "Perfect fit - this runs fast on your card." }
 elseif ($vram -ge 6000)  { $note = "Good fit - runs well on your card." }
-elseif ($vram -ge 4000)  { $note = "It'll run, maybe a touch slow. If it's rough, text Bryan for a lighter model." }
+elseif ($vram -ge 4000)  { $note = "It'll run, maybe a touch slow. Try a lighter model if it's rough." }
 else                     { $note = "No big graphics card detected - it'll lean on your processor, so it works but slower. Still fine to build with." }
 
 Head "YOUR PC:"

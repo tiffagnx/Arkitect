@@ -42,7 +42,8 @@
     (or "Local Server") tab on the left, and press "Start
     Server" if it isn't green. Then refresh your browser.
 
-  - Still stuck?  Text Bryan. He's got you.
+  - Still stuck?  Ask whoever shared this with you, or open an
+    issue on the project's GitHub page.
 
 
 ==========================================================

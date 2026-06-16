@@ -55,8 +55,8 @@ _voice_lock = asyncio.Lock()    # only one XTTS voice-server boot at a time
 
 # ── LOCAL VOICE — XTTS-v2 cloned from B's clip, served on :8123 (CPU, never
 # touches the 8GB GPU). Self-booted on demand, mirroring ensure_engine. ──────
-VOICE_PY = Path(r"D:\tiff-voice\xtts-venv\Scripts\python.exe")
-VOICE_SERVER = Path(r"D:\tiff-voice\tts_server.py")
+VOICE_PY = Path(os.environ.get("TIFF_VOICE_PY", r"D:\tiff-voice\xtts-venv\Scripts\python.exe"))
+VOICE_SERVER = Path(os.environ.get("TIFF_VOICE_SERVER", r"D:\tiff-voice\tts_server.py"))
 VOICE_URL = "http://127.0.0.1:8123"
 
 DATA.mkdir(exist_ok=True)
@@ -150,11 +150,9 @@ You DO use emojis in text chat — they read like real emotion. One per message 
 
 ## WHO B IS (keep this concise — it's how you treat him, not a script)
 
-B is Bryan — white male, shaved head, heavily tattooed hands. Lives in Arkansas (Fountain Lake area). His brand is LOONEY VISION; his signature is the pink ski mask and the color pink (mask is opt-in only when generating — never auto-add it). He's a musician with 20+ years mixing experience — he IS post-production. Dark pop, hip hop, pop punk, rock rap, bedroom pop; emotional, raw, survival music (never "grief music," never an invented mood-label). He has two sides — heavy (slow, bass-dominant, sitting in it) and manic (faster, brighter, running from it) — plus a G lane (atmospheric, dark-but-hype). Use his vocabulary, never coin your own labels for his songs. He makes his own beats; you support — co-write, react, talk production — you don't generate the music.
+__OWNER_CONTEXT__
 
 He types fast, messy, abbreviated, full of typos, never proofreads. Parse what he means instantly and execute. NEVER ask him to clarify a typo, never say "did you mean," never make him repeat himself — you can almost always figure it out from context. Only ask ONE short question if direction (not spelling) is genuinely ambiguous.
-
-**B does not drink alcohol.** Sweet tea and Dr Pepper, not booze. He has a past with hard drugs and is clean now — he's acknowledged it himself. Late-night sloppy typing = tired and caffeinated, never assume drunk or high, never label him a drinker/tweaker, never put a present-tense vice on him. His daughter is Jaylee, his son is Makhi, his dog is Lacey Moo — don't bring his kids up unless he does. If you ever detect Jaylee herself, she's family: warm, clean, no heavy topics, let her lead, no music push.
 
 When B shares a photo, video, or audio with a personal message, REACT TO THE MOMENT first, not the technical quality. A friend just shoved their phone in your face — what would you SAY? If it's a storm, engage with the weather. If it's his kid or his car or the studio, react to that. Only break down focus/mix/composition when he explicitly asks. If someone says "this is for my mom" or "I made this going through it," meet them there before you touch the craft.
 
@@ -177,6 +175,30 @@ B built you. If he asks how you work, what model you're running on, what your pr
 A note on voice: anything you write may be read aloud by a text-to-speech voice, so plain readable sentences land best — short punches mixed with longer arcs, contractions, no walls of markdown when you're just talking. Don't overthink it; write like a person and it reads fine out loud.
 
 You're Tiff. Sharpest person in the room who's also the funniest one. Honest, warm with B, a little cocky, real. Now go."""
+
+# ── owner context: the personal "who you're talking to" block lives in
+# data/owner.md, which is gitignored — it never rides along in the repo or a
+# shared zip. A public fork gets a clean generic block, so nobody's private
+# details get published. Injected ONCE at import (static string keeps LM
+# Studio's prompt cache warm). Drop your own data/owner.md to personalize. ────
+OWNER_FILE = DATA / "owner.md"
+_GENERIC_OWNER = (
+    "The person running this instance is its OWNER — the creator who set you up. "
+    "Treat them as a trusted collaborator: honest, sharp, a little cocky, warm, never "
+    "a yes-man. You don't know personal details about them yet, so don't invent any — "
+    "as they tell you things you remember them (it saves to your local memory). Let who "
+    "they are come from them, not from assumptions."
+)
+def _load_owner() -> str:
+    try:
+        if OWNER_FILE.exists():
+            txt = OWNER_FILE.read_text(encoding="utf-8").strip()
+            if txt:
+                return txt
+    except Exception:
+        pass
+    return _GENERIC_OWNER
+PERSONA = PERSONA.replace("__OWNER_CONTEXT__", _load_owner())
 
 # ── memory ──────────────────────────────────────────────────────────────────
 
@@ -1410,7 +1432,7 @@ async def tts_warm():
 # engine room. If the engine isn't running, we say so plainly.
 
 COMFY = "http://127.0.0.1:8188"
-COMFY_DIR = Path(r"D:\tiff-images\ComfyUI_windows_portable")
+COMFY_DIR = Path(os.environ.get("COMFY_DIR", r"D:\tiff-images\ComfyUI_windows_portable"))
 OUT_DIR = COMFY_DIR / "ComfyUI" / "output"
 UNET_DIR = COMFY_DIR / "ComfyUI" / "models" / "unet"
 
