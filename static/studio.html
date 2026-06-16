@@ -158,6 +158,11 @@
   /* zoom / snap controls */
   .zoomctl { display:inline-flex; align-items:center; gap:4px; margin-left:8px; }
   .zb { padding:6px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 11px 'Space Mono'; cursor:pointer; }
+  .toolsel { display:inline-flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; margin-right:5px; }
+  .tb { padding:6px 9px; background:transparent; border:none; border-right:1px solid var(--hairline); cursor:pointer; color:var(--dim); font:600 13px Inter; line-height:1; }
+  .tb:last-child { border-right:none; }
+  .tb.on { background:rgba(62,156,184,.2); color:#9FCFDD; }
+  .tb:hover { color:var(--text); }
   .zb:hover { border-color:rgba(62,156,184,.5); color:#DCE7EC; }
   .zb.on { background:rgba(0,209,196,.16); color:var(--teal); border-color:rgba(0,209,196,.4); }
   #zoomLbl { font:600 10px 'Space Mono'; color:var(--dim); min-width:36px; text-align:center; }
@@ -409,6 +414,12 @@
   <span class="countin" id="countin"></span>
   <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
   <div class="zoomctl">
+    <span class="toolsel" title="edit tool">
+      <button class="tb on" id="toolGrab" title="Grab — move clips (drag anywhere)">✋</button>
+      <button class="tb" id="toolTrim" title="Trim — resize a clip's edge">✂</button>
+      <button class="tb" id="toolSel" title="Select — highlight a range">⌶</button>
+      <button class="tb" id="toolSmart" title="Smart — auto: middle moves, edge trims, bottom selects">◆</button>
+    </span>
     <button class="zb" id="zoomOut" title="zoom out (time)">−</button><span id="zoomLbl">100%</span><button class="zb" id="zoomIn" title="zoom in time (or Ctrl+wheel)">+</button>
     <button class="zb" id="vzOut" title="audio zoom out (vertical)">▽</button><button class="zb" id="vzIn" title="audio zoom in (vertical)">△</button>
     <button class="zb" id="laneTall" title="taller lanes">↕</button>
@@ -568,6 +579,7 @@ function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
 let zoom=1, scrollT=0, laneH=104, snapOn=true, gridNote=16, vZoom=1;
+let tool='grab', SEL=null;   // edit tool: grab(move) | trim | select(highlight) | smart ; SEL = {trackId,a,b} time range
 function gridStep(){ return (60/curTempo()) * (4/gridNote); }   // seconds per grid line (1/gridNote note)
 function viewDur(){ return maxDur()/zoom; }
 function clampScroll(){ const room=Math.max(0, maxDur()-viewDur()); scrollT=Math.max(0, Math.min(scrollT, room)); }
@@ -716,6 +728,12 @@ function showWaveMenu(t, wv, e){
   const m=ctxMenuEl(); m.innerHTML="";
   const add=(label,fn,enabled=true)=>{ const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
   const sep=()=>{ const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
+  if(SEL && SEL.trackId===t.id && Math.abs(SEL.a-SEL.b)>0.01){     // a highlighted range is active
+    add("✂  Separate at selection", ()=>separateAtSelection(t));
+    add("🗑  Delete selection", ()=>deleteSelection(t));
+    add("✕  Clear selection", ()=>clearSelection());
+    sep();
+  }
   if(cl){
     add("✂  Separate here", ()=>separateClip(t,cl,atTime));
     add("🗑  Delete this clip", ()=>deleteClip(t,cl));
@@ -1988,43 +2006,56 @@ function laneUi(t) {
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
   renderStripSlots(t, d.querySelector(".ts-slots"));
   const wv = d.querySelector(".wave");
-  // SMART TOOL: near a clip edge = trim that edge, middle = grab/move, empty = playhead
+  // TOOL-AWARE: Grab(move anywhere) · Trim(resize edge) · Select(highlight) · Smart(auto)
   wv.onmousedown = (e) => {
     if (e.button !== 0) return;
     selectTrack(t);
     const vd = viewDur(), r = wv.getBoundingClientRect();
     const atTime = scrollT + (e.clientX - r.left) / r.width * vd;
     const cl = clipAt(t, atTime);
-    if (!cl) { selClip = null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty space → move playhead
+    // SELECT: drag to highlight a time range (or Smart tool in the bottom strip of a clip)
+    if (tool==='select' || (tool==='smart' && cl && (e.clientY-r.top) > r.height*0.62)) {
+      SEL = { trackId:t.id, a:atTime, b:atTime }; drawLane(t);
+      const mv=(ev)=>{ SEL.b = Math.max(0, scrollT + (ev.clientX-r.left)/r.width*vd); drawLane(t); };
+      const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
+        if(Math.abs(SEL.a-SEL.b)<0.01){ SEL=null; drawLane(t); } else flash("Selection made — right-click for options"); };
+      document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
+    }
+    if (!cl) { selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty → playhead
     selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);
     const sx = e.clientX;
     const leftX = r.left + ((cl.start - scrollT)/vd)*r.width, rightX = r.left + ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
-    const edge = (Math.abs(e.clientX-leftX)<=7) ? 'L' : (Math.abs(e.clientX-rightX)<=7) ? 'R' : null;
-    if (edge) {   // TRIM — shorten the clip from the grabbed edge (sample-accurate, undoable)
+    // TRIM: only with the Trim tool (nearest edge), or Smart tool when right on an edge
+    let edge=null;
+    if (tool==='trim') edge = (Math.abs(e.clientX-leftX) <= Math.abs(e.clientX-rightX)) ? 'L' : 'R';
+    else if (tool==='smart') edge = (Math.abs(e.clientX-leftX)<=7) ? 'L' : (Math.abs(e.clientX-rightX)<=7) ? 'R' : null;
+    if (edge) {
       const oB=cl.buffer, oS=cl.start, oD=cl.buffer.duration; let trimmed=false;
       const mv=(ev)=>{ if(!trimmed && Math.abs(ev.clientX-sx)>2){ trimmed=true; pushUndoClips(t); }
         if(trimmed){ const dt=(ev.clientX-sx)/r.width*vd;
           if(edge==='L'){ let cut=snapTime(oS+Math.max(0,dt))-oS; cut=Math.max(0,Math.min(oD-0.05,cut)); cl.start=oS+cut; cl.buffer=bufSlice(oB, cut/oD, 1); }
           else { let keep=snapTime(oS+oD+Math.min(0,dt))-oS; keep=Math.max(0.05,Math.min(oD,keep)); cl.buffer=bufSlice(oB, 0, keep/oD); }
           drawLane(t); } };
-      const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
-        if(trimmed){ syncPrimary(t); if(playing) restartPlayback(); flash("Trimmed clip"); } };
+      const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); if(trimmed){ syncPrimary(t); if(playing) restartPlayback(); flash("Trimmed clip"); } };
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
-    const startStart = cl.start; let moved = false;   // GRAB / move
-    const mv = (ev) => {
-      if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
-      if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(startStart + dx); drawLane(t); }
-    };
+    // GRAB / MOVE (default) — drag anywhere on the clip slides it left/right, never resizes
+    const startStart = cl.start; let moved = false;
+    const mv = (ev) => { if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
+      if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(Math.max(0, startStart + dx)); drawLane(t); } };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
-      if (!moved) seek(atTime);
-      else { syncPrimary(t); if (playing) restartPlayback(); flash("Moved clip"); } };
+      if (!moved) seek(atTime); else { syncPrimary(t); if (playing) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
-  wv.onmousemove = (e) => {   // smart-tool cursor feedback (trim near edges, grab on a clip)
+  wv.onmousemove = (e) => {   // cursor reflects the active tool
     if (e.buttons) return; const vd=viewDur(), r=wv.getBoundingClientRect(), cl=clipAt(t, scrollT+(e.clientX-r.left)/r.width*vd);
-    if (cl) { const lX=r.left+((cl.start-scrollT)/vd)*r.width, rX=r.left+((cl.start+cl.buffer.duration-scrollT)/vd)*r.width;
-      wv.style.cursor=(Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7)?'ew-resize':'grab'; } else wv.style.cursor='crosshair';
+    let cur='crosshair';
+    if (tool==='select') cur='text';
+    else if (tool==='trim') cur = cl ? 'ew-resize' : 'crosshair';
+    else if (tool==='grab') cur = cl ? 'grab' : 'crosshair';
+    else if (tool==='smart' && cl){ const lX=r.left+((cl.start-scrollT)/vd)*r.width, rX=r.left+((cl.start+cl.buffer.duration-scrollT)/vd)*r.width;
+      cur = (Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7) ? 'ew-resize' : ((e.clientY-r.top)>r.height*0.62 ? 'text' : 'grab'); }
+    wv.style.cursor=cur;
   };
   wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
   selectTrack(t); ensureMasterLane();
@@ -2951,6 +2982,11 @@ function drawLane(t){
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
   }
+  if(SEL && SEL.trackId===t.id){                                            // selection highlight (Select tool)
+    const x1=t2x(Math.min(SEL.a,SEL.b),W), x2=t2x(Math.max(SEL.a,SEL.b),W);
+    g.fillStyle="rgba(95,180,206,0.18)"; g.fillRect(x1,0,x2-x1,H);
+    g.strokeStyle="rgba(95,180,206,0.7)"; g.lineWidth=1; g.beginPath(); g.moveTo(x1,0); g.lineTo(x1,H); g.moveTo(x2,0); g.lineTo(x2,H); g.stroke();
+  }
 }
 
 /* ── live graph per track ── */
@@ -3143,6 +3179,23 @@ const _LANE_H = [104,160,230]; let _lhi = 0;
 $("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE_H[_lhi]); };
 $("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/"+gridNote+")" : "Snap: OFF"); };
 $("gridSel").onchange = (e) => { gridNote = +e.target.value; tracks.forEach(t=>drawLane(t)); flash("Grid: 1/"+gridNote); };
+function setTool(tk){ tool=tk;
+  $("toolGrab").classList.toggle("on", tk==='grab'); $("toolTrim").classList.toggle("on", tk==='trim');
+  $("toolSel").classList.toggle("on", tk==='select'); $("toolSmart").classList.toggle("on", tk==='smart');
+  if(tk!=='select' && tk!=='smart'){ SEL=null; tracks.forEach(t=>drawLane(t)); }
+  flash("Tool: "+{grab:"Grab — move clips",trim:"Trim — resize edges",select:"Select — highlight a range",smart:"Smart — auto"}[tk]);
+}
+$("toolGrab").onclick=()=>setTool('grab'); $("toolTrim").onclick=()=>setTool('trim'); $("toolSel").onclick=()=>setTool('select'); $("toolSmart").onclick=()=>setTool('smart');
+function separateAtSelection(t){
+  if(!SEL||SEL.trackId!==t.id||Math.abs(SEL.a-SEL.b)<0.01){ flash("Make a selection first (⌶ Select tool)"); return null; }
+  const a=Math.min(SEL.a,SEL.b), b=Math.max(SEL.a,SEL.b), mid=(a+b)/2;
+  const cl=clipAt(t,mid); if(!cl){ flash("Selection isn't over a clip"); return null; }
+  if(b<cl.start+cl.buffer.duration-0.01) separateClip(t,cl,b);          // split at selection end
+  const cl2=clipAt(t,mid); if(cl2 && a>cl2.start+0.01) separateClip(t,cl2,a);   // split at selection start
+  const iso=clipAt(t,mid); SEL=null; drawLane(t); return iso;
+}
+function clearSelection(){ SEL=null; tracks.forEach(t=>drawLane(t)); }
+function deleteSelection(t){ const iso=separateAtSelection(t); if(iso){ deleteClip(t,iso); flash("Deleted selection"); } }
 $("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>drawLane(t)); };
 $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
 $("setupBtn").onclick = (e) => { e.stopPropagation(); $("rail").classList.toggle("open"); $("setupBtn").classList.toggle("on", $("rail").classList.contains("open")); };

@@ -120,6 +120,14 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 
 ## 6. PROGRESS LOG (newest first)
 
+- **2026-06-16** — FIX the broken move + add real TOOLS (B: 'the hand only stretches it,
+  can't move it, no way to highlight'). Toolbar tool selector: ✋ Grab (DEFAULT, drag
+  anywhere = move, never resize) · ✂ Trim (resize nearest edge) · ⌶ Select (drag = highlight
+  a time range) · ◆ Smart (auto by cursor position). SEL range drawn + separate/delete-at-
+  selection in the right-click menu. Cursor reflects the tool. Verified BY SCREENSHOT +
+  test: Grab moved a clip start 1.0->1.66 with duration UNCHANGED (5->5, not stretched);
+  Select makes a range; tool buttons render, Grab active.
+
 - **2026-06-16** — GENERATE-A-SOUND into an empty spot SHIPPED (v1): right-click empty lane
   -> '✨ Generate a sound here' -> type -> drops a clip at that exact time. generateSfx =
   LOCAL procedural synth (riser/downer/impact/sub/snare/hat/whoosh/crackle/zap/tone via
