@@ -106,6 +106,9 @@
   .clip-fx #cf-del { grid-column:1 / -1; color:#FF7A93; border-color:rgba(255,90,110,.35); }
   .chan-hint { font:400 11px Inter; line-height:1.5; color:var(--dim); background:rgba(255,255,255,.025);
     border:1px dashed var(--hairline); border-radius:10px; padding:10px 12px; }
+  .chan-io { display:flex; align-items:center; gap:9px; margin:7px 0 2px; }
+  .io-lbl { font:700 9px 'Space Mono'; letter-spacing:.12em; color:var(--dim); flex:none; }
+  .io-out { flex:1; padding:6px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FFD6EA; font:600 11px Inter; cursor:pointer; }
   .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .lhead .cdot { width:11px; height:11px; border-radius:3px; flex:none; margin-right:8px; box-shadow:0 0 7px rgba(0,0,0,.4) inset; }
   .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1861,6 +1864,7 @@ function auxLaneUi(t){
   d.onclick = (e) => { if (!e.target.closest(".chip")) selectTrack(t); };
   d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
+    tracks.forEach(x => { if (x.output === t.id) x.output = 'master'; });   // stems routed here fall back to Master
     refreshSendMenus(); };
   selectTrack(t);
 }
@@ -1927,6 +1931,9 @@ function renderChannel(t){
   html += `<div class="chan-actions">`;
   if(!isAux) html += `<button class="cbtn ai" id="ca-ai" title="Analyze this stem & propose bounded EQ/comp moves — real FFT, never guessed">✨ Auto-mix</button>`;
   html += `<button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
+  if(!isAux){ const auxes=tracks.filter(x=>x.type==='aux');
+    html += `<div class="chan-io"><span class="io-lbl">OUTPUT →</span><select class="io-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select></div>`;
+  }
   html += `<div class="chan-section" style="border-top:none;padding-top:2px">Channel · double-click a knob to reset</div><div class="chan-knobs">`;
   params.forEach(([k,lbl]) => html += `<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
   html += `</div>`;
@@ -1955,6 +1962,7 @@ function renderChannel(t){
   const ai=document.getElementById("ca-ai"); if(ai) ai.onclick=(e)=>runAutoMix(t,e.currentTarget);
   const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
   const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
+  const io=panel.querySelector(".io-out"); if(io) io.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); flash("Output → "+e.target.selectedOptions[0].textContent); };
   // wire clip fx (re-resolve the clip on click in case the array changed)
   if(cl){
     const live=(fn)=>()=>{ const c2=clipsOf(t).find(c=>c.id===(selClip&&selClip.clipId))||cl; fn(t,c2); };
@@ -2582,7 +2590,11 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     } catch { insertNodes.push(null); }
   }
   tail.connect(comp); comp.connect(pan); pan.connect(fader);
-  const dest = isOffline ? c._masterGain : master.gain;
+  let dest = isOffline ? c._masterGain : master.gain;     // default output = Master
+  if (!isAux && t.output && t.output !== 'master') {       // routed to an FX bus instead
+    const ao = tracks.find(x => x.id === t.output && x.type === 'aux');
+    if (ao && ao._in) dest = ao._in;
+  }
   const vdest = isOffline ? c._verbPre : verb.predelay;
   fader.connect(dest);
   fader.connect(send); send.connect(vdest);
@@ -2804,6 +2816,7 @@ async function buildProjectPayload(title) {
       inserts: (t.inserts || []).map(ins => ({ name: ins.name, params: { ...ins.params }, bypassed: !!ins.bypassed })),
       muted: !!t.muted, solo: !!t.solo,
       offset: t.offset || 0,
+      output: t.output || 'master',
       sends: (t.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
@@ -2918,6 +2931,7 @@ async function loadProject(id) {
         inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params || {}) }, bypassed: !!ins.bypassed })),
         muted: !!td.muted, solo: !!td.solo,
         offset: td.offset || 0,
+        output: td.output || 'master',
         sends: (td.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
         src: null, live: null,
       };
