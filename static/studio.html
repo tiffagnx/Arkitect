@@ -104,6 +104,8 @@
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
+  .lane.aux .lhead, .lane.masterlane .lhead { flex:1; padding:11px 14px; margin:0; }
+  select.zb.gridsel { -webkit-appearance:none; appearance:none; padding:6px 7px; color:var(--text); }
   .mbadge { font:700 8px 'Space Mono'; letter-spacing:.16em; color:#E6B878; background:rgba(200,146,74,.16); border:1px solid rgba(200,146,74,.42); border-radius:5px; padding:2px 7px; }
   .lane { cursor:pointer; }
   .lane.sel { border-color:rgba(62,156,184,.7); box-shadow:0 0 0 1px rgba(62,156,184,.35), 0 0 22px rgba(62,156,184,.1); }
@@ -385,9 +387,13 @@
   <span class="countin" id="countin"></span>
   <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
   <div class="zoomctl">
-    <button class="zb" id="zoomOut" title="zoom out">−</button><span id="zoomLbl">100%</span><button class="zb" id="zoomIn" title="zoom in (or Ctrl+wheel)">+</button>
+    <button class="zb" id="zoomOut" title="zoom out (time)">−</button><span id="zoomLbl">100%</span><button class="zb" id="zoomIn" title="zoom in time (or Ctrl+wheel)">+</button>
+    <button class="zb" id="vzOut" title="audio zoom out (vertical)">▽</button><button class="zb" id="vzIn" title="audio zoom in (vertical)">△</button>
     <button class="zb" id="laneTall" title="taller lanes">↕</button>
-    <button class="zb on" id="snapBtn" title="snap clip moves to the beat grid">⌗ Snap</button>
+    <select class="zb gridsel" id="gridSel" title="grid / snap resolution">
+      <option value="4">1/4</option><option value="8">1/8</option><option value="16" selected>1/16</option><option value="32">1/32</option><option value="64">1/64</option>
+    </select>
+    <button class="zb on" id="snapBtn" title="snap clip moves to the grid">⌗ Snap</button>
   </div>
   <div class="right">
     <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
@@ -538,10 +544,11 @@ async function renderBuf(buf, build, tailSec=0){
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
-let zoom=1, scrollT=0, laneH=104, snapOn=true;
+let zoom=1, scrollT=0, laneH=104, snapOn=true, gridNote=16, vZoom=1;
+function gridStep(){ return (60/curTempo()) * (4/gridNote); }   // seconds per grid line (1/gridNote note)
 function viewDur(){ return maxDur()/zoom; }
 function clampScroll(){ const room=Math.max(0, maxDur()-viewDur()); scrollT=Math.max(0, Math.min(scrollT, room)); }
-function snapTime(x){ x=Math.max(0,x); if(!snapOn) return x; const step=(60/curTempo())/4; return Math.round(x/step)*step; }  // snap to 1/16
+function snapTime(x){ x=Math.max(0,x); if(!snapOn) return x; const step=gridStep(); return Math.round(x/step)*step; }   // snap to the selected grid (1/4…1/64)
 function t2x(time, W){ return ((time-scrollT)/viewDur())*W; }
 function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.textContent=Math.round(zoom*100)+"%";
   const hs=document.getElementById("hscroll"); if(hs){ const room=Math.max(0, maxDur()-viewDur()); hs.max=room.toFixed(3); hs.value=Math.min(scrollT,room); hs.style.display=room>0.02?'block':'none'; } }
@@ -2220,50 +2227,41 @@ function selectTrack(t){
 function renderChannel(t){
   const panel = $("chan");
   if(t.type==='master'){ renderMasterChannel(panel); return; }
-  const isAux = t.type==='aux';
-  const params = isAux ? [['gain','VOL'],['pan','PAN']] : [['gain','VOL'],['pan','PAN'],['lo','LOW'],['mid','MID'],['hi','HIGH'],['comp','COMP'],['send','VERB']];
-  const cl = (!isAux && selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
-  let html = `<div class="chan-head"><span class="cdot" style="background:${t.color}"></span>`;
-  if(isAux) html += `<span class="auxbadge">FX BUS</span>`;
-  html += `<span class="name">${t.name}</span></div>`;
-  // actions — auto-mix / mute / solo (moved off the lanes, onto the channel)
-  html += `<div class="chan-actions">`;
-  if(!isAux) html += `<button class="cbtn ai" id="ca-ai" title="Analyze this stem & propose bounded EQ/comp moves — real FFT, never guessed">✨ Auto-mix</button>`;
-  html += `<button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
-  if(!isAux){ const auxes=tracks.filter(x=>x.type==='aux');
-    html += `<div class="chan-io"><span class="io-lbl">OUTPUT →</span><select class="io-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select></div>`;
+  // AUX bus: keeps VOL/PAN knobs + insert rack (buses have no track strip yet)
+  if(t.type==='aux'){
+    const params=[['gain','VOL'],['pan','PAN']];
+    let html=`<div class="chan-head"><span class="cdot" style="background:${t.color}"></span><span class="auxbadge">FX BUS</span><span class="name">${t.name}</span></div>`;
+    html+=`<div class="chan-actions"><button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
+    html+=`<div class="chan-section" style="border-top:none;padding-top:2px">Bus · double-click a knob to reset</div><div class="chan-knobs">`;
+    params.forEach(([k,lbl])=>html+=`<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
+    html+=`</div><div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">stack plugins here</span><select class="ins-add"><option value="">+ add effect…</option></select></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
+    panel.innerHTML=html;
+    params.forEach(([k])=>makeChanKnob(t,k));
+    fillAddSelect(t); renderInserts(t);
+    panel.querySelector(".ins-add").onchange=(e)=>{ addInsert(t,e.target.value); e.target.value=""; };
+    const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
+    const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
+    return;
   }
-  html += `<div class="chan-section" style="border-top:none;padding-top:2px">Channel · double-click a knob to reset</div><div class="chan-knobs">`;
-  params.forEach(([k,lbl]) => html += `<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
-  html += `</div>`;
-  // CLIP — print an effect onto JUST the selected clip
-  if(!isAux){
-    html += `<div class="chan-section">Clip${cl?' · selected':''}</div>`;
-    if(cl){
-      html += `<div class="clip-fx">` + [
-        ['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],
-        ['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],
-        ['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']
-      ].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("") + `</div>`;
-      html += `<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
-      html += `<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 Tune — see the notes (Melodyne)</button>`;
-    } else {
-      html += `<div class="chan-hint">Right-click a clip (or click it) to grab one piece. Separate it, then print Reverse / Reverse-reverb / VERB / BPM-delay onto just that slice.</div>`;
-    }
+  // STEM: name/M-S/VOL/PAN/inserts live on the track STRIP (left of the lane). The right
+  // panel is now just ROUTING + CLIP tools — no more confusing "Channel" knob duplicate.
+  const cl = (selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
+  const auxes=tracks.filter(x=>x.type==='aux');
+  let html=`<div class="chan-head"><span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span><button class="cbtn ai" id="ca-ai" style="margin-left:auto;padding:5px 9px" title="Analyze & propose bounded EQ/comp moves — real FFT">✨ Auto-mix</button></div>`;
+  html+=`<div class="chan-io"><span class="io-lbl">OUTPUT →</span><select class="io-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select></div>`;
+  html+=`<div class="chan-section">Sends → FX bus</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
+  html+=`<div class="chan-section">Clip${cl?' · selected':''}</div>`;
+  if(cl){
+    html+=`<div class="clip-fx">`+[['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("")+`</div>`;
+    html+=`<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
+    html+=`<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 Tune — see the notes (Melodyne)</button>`;
+  } else {
+    html+=`<div class="chan-hint">Click a clip in the lane to edit it — separate, reverse, print VERB, BPM-delay, AudioSuite, or open it in Tune. <b>Volume, pan & plugins are on the track strip (left).</b></div>`;
   }
-  html += `<div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">${isAux?'stack plugins here':'plugin chain'}</span><select class="ins-add"><option value="">+ add effect…</option></select></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
-  if(!isAux) html += `<div class="chan-section">Sends → FX bus</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
-  panel.innerHTML = html;
-  params.forEach(([k]) => makeChanKnob(t,k));
-  fillAddSelect(t); renderInserts(t);
-  panel.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value=""; };
-  if(!isAux) renderSends(t);
-  // wire actions
+  panel.innerHTML=html;
+  renderSends(t);
   const ai=document.getElementById("ca-ai"); if(ai) ai.onclick=(e)=>runAutoMix(t,e.currentTarget);
-  const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
-  const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
   const io=panel.querySelector(".io-out"); if(io) io.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); flash("Output → "+e.target.selectedOptions[0].textContent); };
-  // wire clip fx (re-resolve the clip on click in case the array changed)
   if(cl){
     const live=(fn)=>()=>{ const c2=clipsOf(t).find(c=>c.id===(selClip&&selClip.clipId))||cl; fn(t,c2); };
     document.getElementById("cf-rev").onclick=live(clipFx_reverse);
@@ -2818,24 +2816,26 @@ function showAiSummary(lane, t, text) {
 
 // faint beat grid across the VISIBLE window — so clip moves read against the tempo
 function drawGrid(g, W, H){
-  const beat = 60/curTempo(); if(beat<=0) return; const vd=viewDur(); if(vd/beat>300) return;
+  const step=gridStep(); if(step<=0) return; const vd=viewDur(); if(vd/step>420) return;
+  const spb=Math.max(1, Math.round(gridNote/4)), spbar=Math.max(1, gridNote);   // grid lines per beat / per bar
   g.lineWidth = 1;
-  for(let i=Math.floor(scrollT/beat); ; i++){
-    const x=t2x(i*beat, W); if(x>W) break; if(x<0) continue;
-    g.strokeStyle = (i%4===0) ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.045)";
+  for(let i=Math.floor(scrollT/step); ; i++){
+    const x=t2x(i*step, W); if(x>W) break; if(x<0) continue;
+    g.strokeStyle = (i%spbar===0) ? "rgba(255,255,255,0.15)" : (i%spb===0) ? "rgba(255,255,255,0.085)" : "rgba(255,255,255,0.035)";
     g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
   }
 }
-// one clip's waveform drawn inside its box [x0, x0+w], only the on-screen part
+// one clip's waveform drawn inside its box [x0, x0+w], only the on-screen part (vZoom = vertical/audio zoom)
 function drawClipWave(g, buf, x0, w, H, color){
-  const data=buf.getChannelData(0), N=data.length, mid=H/2, W=g.canvas.width;
+  const data=buf.getChannelData(0), N=data.length, mid=H/2, W=g.canvas.width, cap=H*0.48;
   const pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0));
   g.strokeStyle=hexA(color,0.9); g.lineWidth=1; g.beginPath();
   for(let px=pa; px<pb; px++){
     const i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); let mn=1,mx=-1;
     for(let j=i0;j<i1;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
     if(mx<mn){ mn=0; mx=0; }
-    g.moveTo(x0+px, mid-mx*H*0.46); g.lineTo(x0+px, mid-mn*H*0.46);
+    const top=Math.max(-cap,Math.min(cap, mx*H*0.46*vZoom)), bot=Math.max(-cap,Math.min(cap, mn*H*0.46*vZoom));
+    g.moveTo(x0+px, mid-top); g.lineTo(x0+px, mid-bot);
   }
   g.stroke();
 }
@@ -3045,7 +3045,10 @@ $("zoomIn").onclick  = () => setZoom(zoom*1.5);
 $("zoomOut").onclick = () => setZoom(zoom/1.5);
 const _LANE_H = [104,160,230]; let _lhi = 0;
 $("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE_H[_lhi]); };
-$("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/16)" : "Snap: OFF"); };
+$("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/"+gridNote+")" : "Snap: OFF"); };
+$("gridSel").onchange = (e) => { gridNote = +e.target.value; tracks.forEach(t=>drawLane(t)); flash("Grid: 1/"+gridNote); };
+$("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>drawLane(t)); };
+$("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
 $("tracks").addEventListener("wheel", (e) => {
   if (viewMode === 'mix') return;

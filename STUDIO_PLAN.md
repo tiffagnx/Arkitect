@@ -120,6 +120,12 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 
 ## 6. PROGRESS LOG (newest first)
 
+- **2026-06-16** — Edit-window cont'd: KILLED the confusing right Channel knob panel for
+  stems (right side = Output + Sends + Clip tools; vol/pan/plugins live on the strip). Added
+  GRID selector 1/4-1/64 (drawGrid bar/beat/sub emphasis + snapTime use gridStep) + AUDIO
+  (vertical) zoom (vZoom in drawClipWave). Aux/Master lanes fixed for the flex layout.
+  Next: smart tool, press-reveal fader polish, master lane -> strip format, left-rail dropdown.
+
 - **2026-06-16** — Started the PRO TOOLS EDIT-WINDOW rebuild (B's 2 screenshots): each lane
   is now [control strip LEFT | waveform RIGHT]. Strip = name (dblclick rename), M/S, VOL +
   PAN drag widgets, and inline INSERT SLOTS A-E (click empty=dropdown, filled=open, x=remove),
