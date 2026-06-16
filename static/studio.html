@@ -146,6 +146,17 @@
   .ins-sname { font:600 11.5px Inter; color:#FFD6EA; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ins-mini { background:none; border:none; color:var(--dim); cursor:pointer; font-size:12px; padding:1px 3px; line-height:1; }
   .ins-mini:hover { color:#FFD6EA; } .ins-mini.rm:hover { color:#FF7A93; }
+  /* aux / FX bus lane + sends */
+  .lane.aux { border-color:rgba(139,92,246,.32); }
+  .auxbadge { font:700 8px 'Space Mono'; letter-spacing:.14em; color:#E6CBFF; background:rgba(139,92,246,.16);
+    border:1px solid rgba(139,92,246,.4); border-radius:6px; padding:2px 7px; margin-right:7px; }
+  .sends-rack .send-list { display:flex; flex-direction:column; gap:5px; }
+  .send-row { display:flex; align-items:center; gap:8px; padding:5px 9px; border-radius:8px; background:rgba(139,92,246,.06); border:1px solid var(--hairline); }
+  .send-row .cdot { width:9px; height:9px; border-radius:2px; flex:none; }
+  .send-name { font:600 11px Inter; color:#E6CBFF; min-width:74px; }
+  .send-lvl { flex:1; accent-color:var(--violet); height:4px; cursor:pointer; }
+  .send-add { background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline); border-radius:7px; font:500 10.5px Inter; padding:3px 8px; margin-left:auto; }
+  .send-add option { background:var(--bg1); }
   /* floating plugin window */
   .plugwin { position:fixed; z-index:300; min-width:268px; max-width:360px;
     background:#160e1e; border:1px solid rgba(233,30,140,.4); border-radius:13px; box-shadow:0 18px 64px rgba(0,0,0,.7); overflow:hidden; }
@@ -221,6 +232,7 @@
   <div class="right">
     <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
     <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
+    <button class="tbtn" id="addAuxBtn" title="Add an FX bus — an aux track you stack plugins on and send stems to">+ FX Bus</button>
     <button class="tbtn" id="saveBtn" title="Save this mix (survives a refresh)">💾 Save</button>
     <button class="tbtn" id="loadBtn" title="Load a saved mix">📂 Load</button>
     <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
@@ -1513,11 +1525,13 @@ function laneUi(t) {
     <div class="ins-rack" id="rack-${t.id}">
       <div class="ins-bar"><span class="ins-title">Inserts</span><select class="ins-add"><option value="">+ add effect…</option></select></div>
       <div class="ins-list" id="inslist-${t.id}"></div>
-    </div>`;
+    </div>
+    <div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
   $("tracks").appendChild(d);
   drawWave(d.querySelector(".wave"), t.buffer, t.color);
   fillAddSelect(t);
   renderInserts(t, d);
+  renderSends(t);
   d.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value = ""; };
 
   d.querySelector(".chip.ai").onclick = (e) => { runAutoMix(t, e.currentTarget); };
@@ -1627,6 +1641,62 @@ function openPluginWindow(t, i){
   document.body.appendChild(w);
   makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
 }
+// ── AUX / FX BUSES + SENDS — stack plugins on a bus, send stems to it (Pro Tools style) ──
+function addAux(){
+  const t = { id: Math.random().toString(36).slice(2), name: "FX Bus " + (tracks.filter(x=>x.type==='aux').length+1), type:'aux',
+    gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: nextStemColor() };
+  tracks.push(t); auxLaneUi(t); refreshSendMenus();
+  if (playing) restartPlayback();
+  flash("FX bus added — drop a plugin on it, then add a Send to it from a stem");
+}
+function auxLaneUi(t){
+  if (!t.color) t.color = nextStemColor();
+  const d = document.createElement("div"); d.className = "lane aux"; d.id = "lane-" + t.id;
+  d.innerHTML = `
+    <div class="lhead">
+      <span class="cdot" style="background:${t.color}"></span>
+      <span class="auxbadge">FX BUS</span><span class="name">${t.name}</span>
+      <button class="chip m">M</button><button class="chip s">S</button>
+      <button class="chip x">✕</button>
+    </div>
+    <div class="strip">
+      <div class="knob pink"><label>VOL</label><input type="range" data-k="gain" min="0" max="1.4" step="0.01" value="${t.gain}" /></div>
+      <div class="knob"><label>PAN</label><input type="range" data-k="pan" min="-1" max="1" step="0.01" value="0" /></div>
+    </div>
+    <div class="ins-rack" id="rack-${t.id}">
+      <div class="ins-bar"><span class="ins-title">Inserts · stack your plugins here</span><select class="ins-add"><option value="">+ add effect…</option></select></div>
+      <div class="ins-list" id="inslist-${t.id}"></div>
+    </div>`;
+  $("tracks").appendChild(d);
+  fillAddSelect(t); renderInserts(t, d);
+  d.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value = ""; };
+  d.querySelector(".chip.m").onclick = (e) => { t.muted = !t.muted; e.target.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
+  d.querySelector(".chip.s").onclick = (e) => { t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
+  d.querySelector(".chip.x").onclick = () => { stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove(); refreshSendMenus(); };
+  d.querySelectorAll(".strip input[type=range]").forEach(inp => { inp.oninput = () => { const k=inp.dataset.k, v=parseFloat(inp.value); if(k==="gain")t.gain=v; if(k==="pan")t.pan=v; applyTrack(t); }; });
+}
+function renderSends(t){
+  const host = document.getElementById("sends-"+t.id); if(!host) return;
+  const auxes = tracks.filter(x => x.type === 'aux');
+  t.sends = (t.sends || []).filter(s => auxes.some(a => a.id === s.toAux));   // drop sends whose bus was removed
+  let html = `<div class="ins-bar"><span class="ins-title">Sends → FX bus</span>`;
+  const avail = auxes.filter(a => !t.sends.some(s => s.toAux === a.id));
+  if (auxes.length) html += `<select class="send-add"><option value="">+ send to…</option>${avail.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select>`;
+  else html += `<span style="margin-left:auto;font:400 9px 'Space Mono';color:var(--dim)">make an FX bus first (+ FX Bus, top-right)</span>`;
+  html += `</div><div class="send-list">`;
+  t.sends.forEach((s,i)=>{ const aux=auxes.find(a=>a.id===s.toAux);
+    html += `<div class="send-row" data-i="${i}"><span class="cdot" style="background:${aux.color}"></span><span class="send-name">${aux.name}</span><input type="range" class="send-lvl" min="0" max="1.2" step="0.01" value="${s.level}"><button class="ins-mini srm" title="remove send">✕</button></div>`; });
+  html += `</div>`;
+  host.innerHTML = html;
+  const sa = host.querySelector(".send-add");
+  if (sa) sa.onchange = (e) => { if(e.target.value){ t.sends.push({toAux:e.target.value, level:0.5}); renderSends(t); if(playing) restartPlayback(); } };
+  host.querySelectorAll(".send-row").forEach(row => { const i=+row.dataset.i;
+    row.querySelector(".send-lvl").oninput = (e) => { const v=parseFloat(e.target.value); t.sends[i].level=v; if(t.sends[i]._sg) t.sends[i]._sg.gain.value=v; };
+    row.querySelector(".srm").onclick = () => { t.sends.splice(i,1); renderSends(t); if(playing) restartPlayback(); };
+  });
+}
+function refreshSendMenus(){ tracks.filter(t => t.buffer).forEach(t => renderSends(t)); }
+$("addAuxBtn").onclick = addAux;
 /* =========================================================================
    TRUTHFUL AUTO-MIX LAYER  (vanilla JS, Web Audio)
    measure() -> detectType() -> autoMix(track) -> applyMoves(track)
@@ -2185,8 +2255,11 @@ function drawWave(cv, buf, color) {
 
 /* ── live graph per track ── */
 function buildTrackGraph(c, t, when, offset, isOffline) {
-  const src = c.createBufferSource(); src.buffer = t.buffer;
+  const isAux = t.type === 'aux';
+  let src = null;
   const inG = c.createGain();
+  if (isAux) { (t._in || (t._in = c.createGain())).connect(inG); }   // FX bus: input is the send-collecting gain
+  else { src = c.createBufferSource(); src.buffer = t.buffer; src.connect(inG); }
   const lo = c.createBiquadFilter(); lo.type = "lowshelf"; lo.frequency.value = 120;
   const mid = c.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.9;
   const hi = c.createBiquadFilter(); hi.type = "highshelf"; hi.frequency.value = 8000;
@@ -2195,7 +2268,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   const fader = c.createGain();
   const send = c.createGain();
 
-  src.connect(inG); inG.connect(lo); lo.connect(mid); mid.connect(hi);
+  inG.connect(lo); lo.connect(mid); mid.connect(hi);
   let tail = hi;
   const insertNodes = [];
   for (const ins of (t.inserts || [])) {
@@ -2213,24 +2286,27 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   const vdest = isOffline ? c._verbPre : verb.predelay;
   fader.connect(dest);
   fader.connect(send); send.connect(vdest);
-
-  const live = { src, inG, lo, mid, hi, comp, pan, fader, send, insertNodes };
+  // aux SENDS — post-fader taps from a stem into FX-bus (aux) inputs; level rides per send
+  const sendGains = [];
+  if (!isAux) for (const s of (t.sends || [])) {
+    const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux');
+    if (aux && aux._in) { const sg = c.createGain(); sg.gain.value = (s.level != null ? s.level : 0.5); fader.connect(sg); sg.connect(aux._in); sendGains.push(sg); s._sg = sg; }
+  }
+  const live = { src, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains };
   applyTrackTo(t, live);
   // `when` is the ctx time the transport position `offset` maps to.
   // `t.offset` (recorded takes) is where this clip SITS on the timeline; full
   // stems default to 0 = play from the top.
-  const clipPos = t.offset || 0;
-  const transportZeroCtx = when - offset;            // ctx time of transport pos 0
-  const clipStartCtx = transportZeroCtx + clipPos;   // ctx time this clip should sound
-  if (clipStartCtx >= when) {
-    // clip hasn't begun yet — start it in the future at sample 0
-    src.start(clipStartCtx, 0);
-  } else {
-    // transport is already past the clip start — start now, partway in
-    const into = (when - clipStartCtx);
-    if (into < t.buffer.duration - 0.01) {
-      src.start(when, Math.max(0, Math.min(into, t.buffer.duration - 0.01)));
-    } // else: clip already finished, don't start it
+  if (src) {
+    const clipPos = t.offset || 0;
+    const transportZeroCtx = when - offset;            // ctx time of transport pos 0
+    const clipStartCtx = transportZeroCtx + clipPos;   // ctx time this clip should sound
+    if (clipStartCtx >= when) {
+      src.start(clipStartCtx, 0);                       // clip hasn't begun yet — start in the future at sample 0
+    } else {
+      const into = (when - clipStartCtx);               // transport already past the clip start — start partway in
+      if (into < t.buffer.duration - 0.01) src.start(when, Math.max(0, Math.min(into, t.buffer.duration - 0.01)));
+    }
   }
   return live;
 }
@@ -2248,7 +2324,7 @@ function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
 function applyMix() { tracks.forEach(applyTrack); }
 
 /* ── transport ── */
-function maxDur() { return Math.max(0.01, ...tracks.map(t => (t.offset || 0) + t.buffer.duration)); }
+function maxDur() { return Math.max(0.01, ...tracks.filter(t => t.buffer).map(t => (t.offset || 0) + t.buffer.duration)); }
 function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
 let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet module);
                    // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
@@ -2264,11 +2340,12 @@ async function playAll() {
   // otherwise sources start beyond their audio and play silence
   if (startOffset >= maxDur() - 0.02) startOffset = 0;
   startCtxTime = c.currentTime + 0.05;
+  tracks.forEach(t => { if (t.type === 'aux') t._in = c.createGain(); });   // FX-bus inputs first, so stem sends can land on them
   tracks.forEach(t => { t.live = buildTrackGraph(c, t, startCtxTime, startOffset, false); });
   playing = true;
   $("play").textContent = "❚❚ Pause";
 }
-function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.src.stop(); } catch {} t.live = null; }); }
+function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.src?.stop(); } catch {} t.live = null; t._in = null; }); }
 function pauseAll() { playGen++; startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
 function stopAll() { playGen++; stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
 function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
@@ -2396,6 +2473,7 @@ $("exportBtn").onclick = async () => {
     oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
     const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
     oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterGain);
+    tracks.forEach(t => { if (t.type === 'aux') t._in = oc.createGain(); });
     tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
     const rendered = await oc.startRendering();
     const a = document.createElement("a");
@@ -2439,17 +2517,19 @@ let currentProjectId = null;   // set after first save / after a load → re-sav
 async function buildProjectPayload(title) {
   const trackData = [];
   for (const t of tracks) {
-    const wavUrl = await blobToDataUrl(bufferToWavBlob(t.buffer));
-    trackData.push({
+    const td = {
+      id: t.id, type: t.type || 'audio',
       name: t.name,
       gain: t.gain, pan: t.pan,
       eq: { lo: t.eq.lo, mid: t.eq.mid, hi: t.eq.hi },
       comp: t.comp, send: t.send,
-      inserts: (t.inserts || []).map(ins => ({ name: ins.name, params: { ...ins.params } })),
+      inserts: (t.inserts || []).map(ins => ({ name: ins.name, params: { ...ins.params }, bypassed: !!ins.bypassed })),
       muted: !!t.muted, solo: !!t.solo,
       offset: t.offset || 0,
-      wav: wavUrl,
-    });
+      sends: (t.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
+    };
+    if (t.buffer) td.wav = await blobToDataUrl(bufferToWavBlob(t.buffer));   // aux buses carry no audio
+    trackData.push(td);
   }
   return {
     id: currentProjectId,   // null on first save → backend mints one; reused after → updates the same project
@@ -2523,11 +2603,25 @@ async function loadProject(id) {
 
     // rebuild each saved track through the real track path
     for (const td of (proj.tracks || [])) {
+      if (td.type === 'aux') {                 // FX bus — no audio, just plugins
+        const t = { id: td.id || Math.random().toString(36).slice(2), name: td.name || "FX Bus", type:'aux',
+          gain: td.gain != null ? td.gain : 0.9, pan: td.pan != null ? td.pan : 0,
+          eq: { lo: td.eq?.lo||0, mid: td.eq?.mid||0, hi: td.eq?.hi||0 }, comp: td.comp || 0, send: td.send || 0,
+          inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params||{}) }, bypassed: !!ins.bypassed })),
+          muted: !!td.muted, solo: !!td.solo, src:null, live:null };
+        tracks.push(t); auxLaneUi(t);
+        const al = $("lane-"+t.id);
+        al.querySelectorAll(".strip input[type=range]").forEach(inp => { if(inp.dataset.k==="gain") inp.value=t.gain; if(inp.dataset.k==="pan") inp.value=t.pan; });
+        al.querySelector(".chip.m")?.classList.toggle("on", t.muted);
+        al.querySelector(".chip.s")?.classList.toggle("on", t.solo);
+        renderInserts(t, al);
+        continue;
+      }
       let buf;
       try { buf = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); }
       catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
       const t = {
-        id: Math.random().toString(36).slice(2),
+        id: td.id || Math.random().toString(36).slice(2),
         name: td.name || "track",
         buffer: buf,
         gain: td.gain != null ? td.gain : 0.9,
@@ -2535,9 +2629,10 @@ async function loadProject(id) {
         eq: { lo: td.eq?.lo || 0, mid: td.eq?.mid || 0, hi: td.eq?.hi || 0 },
         comp: td.comp != null ? td.comp : 0,
         send: td.send != null ? td.send : 0,
-        inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params || {}) } })),
+        inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params || {}) }, bypassed: !!ins.bypassed })),
         muted: !!td.muted, solo: !!td.solo,
         offset: td.offset || 0,
+        sends: (td.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
         src: null, live: null,
       };
       tracks.push(t);
@@ -2557,6 +2652,7 @@ async function loadProject(id) {
       renderInserts(t, lane);          // show the insert rack with its values
       applyTrack(t);
     }
+    refreshSendMenus();                 // now that all buses exist, render every stem's sends
     $("drop").style.display = tracks.length ? "none" : "block";
     studioStatus("Loaded “" + (proj.title || id) + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
@@ -2854,6 +2950,7 @@ function scheduleTransportAt(atCtxTime, offset) {
   stopSources();
   if (offset >= maxDur() - 0.02) offset = 0;
   startCtxTime = atCtxTime; startOffset = offset;
+  tracks.forEach(t => { if (t.type === 'aux') t._in = c.createGain(); });
   tracks.forEach(t => { t.live = buildTrackGraph(c, t, atCtxTime, offset, false); });
   playing = true; $("play").textContent = "❚❚ Pause";
 }
