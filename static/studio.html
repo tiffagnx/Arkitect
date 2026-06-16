@@ -73,10 +73,34 @@
   .drop { border:2px dashed rgba(62,156,184,.35); border-radius:18px; padding:38px 20px; text-align:center;
     color:var(--dim); font-size:13.5px; cursor:pointer; transition:all .15s; }
   .drop:hover, .drop.over { border-color:var(--pink); color:var(--text); background:rgba(62,156,184,.05); }
-  .lane { border:1px solid var(--hairline); border-radius:16px; background:var(--panel); backdrop-filter:blur(18px);
-    padding:10px 12px; animation:rise .25s ease-out; }
+  .lane { display:flex; align-items:stretch; border:1px solid var(--hairline); border-radius:12px; background:var(--panel);
+    backdrop-filter:blur(18px); overflow:hidden; margin-bottom:8px; animation:rise .25s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
   .lane.muted { opacity:.45; }
+  /* per-track control strip (Pro Tools edit-window: controls LEFT of the waveform, sized to the lane) */
+  .tstrip { width:212px; flex:none; border-right:1px solid var(--hairline); padding:8px 9px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }
+  .ts-top { display:flex; align-items:center; gap:7px; }
+  .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }
+  .ts-name { font:600 12px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
+  .ts-x { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E58A8E; width:20px; height:20px; border-radius:6px; cursor:pointer; font-size:11px; flex:none; }
+  .ts-row { display:flex; align-items:stretch; gap:5px; height:30px; }
+  .ts-btn { width:24px; flex:none; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; border-radius:6px; cursor:pointer; }
+  .ts-btn.m.on { background:rgba(229,86,91,.2); color:#E58A8E; border-color:rgba(229,86,91,.55); }
+  .ts-btn.s.on { background:rgba(217,164,65,.2); color:#E6B878; border-color:rgba(217,164,65,.55); }
+  .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:3px 7px; cursor:ns-resize; overflow:hidden; min-width:0; }
+  .ts-ctl.drag { border-color:rgba(62,156,184,.7); box-shadow:0 0 10px rgba(62,156,184,.25); }
+  .ts-k { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); display:block; position:relative; z-index:1; }
+  .ts-v { font:700 12px 'Space Mono'; color:var(--text); position:relative; z-index:1; }
+  .ts-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(62,156,184,.28), rgba(62,156,184,.10)); border-right:1px solid rgba(62,156,184,.55); z-index:0; }
+  .ts-slots { display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1; min-height:0; }
+  .ts-slot { font:600 9.5px 'Space Mono'; border-radius:5px; padding:3px 7px; display:flex; align-items:center; gap:6px; flex:none; }
+  .ts-slot.add { background:rgba(255,255,255,.03); border:1px dashed var(--hairline); color:var(--dim); cursor:pointer; outline:none; -webkit-appearance:none; appearance:none; }
+  .ts-slot.add:hover { border-color:rgba(62,156,184,.5); color:#9FCFDD; }
+  .ts-slot.filled { background:rgba(124,138,165,.14); border:1px solid rgba(124,138,165,.38); color:#C9D2E0; }
+  .ts-slot.filled.byp { opacity:.45; }
+  .ts-sn { flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ts-sn:hover { color:#9FCFDD; }
+  .ts-sx { color:#E58A8E; cursor:pointer; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
@@ -214,7 +238,7 @@
     color:var(--dim); border-radius:7px; font:700 9px 'Space Mono'; padding:2px 7px; cursor:pointer; }
   .ai-summary-x:hover { color:#9FCFDD; border-color:rgba(62,156,184,.5); }
   .ai-summary-body { font:400 11px Inter; line-height:1.55; color:var(--text); white-space:pre-wrap; }
-  .wave { width:100%; height:54px; border-radius:10px; background:rgba(0,0,0,.4); cursor:pointer; display:block; }
+  .wave { flex:1; min-width:0; height:auto; background:rgba(0,0,0,.4); cursor:crosshair; display:block; }
   .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
   .knob { display:flex; align-items:center; gap:6px; }
   .knob label { font:500 9.5px 'Space Mono'; color:var(--dim); width:34px; letter-spacing:.04em; }
@@ -514,7 +538,7 @@ async function renderBuf(buf, build, tailSec=0){
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
-let zoom=1, scrollT=0, laneH=54, snapOn=true;
+let zoom=1, scrollT=0, laneH=104, snapOn=true;
 function viewDur(){ return maxDur()/zoom; }
 function clampScroll(){ const room=Math.max(0, maxDur()-viewDur()); scrollT=Math.max(0, Math.min(scrollT, room)); }
 function snapTime(x){ x=Math.max(0,x); if(!snapOn) return x; const step=(60/curTempo())/4; return Math.round(x/step)*step; }  // snap to 1/16
@@ -1861,6 +1885,39 @@ async function addFiles(files) {
   if (playing) restartPlayback();
 }
 
+// per-track strip control (Pro Tools edit-window style): shows a number, press + drag to change
+function bindStripCtl(t, el, key, min, max, dflt, fmt, fill){
+  if(!el) return; const vEl=el.querySelector(".ts-v"), fEl=el.querySelector(".ts-fill"), range=(max-min)||1;
+  const getV=()=>key==='gain'?t.gain:(key==='pan'?t.pan:t[key]);
+  const setV=(v)=>{ if(key==='gain')t.gain=v; else if(key==='pan')t.pan=v; else t[key]=v; applyTrack(t); };
+  const draw=()=>{ const v=getV(); vEl.textContent=fmt(v); if(fill&&fEl) fEl.style.width=(((v-min)/range)*100).toFixed(1)+"%"; };
+  draw(); el._draw=draw;
+  el.onmousedown=(e)=>{ e.stopPropagation(); e.preventDefault(); el.classList.add("drag"); const sy=e.clientY, sv=getV();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/120*range; v=Math.max(min,Math.min(max,v)); setV(v); draw(); };
+    const up=()=>{ el.classList.remove("drag"); document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
+  el.ondblclick=(e)=>{ e.stopPropagation(); setV(dflt); draw(); };
+}
+// inline insert SLOTS A–E on the track strip
+function renderStripSlots(t, host){
+  if(!host) return; host.innerHTML=""; t.inserts=t.inserts||[];
+  const n=Math.min(5, t.inserts.length+1);
+  for(let i=0;i<n;i++){
+    const ins=t.inserts[i];
+    if(ins){ const s=document.createElement("div"); s.className="ts-slot filled"+(ins.bypassed?" byp":"");
+      s.innerHTML=`<span class="ts-sn" title="open ${ins.name}">${ins.name}</span><span class="ts-sx" title="remove">✕</span>`;
+      s.querySelector(".ts-sn").onclick=(e)=>{ e.stopPropagation(); openPluginWindow(t,i); };
+      s.querySelector(".ts-sx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(t); t.inserts.splice(i,1); renderStripSlots(t,host); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); };
+      host.appendChild(s);
+    } else {
+      const sel=document.createElement("select"); sel.className="ts-slot add"; sel.title="add a plugin to this slot";
+      sel.innerHTML=`<option value="">＋ insert</option>`+TIFF_PLUGINS.list.filter(p=>!p.master).map(p=>`<option>${p.name}</option>`).join("");
+      sel.onmousedown=(e)=>e.stopPropagation();
+      sel.onchange=(e)=>{ if(e.target.value){ t.inserts.push({name:e.target.value,params:{}}); renderStripSlots(t,host); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); } };
+      host.appendChild(sel);
+    }
+  }
+}
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
   clipsOf(t);                                            // make sure the clip model exists
@@ -1868,18 +1925,30 @@ function laneUi(t) {
   d.className = "lane"; d.id = "lane-" + t.id;
   if (t.muted) d.classList.add("muted");
   d.innerHTML = `
-    <div class="lhead">
-      <span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span>
-      <span style="font:600 9px 'Space Mono';color:var(--dim);margin-left:8px;letter-spacing:.04em">drag a clip · right-click: separate / fx</span>
-      <button class="chip x" title="remove this track" style="margin-left:auto">✕</button>
+    <div class="tstrip">
+      <div class="ts-top"><span class="cdot" style="background:${t.color}"></span><span class="ts-name" title="double-click to rename">${t.name}</span><button class="ts-x" title="remove track">✕</button></div>
+      <div class="ts-row">
+        <button class="ts-btn m" title="mute">M</button><button class="ts-btn s" title="solo">S</button>
+        <div class="ts-ctl vol" title="drag up / down — volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div>
+        <div class="ts-ctl pan" title="drag up / down — pan"><span class="ts-k">PAN</span><b class="ts-v"></b></div>
+      </div>
+      <div class="ts-slots"></div>
     </div>
     <canvas class="wave" width="1200" height="${laneH}" style="height:${laneH}px"></canvas>`;
   $("tracks").appendChild(d);
   drawLane(t); updateZoomUi();
-  d.onclick = (e) => { if (!e.target.closest(".chip,.wave")) selectTrack(t); };   // header click → mix this track
-  d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
+  d.onclick = (e) => { if (!e.target.closest(".ts-x,.ts-btn,.ts-ctl,.ts-slots,.ts-name,.wave")) selectTrack(t); };
+  const nm = d.querySelector(".ts-name"); nm.ondblclick = (e) => { e.stopPropagation(); renameTrack(t, nm); };
+  d.querySelector(".ts-x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
     $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "block"; };
+  const mb = d.querySelector(".ts-btn.m"), sb = d.querySelector(".ts-btn.s");
+  mb.classList.toggle("on", t.muted); sb.classList.toggle("on", t.solo);
+  mb.onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; mb.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
+  sb.onclick = (e) => { e.stopPropagation(); t.solo = !t.solo; sb.classList.toggle("on", t.solo); applyMix(); };
+  bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, v => v.toFixed(2), true);
+  bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
+  renderStripSlots(t, d.querySelector(".ts-slots"));
   const wv = d.querySelector(".wave");
   wv.onmousedown = (e) => {
     if (e.button !== 0) return;
@@ -2974,7 +3043,7 @@ $("vMix").onclick  = () => setView('mix');
 // zoom / lane-height / snap / horizontal scroll
 $("zoomIn").onclick  = () => setZoom(zoom*1.5);
 $("zoomOut").onclick = () => setZoom(zoom/1.5);
-const _LANE_H = [54,92,140]; let _lhi = 0;
+const _LANE_H = [104,160,230]; let _lhi = 0;
 $("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE_H[_lhi]); };
 $("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/16)" : "Snap: OFF"); };
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };

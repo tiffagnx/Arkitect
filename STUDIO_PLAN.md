@@ -52,8 +52,22 @@ high contrast text; structured, user-friendly, feels like pro gear, not makeup.
 **Phase A — DAW core.** ✅ DONE. Clip model, edit/mix windows, plugins+faceplates, FX
 buses + sends + output routing, AudioSuite, zoom/snap/resize, tap/auto-tempo, key detect.
 
-**Phase B — Pro re-skin.** 🔶 IN PROGRESS. Studio re-themed graphite+steel (done). NEXT:
-per-plugin faceplate colors; tighten spacing/typography to feel like real gear.
+**Phase B — Pro re-skin.** ✅ graphite+steel + per-plugin colors done.
+
+**Phase B2 — PRO TOOLS EDIT-WINDOW LAYOUT** ⬜ (B's locked spec, 2 PT screenshots). The
+controls go on the LEFT of each lane, inline — NOT a shared right panel (that was the
+mistake; right panel = Mix-window idea). Each track = a row:
+  - LEFT control strip, SAME HEIGHT as the lane (grows when you resize the lane taller):
+    track NAME (dblclick rename), M/S/R, a VOLUME widget (shows the number; press → fader
+    reveals, drag = live number), PAN (L/R). 
+  - INSERT SLOTS A–E stacked next to it: click empty → dropdown of plugins → loads there;
+    click filled → opens it; ✕ removes.
+  - Then the WAVEFORM, GRIDDED (snap select 1/16, 1/32, 1/64), with horizontal zoom +
+    AUDIO (vertical) zoom up top.
+  - SMART TOOL (selector + grabber combined).
+  - Left rail (Output etc.) → collapses to a top dropdown "Output".
+  - Kill the confusing right "Channel · output master" panel.
+  Bar: superior to Pro Tools but still that professional. B: "we're almost there."
 
 **Phase C — The Melodyne.** 🔶 IN PROGRESS.
   1. ✅ Mono pitch detection (YIN) + note segmentation (median-filter + consolidation).
@@ -105,6 +119,13 @@ classify the track, propose a full chain, show the reasoning, let her "think."
 ---
 
 ## 6. PROGRESS LOG (newest first)
+
+- **2026-06-16** — Started the PRO TOOLS EDIT-WINDOW rebuild (B's 2 screenshots): each lane
+  is now [control strip LEFT | waveform RIGHT]. Strip = name (dblclick rename), M/S, VOL +
+  PAN drag widgets, and inline INSERT SLOTS A-E (click empty=dropdown, filled=open, x=remove),
+  sized to the lane (grows w/ the ↕ height). Default lane height bumped to fit. Next: slim/kill
+  the redundant right Channel panel, waveform GRID + audio(vertical) zoom, smart tool, fancy
+  fader-reveal, master lane to match.
 
 - **2026-06-16** — MASTER reworked into a TRACK in the edit window (B + research: the
   master bus IS a track w/ its own inserts/fader). Removed from the left rail; a gold
