@@ -93,6 +93,19 @@
   .cknob:hover { border-color:rgba(233,30,140,.85); }
   .cknob-ind { position:absolute; left:50%; top:6px; width:2.5px; height:16px; margin-left:-1.25px; border-radius:2px;
     background:linear-gradient(#FFC6E6,var(--pink)); transform-origin:50% 18px; box-shadow:0 0 5px rgba(233,30,140,.85); }
+  /* channel-panel actions + per-clip FX */
+  .chan-actions { display:flex; flex-wrap:wrap; gap:7px; margin:2px 0 4px; }
+  .cbtn { padding:6px 11px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer; background:rgba(255,255,255,.04);
+    color:#E8D6E8; font:700 10px 'Space Mono'; letter-spacing:.03em; transition:all .1s; white-space:nowrap; }
+  .cbtn:hover { border-color:rgba(233,30,140,.7); color:#FFD6EA; background:rgba(233,30,140,.10); }
+  .cbtn.ai { color:#9BF0E8; border-color:rgba(0,209,196,.35); }
+  .cbtn.m.on { background:rgba(255,90,110,.20); color:#FF9DAB; border-color:rgba(255,90,110,.6); }
+  .cbtn.s.on { background:rgba(245,166,35,.20); color:#FFD79B; border-color:rgba(245,166,35,.6); }
+  .clip-fx { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .clip-fx .cbtn { width:100%; text-align:center; }
+  .clip-fx #cf-del { grid-column:1 / -1; color:#FF7A93; border-color:rgba(255,90,110,.35); }
+  .chan-hint { font:400 11px Inter; line-height:1.5; color:var(--dim); background:rgba(255,255,255,.025);
+    border:1px dashed var(--hairline); border-radius:10px; padding:10px 12px; }
   .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
   .lhead .cdot { width:11px; height:11px; border-radius:3px; flex:none; margin-right:8px; box-shadow:0 0 7px rgba(0,0,0,.4) inset; }
   .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -336,80 +349,130 @@ const STEM_COLORS = ["#E91E8C","#00D1C4","#8B5CF6","#F5A623","#34D399","#60A5FA"
 let colorN = 0;
 function nextStemColor(){ return STEM_COLORS[colorN++ % STEM_COLORS.length]; }
 function hexA(hex, a){ const m = (hex||"#E91E8C").replace("#",""); return `rgba(${parseInt(m.slice(0,2),16)},${parseInt(m.slice(2,4),16)},${parseInt(m.slice(4,6),16)},${a})`; }
-// ── clip editing: drag-select on a wave, then CUT a slice out / TRIM to it (per-stem undo) ──
-let SEL = null;            // {trackId, a, b} — selection as fractions [0,1] of the track's buffer
-const UNDO = [];           // [{trackId, buffer, offset}] snapshots for undo
+/* ═══════════════════════════════════════════════════════════════════════
+   CLIP MODEL — a track holds CLIPS on a shared timeline. Separate splits a
+   clip IN PLACE (nothing slides — the BPM/grid stays sacred). Drag a clip to
+   move it. Render an effect onto JUST ONE clip (chops / drops / reverse-verb /
+   BPM delay) — the whole point of mixing, not just playing.
+   clip = { id, buffer, start }   // start = seconds on the timeline
+   ═══════════════════════════════════════════════════════════════════════ */
+function rid(){ return Math.random().toString(36).slice(2); }
+let selClip = null;        // {trackId, clipId} — the clip currently under edit
+const UNDO = [];           // [{trackId, clips:[{id,buffer,start}]}] snapshots
 let _toastT;
 function flash(m){ let e=document.getElementById("toast"); if(!e){ e=document.createElement("div"); e.id="toast"; e.className="toast"; document.body.appendChild(e); } e.textContent=m; e.classList.add("on"); clearTimeout(_toastT); _toastT=setTimeout(()=>e.classList.remove("on"),1800); }
-function pushUndo(t){ UNDO.push({trackId:t.id, buffer:t.buffer, offset:t.offset||0}); if(UNDO.length>40) UNDO.shift(); }
-function bufSlice(buf, f1, f2, keepInside){
+function clipsOf(t){
+  if(t.type==='aux') return [];
+  if(!t.clips || !t.clips.length) t.clips = t.buffer ? [{ id:rid(), buffer:t.buffer, start:t.offset||0 }] : [];
+  return t.clips;
+}
+function syncPrimary(t){ if(t.clips && t.clips.length){ t.buffer = t.clips[0].buffer; t.offset = t.clips[0].start; } }
+function pushUndoClips(t){ UNDO.push({ trackId:t.id, clips: clipsOf(t).map(c=>({id:c.id,buffer:c.buffer,start:c.start})) }); if(UNDO.length>80) UNDO.shift(); }
+function undoLast(){
+  const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
+  const t = tracks.find(x=>x.id===u.trackId); if(!t){ flash("Nothing to undo"); return; }
+  t.clips = u.clips.map(c=>({id:c.id,buffer:c.buffer,start:c.start}));
+  syncPrimary(t); selClip=null; drawLane(t);
+  if(playing) restartPlayback(); flash("Undid the last edit");
+  if(selTrackId===t.id) renderChannel(t);
+}
+// keep [f1,f2] of a buffer (fractions). sample-accurate splice for Separate.
+function bufSlice(buf, f1, f2){
   const sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
-  const a=Math.max(0,Math.min(N,Math.floor(Math.min(f1,f2)*N))), b=Math.max(0,Math.min(N,Math.floor(Math.max(f1,f2)*N)));
-  const newLen=Math.max(1, keepInside ? (b-a) : (N-(b-a)));
-  const out=ctx.createBuffer(ch,newLen,sr);
-  for(let k=0;k<ch;k++){ const s=buf.getChannelData(k), d=out.getChannelData(k);
-    if(keepInside){ for(let i=0;i<newLen;i++) d[i]=s[a+i]; }
-    else { let j=0; for(let i=0;i<a;i++) d[j++]=s[i]; for(let i=b;i<N;i++) d[j++]=s[i]; } }
+  const a=Math.max(0,Math.min(N,Math.floor(f1*N))), b=Math.max(a+1,Math.min(N,Math.floor(f2*N)));
+  const out=ctx.createBuffer(ch,b-a,sr);
+  for(let k=0;k<ch;k++){ const s=buf.getChannelData(k), d=out.getChannelData(k); for(let i=0;i<b-a;i++) d[i]=s[a+i]; }
   return out;
 }
-function applyEdit(t, keepInside){
-  if(!SEL || SEL.trackId!==t.id || Math.abs(SEL.a-SEL.b)<0.002){ flash("Drag across the wave to pick a region first"); return; }
-  pushUndo(t);
-  t.buffer=bufSlice(t.buffer, SEL.a, SEL.b, keepInside);
-  SEL=null;
-  if(playing) restartPlayback();
-  flash(keepInside ? "Trimmed to selection" : "Cut the selection out");
+function reverseBuffer(buf){ const o=ctx.createBuffer(buf.numberOfChannels,buf.length,buf.sampleRate);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch), d=o.getChannelData(ch); for(let i=0,N=buf.length;i<N;i++) d[i]=s[N-1-i]; } return o; }
+function mixBuffers(a, b, ga, gb){ const sr=a.sampleRate, ch=Math.max(a.numberOfChannels,b.numberOfChannels), N=Math.max(a.length,b.length);
+  const o=ctx.createBuffer(ch,N,sr);
+  for(let k=0;k<ch;k++){ const da=a.getChannelData(Math.min(k,a.numberOfChannels-1)), db=b.getChannelData(Math.min(k,b.numberOfChannels-1)), d=o.getChannelData(k);
+    for(let i=0;i<N;i++) d[i]=(i<da.length?da[i]*ga:0)+(i<db.length?db[i]*gb:0); } return o; }
+async function renderBuf(buf, build, tailSec=0){
+  const sr=buf.sampleRate, len=buf.length+Math.ceil((tailSec||0)*sr);
+  const off=new OfflineAudioContext(buf.numberOfChannels, Math.max(1,len), sr);
+  const s=off.createBufferSource(); s.buffer=buf; build(off,s); s.start();
+  return await off.startRendering();
 }
-function undoTrack(t){
-  for(let i=UNDO.length-1;i>=0;i--){ if(UNDO[i].trackId===t.id){ const u=UNDO.splice(i,1)[0]; t.buffer=u.buffer; t.offset=u.offset; SEL=null;
-    if(u.removeTrackId){ const rt=tracks.find(x=>x.id===u.removeTrackId); if(rt){ tracks.splice(tracks.indexOf(rt),1); document.getElementById("lane-"+rt.id)?.remove(); } }
-    if(playing) restartPlayback(); flash("Undone"); return; } }
-  flash("Nothing to undo on this stem");
+function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
+
+// ── SEPARATE: split one clip at an absolute timeline second; both halves stay put ──
+function separateClip(t, cl, atTime){
+  const local = atTime - cl.start;
+  if(local<=0.01 || local>=cl.buffer.duration-0.01){ flash("Pick a spot inside the clip to separate"); return; }
+  pushUndoClips(t);
+  const f = local/cl.buffer.duration, i = t.clips.indexOf(cl);
+  const ca={id:rid(),buffer:bufSlice(cl.buffer,0,f),start:cl.start};
+  const cb={id:rid(),buffer:bufSlice(cl.buffer,f,1),start:cl.start+local};
+  t.clips.splice(i,1,ca,cb); syncPrimary(t); selClip={trackId:t.id,clipId:cb.id};
+  drawLane(t); if(playing) restartPlayback(); flash("Separated — drag either piece");
+  if(selTrackId===t.id) renderChannel(t);
 }
-// SEPARATE: split a stem at a point into two pieces that stay lined up on the timeline
-function splitTrack(t, frac){
-  frac = Math.max(0.001, Math.min(0.999, frac));
-  const origBuf = t.buffer, origOff = t.offset||0, splitTime = frac * t.buffer.duration;
-  const before = bufSlice(t.buffer, 0, frac, true);   // keep [0, frac]
-  const after  = bufSlice(t.buffer, frac, 1, true);   // keep [frac, 1]
-  const nt = { id:Math.random().toString(36).slice(2), name:t.name+" ·b", buffer:after,
-    gain:t.gain, pan:t.pan, eq:{lo:t.eq.lo,mid:t.eq.mid,hi:t.eq.hi}, comp:t.comp, send:t.send,
-    inserts:JSON.parse(JSON.stringify(t.inserts||[])), muted:false, solo:false, src:null, live:null,
-    color:t.color, offset:origOff+splitTime };
-  t.buffer = before;
-  UNDO.push({ trackId:t.id, buffer:origBuf, offset:origOff, removeTrackId:nt.id });
-  const idx = tracks.indexOf(t); tracks.splice(idx+1, 0, nt);
-  laneUi(nt);
-  const tl = document.getElementById("lane-"+t.id), nl = document.getElementById("lane-"+nt.id);
-  if(tl && nl) tl.parentNode.insertBefore(nl, tl.nextSibling);   // sit the 2nd piece right under the 1st
-  SEL=null; if(playing) restartPlayback(); flash("Separated into two");
-}
-// SILENCE: zero the selected region in place (keeps the stem's length)
-function silenceSel(t){
-  if(!SEL||SEL.trackId!==t.id||Math.abs(SEL.a-SEL.b)<0.002){ flash("Drag a region first"); return; }
-  pushUndo(t);
-  const buf=t.buffer, N=buf.length, a=Math.floor(Math.min(SEL.a,SEL.b)*N), b=Math.floor(Math.max(SEL.a,SEL.b)*N);
-  const out=ctx.createBuffer(buf.numberOfChannels,N,buf.sampleRate);
-  for(let k=0;k<buf.numberOfChannels;k++){ const s=buf.getChannelData(k), d=out.getChannelData(k); d.set(s); for(let i=a;i<b;i++) d[i]=0; }
-  t.buffer=out; if(playing) restartPlayback(); flash("Silenced selection");
-}
+function deleteClip(t, cl){ pushUndoClips(t); const i=t.clips.indexOf(cl); if(i>=0) t.clips.splice(i,1);
+  if(selClip&&selClip.clipId===cl.id) selClip=null; syncPrimary(t); drawLane(t); if(playing) restartPlayback(); flash("Clip deleted");
+  if(selTrackId===t.id) renderChannel(t); }
+function afterClipFx(t, cl, label){ syncPrimary(t); drawLane(t); if(playing) restartPlayback(); flash(label); if(selTrackId===t.id) renderChannel(t); }
+
+// ── CLIP RENDER FX — print an effect onto JUST this clip (AudioSuite style) ──
+function clipFx_reverse(t, cl){ pushUndoClips(t); cl.buffer=reverseBuffer(cl.buffer); afterClipFx(t,cl,"Reversed"); }
+function clipFx_fade(t, cl, dir){ pushUndoClips(t); const buf=cl.buffer,N=buf.length,out=ctx.createBuffer(buf.numberOfChannels,N,buf.sampleRate);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch),d=out.getChannelData(ch);
+    for(let i=0;i<N;i++){ const f=dir==='in'?i/N:1-i/N; d[i]=s[i]*f*f; } }   // f² = smoother taper
+  cl.buffer=out; afterClipFx(t,cl,dir==='in'?"Faded in":"Faded out"); }
+function clipFx_chop(t, cl){ pushUndoClips(t); const buf=cl.buffer,sr=buf.sampleRate,N=buf.length,out=ctx.createBuffer(buf.numberOfChannels,N,sr);
+  const div=(60/curTempo())/4, slot=Math.max(1,Math.floor(div*sr)), on=Math.floor(slot*0.55), edge=Math.min(Math.floor(sr*0.003), Math.floor(on/2));
+  for(let ch=0;ch<buf.numberOfChannels;ch++){ const s=buf.getChannelData(ch),d=out.getChannelData(ch);
+    for(let i=0;i<N;i++){ const ph=i%slot; let g=ph<on?1:0; if(g){ if(ph<edge) g=ph/edge; else if(ph>on-edge) g=(on-ph)/edge; } d[i]=s[i]*g; } }
+  cl.buffer=out; afterClipFx(t,cl,"Chopped to 1/16"); }
+async function clipFx_verb(t, cl){
+  const ir=makeIR(ctx, parseFloat($("vSize").value)||2.2, parseFloat($("vTone").value)||6000);
+  const ret=parseFloat($("vRet").value)||0.8;
+  const out=await renderBuf(cl.buffer,(off,s)=>{ const dry=off.createGain(); dry.gain.value=1; s.connect(dry); dry.connect(off.destination);
+    const cv=off.createConvolver(); cv.buffer=ir; const wet=off.createGain(); wet.gain.value=ret; s.connect(cv); cv.connect(wet); wet.connect(off.destination); }, ir.duration);
+  pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,"TIFF VERB printed onto clip"); }
+async function clipFx_revReverb(t, cl){
+  const ir=makeIR(ctx, parseFloat($("vSize").value)||2.5, parseFloat($("vTone").value)||6000);
+  const rev=reverseBuffer(cl.buffer);
+  const wet=await renderBuf(rev,(off,s)=>{ const cv=off.createConvolver(); cv.buffer=ir; const w=off.createGain(); w.gain.value=1; s.connect(cv); cv.connect(w); w.connect(off.destination); }, ir.duration);
+  const swell=reverseBuffer(wet);                 // reverse the wet → reverb SWELLS into the hit
+  pushUndoClips(t); cl.buffer=mixBuffers(cl.buffer, swell, 1.0, 0.85); afterClipFx(t,cl,"Reverse reverb printed"); }
+async function clipFx_bpmDelay(t, cl){
+  const beat=60/curTempo(), dt=beat*0.75;          // dotted-eighth, the classic
+  const out=await renderBuf(cl.buffer,(off,s)=>{ const dry=off.createGain(); dry.gain.value=1; s.connect(dry); dry.connect(off.destination);
+    const dl=off.createDelay(2.0); dl.delayTime.value=dt; const fb=off.createGain(); fb.gain.value=0.42; const w=off.createGain(); w.gain.value=0.5;
+    s.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(w); w.connect(off.destination); }, 2.4);
+  pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,`BPM delay @ ${curTempo()}`); }
+
 // right-click context menu on a waveform — Pro Tools style
 function ctxMenuEl(){ let m=document.getElementById("ctxmenu"); if(!m){ m=document.createElement("div"); m.id="ctxmenu"; m.className="ctxmenu"; document.body.appendChild(m); } return m; }
 function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classList.remove("on"); }
+function clipAt(t, atTime){ return clipsOf(t).find(c => atTime>=c.start && atTime<=c.start+c.buffer.duration) || null; }
 function showWaveMenu(t, wv, e){
   e.preventDefault();
-  const frac = Math.max(0, Math.min(1, e.offsetX / wv.clientWidth));
-  const hasSel = SEL && SEL.trackId===t.id && Math.abs(SEL.a-SEL.b)>0.002;
-  const m = ctxMenuEl(); m.innerHTML="";
-  const add = (label, fn, enabled=true) => { const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
-  const sep = () => { const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
-  add("Cut selection", ()=>applyEdit(t,false), hasSel);
-  add("Trim to selection", ()=>applyEdit(t,true), hasSel);
-  add("Silence selection", ()=>silenceSel(t), hasSel);
+  const dur=maxDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=frac*dur;
+  const cl=clipAt(t, atTime);
+  selectTrack(t); selClip = cl ? {trackId:t.id, clipId:cl.id} : null; drawLane(t);
+  const m=ctxMenuEl(); m.innerHTML="";
+  const add=(label,fn,enabled=true)=>{ const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
+  const sep=()=>{ const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
+  if(cl){
+    add("✂  Separate here", ()=>separateClip(t,cl,atTime));
+    add("🗑  Delete this clip", ()=>deleteClip(t,cl));
+    sep();
+    add("◁  Reverse", ()=>clipFx_reverse(t,cl));
+    add("🌀  Reverse reverb", ()=>clipFx_revReverb(t,cl));
+    add("🌀  Print TIFF VERB", ()=>clipFx_verb(t,cl));
+    add("⟿  BPM delay", ()=>clipFx_bpmDelay(t,cl));
+    add("⋮⋮  Chop (1/16)", ()=>clipFx_chop(t,cl));
+    add("◢  Fade in", ()=>clipFx_fade(t,cl,'in'));
+    add("◣  Fade out", ()=>clipFx_fade(t,cl,'out'));
+  } else add("click on a clip first", ()=>{}, false);
   sep();
-  add("↶  Undo", ()=>undoTrack(t));
-  m.style.left = Math.min(e.clientX, window.innerWidth-210)+"px";
-  m.style.top  = Math.min(e.clientY, window.innerHeight-250)+"px";
+  add("↶  Undo", undoLast);
+  m.style.left = Math.min(e.clientX, window.innerWidth-220)+"px";
+  m.style.top  = Math.min(e.clientY, window.innerHeight-320)+"px";
   m.classList.add("on");
 }
 document.addEventListener("click", hideMenu);
@@ -930,6 +993,30 @@ $("plugfile").onchange = async (e) => {
    diffuse tail + HF damping, independent per channel = real space, true
    stereo. Signature preserved (c, seconds, tone) so call sites don't change.
    Pre-delay stays on the existing predelay DelayNode — NOT baked here. ── */
+/* ── TIFF VERB — B's reverb, now a first-class INSERT so it lives in the same
+   plugin list as everything else (no more orphan on the left). Convolution
+   reverb with a baked impulse; Size/Tone rebake (debounced), Mix blends. ── */
+TIFF_PLUGINS.register({
+  name: "TIFF VERB",
+  params: [
+    { id:"size", label:"Size s",  min:0.2, max:6,     value:2.2 },
+    { id:"tone", label:"Tone Hz", min:1000, max:12000, value:6000 },
+    { id:"mix",  label:"Mix",     min:0,   max:1,     value:0.35 },
+  ],
+  create(c) {
+    const i=c.createGain(), o=c.createGain(), dry=c.createGain(), wet=c.createGain(), cv=c.createConvolver();
+    let size=2.2, tone=6000, bt=null;
+    const bake=()=>{ try { cv.buffer = makeIR(c, size, tone); } catch {} };
+    bake(); dry.gain.value=0.65; wet.gain.value=0.35;
+    i.connect(dry); dry.connect(o);
+    i.connect(cv); cv.connect(wet); wet.connect(o);
+    return { input:i, output:o, set(id,v){
+      if(id==='mix'){ wet.gain.value=v; dry.gain.value=1-v*0.6; }
+      else if(id==='size'){ size=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+      else if(id==='tone'){ tone=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+    } };
+  }
+});
 function makeIR(c, seconds, tone) {
   const rate = c.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
   const ir = c.createBuffer(2, len, rate);
@@ -1519,42 +1606,44 @@ async function addFiles(files) {
 
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
+  clipsOf(t);                                            // make sure the clip model exists
   const d = document.createElement("div");
   d.className = "lane"; d.id = "lane-" + t.id;
+  if (t.muted) d.classList.add("muted");
   d.innerHTML = `
     <div class="lhead">
       <span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span>
-      <button class="chip ai" title="Auto-mix: analyze this track and propose bounded EQ/comp/de-ess moves">✨ Auto</button>
-      <button class="chip cut" title="Drag across the wave to select, then Cut the selected region out">✂ Cut</button>
-      <button class="chip trim" title="Trim — keep ONLY the selected region">Trim</button>
-      <button class="chip undo" title="Undo the last edit on this stem">↶</button>
-      <button class="chip m">M</button><button class="chip s">S</button>
-      <button class="chip x">✕</button>
+      <span style="font:600 9px 'Space Mono';color:var(--dim);margin-left:8px;letter-spacing:.04em">drag a clip · right-click: separate / fx</span>
+      <button class="chip x" title="remove this track" style="margin-left:auto">✕</button>
     </div>
     <canvas class="wave" width="1200" height="54"></canvas>`;
   $("tracks").appendChild(d);
-  drawWave(d.querySelector(".wave"), t.buffer, t.color);
-  d.onclick = (e) => { if (!e.target.closest(".chip")) selectTrack(t); };   // click the lane → its mix shows in the panel
-  d.querySelector(".chip.ai").onclick = (e) => { e.stopPropagation(); runAutoMix(t, e.currentTarget); };
-  d.querySelector(".chip.m").onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; e.target.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
-  d.querySelector(".chip.s").onclick = (e) => { e.stopPropagation(); t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
+  drawLane(t);
+  d.onclick = (e) => { if (!e.target.closest(".chip,.wave")) selectTrack(t); };   // header click → mix this track
   d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
     $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "block"; };
-  d.querySelector(".chip.cut").onclick = (e) => { e.stopPropagation(); applyEdit(t, false); };
-  d.querySelector(".chip.trim").onclick = (e) => { e.stopPropagation(); applyEdit(t, true); };
-  d.querySelector(".chip.undo").onclick = (e) => { e.stopPropagation(); undoTrack(t); };
   const wv = d.querySelector(".wave");
   wv.onmousedown = (e) => {
+    if (e.button !== 0) return;
     selectTrack(t);
-    const f0 = Math.max(0, Math.min(1, e.offsetX / wv.clientWidth));
-    SEL = { trackId: t.id, a: f0, b: f0 }; let moved = false;
-    const mv = (ev) => { const r = wv.getBoundingClientRect(); SEL.b = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); if (Math.abs(SEL.b - f0) > 0.004) moved = true; };
-    const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (!moved) { SEL = null; seek(f0 * maxDur()); } };
+    const dur = maxDur(), r = wv.getBoundingClientRect();
+    const atTime = (e.clientX - r.left) / r.width * dur;
+    const cl = clipAt(t, atTime);
+    if (!cl) { selClip = null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty space → just move playhead
+    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);           // grabbed a clip
+    const startStart = cl.start, sx = e.clientX; let moved = false;
+    const mv = (ev) => {
+      if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }    // snapshot once, on the first real drag
+      if (moved) { const dx = (ev.clientX - sx) / r.width * dur; cl.start = Math.max(0, startStart + dx); drawLane(t); }
+    };
+    const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
+      if (!moved) seek(atTime);                                                            // tap (no drag) = move playhead here
+      else { syncPrimary(t); if (playing) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
-  selectTrack(t);   // newly added → show its controls in the panel
+  selectTrack(t);
 }
 /* ── INSERT RACK — a track holds a CHAIN of effects (t.inserts), each an
    {name, params} pair. The UI builds itself from each plugin's params[]:
@@ -1646,17 +1735,16 @@ function addAux(){
 function auxLaneUi(t){
   if (!t.color) t.color = nextStemColor();
   const d = document.createElement("div"); d.className = "lane aux"; d.id = "lane-" + t.id;
+  if (t.muted) d.classList.add("muted");
   d.innerHTML = `
     <div class="lhead">
       <span class="cdot" style="background:${t.color}"></span>
       <span class="auxbadge">FX BUS</span><span class="name">${t.name}</span>
-      <button class="chip m">M</button><button class="chip s">S</button>
-      <button class="chip x">✕</button>
+      <span style="font:600 9px 'Space Mono';color:var(--dim);margin-left:8px">plugins + level on the right →</span>
+      <button class="chip x" title="remove bus" style="margin-left:auto">✕</button>
     </div>`;
   $("tracks").appendChild(d);
   d.onclick = (e) => { if (!e.target.closest(".chip")) selectTrack(t); };
-  d.querySelector(".chip.m").onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; e.target.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
-  d.querySelector(".chip.s").onclick = (e) => { e.stopPropagation(); t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
   d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
     refreshSendMenus(); };
@@ -1717,12 +1805,30 @@ function selectTrack(t){
 function renderChannel(t){
   const panel = $("chan"); const isAux = t.type==='aux';
   const params = isAux ? [['gain','VOL'],['pan','PAN']] : [['gain','VOL'],['pan','PAN'],['lo','LOW'],['mid','MID'],['hi','HIGH'],['comp','COMP'],['send','VERB']];
+  const cl = (!isAux && selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
   let html = `<div class="chan-head"><span class="cdot" style="background:${t.color}"></span>`;
   if(isAux) html += `<span class="auxbadge">FX BUS</span>`;
   html += `<span class="name">${t.name}</span></div>`;
+  // actions — auto-mix / mute / solo (moved off the lanes, onto the channel)
+  html += `<div class="chan-actions">`;
+  if(!isAux) html += `<button class="cbtn ai" id="ca-ai" title="Analyze this stem & propose bounded EQ/comp moves — real FFT, never guessed">✨ Auto-mix</button>`;
+  html += `<button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
   html += `<div class="chan-section" style="border-top:none;padding-top:2px">Channel · double-click a knob to reset</div><div class="chan-knobs">`;
   params.forEach(([k,lbl]) => html += `<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
   html += `</div>`;
+  // CLIP — print an effect onto JUST the selected clip
+  if(!isAux){
+    html += `<div class="chan-section">Clip${cl?' · selected':''}</div>`;
+    if(cl){
+      html += `<div class="clip-fx">` + [
+        ['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],
+        ['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],
+        ['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']
+      ].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("") + `</div>`;
+    } else {
+      html += `<div class="chan-hint">Right-click a clip (or click it) to grab one piece. Separate it, then print Reverse / Reverse-reverb / VERB / BPM-delay onto just that slice.</div>`;
+    }
+  }
   html += `<div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">${isAux?'stack plugins here':'plugin chain'}</span><select class="ins-add"><option value="">+ add effect…</option></select></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
   if(!isAux) html += `<div class="chan-section">Sends → FX bus</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
   panel.innerHTML = html;
@@ -1730,17 +1836,28 @@ function renderChannel(t){
   fillAddSelect(t); renderInserts(t);
   panel.querySelector(".ins-add").onchange = (e) => { addInsert(t, e.target.value); e.target.value=""; };
   if(!isAux) renderSends(t);
+  // wire actions
+  const ai=document.getElementById("ca-ai"); if(ai) ai.onclick=(e)=>runAutoMix(t,e.currentTarget);
+  const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
+  const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
+  // wire clip fx (re-resolve the clip on click in case the array changed)
+  if(cl){
+    const live=(fn)=>()=>{ const c2=clipsOf(t).find(c=>c.id===(selClip&&selClip.clipId))||cl; fn(t,c2); };
+    document.getElementById("cf-rev").onclick=live(clipFx_reverse);
+    document.getElementById("cf-rr").onclick=live(clipFx_revReverb);
+    document.getElementById("cf-verb").onclick=live(clipFx_verb);
+    document.getElementById("cf-dly").onclick=live(clipFx_bpmDelay);
+    document.getElementById("cf-chop").onclick=live(clipFx_chop);
+    document.getElementById("cf-fi").onclick=()=>clipFx_fade(t,cl,'in');
+    document.getElementById("cf-fo").onclick=()=>clipFx_fade(t,cl,'out');
+    document.getElementById("cf-del").onclick=()=>deleteClip(t,cl);
+  }
 }
-// Ctrl+Z — global undo of the last clip edit (cut / trim / silence)
+// Ctrl+Z — global undo of the last clip edit (separate / move / reverse / verb / etc.)
 document.addEventListener("keydown", (e) => {
   if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && !e.shiftKey){
     if(/^(input|textarea|select)$/i.test(e.target.tagName)) return;
-    e.preventDefault();
-    const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
-    const t = tracks.find(x=>x.id===u.trackId);
-    if(t){ t.buffer=u.buffer; t.offset=u.offset; SEL=null;
-      if(u.removeTrackId){ const rt=tracks.find(x=>x.id===u.removeTrackId); if(rt){ tracks.splice(tracks.indexOf(rt),1); document.getElementById("lane-"+rt.id)?.remove(); } }
-      if(playing) restartPlayback(); flash("Undid the last edit"); }
+    e.preventDefault(); undoLast();
   }
 });
 /* =========================================================================
@@ -2274,38 +2391,59 @@ function showAiSummary(lane, t, text) {
   panel.querySelector(".ai-summary-x").onclick = () => panel.remove();
 }
 
-function drawWave(cv, buf, color) {
-  color = color || "#E91E8C";
-  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
-  g.clearRect(0, 0, W, H);
-  const drawCh = (data, top, h, alpha) => {
-    const step = Math.ceil(data.length / W), mid = top + h / 2;
-    g.strokeStyle = hexA(color, alpha); g.lineWidth = 1; g.beginPath();
-    for (let x = 0; x < W; x++) {
-      let mn = 1, mx = -1;
-      for (let j = 0; j < step; j++) { const v = data[x * step + j] || 0; if (v < mn) mn = v; if (v > mx) mx = v; }
-      g.moveTo(x, mid - (mx * h) / 2); g.lineTo(x, mid - (mn * h) / 2);
-    }
-    g.stroke();
-  };
-  if (buf.numberOfChannels >= 2) {
-    // stereo = ONE stem color: L top (brighter), R bottom (a touch dimmer so L/R still read), faint divider
-    drawCh(buf.getChannelData(0), 0, H / 2, 0.85);
-    drawCh(buf.getChannelData(1), H / 2, H / 2, 0.6);
-    g.strokeStyle = "rgba(255,255,255,0.07)"; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
-  } else {
-    drawCh(buf.getChannelData(0), 0, H, 0.8);  // mono = single trace, same stem color
+// faint beat grid across the lane — so clip moves read against the tempo
+function drawGrid(g, W, H, dur){
+  const beat = 60/curTempo(); if(beat<=0 || dur/beat>400) return;
+  g.lineWidth = 1;
+  for(let i=0, tsec=0; tsec<dur; i++, tsec+=beat){
+    g.strokeStyle = (i%4===0) ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.045)";
+    const x=(tsec/dur)*W; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
+  }
+}
+// one clip's waveform drawn inside its box [x0, x0+w]
+function drawClipWave(g, buf, x0, w, H, color){
+  const data=buf.getChannelData(0), N=data.length, mid=H/2;
+  g.strokeStyle=hexA(color,0.9); g.lineWidth=1; g.beginPath();
+  for(let px=0; px<w; px++){
+    const i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); let mn=1,mx=-1;
+    for(let j=i0;j<i1;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
+    if(mx<mn){ mn=0; mx=0; }
+    g.moveTo(x0+px, mid-mx*H*0.46); g.lineTo(x0+px, mid-mn*H*0.46);
+  }
+  g.stroke();
+}
+// draw a whole lane: every clip as a box on the shared [0,maxDur] timeline
+function drawLane(t){
+  const cv=document.querySelector(`#lane-${t.id} .wave`); if(!cv) return;
+  const g=cv.getContext("2d"), W=cv.width, H=cv.height, dur=maxDur();
+  g.clearRect(0,0,W,H);
+  drawGrid(g,W,H,dur);
+  for(const cl of clipsOf(t)){
+    const x=(cl.start/dur)*W, w=Math.max(2,(cl.buffer.duration/dur)*W);
+    const seld = selClip && selClip.trackId===t.id && selClip.clipId===cl.id;
+    g.fillStyle=hexA(t.color, seld?0.22:0.11); g.fillRect(x,0,w,H);          // clip body tint
+    drawClipWave(g, cl.buffer, x, w, H, t.color);
+    g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
+    g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border
   }
 }
 
 /* ── live graph per track ── */
 function buildTrackGraph(c, t, when, offset, isOffline) {
   const isAux = t.type === 'aux';
-  let src = null;
+  const srcs = [];
   const inG = c.createGain();
   if (isAux) { (t._in || (t._in = c.createGain())).connect(inG); }   // FX bus: input is the send-collecting gain
-  else { src = c.createBufferSource(); src.buffer = t.buffer; src.connect(inG); }
+  else {
+    const transportZeroCtx = when - offset;                          // ctx time of transport pos 0
+    for (const cl of clipsOf(t)) {                                   // one source PER clip, each at its own start
+      const src = c.createBufferSource(); src.buffer = cl.buffer; src.connect(inG);
+      const clipStartCtx = transportZeroCtx + cl.start;
+      if (clipStartCtx >= when) src.start(clipStartCtx, 0);          // clip starts in the future → from its head
+      else { const into = when - clipStartCtx; if (into < cl.buffer.duration - 0.01) src.start(when, Math.max(0, Math.min(into, cl.buffer.duration - 0.01))); }  // transport already inside → start partway in
+      srcs.push(src);
+    }
+  }
   const lo = c.createBiquadFilter(); lo.type = "lowshelf"; lo.frequency.value = 120;
   const mid = c.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.9;
   const hi = c.createBiquadFilter(); hi.type = "highshelf"; hi.frequency.value = 8000;
@@ -2338,22 +2476,8 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux');
     if (aux && aux._in) { const sg = c.createGain(); sg.gain.value = (s.level != null ? s.level : 0.5); fader.connect(sg); sg.connect(aux._in); sendGains.push(sg); s._sg = sg; }
   }
-  const live = { src, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains };
+  const live = { srcs, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains };
   applyTrackTo(t, live);
-  // `when` is the ctx time the transport position `offset` maps to.
-  // `t.offset` (recorded takes) is where this clip SITS on the timeline; full
-  // stems default to 0 = play from the top.
-  if (src) {
-    const clipPos = t.offset || 0;
-    const transportZeroCtx = when - offset;            // ctx time of transport pos 0
-    const clipStartCtx = transportZeroCtx + clipPos;   // ctx time this clip should sound
-    if (clipStartCtx >= when) {
-      src.start(clipStartCtx, 0);                       // clip hasn't begun yet — start in the future at sample 0
-    } else {
-      const into = (when - clipStartCtx);               // transport already past the clip start — start partway in
-      if (into < t.buffer.duration - 0.01) src.start(when, Math.max(0, Math.min(into, t.buffer.duration - 0.01)));
-    }
-  }
   return live;
 }
 function applyTrackTo(t, n) {
@@ -2370,7 +2494,7 @@ function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
 function applyMix() { tracks.forEach(applyTrack); }
 
 /* ── transport ── */
-function maxDur() { return Math.max(0.01, ...tracks.filter(t => t.buffer).map(t => (t.offset || 0) + t.buffer.duration)); }
+function maxDur() { let m=0.01; for(const t of tracks){ for(const cl of clipsOf(t)) m=Math.max(m, cl.start+cl.buffer.duration); } return m; }
 function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
 let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet module);
                    // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
@@ -2391,7 +2515,7 @@ async function playAll() {
   playing = true;
   $("play").textContent = "❚❚ Pause";
 }
-function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.src?.stop(); } catch {} t.live = null; t._in = null; }); }
+function stopSources() { tracks.forEach(t => { try { t.live?.insertNodes?.forEach(n => n?.dispose?.()); } catch {} try { t.live?.srcs?.forEach(s => { try { s.stop(); } catch {} }); } catch {} t.live = null; t._in = null; }); }
 function pauseAll() { playGen++; startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
 function stopAll() { playGen++; stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
 function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
@@ -2410,18 +2534,10 @@ function tickUi() {
   // map the transport playhead into the clip's local time.
   tracks.forEach(t => {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
-    drawWave(cv, t.buffer, t.color);
+    drawLane(t);
     const g = cv.getContext("2d");
-    if (SEL && SEL.trackId === t.id) {                 // cut/trim selection overlay
-      const x1 = Math.min(SEL.a, SEL.b) * cv.width, x2 = Math.max(SEL.a, SEL.b) * cv.width;
-      g.fillStyle = "rgba(255,255,255,0.16)"; g.fillRect(x1, 0, x2 - x1, cv.height);
-      g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 1;
-      g.beginPath(); g.moveTo(x1, 0); g.lineTo(x1, cv.height); g.moveTo(x2, 0); g.lineTo(x2, cv.height); g.stroke();
-    }
-    const local = p - (t.offset || 0);                 // transport pos inside this clip
-    if (local < 0 || local > t.buffer.duration) return; // playhead not over this clip
-    const x = (local / t.buffer.duration) * cv.width;
-    g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;  // white playhead — shows over any stem color
+    const x = (p / dur) * cv.width;                     // white playhead on the shared timeline
+    g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
   // meters
@@ -2574,7 +2690,10 @@ async function buildProjectPayload(title) {
       offset: t.offset || 0,
       sends: (t.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
     };
-    if (t.buffer) td.wav = await blobToDataUrl(bufferToWavBlob(t.buffer));   // aux buses carry no audio
+    if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
+      td.clips = [];
+      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+    }
     trackData.push(td);
   }
   return {
@@ -2663,13 +2782,18 @@ async function loadProject(id) {
         renderInserts(t);
         continue;
       }
-      let buf;
-      try { buf = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); }
-      catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
+      let clips = [];
+      try {
+        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0 }); } }
+        else if (td.wav) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); clips.push({ id: rid(), buffer: b, start: td.offset || 0 }); }   // old single-buffer save
+      } catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
+      if (!clips.length) { studioStatus("Skipped an empty track", true); continue; }
+      const buf = clips[0].buffer;
       const t = {
         id: td.id || Math.random().toString(36).slice(2),
         name: td.name || "track",
         buffer: buf,
+        clips: clips,
         gain: td.gain != null ? td.gain : 0.9,
         pan: td.pan != null ? td.pan : 0,
         eq: { lo: td.eq?.lo || 0, mid: td.eq?.mid || 0, hi: td.eq?.hi || 0 },
