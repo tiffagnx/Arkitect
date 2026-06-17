@@ -69,12 +69,14 @@
     document.body.appendChild(wrap);
     // stand Tec ON the send button (paper-plane), and keep tracking it on resize
     const _send = document.querySelector("#send");
-    if (_send) {
+    const _row = document.querySelector("#inputrow");
+    if (_send && _row) {
       const placeTec = () => {
-        const r = _send.getBoundingClientRect();
-        wrap.style.left = (r.left + r.width / 2 - VIEW / 2) + "px";
+        const rs = _send.getBoundingClientRect();
+        const rr = _row.getBoundingClientRect();
+        wrap.style.left = (rs.left + rs.width / 2 - VIEW / 2) + "px";   // over the send button
         wrap.style.right = "auto";
-        wrap.style.bottom = (window.innerHeight - r.top + 2) + "px";
+        wrap.style.bottom = (window.innerHeight - rr.top + 1) + "px";   // feet ON the input-bubble's top line
       };
       placeTec();
       window.addEventListener("resize", placeTec);
