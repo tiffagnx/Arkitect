@@ -240,7 +240,7 @@
           <option value="medium">🧠 Balanced</option>
           <option value="high">🔥 Deep</option>
         </select>
-        <button class="mode" id="swarmToggle" title="Send research across your own free LLM keys (set them up in Swarm)" style="display:none">🛰 Swarm</button>
+        <select class="think" id="researchType" title="Web = quick search · Swarm = your own free LLM keys dig deeper, then she merges it" style="display:none"><option value="web">🌐 Web</option><option value="swarm">🛰 Swarm</option></select>
         <span class="hint" id="hint" style="display:none">enter to send · shift+enter = new line</span>
       </div>
       <div class="chips" id="chips"></div>
@@ -516,12 +516,12 @@ function setMode(m) {
   $("input").placeholder = m === "research" ? "What should she dig into?"
     : m === "write" ? "Drop your bars — she goes off what YOU wrote…"
     : "Talk to Tiff…";
-  const sw = $("swarmToggle"); if (sw) sw.style.display = m === "research" ? "" : "none";
+  const rt = $("researchType"); if (rt) rt.style.display = m === "research" ? "" : "none";
 }
 $("modeChat").onclick = () => setMode("chat");
 $("modeWrite").onclick = () => setMode("write");
 $("modeResearch").onclick = () => setMode("research");
-$("swarmToggle").onclick = () => { swarmOn = !swarmOn; $("swarmToggle").classList.toggle("on", swarmOn); $("hint").textContent = swarmOn ? "🛰 swarm on — your free LLMs dig, she merges" : "enter to send · shift+enter = new line"; };
+$("researchType").onchange = () => { swarmOn = $("researchType").value === "swarm"; };
 
 /* ── mic: tap to talk, PAUSE freely, tap again when done — YOU press send (never auto-sends) ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
