@@ -47,7 +47,8 @@
   .as-tag.web{background:rgba(62,156,184,.16);color:#9CD3E4;}
   .as-addbtn{width:100%;font:600 12.5px Inter;padding:10px;border-radius:11px;cursor:pointer;color:#0B1417;
     background:linear-gradient(120deg,#5FB4CE,#3E9CB8);border:none;box-shadow:0 4px 16px rgba(62,156,184,.3);}
-  .as-form{display:none;flex-direction:column;gap:11px;margin-top:13px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;}
+  .as-formhead{font:700 12px Oxanium,sans-serif;letter-spacing:.08em;color:#CFE6EE;margin:10px 0 2px;}
+  .as-form{display:flex;flex-direction:column;gap:11px;margin-top:4px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;}
   .as-form.open{display:flex;}
   .as-field{display:flex;flex-direction:column;gap:5px;}
   .as-field label{font:600 10px 'Space Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(198,201,208,.6);}
@@ -85,9 +86,9 @@
         <div class="as-sec">
           <h3>Research providers — your API keys</h3>
           <div class="as-sub">Research with <b>Swarm</b> uses outside LLMs through <b>your own free API keys</b> — they stay on this machine, nothing is shared.</div>
-          <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Hit <b>+ Add a provider / key</b> and pick one — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> next to the provider — it opens their site. Make a free account and copy the key they show you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. That's it — Swarm research now runs on your key.</li></ol></div>
+          <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Pick a provider in the <b>Provider</b> dropdown below — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> right under it — that opens their site. Make a free account and copy the key they give you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. Done — Swarm research now runs on your key.</li></ol></div>
           <div class="as-slots" id="asSlots"><div class="as-empty">loading…</div></div>
-          <button class="as-addbtn" id="asAdd">+ Add a provider / key</button>
+          <div class="as-formhead">＋ Add a provider</div>
           <div class="as-form" id="asForm">
             <div class="as-field"><label>Provider</label><select id="asPreset"></select><div class="h" id="asHint"></div></div>
             <div class="as-frow">
@@ -99,7 +100,7 @@
             <div class="as-btns">
               <button class="save" id="asSave">Save</button>
               <button id="asTest">Test</button>
-              <button class="ghost" id="asCancel">Cancel</button>
+              <button class="ghost" id="asCancel">Clear</button>
               <span class="as-status" id="asStatus"></span>
             </div>
           </div>
@@ -156,8 +157,7 @@
   }
   async function load() { loadPresets(); loadProviders(); }
 
-  $("asAdd").onclick = () => { $("asForm").classList.toggle("open"); setStatus(""); };
-  $("asCancel").onclick = () => $("asForm").classList.remove("open");
+  $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus(""); };
   $("asTest").onclick = async () => {
     const body = { base_url: $("asBase").value.trim(), model: $("asModel").value.trim(), api_key: $("asKey").value.trim() };
     if (!body.base_url || !body.model || !body.api_key) { setStatus("fill in base URL, model and key first", "bad"); return; }
@@ -169,6 +169,6 @@
     const payload = { name: $("asName").value.trim(), base_url: $("asBase").value.trim(), model: $("asModel").value.trim(), api_key: $("asKey").value.trim(), enabled: true, grounded: /generativelanguage/i.test($("asBase").value) };
     if (!payload.name || !payload.base_url || !payload.model || !payload.api_key) { setStatus("need name, base URL, model and key", "bad"); return; }
     const r = await saveProvider(payload);
-    if (r.ok) { $("asForm").classList.remove("open"); $("asKey").value = ""; setStatus(""); } else setStatus(r.error || "save failed", "bad");
+    if (r.ok) { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ saved — added to your providers", "ok"); } else setStatus(r.error || "save failed", "bad");
   };
 })();
