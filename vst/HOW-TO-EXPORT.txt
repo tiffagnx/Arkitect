@@ -1,0 +1,53 @@
+============================================================
+  TURN THESE INTO REAL VST PLUGINS  —  no installing anything
+============================================================
+
+It's a free website that compiles the plugin for you.
+
+  1. Go to:   https://faustide.grame.fr
+
+  2. Open one of the .dsp files in this folder in Notepad
+     (start with  crush.dsp  — it's the simplest). Select ALL,
+     copy it.
+
+  3. On the website, paste it into the big code box (replace
+     whatever's there).
+
+  4. Up top click the  EXPORT  button (cloud/download icon).
+
+  5. Pick your platform + format:
+        Windows  ->  Platform: win64    Format: vst3
+        Mac      ->  Platform: macos    Format: vst3   (or au)
+
+  6. Click Compile / Export. Wait ~30 seconds. It hands you a
+     ZIP to download.
+
+  7. Unzip it. Inside is a  .vst3  file (or folder).
+
+  8. Put it in your VST3 folder:
+        Windows:  C:\Program Files\Common Files\VST3
+        Mac:      /Library/Audio/Plug-Ins/VST3
+
+  9. In your DAW, rescan plugins. It shows up by name
+     (Crush, Saturator, Telephone, TIFF VERB).
+
+------------------------------------------------------------
+ PRO TOOLS
+------------------------------------------------------------
+Pro Tools won't load a VST directly. Two options:
+  - Get "Blue Cat PatchWork" (a wrapper) and load the .vst3
+    inside it — works in Pro Tools + every other DAW.
+  - OR we build a true AAX version later (harder, Avid stuff).
+
+------------------------------------------------------------
+ ORDER TO DO IT
+------------------------------------------------------------
+  1) Export crush.dsp first. Confirm it loads + makes sound
+     in your DAW. That proves the whole pipeline.
+  2) Then saturator + telephone (same steps).
+  3) TIFF VERB last — if the reverb line throws an error on
+     export, copy the red error text and send it to Claude;
+     it's a one-line fix.
+
+These are the SOUND. The badass custom-drawn interfaces come
+after, in JUCE — sound first, face second.

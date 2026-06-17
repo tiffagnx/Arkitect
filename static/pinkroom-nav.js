@@ -7,8 +7,10 @@
   const ROOMS = [
     { icon: "💬", name: "Chat",     href: "/" },
     { icon: "🎚", name: "Studio",   href: "/static/studio.html" },
+    { icon: "🎬", name: "Editor",   href: "/static/editor.html" },
     { icon: "🛠", name: "Builder",  href: "/static/build.html" },
     { icon: "🖼", name: "Images",   href: "/static/images.html" },
+    { icon: "🛰", name: "Swarm",    href: "/static/swarm.html" },
     { icon: "👾", name: "16-Bit",   href: "/static/bit16.html" },
     { icon: "🎙", name: "Talk Live", href: "/static/talk.html" },
   ];

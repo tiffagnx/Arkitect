@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -1113,6 +1113,8 @@ IMG_META = DATA / "img_meta"          # per-image sidecars: prompt/seed/mode →
 IMG_META.mkdir(exist_ok=True)
 STUDIO_DIR = DATA / "studio_projects"  # saved Studio mixes
 STUDIO_DIR.mkdir(exist_ok=True)
+PLUGINS_DIR = DATA / "plugins"         # Builder-made Studio plugins (.js + meta), auto-loadable by the Studio
+PLUGINS_DIR.mkdir(exist_ok=True)
 
 BUILD_SYSTEM = (
     "You are an elite front-end engineer. You output ONE complete, self-contained HTML file and "
@@ -1134,6 +1136,140 @@ BUILD_SYSTEM = (
     "6. Mobile-friendly: meta viewport, things wrap, buttons are 44px+ touch targets.\n"
     "7. If the request is vague, make the most useful reasonable version — never ask questions."
 )
+
+
+# ── PLUGIN BUILD ── the model only ever writes ONE small thing: a Studio plugin
+# in B's own TIFF_PLUGINS.register format. We hand it the exact contract + a single
+# worked example (few-shot) + a hard Web-Audio cheatsheet so a local 7B coder lands
+# valid DSP on the first/second try. It drops straight into the Studio's plugin chain.
+PLUGIN_EXAMPLE = '''TIFF_PLUGINS.register({
+  name: "Tremolo",
+  subtitle: "amplitude modulation",
+  foot: "drag a knob up / down",
+  params: [
+    { id:"rate",  label:"RATE",  min:0.1, max:12, step:0.1,  value:5,   fmt:v=>v.toFixed(1)+" Hz" },
+    { id:"depth", label:"DEPTH", min:0,   max:1,  step:0.01, value:0.6, fmt:v=>Math.round(v*100)+"%" },
+    { id:"mix",   label:"MIX",   min:0,   max:1,  step:0.01, value:1,   fmt:v=>Math.round(v*100)+"%" }
+  ],
+  create(c){
+    const input=c.createGain(), output=c.createGain();
+    const dry=c.createGain(),   wet=c.createGain();   dry.gain.value=0; wet.gain.value=1;
+    const vca=c.createGain();   vca.gain.value=0.7;            // center = 1 - depth/2
+    const lfo=c.createOscillator(); lfo.type="sine"; lfo.frequency.value=5;
+    const depthGain=c.createGain(); depthGain.gain.value=0.3;  // = depth/2
+    lfo.connect(depthGain); depthGain.connect(vca.gain);       // gain rides center +/- depth/2
+    input.connect(vca); vca.connect(wet); wet.connect(output); // processed path
+    input.connect(dry); dry.connect(output);                   // dry/blend path
+    lfo.start();
+    return {
+      input, output,
+      set(id,v){
+        if(id==="rate")  lfo.frequency.setTargetAtTime(v, c.currentTime, 0.02);
+        else if(id==="depth"){ depthGain.gain.value=v*0.5; vca.gain.value=1-v*0.5; }
+        else if(id==="mix"){ wet.gain.value=v; dry.gain.value=1-v; }
+      },
+      dispose(){ try{ lfo.stop(); }catch(e){} }
+    };
+  }
+});'''
+
+PLUGIN_SYSTEM = (
+    "You are an elite Web Audio DSP engineer. You write ONE audio plugin for THE STUDIO and output "
+    "NOTHING else — no markdown fences, no prose, no comments about what you did. Your entire reply is a "
+    "single JavaScript statement: one TIFF_PLUGINS.register({ ... }); call. Start with "
+    "'TIFF_PLUGINS.register(' and end with ');'.\n\n"
+    "THE CONTRACT (follow exactly):\n"
+    "TIFF_PLUGINS.register({\n"
+    "  name: 'Short Name',              // 1-3 words, Title Case\n"
+    "  subtitle: 'what it is',          // optional, lowercase\n"
+    "  foot: 'drag a knob up / down',   // optional\n"
+    "  params: [ { id:'mix', label:'MIX', min:0, max:1, step:0.01, value:0.5, fmt:v=>Math.round(v*100)+'%' } ],\n"
+    "  create(c){                       // c is an AudioContext\n"
+    "    const input = c.createGain(), output = c.createGain();\n"
+    "    /* build the audio graph between input and output */\n"
+    "    return { input, output, set(id,v){ /* apply each param */ }, dispose(){ /* stop oscillators */ } };\n"
+    "  }\n"
+    "});\n\n"
+    "HARD RULES:\n"
+    "1. ALWAYS return both `input` and `output`, and ALWAYS keep at least one connected path to `output` "
+    "(a dry path or the processed path) so the plugin is never silent.\n"
+    "2. `set(id,v)` MUST handle EVERY param id you declare. Prefer param.setTargetAtTime(v, c.currentTime, 0.01) "
+    "for smooth changes; param.value = v is fine for stepped controls.\n"
+    "3. Inside create(), initialize every node to its param's DEFAULT `value`.\n"
+    "4. If you create OscillatorNodes / LFOs, call .start() on them and stop them in dispose().\n"
+    "5. Any feedback gain MUST be < 1 (use <= 0.9). Never let the graph blow up or emit NaN/Infinity. "
+    "WaveShaper curves must be normalized to roughly [-1,1].\n"
+    "6. Use ONLY these native nodes — NO AudioWorkletNode, NO external libraries:\n"
+    "   c.createGain, c.createBiquadFilter (types: lowpass highpass bandpass lowshelf highshelf peaking notch allpass), "
+    "c.createDelay(maxSeconds), c.createWaveShaper (set .curve = Float32Array, .oversample='4x'), "
+    "c.createConvolver (set .buffer), c.createDynamicsCompressor (threshold knee ratio attack release), "
+    "c.createStereoPanner (.pan), c.createChannelSplitter(2), c.createChannelMerger(2), "
+    "c.createOscillator (.type .frequency), c.createConstantSource, c.createBuffer(ch,len,c.sampleRate) + "
+    "c.createBufferSource (for noise beds / impulse responses), and c.sampleRate / c.currentTime.\n"
+    "7. params: id (string), label (SHORT, UPPERCASE), min, max, value (default, inside the range). "
+    "Optional: step, and fmt (a function value->string with units, e.g. fmt:v=>(v/1000).toFixed(1)+'k').\n"
+    "8. Match real-gear control names and ranges for the effect type the user asked for. Keep it focused.\n\n"
+    "STUDY THIS COMPLETE WORKED EXAMPLE, then write YOUR plugin for the request in the SAME shape:\n\n"
+    + PLUGIN_EXAMPLE
+)
+
+
+# ── PLUGIN DSL ── the model emits a tiny JSON SPEC (not DSP code); the client's
+# deterministic compiler turns it into a guaranteed-stable plugin from pre-tested,
+# clamped blocks. response_format json_object makes malformed output impossible.
+PLUGIN_DSL_SYSTEM = (
+    "You design an audio plugin for THE STUDIO by emitting a small JSON SPEC — nothing else. "
+    "Output ONE JSON object and NOTHING outside it (no prose, no markdown fences). A deterministic "
+    "compiler turns your spec into a working, guaranteed-stable plugin, so you NEVER write DSP code.\n\n"
+    "SPEC SHAPE:\n"
+    "{\n"
+    '  "name": "Short Name",            // 1-3 words\n'
+    '  "subtitle": "what it is",        // lowercase\n'
+    '  "type": "reverb|delay|eq|filter|compressor|distortion|saturation|chorus|tremolo|bitcrush|utility",\n'
+    '  "chain": [ { "block": "<type>", ...params } ],   // effects in series: input -> ... -> output\n'
+    '  "knobs": [ { "id":"mix", "label":"MIX", "min":0, "max":1, "value":0.3, "unit":"%", "target":1, "set":"mix" } ]\n'
+    "}\n\n"
+    "BLOCKS for `chain` (use real-gear params + ranges; every value is clamped for you):\n"
+    "- lowpass / highpass / bandpass / lowshelf / highshelf / peaking / notch -> { freq:20-20000, q:0.05-18, gain:-24..24 (shelf/peaking) }  set: freq|q|gain\n"
+    "- gain -> { db:-24..24 }  set: db\n"
+    "- pan -> { pan:-1..1 }  set: pan\n"
+    "- compressor -> { threshold:-60..0, ratio:1-20, attack:0.5-100(ms), release:10-1000(ms), knee:0-40, makeup:0-24(dB) }  set: threshold|ratio|attack|release|knee|makeup\n"
+    "- drive  (distortion/saturation) -> { amount:0-100, mode:\"tanh\"|\"tape\"|\"fold\", mix:0-1 }  set: amount|mix\n"
+    "- bitcrush -> { bits:1-16, tone:hz, mix:0-1 }  set: bits|tone|mix\n"
+    "- tremolo -> { rate:0.1-20(hz), depth:0-1 }  set: rate|depth\n"
+    "- chorus  -> { rate:0.05-8(hz), depth:0-0.01, mix:0-1 }  set: rate|depth|mix\n"
+    "- delay   -> { time:1-2000(ms), feedback:0-0.92, tone:hz, mix:0-1 }  set: time|feedback|tone|mix\n"
+    "- reverb  -> { seconds:0.1-6, tone:hz, predelay:0-200(ms), mix:0-1 }  set: seconds|tone|predelay|mix\n\n"
+    "KNOBS: each is a user-facing control. `target` = 0-based index of the block in `chain` it controls; "
+    "`set` = which of that block's params it drives. `unit` is one of %, hz, s, ms, db, x, or \"\". "
+    "Give 2-5 knobs that fit the effect.\n\n"
+    "RULES: keep the chain focused (1-4 blocks). Any wet effect (reverb/delay/chorus) MUST expose a MIX knob. "
+    "Match the param names + ranges EXACTLY. Only if the request truly can't be built from these blocks, instead "
+    "output { \"name\":\"...\", \"raw\":\"TIFF_PLUGINS.register({ ...native Web Audio nodes only... })\" }.\n\n"
+    "WORKED EXAMPLE — request: \"a warm plate reverb with size, tone and mix\":\n"
+    '{"name":"Warm Plate","subtitle":"plate reverb","type":"reverb",'
+    '"chain":[{"block":"highpass","freq":120},{"block":"reverb","seconds":2.2,"tone":5000,"predelay":20,"mix":0.35}],'
+    '"knobs":['
+    '{"id":"size","label":"SIZE","min":0.3,"max":6,"value":2.2,"unit":"s","target":1,"set":"seconds"},'
+    '{"id":"tone","label":"TONE","min":800,"max":12000,"value":5000,"unit":"hz","target":1,"set":"tone"},'
+    '{"id":"mix","label":"MIX","min":0,"max":1,"value":0.35,"unit":"%","target":1,"set":"mix"}]}'
+)
+
+
+async def _coder_model(requested: str) -> str:
+    """Plugin builds want the code-tuned brain. If a coder model is installed (qwen-coder,
+    deepseek-coder, codestral), prefer it over a general/vision model — plugins need no eyes,
+    just clean JS. Falls back to whatever was requested if no coder is around."""
+    if re.search(r"coder|deepseek|codestral", requested or "", re.I):
+        return requested
+    try:
+        async with httpx.AsyncClient(timeout=4) as cx:
+            rows = (await cx.get("http://127.0.0.1:1234/api/v0/models")).json().get("data", [])
+        ids = [r.get("id", "") for r in rows]
+        coder = next((m for m in ids if re.search(r"coder|deepseek|codestral", m, re.I)), "")
+        return coder or requested
+    except Exception:
+        return requested
 
 
 BUILD_WINDOW = 16384   # the 8GB card's safe context with the vision projector loaded (24K OOMs on image builds)
@@ -1231,6 +1367,41 @@ async def build(req: Request):
 
         return StreamingResponse(gen_talk(), media_type="text/event-stream")
 
+    # ── PLUGIN: write / update ONE Studio plugin (TIFF_PLUGINS.register JS) ──
+    if mode == "plugin":
+        pmodel = await _coder_model(model)
+        convo = ""
+        if history:
+            convo = ("WHAT WE'VE BEEN TALKING ABOUT:\n" +
+                     "\n".join(f"{'B' if m['role'] == 'user' else 'you'}: {m['content']}" for m in history[-6:]) +
+                     "\n\n")
+        instr = prompt or feedback or (history[-1]["content"] if history and history[-1]["role"] == "user" else "")
+        if prev_code:
+            text = (f"{convo}Current plugin spec (JSON):\n\n{prev_code[:6000]}\n\n"
+                    f"NOW DO THIS: {instr}\n\n"
+                    "Output the FULL updated spec as ONE JSON object — keep every block/knob that should stay.")
+        else:
+            text = f"{convo}BUILD THIS PLUGIN: {instr}\n\nOutput ONE JSON spec object."
+        payload = {
+            "model": pmodel,
+            "messages": [{"role": "system", "content": PLUGIN_DSL_SYSTEM}, {"role": "user", "content": text}],
+            "temperature": 0.15,    # research: low temp maximizes first-try correctness
+            "top_p": 0.95,
+            "max_tokens": 1800,     # a JSON spec is small
+            "response_format": {"type": "json_object"},   # force valid JSON — kills malformed output
+            "stream": True,
+        }
+
+        async def gen_plugin():
+            if await _ctx_too_small(pmodel):
+                yield f"data: {json.dumps({'type':'status','text':'waking the coder brain at full size…'})}\n\n"
+                await _reload_ctx(pmodel)
+            async for ev in lm_stream(payload):
+                yield ev
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+        return StreamingResponse(gen_plugin(), media_type="text/event-stream")
+
     # ── BUILD: write / update the actual single-file app ────────────────────
     convo = ""
     if history:
@@ -1310,6 +1481,77 @@ async def build_save(req: Request):
 @app.delete("/api/builds/{bid}")
 async def build_del(bid: str):
     f = BUILDS_DIR / f"{re.sub(r'[^a-zA-Z0-9-]', '', bid)}.json"
+    if f.exists():
+        f.unlink()
+    return {"ok": True}
+
+
+# ── PLUGIN STORE ── plugins the Builder makes live here. The Builder's "Send to
+# Studio" POSTs here; the Studio loads them all in one shot from /api/plugins/bundle.js
+# (additive — one fetch line in the Studio, no clash with the rest of its code).
+@app.get("/api/plugins")
+async def plugins_list():
+    out = []
+    for f in sorted(PLUGINS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:200]:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            out.append({"id": d["id"], "name": d.get("name", "Plugin"),
+                        "subtitle": d.get("subtitle", ""), "ts": d.get("ts", 0)})
+        except Exception:
+            continue
+    return {"plugins": out}
+
+
+@app.get("/api/plugins/bundle.js")
+async def plugins_bundle():
+    """All saved plugins concatenated as one loadable JS file. Each plugin is wrapped in
+    its own try/catch so a single bad one can't break the rest. The Studio can register
+    every Builder-made plugin by loading this once on boot."""
+    from starlette.responses import Response
+    parts = ["/* Pink Room — Builder-made Studio plugins (auto-generated). Do not edit by hand. */"]
+    for f in sorted(PLUGINS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            code = d.get("code", "")
+            if "TIFF_PLUGINS.register" in code:
+                name = str(d.get("name", "?")).replace("'", "")
+                parts.append("try{\n" + code + "\n}catch(e){console.error('[plugin] " + name + " failed to load',e);}")
+        except Exception:
+            continue
+    return Response("\n\n".join(parts), media_type="application/javascript")
+
+
+@app.get("/api/plugins/{pid}")
+async def plugin_get(pid: str):
+    f = PLUGINS_DIR / f"{re.sub(r'[^a-zA-Z0-9-]', '', pid)}.json"
+    if not f.exists():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        return JSONResponse({"error": "saved plugin is corrupt"}, status_code=400)
+
+
+@app.post("/api/plugins")
+async def plugin_save(req: Request):
+    d = await req.json()
+    code = (d.get("code") or "").strip()
+    if "TIFF_PLUGINS.register" not in code:
+        return JSONResponse({"error": "not a plugin (no TIFF_PLUGINS.register call)"}, status_code=400)
+    pid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or str(uuid.uuid4()))
+    name = (d.get("name") or "").strip()
+    if not name:
+        m = re.search(r'name\s*:\s*["\']([^"\']+)["\']', code)
+        name = m.group(1) if m else "Plugin"
+    rec = {"id": pid, "name": name, "subtitle": (d.get("subtitle") or "").strip(),
+           "code": code, "ts": int(time.time())}
+    (PLUGINS_DIR / f"{pid}.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
+    return {"ok": True, "id": pid, "name": name}
+
+
+@app.delete("/api/plugins/{pid}")
+async def plugin_del(pid: str):
+    f = PLUGINS_DIR / f"{re.sub(r'[^a-zA-Z0-9-]', '', pid)}.json"
     if f.exists():
         f.unlink()
     return {"ok": True}
@@ -2093,6 +2335,739 @@ async def session_del(sid: str):
     return {"ok": True}
 
 
+# ════════════════════════════════════════════════════════════════════════════
+#  THE EDITOR — the flagship wing. A pro NLE + compositor (static/editor.html).
+#  Render engine = native ffmpeg + NVENC (already on PATH). Preview = 540p
+#  proxies so the 2060S scrubs smooth. Storage rule (B's box): proxy/thumb/peak
+#  CACHE + exports live HERE on C: (NVMe SSD); SOURCE media is referenced in
+#  place and never copied, so the slow SMR D: write-speed trap is sidestepped.
+# ════════════════════════════════════════════════════════════════════════════
+import subprocess          # used at module scope below (the older code imports it
+import shutil as _shutil   # locally per-function; the editor helpers need it global)
+import sys as _sys
+import array as _array
+import hashlib as _hashlib
+
+EDITOR_DIR  = DATA / "editor"
+EDIT_PROJ   = EDITOR_DIR / "projects"
+EDIT_CACHE  = EDITOR_DIR / "cache"        # proxies/thumbs/peaks, keyed by media id
+EDIT_OUT    = EDITOR_DIR / "exports"      # rendered deliverables
+for _d in (EDITOR_DIR, EDIT_PROJ, EDIT_CACHE, EDIT_OUT):
+    _d.mkdir(exist_ok=True)
+
+FFMPEG  = _shutil.which("ffmpeg")  or r"C:\Users\koonc\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-full_build\bin\ffmpeg.exe"
+FFPROBE = _shutil.which("ffprobe") or FFMPEG.replace("ffmpeg.exe", "ffprobe.exe")
+_NOWIN = 0x08000000  # CREATE_NO_WINDOW — no console flash on subprocess calls
+
+EDIT_MEDIA: dict[str, dict] = {}          # mid -> full record (incl. server-only src path)
+EDIT_MEDIA_FILE = EDITOR_DIR / "media.json"
+EXPORT_JOBS: dict[str, dict] = {}         # jid -> {status,progress,out_path,error,proc}
+
+_VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv", ".ts"}
+_AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma"}
+_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+
+
+def _load_media_reg():
+    global EDIT_MEDIA
+    if EDIT_MEDIA_FILE.exists():
+        try:
+            EDIT_MEDIA = json.loads(EDIT_MEDIA_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            EDIT_MEDIA = {}
+_load_media_reg()
+
+
+def _save_media_reg():
+    try:
+        _atomic_write(EDIT_MEDIA_FILE, json.dumps(EDIT_MEDIA, indent=1))
+    except Exception:
+        pass
+
+
+def _media_public(m: dict) -> dict:
+    """Client-safe view of a media record — never leaks the absolute src path."""
+    return {k: v for k, v in m.items() if k != "src"}
+
+
+def _ratio(s: str) -> float:
+    try:
+        if "/" in s:
+            n, d = s.split("/"); d = float(d)
+            return float(n) / d if d else 0.0
+        return float(s)
+    except Exception:
+        return 0.0
+
+
+def _probe(path: str) -> dict | None:
+    try:
+        p = subprocess.run(
+            [FFPROBE, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path],
+            capture_output=True, text=True, creationflags=_NOWIN, timeout=60)
+        data = json.loads(p.stdout or "{}")
+    except Exception:
+        return None
+    fmt = data.get("format", {})
+    streams = data.get("streams", [])
+    v = next((s for s in streams if s.get("codec_type") == "video"), None)
+    a = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    dur = 0.0
+    for src in (fmt.get("duration"), (v or {}).get("duration"), (a or {}).get("duration")):
+        try:
+            dur = float(src);  break
+        except Exception:
+            continue
+    fps = _ratio((v or {}).get("avg_frame_rate") or (v or {}).get("r_frame_rate") or "0") if v else 0.0
+    return {
+        "dur": dur, "fps": fps or 30.0,
+        "w": int((v or {}).get("width") or 0), "h": int((v or {}).get("height") or 0),
+        "has_video": bool(v), "has_audio": bool(a),
+        "vcodec": (v or {}).get("codec_name", ""), "acodec": (a or {}).get("codec_name", ""),
+    }
+
+
+def _kind_for(ext: str) -> str:
+    if ext in _VIDEO_EXT: return "video"
+    if ext in _AUDIO_EXT: return "audio"
+    if ext in _IMAGE_EXT: return "image"
+    return "video"
+
+
+def _run(cmd, timeout=900):
+    return subprocess.run(cmd, capture_output=True, creationflags=_NOWIN, timeout=timeout)
+
+
+def _gen_poster(src, dst, kind, dur):
+    try:
+        if kind == "image":
+            _run([FFMPEG, "-y", "-v", "error", "-i", src, "-vf", "scale=400:-1", str(dst)], 60)
+        else:
+            ss = max(0.0, min(1.0, dur / 2)) if dur else 0.0
+            _run([FFMPEG, "-y", "-v", "error", "-ss", f"{ss:.3f}", "-i", src,
+                  "-frames:v", "1", "-vf", "scale=400:-1", str(dst)], 60)
+    except Exception:
+        pass
+
+
+def _gen_proxy(src, dst, has_audio):
+    """540p H.264 proxy. NVENC first; fall back to CPU x264 if the card balks."""
+    base = [FFMPEG, "-y", "-v", "error", "-i", src,
+            "-vf", "scale=-2:540", "-g", "30", "-pix_fmt", "yuv420p"]
+    audio = (["-c:a", "aac", "-b:a", "128k"] if has_audio else ["-an"])
+    tail = ["-movflags", "+faststart", str(dst)]
+    try:
+        r = _run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "30"] + audio + tail, 900)
+        if r.returncode == 0 and dst.exists():
+            return
+    except Exception:
+        pass
+    try:
+        _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"] + audio + tail, 1800)
+    except Exception:
+        pass
+
+
+def _gen_filmstrip(src, dst, dur):
+    try:
+        n = max(1, min(60, int(round(dur)) or 1))
+        rate = (n / dur) if dur > 0 else 1.0
+        _run([FFMPEG, "-y", "-v", "error", "-i", src, "-frames:v", "1",
+              "-vf", f"fps={rate:.6f},scale=96:54:force_original_aspect_ratio=increase,"
+                     f"crop=96:54,tile={n}x1", str(dst)], 180)
+        return n
+    except Exception:
+        return 0
+
+
+def _gen_peaks(src, dst):
+    try:
+        p = subprocess.run([FFMPEG, "-v", "error", "-i", src, "-ac", "1", "-ar", "8000",
+                            "-f", "s16le", "-"], capture_output=True, creationflags=_NOWIN, timeout=300)
+        raw = p.stdout
+        a = _array.array("h"); a.frombytes(raw[: len(raw) // 2 * 2])
+        n = len(a); buckets = 1200
+        peaks = []
+        if n:
+            step = max(1, n // buckets)
+            for i in range(0, n, step):
+                chunk = a[i:i + step]
+                m = max(abs(max(chunk)), abs(min(chunk))) if chunk else 0
+                peaks.append(round(m / 32768, 3))
+        dst.write_text(json.dumps({"peaks": peaks}), encoding="utf-8")
+    except Exception:
+        pass
+
+
+async def _build_cache(mid: str):
+    """Background: poster + proxy + filmstrip + waveform peaks for one media item."""
+    m = EDIT_MEDIA.get(mid)
+    if not m:
+        return
+    src = m["src"]; kind = m["kind"]; dur = m.get("dur", 0)
+    cdir = EDIT_CACHE / mid
+    cdir.mkdir(exist_ok=True)
+    try:
+        await asyncio.to_thread(_gen_poster, src, cdir / "poster.jpg", kind, dur)
+        m.setdefault("cache", {})["poster"] = (cdir / "poster.jpg").exists()
+        if kind == "video":
+            await asyncio.to_thread(_gen_proxy, src, cdir / "proxy.mp4", m.get("has_audio"))
+            m["cache"]["proxy"] = (cdir / "proxy.mp4").exists()
+            strip_n = await asyncio.to_thread(_gen_filmstrip, src, cdir / "strip.jpg", dur)
+            if strip_n:
+                m["cache"]["strip"] = strip_n
+        if m.get("has_audio") or kind == "audio":
+            await asyncio.to_thread(_gen_peaks, src, cdir / "peaks.json")
+            m["cache"]["peaks"] = (cdir / "peaks.json").exists()
+        m["ready"] = True
+        _save_media_reg()
+    except Exception:
+        m["ready"] = True  # never wedge the UI on a cache miss
+
+
+@app.post("/api/editor/pick")
+async def editor_pick():
+    """Native OS 'Open' dialog on B's own machine — no upload, no copy, ffmpeg
+    reads the originals in place. Run in a child process so Tk never touches the
+    server's async loop. Returns absolute paths the import step then probes."""
+    script = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
+        "fs=filedialog.askopenfilenames(title='Import media — Pink Room Editor',"
+        "filetypes=[('Media','*.mp4 *.mov *.mkv *.webm *.avi *.m4v *.mpg *.mpeg *.wmv "
+        "*.mp3 *.wav *.m4a *.aac *.flac *.ogg *.opus *.png *.jpg *.jpeg *.gif *.webp *.bmp *.tif *.tiff'),"
+        "('All files','*.*')])\n"
+        "import sys;sys.stdout.write('\\n'.join(fs))\n"
+    )
+    try:
+        r = await asyncio.to_thread(
+            lambda: subprocess.run([_sys.executable, "-c", script],
+                                   capture_output=True, text=True, creationflags=_NOWIN, timeout=600))
+        paths = [p for p in (r.stdout or "").splitlines() if p.strip()]
+        return {"paths": paths}
+    except Exception as e:
+        return JSONResponse({"error": f"file dialog failed: {e}"}, status_code=500)
+
+
+@app.post("/api/editor/import")
+async def editor_import(req: Request):
+    """Register one or more source files: probe, assign a stable id, kick off
+    background cache (proxy/thumbs/peaks). Returns client-safe media records."""
+    body = await req.json()
+    paths = body.get("paths") or []
+    out = []
+    for raw in paths:
+        path = os.path.abspath(raw)
+        if not os.path.isfile(path):
+            continue
+        mid = _hashlib.sha1(path.lower().encode("utf-8")).hexdigest()[:16]
+        ext = os.path.splitext(path)[1].lower()
+        if mid in EDIT_MEDIA and EDIT_MEDIA[mid].get("ready"):
+            out.append(_media_public(EDIT_MEDIA[mid]));  continue
+        info = _probe(path) or {}
+        kind = _kind_for(ext)
+        if kind == "video" and not info.get("has_video"):
+            kind = "audio" if info.get("has_audio") else "video"
+        dur = info.get("dur", 0) or (5.0 if kind == "image" else 0)
+        fps = info.get("fps", 30.0) or 30.0
+        rec = {
+            "id": mid, "src": path, "name": os.path.basename(path), "kind": kind,
+            "dur": dur, "fps": fps, "frames": int(round(dur * fps)) if kind != "image" else 0,
+            "w": info.get("w", 0), "h": info.get("h", 0),
+            "has_audio": info.get("has_audio", False),
+            "vcodec": info.get("vcodec", ""), "acodec": info.get("acodec", ""),
+            "cache": {}, "ready": False, "ts": int(time.time()),
+        }
+        EDIT_MEDIA[mid] = rec
+        _save_media_reg()
+        _fire(_build_cache(mid))
+        out.append(_media_public(rec))
+    return {"media": out}
+
+
+@app.get("/api/editor/media")
+async def editor_media_list():
+    items = sorted(EDIT_MEDIA.values(), key=lambda m: m.get("ts", 0), reverse=True)
+    return {"media": [_media_public(m) for m in items if os.path.isfile(m.get("src", ""))]}
+
+
+@app.get("/api/editor/media/{mid}/status")
+async def editor_media_status(mid: str):
+    m = EDIT_MEDIA.get(mid)
+    if not m:
+        return JSONResponse({"error": "unknown media"}, status_code=404)
+    return {"ready": m.get("ready", False), "cache": m.get("cache", {})}
+
+
+def _media_or_404(mid: str):
+    return EDIT_MEDIA.get(re.sub(r"[^a-f0-9]", "", mid))
+
+
+@app.get("/api/editor/media/{mid}/src")
+async def editor_media_src(mid: str):
+    m = _media_or_404(mid)
+    if not m or not os.path.isfile(m["src"]):
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(m["src"])  # Starlette serves Range requests for scrubbing
+
+
+@app.get("/api/editor/media/{mid}/proxy")
+async def editor_media_proxy(mid: str):
+    m = _media_or_404(mid)
+    if not m:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    px = EDIT_CACHE / mid / "proxy.mp4"
+    if px.exists():
+        return FileResponse(px)
+    if os.path.isfile(m["src"]):
+        return FileResponse(m["src"])
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.get("/api/editor/media/{mid}/poster")
+async def editor_media_poster(mid: str):
+    p = EDIT_CACHE / re.sub(r"[^a-f0-9]", "", mid) / "poster.jpg"
+    if p.exists():
+        return FileResponse(p)
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.get("/api/editor/media/{mid}/strip")
+async def editor_media_strip(mid: str):
+    p = EDIT_CACHE / re.sub(r"[^a-f0-9]", "", mid) / "strip.jpg"
+    if p.exists():
+        return FileResponse(p)
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.get("/api/editor/media/{mid}/peaks")
+async def editor_media_peaks(mid: str):
+    p = EDIT_CACHE / re.sub(r"[^a-f0-9]", "", mid) / "peaks.json"
+    if p.exists():
+        return FileResponse(p)
+    return {"peaks": []}
+
+
+# ── editor projects (mirror sessions/studio: atomic JSON in data/editor) ──────
+
+@app.get("/api/editor/projects")
+async def editor_projects_list():
+    out = []
+    for f in sorted(EDIT_PROJ.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:80]:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            out.append({"id": d["id"], "title": d.get("title", "untitled"), "ts": d.get("ts", 0)})
+        except Exception:
+            continue
+    return {"projects": out}
+
+
+@app.get("/api/editor/projects/{pid}")
+async def editor_project_get(pid: str):
+    f = EDIT_PROJ / f"{re.sub(r'[^a-zA-Z0-9-]', '', pid)}.json"
+    if not f.exists():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except Exception:
+        return JSONResponse({"error": "saved project is corrupt"}, status_code=400)
+
+
+@app.post("/api/editor/projects")
+async def editor_project_save(req: Request):
+    d = await req.json()
+    pid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or str(uuid.uuid4()))
+    d["id"] = pid
+    d["ts"] = int(time.time())
+    _atomic_write(EDIT_PROJ / f"{pid}.json", json.dumps(d, indent=1))
+    return {"ok": True, "id": pid}
+
+
+@app.delete("/api/editor/projects/{pid}")
+async def editor_project_del(pid: str):
+    f = EDIT_PROJ / f"{re.sub(r'[^a-zA-Z0-9-]', '', pid)}.json"
+    if f.exists():
+        f.unlink()
+    return {"ok": True}
+
+
+# ── EXPORT — translate the timeline JSON into one native ffmpeg filter_complex ─
+
+def _esc_dt(s: str) -> str:
+    """Escape text for ffmpeg drawtext."""
+    s = s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "’")
+    s = s.replace("%", "\\%").replace("\n", " ")
+    return s
+
+
+def _build_export_cmd(tl: dict, out_path: str, settings: dict):
+    W = int(tl.get("width", 1920)); H = int(tl.get("height", 1080))
+    FPS = float(tl.get("fps", 30)) or 30.0
+    tracks = tl.get("tracks", [])
+
+    vclips, aclips, texts = [], [], []
+    for tr in tracks:
+        kind = tr.get("kind")
+        for c in tr.get("clips", []):
+            if kind == "text":
+                texts.append(c)
+            elif kind == "audio":
+                aclips.append(dict(c))
+            else:  # video / image lanes
+                vclips.append(dict(c))
+                m = EDIT_MEDIA.get(c.get("mediaId"))
+                if c.get("audio", True) and m and m.get("has_audio"):
+                    aclips.append({**c, "_fromvideo": True})
+    vclips.sort(key=lambda c: (c.get("track", 0), c.get("start", 0)))
+
+    def cend(c): return c.get("start", 0) + c.get("dur", 0)
+    dur_frames = int(tl.get("duration") or 0) or (max([cend(c) for c in (vclips + aclips)] or [0]))
+    total_sec = max(0.1, dur_frames / FPS)
+
+    cmd = [FFMPEG, "-y"]
+    # One input PER CLIP (re-opening a reused file is cheap locally and avoids
+    # split/asplit plumbing — a stream pad can only feed one filter input).
+    def add_input(m, is_image):
+        idx = len([x for x in cmd if x == "-i"])
+        if is_image:
+            cmd.extend(["-loop", "1", "-i", m["src"]])
+        else:
+            cmd.extend(["-i", m["src"]])
+        return idx
+
+    fc = [f"color=c=black:s={W}x{H}:r={FPS}:d={total_sec:.3f},format=yuva420p[base]"]
+    last = "base"; n = 0
+    for c in vclips:
+        m = EDIT_MEDIA.get(c.get("mediaId"))
+        if not m or not os.path.isfile(m["src"]):
+            continue
+        is_img = m["kind"] == "image"
+        ii = add_input(m, is_img)
+        d = max(0.04, c.get("dur", 0) / FPS)
+        pos = c.get("start", 0) / FPS
+        tin = (c.get("transIn") or 0) / FPS
+        tout = (c.get("transOut") or 0) / FPS
+        lbl = f"v{n}"
+        chain = f"[{ii}:v]"
+        if is_img:
+            chain += f"trim=duration={d:.3f},setpts=PTS-STARTPTS,"
+        else:
+            chain += f"trim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},setpts=PTS-STARTPTS,"
+        chain += (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                  f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuva420p")
+        if tin > 0:
+            chain += f",fade=t=in:st=0:d={tin:.3f}:alpha=1"
+        if tout > 0:
+            chain += f",fade=t=out:st={max(0,d-tout):.3f}:d={tout:.3f}:alpha=1"
+        op = float(c.get("opacity", 1.0))
+        if op < 1.0:
+            chain += f",colorchannelmixer=aa={op:.3f}"
+        chain += f",setpts=PTS+{pos:.3f}/TB[{lbl}]"
+        fc.append(chain)
+        nl = f"b{n}"
+        fc.append(f"[{last}][{lbl}]overlay=enable='between(t,{pos:.3f},{pos+d:.3f})':eof_action=pass[{nl}]")
+        last = nl; n += 1
+
+    FONT = settings.get("font", "C\\:/Windows/Fonts/arialbd.ttf")
+    for t in texts:
+        pos = t.get("start", 0) / FPS; d = max(0.04, t.get("dur", 0) / FPS)
+        txt = _esc_dt(t.get("text", "")); size = int(t.get("size", 72))
+        col = t.get("color", "white")
+        xexpr = "(w-text_w)/2" if t.get("x") is None else str(int(t["x"]))
+        yexpr = "(h-text_h)*0.82" if t.get("y") is None else str(int(t["y"]))
+        nl = f"t{n}"
+        fc.append(f"[{last}]drawtext=fontfile='{FONT}':text='{txt}':fontcolor={col}:"
+                  f"fontsize={size}:x={xexpr}:y={yexpr}:shadowcolor=black@0.6:shadowx=2:shadowy=2:"
+                  f"enable='between(t,{pos:.3f},{pos+d:.3f})'[{nl}]")
+        last = nl; n += 1
+
+    fc.append(f"[{last}]format=yuv420p[vout]")
+
+    amaps = []
+    for j, c in enumerate(aclips):
+        m = EDIT_MEDIA.get(c.get("mediaId"))
+        if not m or not os.path.isfile(m["src"]) or not m.get("has_audio"):
+            continue
+        ii = add_input(m, False)
+        d = max(0.04, c.get("dur", 0) / FPS)
+        pos_ms = int(c.get("start", 0) / FPS * 1000)
+        vol = float(c.get("volume", 1.0))
+        lbl = f"a{j}"
+        ch = (f"[{ii}:a]atrim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},"
+              f"asetpts=PTS-STARTPTS,volume={vol:.3f}")
+        afi = (c.get("audioFadeIn") or 0) / FPS
+        afo = (c.get("audioFadeOut") or 0) / FPS
+        if afi > 0: ch += f",afade=t=in:st=0:d={afi:.3f}"
+        if afo > 0: ch += f",afade=t=out:st={max(0,d-afo):.3f}:d={afo:.3f}"
+        if pos_ms > 0: ch += f",adelay={pos_ms}|{pos_ms}"
+        ch += f"[{lbl}]"
+        fc.append(ch); amaps.append(f"[{lbl}]")
+
+    has_audio = bool(amaps)
+    if has_audio:
+        fc.append(f"{''.join(amaps)}amix=inputs={len(amaps)}:normalize=0:"
+                  f"dropout_transition=0,alimiter=limit=0.97[aout]")
+
+    cmd += ["-filter_complex", ";".join(fc), "-map", "[vout]"]
+    if has_audio:
+        cmd += ["-map", "[aout]"]
+
+    enc = settings.get("encoder", "nvenc")
+    if enc == "x264":
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
+    else:
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
+                "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        cmd += ["-c:a", "aac", "-b:a", "256k"]
+    cmd += ["-r", f"{FPS}", "-t", f"{total_sec:.3f}", "-movflags", "+faststart",
+            "-progress", "pipe:1", "-nostats", out_path]
+    return cmd, total_sec
+
+
+async def _run_export(jid: str, cmd: list, total_sec: float):
+    job = EXPORT_JOBS[jid]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, creationflags=_NOWIN)
+        job["proc"] = proc
+        assert proc.stdout is not None
+        async for line in proc.stdout:
+            s = line.decode("utf-8", "ignore").strip()
+            if s.startswith("out_time_us=") or s.startswith("out_time_ms="):
+                # NOTE: ffmpeg's out_time_ms is actually MICROseconds in 8.x.
+                try:
+                    us = int(s.split("=", 1)[1])
+                    if total_sec > 0:
+                        job["progress"] = max(job["progress"], min(0.99, us / 1e6 / total_sec))
+                except Exception:
+                    pass
+            elif s == "progress=end":
+                job["progress"] = 0.99
+        await proc.wait()
+        err = (await proc.stderr.read()).decode("utf-8", "ignore") if proc.stderr else ""
+        if proc.returncode == 0 and os.path.isfile(job["out_path"]):
+            job["status"] = "done"; job["progress"] = 1.0
+            job["size"] = os.path.getsize(job["out_path"])
+        elif job.get("status") == "cancelled":
+            pass
+        else:
+            job["status"] = "error"
+            job["error"] = (err[-1800:] or "render failed (no output)").strip()
+    except Exception as e:
+        job["status"] = "error"; job["error"] = str(e)
+    finally:
+        job["proc"] = None
+
+
+@app.post("/api/editor/export")
+async def editor_export(req: Request):
+    body = await req.json()
+    tl = body.get("timeline") or {}
+    settings = body.get("settings") or {}
+    name = re.sub(r"[^a-zA-Z0-9_-]", "_", (body.get("name") or "render"))[:60] or "render"
+    jid = uuid.uuid4().hex[:12]
+    out_path = str(EDIT_OUT / f"{name}_{jid}.mp4")
+    try:
+        cmd, total_sec = _build_export_cmd(tl, out_path, settings)
+    except Exception as e:
+        return JSONResponse({"error": f"couldn't build the render: {e}"}, status_code=400)
+    EXPORT_JOBS[jid] = {"status": "rendering", "progress": 0.0, "out_path": out_path,
+                        "error": None, "proc": None, "name": f"{name}_{jid}.mp4"}
+    _fire(_run_export(jid, cmd, total_sec))
+    return {"ok": True, "id": jid}
+
+
+@app.get("/api/editor/export/{jid}")
+async def editor_export_status(jid: str):
+    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+    if not job:
+        return JSONResponse({"error": "unknown job"}, status_code=404)
+    return {k: job[k] for k in ("status", "progress", "error", "name", "size") if k in job}
+
+
+@app.post("/api/editor/export/{jid}/cancel")
+async def editor_export_cancel(jid: str):
+    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+    if not job:
+        return JSONResponse({"error": "unknown job"}, status_code=404)
+    job["status"] = "cancelled"
+    if job.get("proc"):
+        try:
+            job["proc"].terminate()
+        except Exception:
+            pass
+    return {"ok": True}
+
+
+@app.get("/api/editor/export/{jid}/file")
+async def editor_export_file(jid: str):
+    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+    if not job or not os.path.isfile(job.get("out_path", "")):
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(job["out_path"], media_type="video/mp4",
+                        filename=os.path.basename(job["out_path"]))
+
+
+# ── FRAME-SERVER EXPORT — honors keyframes/effects/transforms ────────────────
+#  The browser renders each frame (same compositor as the live preview) at full
+#  res and streams JPEGs over a WebSocket; we write them to a temp dir and encode
+#  with ffmpeg image2 (NVENC), muxing the SAME amix audio chain as the native
+#  path. Files-not-stdin → no pipe-deadlock. Used only when a project actually
+#  uses motion/effects (the client decides); simple cut+dissolve stays native.
+
+def _build_audio_cmd(tl: dict, FPS: float, out_path: str):
+    """Audio-only render reusing the exact amix chain — returns (cmd, has_audio)."""
+    aclips = []
+    for tr in tl.get("tracks", []):
+        kind = tr.get("kind")
+        for c in tr.get("clips", []):
+            if kind == "audio":
+                aclips.append(dict(c))
+            elif kind != "text":
+                m = EDIT_MEDIA.get(c.get("mediaId"))
+                if c.get("audio", True) and m and m.get("has_audio"):
+                    aclips.append({**c, "_fromvideo": True})
+    cmd = [FFMPEG, "-y"]
+    fc, amaps = [], []
+    def add_in(m):
+        idx = len([x for x in cmd if x == "-i"]); cmd.extend(["-i", m["src"]]); return idx
+    for j, c in enumerate(aclips):
+        m = EDIT_MEDIA.get(c.get("mediaId"))
+        if not m or not os.path.isfile(m["src"]) or not m.get("has_audio"):
+            continue
+        ii = add_in(m); d = max(0.04, c.get("dur", 0) / FPS)
+        pos_ms = int(c.get("start", 0) / FPS * 1000); vol = float(c.get("volume", 1.0))
+        lbl = f"a{j}"
+        ch = (f"[{ii}:a]atrim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},"
+              f"asetpts=PTS-STARTPTS,volume={vol:.3f}")
+        afi = (c.get("audioFadeIn") or 0) / FPS; afo = (c.get("audioFadeOut") or 0) / FPS
+        if afi > 0: ch += f",afade=t=in:st=0:d={afi:.3f}"
+        if afo > 0: ch += f",afade=t=out:st={max(0,d-afo):.3f}:d={afo:.3f}"
+        if pos_ms > 0: ch += f",adelay={pos_ms}|{pos_ms}"
+        ch += f"[{lbl}]"; fc.append(ch); amaps.append(f"[{lbl}]")
+    if not amaps:
+        return None, False
+    fc.append(f"{''.join(amaps)}amix=inputs={len(amaps)}:normalize=0:"
+              f"dropout_transition=0,alimiter=limit=0.97[aout]")
+    cmd += ["-filter_complex", ";".join(fc), "-map", "[aout]", "-c:a", "aac", "-b:a", "256k", out_path]
+    return cmd, True
+
+
+async def _render_audio_submix(tl, FPS, out_path) -> bool:
+    cmd, has = _build_audio_cmd(tl, FPS, str(out_path))
+    if not has:
+        return False
+    try:
+        p = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
+                                                 stderr=asyncio.subprocess.DEVNULL, creationflags=_NOWIN)
+        rc = await p.wait()
+        return rc == 0 and os.path.isfile(out_path)
+    except Exception:
+        return False
+
+
+@app.websocket("/api/editor/export_frames")
+async def export_frames(ws: WebSocket):
+    await ws.accept()
+    jid = uuid.uuid4().hex[:12]
+    jobdir = EDIT_OUT / f"frmsrv_{jid}"; fdir = jobdir / "frames"
+    fdir.mkdir(parents=True, exist_ok=True)
+    n = 0
+    try:
+        init = json.loads(await ws.receive_text())
+        W = int(init["w"]); H = int(init["h"]); FPS = float(init.get("fps", 30)) or 30.0
+        total = int(init.get("total", 0)); settings = init.get("settings") or {}
+        tl = init.get("timeline") or {}
+        name = re.sub(r"[^a-zA-Z0-9_-]", "_", (init.get("name") or "render"))[:60] or "render"
+        out_path = str(EDIT_OUT / f"{name}_{jid}.mp4")
+        EXPORT_JOBS[jid] = {"status": "rendering", "progress": 0.0, "error": None,
+                            "proc": None, "out_path": out_path, "name": f"{name}_{jid}.mp4"}
+        await ws.send_json({"type": "ready", "id": jid})
+        # ── receive frames until eof/cancel/disconnect ──
+        while True:
+            msg = await ws.receive()
+            if msg.get("type") == "websocket.disconnect":
+                EXPORT_JOBS[jid]["status"] = "cancelled"; break
+            b = msg.get("bytes")
+            if b is not None:
+                (fdir / f"f_{n:06d}.jpg").write_bytes(b); n += 1
+                if total:
+                    EXPORT_JOBS[jid]["progress"] = min(0.6, n / total * 0.6)
+                continue
+            txt = msg.get("text")
+            if txt:
+                ctl = json.loads(txt)
+                if ctl.get("type") == "cancel":
+                    EXPORT_JOBS[jid]["status"] = "cancelled"; break
+                if ctl.get("type") == "eof":
+                    break
+        if EXPORT_JOBS[jid]["status"] == "cancelled" or n == 0:
+            if n == 0:
+                EXPORT_JOBS[jid]["status"] = "error"; EXPORT_JOBS[jid]["error"] = "no frames received"
+                try: await ws.send_json({"type": "error", "text": "no frames received"})
+                except Exception: pass
+            return
+        # ── audio submix (same amix chain as native) ──
+        EXPORT_JOBS[jid]["progress"] = 0.62
+        audio_path = jobdir / "audio.m4a"
+        has_audio = await _render_audio_submix(tl, FPS, str(audio_path))
+        # ── encode the JPEG sequence ──
+        cmd = [FFMPEG, "-y", "-framerate", f"{FPS}", "-i", str(fdir / "f_%06d.jpg")]
+        if has_audio:
+            cmd += ["-i", str(audio_path)]
+        enc = settings.get("encoder", "nvenc")
+        if enc == "x264":
+            cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
+        else:
+            cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
+                    "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
+        cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+        if has_audio:
+            cmd += ["-c:a", "aac", "-b:a", "256k", "-map", "0:v", "-map", "1:a"]
+            if total:
+                cmd += ["-t", f"{total/FPS:.3f}"]
+        else:
+            cmd += ["-map", "0:v"]
+        cmd += ["-r", f"{FPS}", "-movflags", "+faststart", out_path]
+        EXPORT_JOBS[jid]["progress"] = 0.7
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
+                                                    stderr=asyncio.subprocess.PIPE, creationflags=_NOWIN)
+        EXPORT_JOBS[jid]["proc"] = proc
+        err = (await proc.stderr.read()).decode("utf-8", "ignore") if proc.stderr else ""
+        await proc.wait()
+        EXPORT_JOBS[jid]["proc"] = None
+        if proc.returncode == 0 and os.path.isfile(out_path):
+            EXPORT_JOBS[jid]["status"] = "done"; EXPORT_JOBS[jid]["progress"] = 1.0
+            EXPORT_JOBS[jid]["size"] = os.path.getsize(out_path)
+            await ws.send_json({"type": "done", "id": jid})
+        else:
+            EXPORT_JOBS[jid]["status"] = "error"
+            EXPORT_JOBS[jid]["error"] = (err[-1600:] or "encode failed").strip()
+            await ws.send_json({"type": "error", "text": EXPORT_JOBS[jid]["error"]})
+    except Exception as e:
+        if jid in EXPORT_JOBS:
+            EXPORT_JOBS[jid]["status"] = "error"; EXPORT_JOBS[jid]["error"] = str(e)
+        try: await ws.send_json({"type": "error", "text": str(e)})
+        except Exception: pass
+    finally:
+        if jid in EXPORT_JOBS:
+            EXPORT_JOBS[jid]["proc"] = None
+        try: await ws.close()
+        except Exception: pass
+        try: _shutil.rmtree(jobdir, ignore_errors=True)   # drop the frame scratch, keep the mp4
+        except Exception: pass
+
+
+@app.get("/editor")
+async def editor_page():
+    return FileResponse(
+        ROOT / "static" / "editor.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
+
+
 # ── static ──────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -2104,5 +3079,10 @@ async def index():
         ROOT / "static" / "index.html",
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
+
+# RESEARCH SWARM — fan a question across the user's own free LLM keys (additive; all
+# logic lives in swarm_routes.py, which reuses this module's helpers lazily — no circular import).
+from swarm_routes import router as swarm_router  # noqa: E402
+app.include_router(swarm_router)
 
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")

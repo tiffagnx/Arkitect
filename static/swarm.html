@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Research Swarm — Tiff's Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --bg0:#07050C; --bg1:#16111E;
+          --panel:rgba(14,10,20,0.72); --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text); padding:0 0 80px;
+         background: radial-gradient(1200px 700px at 30% -10%, #221330 0%, var(--bg1) 45%, var(--bg0) 100%); }
+  .top { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--hairline); position:sticky; top:0; backdrop-filter:blur(20px); background:rgba(7,5,12,.6); z-index:10; }
+  .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wrap { max-width:880px; margin:0 auto; padding:26px 20px; display:flex; flex-direction:column; gap:26px; }
+  .intro { font:400 13.5px Inter; line-height:1.65; color:var(--dim); }
+  .intro b { color:#FFC6E6; }
+  .sec { background:var(--panel); border:1px solid var(--hairline); border-radius:18px; padding:18px 18px 20px; backdrop-filter:blur(24px); }
+  .sec > h2 { font:700 11px 'Space Mono'; letter-spacing:.22em; color:var(--dim); text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .sec > h2 .count { color:var(--teal); }
+  /* provider cards */
+  .slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:11px; }
+  .slot { border:1px solid var(--hairline); border-radius:13px; padding:12px 13px; background:rgba(255,255,255,.025); display:flex; flex-direction:column; gap:7px; }
+  .slot.off { opacity:.5; }
+  .slot .nm { font:700 13px Oxanium; letter-spacing:.04em; color:var(--text); display:flex; align-items:center; gap:7px; }
+  .slot .meta { font:400 10.5px 'Space Mono'; color:var(--dim); word-break:break-all; line-height:1.5; }
+  .slot .row { display:flex; gap:6px; margin-top:3px; }
+  .slot button { font:500 10.5px Inter; padding:5px 9px; border-radius:8px; cursor:pointer; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); }
+  .slot button:hover { color:var(--text); border-color:rgba(0,209,196,.45); }
+  .slot button.del:hover { border-color:rgba(255,90,110,.5); color:#FF8FA3; }
+  .slot .tag { font:600 8.5px 'Space Mono'; padding:2px 6px; border-radius:6px; letter-spacing:.04em; }
+  .slot .tag.on { background:rgba(91,227,139,.12); color:#7fe8a6; } .slot .tag.no { background:rgba(255,255,255,.06); color:var(--dim); }
+  .addbtn { margin-top:13px; font:600 12px Inter; padding:9px 14px; border-radius:11px; cursor:pointer; color:#14040E;
+    background:linear-gradient(120deg,#FF73BE,var(--pink)); border:none; box-shadow:0 4px 16px rgba(233,30,140,.3); }
+  .empty { color:var(--dim); font:400 12.5px Inter; padding:8px 2px; }
+  /* add form */
+  .form { display:none; margin-top:14px; border-top:1px solid var(--hairline); padding-top:15px; flex-direction:column; gap:11px; }
+  .form.on { display:flex; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font:600 10px 'Space Mono'; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; }
+  .field input, .field select { width:100%; padding:9px 11px; border-radius:10px; background:rgba(255,255,255,.04);
+    color:var(--text); border:1px solid var(--hairline); font:400 13px Inter; outline:none; }
+  .field input:focus, .field select:focus { border-color:rgba(233,30,140,.5); }
+  .field select option { background:var(--bg1); }
+  .field .hint { font:400 10.5px Inter; color:var(--dim); line-height:1.5; }
+  .field .hint a { color:var(--teal); }
+  .grounded { display:flex; align-items:center; gap:8px; font:400 11.5px Inter; color:var(--dim); cursor:pointer; }
+  .grounded input { width:auto; }
+  .slot .tag.web { background:rgba(54,214,231,.14); color:#7fe0ee; }
+  .subhint { font:400 11px Inter; color:var(--dim); margin-top:9px; line-height:1.55; }
+  .frow { display:flex; gap:10px; flex-wrap:wrap; }
+  .frow .field { flex:1; min-width:180px; }
+  .formbtns { display:flex; gap:8px; align-items:center; }
+  .formbtns button { font:600 12px Inter; padding:9px 15px; border-radius:10px; cursor:pointer; border:1px solid var(--hairline); background:rgba(255,255,255,.05); color:var(--text); }
+  .formbtns .save { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border:none; }
+  .formbtns .ghost { color:var(--dim); }
+  .teststatus { font:400 11.5px 'Space Mono'; color:var(--dim); }
+  .teststatus.ok { color:#7fe8a6; } .teststatus.bad { color:#FF8FA3; }
+  /* run */
+  .runrow { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
+  .runrow .field { flex:1; min-width:200px; }
+  textarea#q { width:100%; min-height:60px; max-height:160px; resize:vertical; padding:11px 12px; border-radius:12px;
+    background:rgba(255,255,255,.04); color:var(--text); border:1px solid var(--hairline); font:400 13.5px Inter; line-height:1.5; outline:none; }
+  textarea#q:focus { border-color:rgba(233,30,140,.5); }
+  .runbtn { font:700 12.5px Inter; padding:11px 18px; border-radius:12px; cursor:pointer; color:#14040E; white-space:nowrap;
+    background:linear-gradient(120deg,#FF73BE,var(--pink)); border:none; box-shadow:0 4px 16px rgba(233,30,140,.32); }
+  .runbtn:disabled { opacity:.5; cursor:default; }
+  .out { margin-top:6px; }
+  .steps { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+  .step { font:400 11.5px 'Space Mono'; color:var(--dim); }
+  .answer { font:400 14px Inter; line-height:1.7; white-space:pre-wrap; word-wrap:break-word; }
+  .answer:empty { display:none; }
+  .srcs { margin-top:14px; display:flex; flex-direction:column; gap:5px; }
+  .srcs a { font:400 11.5px Inter; color:var(--teal); text-decoration:none; word-break:break-all; }
+  .srcs a:hover { text-decoration:underline; }
+  .err { color:#FF8FA3; font:400 12.5px Inter; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/">← Pink Room</a>
+  <h1>🛰 RESEARCH SWARM</h1>
+</div>
+<div class="wrap">
+  <div class="intro">
+    Her local brain is small — so borrow bigger ones. <b>Free.</b> Add your own API keys below
+    (Groq, OpenRouter, Gemini… you mint the keys, they stay on this machine), then send a question to the
+    whole swarm: each one researches a piece, and <b>she</b> merges it all into one answer she couldn't reach alone.
+  </div>
+
+  <!-- PROVIDERS -->
+  <div class="sec">
+    <h2>Your providers <span class="count" id="provCount"></span></h2>
+    <div class="slots" id="slots"><div class="empty">loading…</div></div>
+    <button class="addbtn" id="addBtn">+ Add provider</button>
+    <div class="subhint">Tip: add the same provider twice with different free keys to multiply your daily limit — the swarm rotates across them when one hits its cap. <b style="color:#7fe0ee">🌐</b> = self-searches the web (Gemini).</div>
+
+    <div class="form" id="form">
+      <div class="field">
+        <label>Provider</label>
+        <select id="preset"></select>
+        <div class="hint" id="presetHint"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Name</label><input id="fName" placeholder="Groq" /></div>
+        <div class="field"><label>Model</label><input id="fModel" placeholder="llama-3.3-70b-versatile" /></div>
+      </div>
+      <div class="field"><label>Base URL</label><input id="fBase" placeholder="https://api.groq.com/openai/v1" /></div>
+      <div class="field"><label>API key (your own free key)</label><input id="fKey" type="password" placeholder="paste your key" autocomplete="off" /></div>
+      <label class="grounded" id="groundedRow" style="display:none"><input type="checkbox" id="fGrounded" /> 🌐 Let it search Google itself (Gemini grounding — this one brings its own fresh sources)</label>
+      <div class="formbtns">
+        <button class="save" id="saveBtn">Save</button>
+        <button id="testBtn">Test</button>
+        <button class="ghost" id="cancelBtn">Cancel</button>
+        <span class="teststatus" id="testStatus"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RUN -->
+  <div class="sec">
+    <h2>Run a swarm</h2>
+    <div class="runrow">
+      <div class="field" style="max-width:260px">
+        <label>Merge with (her local brain)</label>
+        <select id="localModel"></select>
+      </div>
+    </div>
+    <div class="runrow">
+      <textarea id="q" placeholder="Ask something her local brain wouldn't know — current events, deep specifics, fresh research…"></textarea>
+      <button class="runbtn" id="runBtn">🛰 Run swarm</button>
+    </div>
+    <div class="out">
+      <div class="steps" id="steps"></div>
+      <div class="answer" id="answer"></div>
+      <div class="srcs" id="srcs"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let PRESETS = [], running = false;
+
+// ── load providers + presets + local models ───────────────────────────────
+async function loadPresets() {
+  const r = await fetch("/api/swarm/presets").then(r=>r.json()).catch(()=>({presets:[]}));
+  PRESETS = r.presets || [];
+  const sel = $("preset"); sel.innerHTML = "";
+  PRESETS.forEach((p,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=p.name; sel.appendChild(o); });
+  sel.onchange = applyPreset; applyPreset();
+}
+function applyPreset() {
+  const p = PRESETS[+$("preset").value]; if (!p) return;
+  if (p.name !== "Custom") { $("fName").value = p.name; $("fBase").value = p.base_url; $("fModel").value=""; $("fModel").placeholder = (p.models_hint||"").split(",")[0].trim(); }
+  else { $("fName").value=""; $("fBase").value=""; }
+  const link = p.key_url ? ` · <a href="${p.key_url}" target="_blank" rel="noopener">get a free key ↗</a>` : "";
+  $("presetHint").innerHTML = (p.free && p.free!=="—" ? `${p.free}. ` : "") +
+    (p.models_hint ? `models: ${p.models_hint}.` : "") +
+    (p.native_web && p.native_web!=="no" && p.native_web!=="?" ? ` · can browse: ${p.native_web}` : "") + link;
+  syncGrounded(true);
+}
+function syncGrounded(fromPreset) {
+  const isGem = /generativelanguage/i.test($("fBase").value);
+  $("groundedRow").style.display = isGem ? "flex" : "none";
+  if (fromPreset) $("fGrounded").checked = isGem; else if (!isGem) $("fGrounded").checked = false;
+}
+$("fBase").addEventListener("input", () => syncGrounded(false));
+async function loadModels() {
+  const r = await fetch("/api/models").then(r=>r.json()).catch(()=>({models:[]}));
+  const sel = $("localModel"); sel.innerHTML = "";
+  (r.models||[]).forEach(m=>{ const o=document.createElement("option"); o.value=o.textContent=m; sel.appendChild(o); });
+  const g = (r.models||[]).find(m=>/gemma-4-e4b/i.test(m)); if (g) sel.value = g;
+}
+async function loadProviders() {
+  const r = await fetch("/api/swarm/providers").then(r=>r.json()).catch(()=>({providers:[]}));
+  const list = r.providers || []; const el = $("slots");
+  $("provCount").textContent = list.length ? `(${list.filter(p=>p.enabled).length} active)` : "";
+  if (!list.length) { el.innerHTML = `<div class="empty">No providers yet — add one below to build your swarm.</div>`; return; }
+  el.innerHTML = "";
+  list.forEach(p => {
+    const d = document.createElement("div"); d.className = "slot" + (p.enabled ? "" : " off");
+    d.innerHTML =
+      `<div class="nm">${p.name}${p.grounded?'<span class="tag web">🌐</span>':''}<span class="tag ${p.enabled?"on":"no"}">${p.enabled?"ON":"OFF"}</span></div>
+       <div class="meta">${p.model || "(no model)"}<br>${p.base_url}<br>key: ${p.key_masked||"—"}</div>
+       <div class="row">
+         <button data-act="toggle">${p.enabled?"Disable":"Enable"}</button>
+         <button data-act="test">Test</button>
+         <button class="del" data-act="del">Delete</button>
+       </div>`;
+    d.querySelector('[data-act="toggle"]').onclick = () => saveProvider({id:p.id, name:p.name, base_url:p.base_url, model:p.model, enabled:!p.enabled, grounded:p.grounded});
+    d.querySelector('[data-act="del"]').onclick = async () => { if(confirm(`Remove ${p.name}?`)){ await fetch(`/api/swarm/providers/${p.id}`,{method:"DELETE"}); loadProviders(); } };
+    d.querySelector('[data-act="test"]').onclick = async (e) => {
+      e.target.textContent="…"; const res = await fetch("/api/swarm/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:p.id})}).then(r=>r.json()).catch(()=>({ok:false,error:"failed"}));
+      e.target.textContent = res.ok ? "✓ ok" : "✕"; e.target.title = res.ok ? (res.reply||"ok") : (res.error||"failed");
+      setTimeout(()=>{ e.target.textContent="Test"; }, 2500);
+    };
+    el.appendChild(d);
+  });
+}
+async function saveProvider(payload) {
+  const r = await fetch("/api/swarm/providers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json()).catch(()=>({error:"failed"}));
+  loadProviders(); return r;
+}
+
+// ── add form ────────────────────────────────────────────────────────────────
+$("addBtn").onclick = () => { $("form").classList.toggle("on"); $("testStatus").textContent=""; };
+$("cancelBtn").onclick = () => { $("form").classList.remove("on"); };
+$("testBtn").onclick = async () => {
+  const body = { base_url:$("fBase").value.trim(), model:$("fModel").value.trim(), api_key:$("fKey").value.trim() };
+  if (!body.base_url || !body.model || !body.api_key) { setTest("fill in base URL, model and key first","bad"); return; }
+  setTest("testing…","");
+  const r = await fetch("/api/swarm/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({ok:false,error:"couldn't reach it"}));
+  setTest(r.ok ? `✓ works — replied "${(r.reply||"ok").slice(0,30)}"` : `✕ ${r.error}`, r.ok?"ok":"bad");
+};
+$("saveBtn").onclick = async () => {
+  const payload = { name:$("fName").value.trim(), base_url:$("fBase").value.trim(), model:$("fModel").value.trim(), api_key:$("fKey").value.trim(), enabled:true, grounded:$("fGrounded").checked };
+  if (!payload.name || !payload.base_url || !payload.model) { setTest("need name, base URL and model","bad"); return; }
+  const r = await saveProvider(payload);
+  if (r.ok) { $("form").classList.remove("on"); $("fKey").value=""; setTest("","" ); } else setTest(r.error||"save failed","bad");
+};
+function setTest(t, cls) { const s=$("testStatus"); s.textContent=t; s.className="teststatus "+(cls||""); }
+
+// ── run the swarm (SSE, same event shape as research mode) ─────────────────
+$("runBtn").onclick = runSwarm;
+$("q").addEventListener("keydown",(e)=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) runSwarm(); });
+async function runSwarm() {
+  const question = $("q").value.trim();
+  if (!question || running) return;
+  running = true; $("runBtn").disabled = true;
+  $("steps").innerHTML = ""; $("answer").textContent = ""; $("srcs").innerHTML = "";
+  const addStep = (icon,text) => { const d=document.createElement("div"); d.className="step"; d.textContent=`${icon||"›"} ${text}`; $("steps").appendChild(d); };
+  try {
+    const res = await fetch("/api/research-swarm",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ question, local_model:$("localModel").value, effort:"low", messages:[{role:"user",content:question}] })});
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf="";
+    while (true) {
+      const {done,value} = await reader.read(); if (done) break;
+      buf += dec.decode(value,{stream:true}); const lines = buf.split("\n\n"); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue; let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type==="step") addStep(ev.icon, ev.text);
+        else if (ev.type==="delta") { $("answer").textContent += ev.text; }
+        else if (ev.type==="sources") { (ev.items||[]).forEach((s,i)=>{ const a=document.createElement("a"); a.href=s.url; a.target="_blank"; a.rel="noopener"; a.textContent=`[${i+1}] ${s.title||s.url}`; $("srcs").appendChild(a); }); }
+        else if (ev.type==="error") { const d=document.createElement("div"); d.className="err"; d.textContent="⚠ "+ev.text; $("steps").appendChild(d); }
+      }
+    }
+  } catch (e) { const d=document.createElement("div"); d.className="err"; d.textContent="⚠ "+e.message; $("steps").appendChild(d); }
+  running = false; $("runBtn").disabled = false;
+}
+
+loadPresets(); loadModels(); loadProviders();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>
