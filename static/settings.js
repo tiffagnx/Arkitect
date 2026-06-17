@@ -28,6 +28,10 @@
   .as-sec h3{font:700 10px 'Space Mono',monospace;letter-spacing:.2em;text-transform:uppercase;color:rgba(198,201,208,.6);margin-bottom:6px;}
   .as-sub{font:400 12.5px Inter;color:rgba(198,201,208,.7);line-height:1.55;margin-bottom:12px;}
   .as-sub b{color:#9CD3E4;}
+  .as-steps{font:400 12px Inter;color:rgba(198,201,208,.82);background:rgba(62,156,184,.06);border:1px solid rgba(62,156,184,.18);border-radius:12px;padding:11px 14px;margin-bottom:14px;line-height:1.6;}
+  .as-steps b{color:#CFE6EE;}
+  .as-steps ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;}
+  .as-steps a{color:#9CD3E4;}
   .as-slots{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
   .as-empty{font:400 12.5px Inter;color:rgba(198,201,208,.55);padding:10px 2px;}
   .as-slot{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.025);}
@@ -48,7 +52,7 @@
   .as-field{display:flex;flex-direction:column;gap:5px;}
   .as-field label{font:600 10px 'Space Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(198,201,208,.6);}
   .as-field input,.as-field select{width:100%;padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.04);
-    color:#E9EAED;border:1px solid rgba(255,255,255,.10);font:400 13px Inter;outline:none;}
+    color:#E9EAED;border:1px solid rgba(255,255,255,.10);font:400 13px Inter;outline:none;color-scheme:dark;}
   .as-field input:focus,.as-field select:focus{border-color:rgba(62,156,184,.55);}
   .as-field select option{background:#15161A;}
   .as-field .h{font:400 10.5px Inter;color:rgba(198,201,208,.6);line-height:1.5;}
@@ -80,7 +84,8 @@
       <div class="as-body">
         <div class="as-sec">
           <h3>Research providers — your API keys</h3>
-          <div class="as-sub">Research with <b>Swarm</b> uses outside LLMs through <b>your own free API keys</b> — they stay on this machine, nothing is shared. Add one or more below; the swarm spreads the work across them.</div>
+          <div class="as-sub">Research with <b>Swarm</b> uses outside LLMs through <b>your own free API keys</b> — they stay on this machine, nothing is shared.</div>
+          <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Hit <b>+ Add a provider / key</b> and pick one — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> next to the provider — it opens their site. Make a free account and copy the key they show you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. That's it — Swarm research now runs on your key.</li></ol></div>
           <div class="as-slots" id="asSlots"><div class="as-empty">loading…</div></div>
           <button class="as-addbtn" id="asAdd">+ Add a provider / key</button>
           <div class="as-form" id="asForm">
