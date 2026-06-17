@@ -236,9 +236,10 @@ function markDone(s, done) { document.querySelector(`.step[data-step="${s}"]`).c
 function fileToImage(file) {
   return new Promise((res, rej) => {
     const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = rej;
-    img.src = URL.createObjectURL(file);
+    const u = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(u); res(img); };
+    img.onerror = e => { URL.revokeObjectURL(u); rej(e); };
+    img.src = u;
   });
 }
 // Make the background transparent: sample the top-left corner; if it's already
@@ -374,16 +375,20 @@ $("worldGen").onclick = async () => {
   if (!idea) { $("worldGenStatus").textContent = "type what the world looks like first"; return; }
   $("worldGen").disabled = true;
   $("worldGenStatus").textContent = "🎨 Tiff's painting your world… (~30-60s)";
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 60000);
   try {
     const body = { prompt: "16-bit pixel art side-scrolling video game background, " + idea + ", retro game world, parallax layers, crisp pixels", mode: "draft", size: "1344x768" };
-    const r = await fetch("/api/image", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(r=>r.json());
+    const r = await fetch("/api/image", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body), signal: ac.signal }).then(r=>r.json());
     if (r.error || !r.filename) { $("worldGenStatus").textContent = "⚠ " + (r.error || "couldn't paint it — upload one instead"); }
     else {
       const img = new Image();
       img.onload = () => { setWorld(img); $("worldGenStatus").textContent = "✓ painted"; };
       img.src = "/api/image/file/" + r.filename;
     }
-  } catch (e) { $("worldGenStatus").textContent = "⚠ " + e.message; }
+  } catch (e) {
+    $("worldGenStatus").textContent = e.name === "AbortError" ? "⚠ timed out — the painter took too long. Try again or upload one instead." : "⚠ " + e.message;
+  } finally { clearTimeout(to); }
   $("worldGen").disabled = false;
 };
 
@@ -399,12 +404,13 @@ function refreshStage() {
 $("songDrop").onclick = () => $("songFile").click();
 $("songFile").onchange = e => {
   const f = e.target.files[0]; if (!f) return;
+  if (G_STATE.songUrl) URL.revokeObjectURL(G_STATE.songUrl);
   G_STATE.songUrl = URL.createObjectURL(f);
   G_STATE.songName = f.name.replace(/\.[^.]+$/, "");
   if (!$("songName").value) $("songName").value = G_STATE.songName;
   $("songStatus").textContent = "✓ " + f.name;
 };
-wireDrop($("songDrop"), f => { G_STATE.songUrl = URL.createObjectURL(f); G_STATE.songName = f.name.replace(/\.[^.]+$/,""); if(!$("songName").value)$("songName").value=G_STATE.songName; $("songStatus").textContent="✓ "+f.name; }, "audio");
+wireDrop($("songDrop"), f => { if (G_STATE.songUrl) URL.revokeObjectURL(G_STATE.songUrl); G_STATE.songUrl = URL.createObjectURL(f); G_STATE.songName = f.name.replace(/\.[^.]+$/,""); if(!$("songName").value)$("songName").value=G_STATE.songName; $("songStatus").textContent="✓ "+f.name; }, "audio");
 $("songName").oninput = () => { G_STATE.songName = $("songName").value.trim(); };
 $("stagePlay").onclick = startGame;
 $("playBtn").onclick = () => { if (G_STATE.cast) startGame(); else goStep("cast"); };
@@ -441,8 +447,8 @@ function startGame() {
   const atlas = G_STATE.cast, world = G_STATE.world;
   const floorY = H * 0.88;
   const LEVEL_LEN = W * 4;                         // single image looped = ~4 screens
-  const bgScale = world ? H / world.naturalHeight : 1;
-  const bgTileW = world ? world.naturalWidth * bgScale : 0;
+  const bgScale = (world && world.naturalHeight > 0) ? H / world.naturalHeight : 1;
+  const bgTileW = (world && world.naturalHeight > 0 && isFinite(bgScale)) ? world.naturalWidth * bgScale : 0;
 
   // platforms — seeded per track
   const rng = mulberry32(hashStr(G_STATE.songName || "level"));
@@ -464,6 +470,7 @@ function startGame() {
   let camX = 0, finished = false, started = false, levelT = 0, raf = 0, last = performance.now();
   let frameTimer = 0, frameI = 0, poseUntil = 0;
   const charScale = (H * 0.42) / atlas.cellH;
+  const charHalfW = (atlas.cellW * charScale) / 2;   // rendered half-width for collision
   const keys = new Set();
 
   const F = (...idx) => { const ok = idx.filter(i => i < atlas.count); return ok.length ? ok : [0]; };
@@ -555,7 +562,7 @@ function startGame() {
     if (player.y >= floorY) { player.y = floorY; player.vy = 0; grounded = true; }
     else if (player.vy >= 0) {
       for (const p of plats) {
-        if (player.x > p.x - 6 && player.x < p.x + p.w + 6 && prevY <= p.y + 2 && player.y >= p.y) { player.y = p.y; player.vy = 0; grounded = true; break; }
+        if (player.x > p.x - charHalfW && player.x < p.x + p.w + charHalfW && prevY <= p.y + 2 && player.y >= p.y) { player.y = p.y; player.vy = 0; grounded = true; break; }
       }
     }
     if (grounded) { player.coyote = COYOTE; player.jumping = false; }
@@ -608,25 +615,30 @@ function endGame() {
   window.removeEventListener("keydown", GAME.kd); window.removeEventListener("keyup", GAME.ku);
   try { GAME.song.pause(); GAME.song.src = ""; } catch(e){}
   stopRec();
+  if (lastRecUrl) { URL.revokeObjectURL(lastRecUrl); lastRecUrl = ""; }
   $("play").style.display = "none";
   GAME = null;
 }
 $("exitBtn").onclick = endGame;
 
 /* ───────────────────────── RECORD: gameplay → WebM ───────────────────────── */
-let REC = null, recChunks = [];
+let REC = null, recChunks = [], lastRecUrl = "";
 function startRec() {
   if (!GAME) return;
   try {
     const stream = GAME.cv.captureStream(30);
     const sEl = GAME.song;
-    if (sEl && sEl.captureStream) { try { sEl.captureStream().getAudioTracks().forEach(t => stream.addTrack(t)); } catch(e){} }
+    if (sEl && sEl.captureStream) {
+      try { sEl.captureStream().getAudioTracks().forEach(t => stream.addTrack(t)); }
+      catch(e){ console.warn("audio captureStream failed — recording will be silent", e); $("hudSilent").textContent = "● rec audio failed — recording silent"; $("hudSilent").style.display = "inline"; }
+    }
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
     REC = new MediaRecorder(stream, { mimeType: mime }); recChunks = [];
     REC.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
     REC.onstop = () => {
       const blob = new Blob(recChunks, { type: "video/webm" });
-      const url = URL.createObjectURL(blob);
+      if (lastRecUrl) URL.revokeObjectURL(lastRecUrl);
+      const url = URL.createObjectURL(blob); lastRecUrl = url;
       $("takeDl").href = url; $("takeDl").download = (G_STATE.songName||"bit16").replace(/\W+/g,"_") + "_run.webm";
       $("take").style.display = "flex";
       REC = null;

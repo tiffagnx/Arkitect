@@ -1,4 +1,4 @@
-# Tiff's Pink Room
+# ARKITECT
 
 A **fully local** AI creative studio. Everything runs on your own PC — your machine,
 your model, nothing leaves the computer, no API keys, no cloud bill. **Tiff** is the

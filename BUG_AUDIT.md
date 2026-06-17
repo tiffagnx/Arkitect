@@ -1,4 +1,4 @@
-# Bug Audit — Pink Room
+# Bug Audit — ARKITECT
 
 **49 confirmed bugs** — Critical: 2 · High: 27 · Medium: 15 · Low: 5. (Read-only audit; fixes below are one-line summaries.)
 

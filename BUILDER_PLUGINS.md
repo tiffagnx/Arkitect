@@ -56,5 +56,5 @@ Native Web-Audio nodes only (no AudioWorklet) so it drops straight into the Stud
 the bench's offline render. Full rules live in `PLUGIN_SYSTEM` in `app.py`.
 
 ## Note
-`app.py` changed (new endpoints + plugin build mode) — **restart the Pink Room once** to pick
+`app.py` changed (new endpoints + plugin build mode) — **restart ARKITECT once** to pick
 them up. `static/build.html` is served fresh per load, so the new UI shows on next refresh.

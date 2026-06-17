@@ -46,6 +46,7 @@ DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 PROV_FILE = DATA / "swarm_providers.json"   # slot metadata (no secrets) — safe to back up
 KEYS_FILE = DATA / "swarm_keys.json"        # { slot_id: api_key } — gitignore this
+_KEYS_LOCK = asyncio.Lock()                 # serialize key writes so concurrent saves can't clobber
 
 # Preset endpoints so "add a provider" is a dropdown, not homework. base_url is the
 # provider's OpenAI-compatible root; the user only pastes a free key + picks a model.
@@ -193,6 +194,8 @@ _PAGE_TTL = 600.0   # seconds
 
 async def _cached_fetch(A, url: str) -> str:
     now = time.time()
+    for k in [k for k, v in list(_PAGE_CACHE.items()) if now - v[0] >= _PAGE_TTL]:
+        _PAGE_CACHE.pop(k, None)                          # TTL evict: drop stale entries every call
     hit = _PAGE_CACHE.get(url)
     if hit and now - hit[0] < _PAGE_TTL:
         return hit[1]
@@ -352,13 +355,21 @@ async def research_swarm(req: Request):
         tasks = [asyncio.create_task(_research_agent(A, slots, i, sq, today)) for i, sq in enumerate(subqs)]
         yield ev("step", icon="🛰", text=f"Sent {len(tasks)} researchers out…")
         results = []
-        for fut in asyncio.as_completed(tasks):
-            r = await fut
-            results.append(r)
-            if r.get("digest"):
-                yield ev("step", icon="📄", text=f"{r['provider']} reported back ({len(r['sources'])} sources)")
-            elif r.get("error"):
-                yield ev("step", icon="⚠️", text=f"a researcher hit a wall: {r['error'][:80]}")
+        try:
+            for fut in asyncio.as_completed(tasks):
+                r = await fut
+                results.append(r)
+                if r.get("digest"):
+                    yield ev("step", icon="📄", text=f"{r['provider']} reported back ({len(r['sources'])} sources)")
+                elif r.get("error"):
+                    yield ev("step", icon="⚠️", text=f"a researcher hit a wall: {r['error'][:80]}")
+        finally:
+            # client disconnect (GeneratorExit) or any early exit → don't leave researchers
+            # running and burning free-tier quota: cancel + await every still-pending task.
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         briefs = [r for r in results if r.get("digest")]
         if not briefs:
@@ -449,7 +460,8 @@ async def swarm_save(req: Request):
     # secret rides separately; only overwrite when a new key is actually provided
     key = (d.get("api_key") or "").strip()
     if key:
-        keys = _load_keys(); keys[pid] = key; _save_json(KEYS_FILE, keys)
+        async with _KEYS_LOCK:                            # re-read under lock so a concurrent save isn't clobbered
+            keys = _load_keys(); keys[pid] = key; _save_json(KEYS_FILE, keys)
     return {"ok": True, "id": pid}
 
 
@@ -457,9 +469,10 @@ async def swarm_save(req: Request):
 async def swarm_delete(pid: str):
     pid = re.sub(r"[^a-zA-Z0-9-]", "", pid)
     _save_json(PROV_FILE, [p for p in _load_providers() if p["id"] != pid])
-    keys = _load_keys()
-    if keys.pop(pid, None) is not None:
-        _save_json(KEYS_FILE, keys)
+    async with _KEYS_LOCK:                                # re-read under lock so a concurrent save isn't clobbered
+        keys = _load_keys()
+        if keys.pop(pid, None) is not None:
+            _save_json(KEYS_FILE, keys)
     return {"ok": True}
 
 
@@ -520,8 +533,9 @@ async def research_for_build(req: Request):
                 "Exact APIs / methods / attributes, correct syntax, working code patterns, and common mistakes to avoid.")
     n = min(len(slots), 4)
     subqs = await _split_question(A, model, question, convo, n)
-    briefs = await asyncio.gather(*[_research_agent(A, slots, i, sq, today) for i, sq in enumerate(subqs)])
-    briefs = [b for b in briefs if b.get("digest")]
+    briefs = await asyncio.gather(*[_research_agent(A, slots, i, sq, today) for i, sq in enumerate(subqs)],
+                                  return_exceptions=True)
+    briefs = [b for b in briefs if isinstance(b, dict) and b.get("digest")]
     if not briefs:
         return {"brief": "", "sources": [], "providers": len(slots), "researchers": 0}
     seen, sources, parts = set(), [], []

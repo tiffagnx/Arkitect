@@ -5,6 +5,12 @@
    Scoped `pr-` class names so it never collides with a page's own styles.
    Also defines the shared `a.pr-back` button used by every room's header. */
 (function () {
+  // guard against double-injection — if the launcher is already on the page
+  // (re-inject), bail so we don't stack a duplicate UI, a second document
+  // 'click' listener, or a second health-poll setInterval.
+  if (window.__prNavInjected || document.querySelector(".pr-fab")) return;
+  window.__prNavInjected = true;
+
   const ROOMS = [
     { icon: "💬", name: "Chat",      href: "/" },
     { icon: "🎚", name: "Studio",    href: "/static/studio.html" },

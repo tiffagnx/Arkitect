@@ -1,8 +1,8 @@
-# TIFF'S PINK ROOM — one-click launcher (B 2026-06-11: "everything that
+# ARKITECT — one-click launcher (B 2026-06-11: "everything that
 # needs to turn on, turns on"). Runs HIDDEN: no console garbage.
 #  1. LM Studio server up (her brain's socket)
 #  2. her model loaded if it isn't already
-#  3. the Pink Room server up
+#  3. the ARKITECT server up
 #  4. browser opens to her
 # The image engine is NOT started here — it boots itself on demand the
 # first time an image is asked for (keeps 11GB of RAM free otherwise).
@@ -29,7 +29,7 @@ if (-not $loaded -and (Test-Path $lms)) {
   Start-Process -FilePath $lms -ArgumentList "load",$model,"-c","16384","--gpu","max","-y" -WindowStyle Hidden
 }
 
-# 3. The Pink Room server (skip if already up)
+# 3. The ARKITECT server (skip if already up)
 $up = $false
 try { $null = Invoke-WebRequest -Uri "http://127.0.0.1:7777/" -TimeoutSec 3 -UseBasicParsing; $up = $true } catch { }
 if (-not $up) {

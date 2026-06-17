@@ -1,6 +1,6 @@
 declare name "Saturator";
 declare author "LOONEY VISION";
-declare description "Tube-ish warmth — Drive + Mix. The Pink Room 'Saturator'.";
+declare description "Tube-ish warmth — Drive + Mix. The ARKITECT 'Saturator'.";
 import("stdfaust.lib");
 
 drive = hslider("DRIVE[style:knob]", 6, 1, 25, 0.1);

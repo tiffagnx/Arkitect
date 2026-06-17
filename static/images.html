@@ -148,6 +148,7 @@ $("ref").onchange = (e) => {
     $("refRow").style.display = "flex";
     setMode("edit"); // attaching a photo auto-selects EDIT (B can override)
   };
+  rd.onerror = () => { $("status").textContent = "⚠ couldn't read that image — try a different file."; };
   rd.readAsDataURL(f);
   e.target.value = "";
 };
@@ -262,8 +263,10 @@ async function generate(over) {
       ? `she's painting (${m})… photoreal/edit models are slower — 1–4 min, longer on a cold start`
       : "she's painting… (30–90s; up to ~2 min if the engine was asleep)";
   try {
-    const body = { prompt: p, mode: m, size, ref: useRef, strength: parseFloat($("strength").value),
+    const body = { prompt: p, mode: m, size, ref: useRef,
                    realism: ($("realism") ? $("realism").checked : true) };
+    // strength is meaningless in EDIT (Kontext denoise is fixed) — only send it elsewhere
+    if (m !== "edit") body.strength = parseFloat($("strength").value);
     if (reroll && typeof over.seed === "number") body.seed = over.seed;
     const r = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body) }).then(r => r.json());

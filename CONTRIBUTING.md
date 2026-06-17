@@ -1,4 +1,4 @@
-# Contributing to Tiff's Pink Room
+# Contributing to ARKITECT
 
 This started as one person's local AI station and is now open for anyone to grow.
 Thanks for being here. The whole project is small on purpose — you can read all of

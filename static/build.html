@@ -718,8 +718,8 @@ async function doSave(){
     if(r.ok){ currentId=r.id; const c=addChip(`🎚 "${r.name}" sent to the Studio`); c.classList.add("ok"); loadSaved(); } else setHint("⚠ "+(r.error||"couldn't send"));
   } else {
     const title=(messages.find(m=>m.role==="user")?.text||"build").slice(0,60);
-    const r=await fetch("/api/builds",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentId,title,prompt:title,code,chat:messages})}).then(r=>r.json());
-    currentId=r.id; setHint("saved to your builds."); loadSaved();
+    const r=await fetch("/api/builds",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:currentId,title,prompt:title,code,chat:messages})}).then(r=>r.json()).catch(()=>({}));
+    if(r.id){ currentId=r.id; setHint("saved to your builds."); loadSaved(); } else setHint("⚠ couldn't save that build.");
   }
 }
 function openLibrary(){ $("smodal").classList.add("on"); $("savedTitle").textContent=mode==="plugin"?"YOUR PLUGINS":"YOUR BUILDS"; loadSaved(); }
@@ -741,20 +741,25 @@ async function loadSaved(){
     const r=await fetch("/api/plugins").then(r=>r.json()).catch(()=>({plugins:[]})); const items=r.plugins||[]; el.innerHTML="";
     if(!items.length){ el.innerHTML=`<div class="empty">No plugins yet — build one and hit 💾 Send to Studio.</div>`; return; }
     items.forEach(p=>{ const d=document.createElement("div"); d.className="saveitem";
-      d.innerHTML=`<span class="si-name">${p.name}</span><span class="si-sub">${p.subtitle||"plugin"}</span><button class="del">✕</button>`;
+      const nm=document.createElement("span"); nm.className="si-name"; nm.textContent=p.name;
+      const sb=document.createElement("span"); sb.className="si-sub"; sb.textContent=p.subtitle||"plugin";
+      const del=document.createElement("button"); del.className="del"; del.textContent="✕";
+      d.appendChild(nm); d.appendChild(sb); d.appendChild(del);
       d.onclick=async(e)=>{ if(e.target.classList.contains("del")){ await fetch(`/api/plugins/${p.id}`,{method:"DELETE"}); loadSaved(); return; }
-        const full=await fetch(`/api/plugins/${p.id}`).then(r=>r.json()); code=full.code||""; currentId=full.id; codeShown=false; setPreview(code); updateBuildLabel(); $("smodal").classList.remove("on"); setHint("loaded — tweak it and re-send."); };
+        const full=await fetch(`/api/plugins/${p.id}`).then(r=>r.json()).catch(()=>({})); if(full && full.code){ code=full.code; currentId=full.id; codeShown=false; setPreview(code); updateBuildLabel(); $("smodal").classList.remove("on"); setHint("loaded — tweak it and re-send."); } else setHint("⚠ couldn't load that plugin."); };
       el.appendChild(d); });
   } else {
     const r=await fetch("/api/builds").then(r=>r.json()).catch(()=>({builds:[]})); const items=r.builds||[]; el.innerHTML="";
     if(!items.length){ el.innerHTML=`<div class="empty">No saved builds yet.</div>`; return; }
     items.forEach(b=>{ const d=document.createElement("div"); d.className="saveitem";
-      d.innerHTML=`<span class="si-name">${b.title}</span><button class="del">✕</button>`;
+      const nm=document.createElement("span"); nm.className="si-name"; nm.textContent=b.title;
+      const del=document.createElement("button"); del.className="del"; del.textContent="✕";
+      d.appendChild(nm); d.appendChild(del);
       d.onclick=async(e)=>{ if(e.target.classList.contains("del")){ await fetch(`/api/builds/${b.id}`,{method:"DELETE"}); loadSaved(); return; }
-        const full=await fetch(`/api/builds/${b.id}`).then(r=>r.json()); const loaded=full.code||""; rehydrate(loaded); code=loaded; currentId=full.id; codeShown=false;
+        const full=await fetch(`/api/builds/${b.id}`).then(r=>r.json()).catch(()=>({})); if(full && full.code){ const loaded=full.code; rehydrate(loaded); code=loaded; currentId=full.id; codeShown=false;
         messages=(full.chat||[]).map(m=>({role:m.role,text:m.text,_b:m._b})); $("thread").innerHTML="";
         messages.forEach(m=>{ if(m._b) addChip("✶ built").classList.add("ok"); else addMsg(m.role==="user"?"user":"tiff",m.text); });
-        setPreview(code); renderChips(); updateBuildLabel(); $("smodal").classList.remove("on"); setHint("loaded — keep stacking on it."); };
+        setPreview(code); renderChips(); updateBuildLabel(); $("smodal").classList.remove("on"); setHint("loaded — keep stacking on it."); } else setHint("⚠ couldn't load that build."); };
       el.appendChild(d); });
   }
 }

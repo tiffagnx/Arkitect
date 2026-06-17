@@ -269,6 +269,7 @@ let mode = "chat";
 let swarmOn = false;          // research mode → fan out to the free-LLM swarm when on
 let streaming = false;
 let abortCtl = null;
+let sessionLoading = false;   // true while a session is being loaded — blocks send() so the new message can't land in the orphaned array
 let pendingAtt = [];          // staged attachments: {id, kind:'image'|'file', name, mime, url?, text?, note?, loading, error}
 let attSeq = 0;
 const TEXT_EXTS = /\.(txt|md|markdown|csv|tsv|json|log|html?|css|js|jsx|ts|tsx|py|xml|ya?ml|ini|toml|rtf|srt|sh|c|cpp|h|java|rb|go|rs|sql)$/i;
@@ -338,6 +339,7 @@ function scrollDown() { const sc = $("scroll"); sc.scrollTop = sc.scrollHeight; 
 /* ── send ── */
 async function send() {
   if (streaming) { abortCtl?.abort(); return; }
+  if (sessionLoading) { setStatus("loading that chat — one sec…"); return; }
   if (pendingAtt.some(a => a.loading)) { setStatus("still reading that file — one sec…"); return; }
   const ta = $("input");
   const typed = ta.value.trim();
@@ -380,6 +382,7 @@ async function send() {
       : { messages, model: $("model").value, mode, effort };
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
                                    body: JSON.stringify(body), signal: abortCtl.signal });
+    if (!res.ok) throw new Error(`server error ${res.status}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
@@ -390,7 +393,7 @@ async function send() {
       const lines = buf.split("\n\n"); buf = lines.pop();
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
-        let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        let ev; try { ev = JSON.parse(line.slice(6)); } catch (err) { console.warn("bad SSE line:", line, err); continue; }
         if (ev.type === "delta") { acc += ev.text; bubble.innerHTML = md(acc); scrollDown(); }
         if (ev.type === "step") {
           if (!stepsEl) { stepsEl = addSteps(); $("col").insertBefore(stepsEl, bubble.parentElement); }
@@ -443,19 +446,36 @@ async function loadSessions() {
         if (s.id === sessionId) newChat();
         loadSessions(); return;
       }
-      const full = await fetch(`/api/sessions/${s.id}`).then(r => r.json());
-      sessionId = s.id; messages = full.messages || [];
-      $("col").innerHTML = "";
-      messages.forEach(m => addMsg(m.role, msgText(m), msgAtts(m)));
+      if (streaming) { abortCtl?.abort(); }   // a send in flight must not push into the session we're loading
+      sessionLoading = true;
+      try {
+        const full = await fetch(`/api/sessions/${s.id}`).then(r => r.json());
+        sessionId = s.id; messages = full.messages || [];
+        $("col").innerHTML = "";
+        messages.forEach(m => addMsg(m.role, msgText(m), msgAtts(m)));
+      } finally {
+        sessionLoading = false;
+      }
       loadSessions();
     };
     el.appendChild(d);
   });
 }
 function newChat() {
+  if (streaming) { abortCtl?.abort(); }   // don't strand an in-flight reply on the old (now-cleared) chat
   sessionId = null; messages = [];
-  $("col").innerHTML = "";
-  location.reload();
+  // rebuild the welcome state in place — no full reload (kills flicker + keeps the page alive)
+  $("col").innerHTML =
+    `<div class="hello" id="hello">
+        <div class="orb"></div>
+        <h2>Hey. It’s me — on your machine.</h2>
+        <p>No cloud, no bill, no one listening. Pick a model up top, talk to me like always.
+           Flip on <b style="color:#7BF0E4">Research</b> and I’ll search the web, read the pages, and break it down — you’ll watch me work.</p>
+      </div>`;
+  clearAtts();
+  const ta = $("input"); if (ta) { ta.value = ""; ta.style.height = "auto"; }
+  setStatus("ready");
+  loadSessions();   // refresh the sidebar so the active highlight clears
 }
 $("newChat").onclick = newChat;
 
@@ -509,6 +529,7 @@ function stopMic(){ if (listening) { wantStop = true; try { rec?.stop(); } catch
 $("mic").onclick = () => {
   if (!SR) { setStatus("this browser has no speech engine — Chrome does", true); return; }
   if (listening) { stopMic(); return; }                                 // tap again = stop; your text stays in the box
+  if (rec) { try { rec.onend = null; rec.abort(); } catch(_){} rec = null; }   // kill any prior instance so rapid taps don't overlap
   wantStop = false;
   finalText = $("input").value ? $("input").value.replace(/\s+$/,"") + " " : "";   // keep anything already typed
   rec = new SR();

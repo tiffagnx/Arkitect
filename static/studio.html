@@ -1880,7 +1880,7 @@ function ensureCtx() {
 }
 // Browsers gate audio behind a user gesture — ANY first touch unlocks it.
 ["pointerdown", "keydown"].forEach(evt =>
-  document.addEventListener(evt, () => { if (ctx?.state === "suspended") ctx.resume(); }, true));
+  document.addEventListener(evt, () => { if (ctx?.state === "suspended") ctx.resume().catch(() => {}); }, true));
 function buildBus(c) {
   // SUM (everything lands here) -> [master mastering chain] -> GAIN (volume) -> LIMITER (ceiling) -> out
   master = { sum: c.createGain(), gain: c.createGain(), limiter: c.createDynamicsCompressor(),
@@ -1916,6 +1916,7 @@ function buildMasterChain(c, isOffline){
   }
   tail.connect(gain);
   if (!isOffline) { master._ins = nodes; masterTrack.live = { insertNodes: nodes }; }   // live nodes so master plugin knobs respond
+  else { c._ins = nodes; }   // offline: keep a handle so export can dispose them (no AudioNode leak per render)
   return nodes;
 }
 
@@ -2040,11 +2041,11 @@ function laneUi(t) {
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
     // GRAB / MOVE (default) — drag anywhere on the clip slides it left/right, never resizes
-    const startStart = cl.start; let moved = false;
+    const startStart = cl.start; let moved = false; const wasPlaying = playing;   // capture at drag-START so a clip-move never wrongly (re)starts playback
     const mv = (ev) => { if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
       if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(Math.max(0, startStart + dx)); drawLane(t); } };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
-      if (!moved) seek(atTime); else { syncPrimary(t); if (playing) restartPlayback(); flash("Moved clip"); } };
+      if (!moved) seek(atTime); else { syncPrimary(t); if (wasPlaying) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   wv.onmousemove = (e) => {   // cursor reflects the active tool
@@ -3145,7 +3146,7 @@ let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet mo
                    // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
 async function playAll() {
   const c = ensureCtx();
-  if (c.state === "suspended") c.resume();
+  if (c.state === "suspended") await c.resume();
   if (!tracks.length) return;
   const myGen = ++playGen;
   await ensureWorklets(c);   // worklet plugins need their module present before build
@@ -3329,6 +3330,7 @@ $("exportBtn").onclick = async () => {
     tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
     buildMasterChain(oc, true);                                       // master mastering chain on the export
     const rendered = await oc.startRendering();
+    try { oc._ins?.forEach(n => n?.dispose?.()); oc._ins = []; } catch {}   // free the offline master insert nodes (no leak per export)
     const a = document.createElement("a");
     a.href = URL.createObjectURL(bufferToWavBlob(rendered));
     a.download = "arkitect-mix.wav"; a.click();

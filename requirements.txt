@@ -1,4 +1,4 @@
-# Tiff's Pink Room — Python dependencies
+# ARKITECT — Python dependencies
 # Install with:  pip install -r requirements.txt
 # (the START.bat launcher does this for you automatically on first run)
 

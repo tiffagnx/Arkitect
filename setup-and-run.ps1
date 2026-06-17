@@ -1,4 +1,4 @@
-# Tiff's Pink Room - smart setup + launcher
+# ARKITECT - smart setup + launcher
 # Double-clicked via "START HERE.bat". Auto-installs everything it can,
 # detects the PC's specs to recommend/download the right model, then runs.
 $ErrorActionPreference = "Continue"
@@ -12,7 +12,7 @@ function Good($m){ Write-Host $m -ForegroundColor Green }
 
 Write-Host ""
 Head "=================================================="
-Head "        TIFF'S PINK ROOM  -  setup + launch"
+Head "        ARKITECT  -  setup + launch"
 Head "=================================================="
 Info  "  (If Windows ever asks for permission, click YES.)"
 Write-Host ""
@@ -110,12 +110,12 @@ Good "Brain: loaded."
 
 # ---------- 6. launch ----------
 Write-Host ""
-Good "Opening Tiff's Pink Room in your browser..."
+Good "Opening ARKITECT in your browser..."
 # open the browser a few seconds after the server starts (detached)
 Start-Process "powershell" -ArgumentList "-NoProfile","-Command","Start-Sleep 7; Start-Process 'http://localhost:7777'" -WindowStyle Hidden
 Write-Host ""
 Head "=================================================="
-Head "  Pink Room is running."
+Head "  ARKITECT is running."
 Head "  KEEP THIS WINDOW OPEN while you use it."
 Head "  Close this window to stop the room."
 Head "=================================================="

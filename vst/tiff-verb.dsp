@@ -1,6 +1,6 @@
 declare name "TIFF VERB";
 declare author "LOONEY VISION";
-declare description "Stereo reverb — SIZE / TONE / PRE-DLY / RETURN. The Pink Room verb, as a plugin.";
+declare description "Stereo reverb — SIZE / TONE / PRE-DLY / RETURN. The ARKITECT verb, as a plugin.";
 import("stdfaust.lib");
 
 // Your 4 knobs. (The browser version is a convolution reverb on a generated IR;

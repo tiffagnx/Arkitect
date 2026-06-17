@@ -431,16 +431,25 @@ async function speakReply(text) {
     speakWithSynthesis(text); return;
   }
   const blob = await res.blob();
-  audioEl.src = URL.createObjectURL(blob);
+  const prevSrc = audioEl.src;
+  if (prevSrc && prevSrc.startsWith("blob:")) URL.revokeObjectURL(prevSrc);   // don't leak the previous reply's blob on interrupt
+  const url = URL.createObjectURL(blob);
+  audioEl.src = url;
   audioEl.onplay  = () => { speaking = true; synthAmp = 0; setStatus("talking…", { live: true }); };
-  audioEl.onended = () => { speaking = false; setStatus("ready"); URL.revokeObjectURL(audioEl.src); };
-  audioEl.onerror = () => { speaking = false; speakWithSynthesis(text); };
+  audioEl.onended = () => { speaking = false; setStatus("ready"); URL.revokeObjectURL(url); };
+  audioEl.onerror = () => { speaking = false; URL.revokeObjectURL(url); speakWithSynthesis(text); };
   try { await audioEl.play(); }                     // first play follows the send/mic gesture
   catch (e) { speakWithSynthesis(text); }
 }
 
 async function sendToTiff(userText) {
-  if (streaming) { abortCtl?.abort(); return; }
+  if (streaming) {
+    abortCtl?.abort();
+    streaming = false; thinking = false; speaking = false;
+    $("send").classList.remove("stop"); $("send").textContent = "➤";
+    setStatus("ready");
+    return;
+  }
   userText = (userText || "").trim();
   if (!userText) return;
 
@@ -504,7 +513,7 @@ ta.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); const v = ta.value.trim(); ta.value = ""; ta.style.height = "auto"; sendToTiff(v); }
 });
 $("send").onclick = () => {
-  if (streaming) { abortCtl?.abort(); return; }
+  if (streaming) { sendToTiff(""); return; }   // streaming branch in sendToTiff aborts + resets UI
   const v = ta.value.trim(); ta.value = ""; ta.style.height = "auto"; sendToTiff(v);
 };
 

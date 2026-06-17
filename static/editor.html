@@ -999,7 +999,7 @@ lanes.addEventListener('drop',e=>{e.preventDefault();$$('.lane').forEach(l=>l.cl
 // ── RULER / PLAYHEAD SCRUB ─────────────────────────────────────────────
 ruler.addEventListener('pointerdown',e=>{ruler.setPointerCapture(e.pointerId);
   const mv=ev=>{const rect=ruler.getBoundingClientRect();setPlayhead((ev.clientX-rect.left)/ppf);};
-  mv(e);const up=()=>{ruler.removeEventListener('pointermove',mv);ruler.removeEventListener('pointerup',up);};
+  mv(e);const up=()=>{ruler.releasePointerCapture(e.pointerId);ruler.removeEventListener('pointermove',mv);ruler.removeEventListener('pointerup',up);};
   ruler.addEventListener('pointermove',mv);ruler.addEventListener('pointerup',up);});
 lanesWrap.addEventListener('scroll',()=>{ruler.parentElement.scrollLeft=lanesWrap.scrollLeft;
   heads.parentElement.scrollTop=lanesWrap.scrollTop;updatePlayhead();});
@@ -1126,16 +1126,17 @@ async function exportViaFrameServer(tl){
   const W=tl.width,H=tl.height,fps=tl.fps,total=tl.duration||timelineFrames();
   let wake=null;try{wake=await navigator.wakeLock.request('screen');}catch{}
   const off=new OffscreenCanvas(W,H),octx=off.getContext('2d',{alpha:false});
-  const srcMap=await preloadExportVideos();
-  const proto=location.protocol==='https:'?'wss':'ws';
-  const ws=new WebSocket(`${proto}://${location.host}/api/editor/export_frames`);ws.binaryType='arraybuffer';
+  let srcMap=null,ws=null;
   let done=null,err=null,ready=false;
-  ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='ready')ready=true;if(m.type==='done')done=m.id;if(m.type==='error')err=m.text;}catch{}};
-  await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=()=>rej(new Error('render socket failed'));});
-  ws.send(JSON.stringify({type:'init',w:W,h:H,fps,total,settings:tl._settings,timeline:tl,name:tl.title||'render'}));
-  for(let i=0;i<300&&!ready&&!err;i++)await sleep(50);
-  if(err)throw new Error(err);
   try{
+    srcMap=await preloadExportVideos();
+    const proto=location.protocol==='https:'?'wss':'ws';
+    ws=new WebSocket(`${proto}://${location.host}/api/editor/export_frames`);ws.binaryType='arraybuffer';
+    ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='ready')ready=true;if(m.type==='done')done=m.id;if(m.type==='error')err=m.text;}catch{}};
+    await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=()=>rej(new Error('render socket failed'));});
+    ws.send(JSON.stringify({type:'init',w:W,h:H,fps,total,settings:tl._settings,timeline:tl,name:tl.title||'render'}));
+    for(let i=0;i<300&&!ready&&!err;i++)await sleep(50);
+    if(err)throw new Error(err);
     for(let f=0;f<total;f++){
       if(window.__expCancel){try{ws.send(JSON.stringify({type:'cancel'}));}catch{}ws.close();return null;}
       await seekActiveVideos(f,fps,srcMap);
@@ -1151,7 +1152,8 @@ async function exportViaFrameServer(tl){
     for(let i=0;i<9000&&!done&&!err;i++)await sleep(100);
   }finally{
     if(wake)try{wake.release();}catch{}
-    for(const k in srcMap){try{srcMap[k].pause();srcMap[k].removeAttribute('src');srcMap[k].load();}catch{}}
+    if(ws)try{ws.close();}catch{}
+    if(srcMap)for(const k in srcMap){try{srcMap[k].pause();srcMap[k].removeAttribute('src');srcMap[k].load();}catch{}}
   }
   if(err)throw new Error(err);
   if(!done)throw new Error('render timed out');

@@ -1,5 +1,5 @@
 """
-TIFF'S PINK ROOM — B's own local AI station. Built 2026-06-11.
+ARKITECT — B's own local AI station. Built 2026-06-11.
 
 Not a fork, not a skin — written from zero for B. One small FastAPI server:
   - streams chat from LM Studio (any loaded model) with Tiff's persona +
@@ -366,11 +366,17 @@ async def _unload_brain():
         return
     import subprocess
     try:
-        subprocess.Popen([str(LMS_CLI), "unload", "--all"],
-                         creationflags=0x08000000)  # CREATE_NO_WINDOW
+        # run + wait (was a fire-and-forget Popen): the brain must actually be OUT of
+        # VRAM before FLUX loads, or the 8GB card thrashes. timeout so a hung lms can't
+        # wedge the render path.
+        r = subprocess.run([str(LMS_CLI), "unload", "--all"],
+                           creationflags=0x08000000,  # CREATE_NO_WINDOW
+                           capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            print(f"[_unload_brain] lms unload failed (rc={r.returncode}): {(r.stderr or '').strip()[:200]}")
         await asyncio.sleep(2)  # let VRAM actually free before FLUX loads
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[_unload_brain] couldn't unload the brain: {e}")
 
 
 async def brain_up() -> bool:
@@ -1508,7 +1514,7 @@ async def plugins_bundle():
     its own try/catch so a single bad one can't break the rest. The Studio can register
     every Builder-made plugin by loading this once on boot."""
     from starlette.responses import Response
-    parts = ["/* Pink Room — Builder-made Studio plugins (auto-generated). Do not edit by hand. */"]
+    parts = ["/* ARKITECT — Builder-made Studio plugins (auto-generated). Do not edit by hand. */"]
     for f in sorted(PLUGINS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime):
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
@@ -1532,12 +1538,34 @@ async def plugin_get(pid: str):
         return JSONResponse({"error": "saved plugin is corrupt"}, status_code=400)
 
 
+def _valid_plugin(code: str) -> bool:
+    """Conservative contract check for a Builder-saved Studio plugin. This code is
+    concatenated into bundle.js and runs in every browser, so we refuse anything that
+    doesn't match the documented TIFF_PLUGINS.register({...}) shape. Kept LOOSE on
+    purpose — it only requires the four contract anchors (the register call, a name,
+    a create() factory, and the input/output return) so legitimate plugins (see
+    PLUGIN_EXAMPLE) all pass; it's a shape gate, not a JS sandbox."""
+    c = code.strip()
+    if not re.match(r"^TIFF_PLUGINS\.register\s*\(\s*\{", c):
+        return False          # must BE the register call, not merely mention it
+    if not re.search(r"\bname\s*:", c):
+        return False          # contract requires a name
+    if not re.search(r"\bcreate\s*\(", c):
+        return False          # contract requires a create() factory
+    if "input" not in c or "output" not in c:
+        return False          # create() must return input + output (rule #1)
+    return True
+
+
 @app.post("/api/plugins")
 async def plugin_save(req: Request):
     d = await req.json()
     code = (d.get("code") or "").strip()
     if "TIFF_PLUGINS.register" not in code:
         return JSONResponse({"error": "not a plugin (no TIFF_PLUGINS.register call)"}, status_code=400)
+    if not _valid_plugin(code):
+        return JSONResponse({"error": "plugin doesn't match the TIFF_PLUGINS.register contract "
+                             "(needs name, create(c){...} returning input/output)"}, status_code=400)
     pid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or str(uuid.uuid4()))
     name = (d.get("name") or "").strip()
     if not name:
@@ -1590,7 +1618,7 @@ async def studio_save(req: Request):
     pid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or str(uuid.uuid4()))
     d["id"] = pid
     d["ts"] = int(time.time())
-    _atomic_write(STUDIO_DIR / f"{pid}.json", json.dumps(d))
+    _atomic_write(STUDIO_DIR / f"{pid}.json", json.dumps(d, indent=1))
     return {"ok": True, "id": pid}
 
 
@@ -1670,13 +1698,14 @@ async def tts_warm():
 
 
 # ── IMAGES — FLUX on B's own GPU via ComfyUI (D:\tiff-images, port 8188) ───
-# Free, unlimited, local. The Pink Room is the pretty face; ComfyUI is the
+# Free, unlimited, local. ARKITECT is the pretty face; ComfyUI is the
 # engine room. If the engine isn't running, we say so plainly.
 
 COMFY = "http://127.0.0.1:8188"
 COMFY_DIR = Path(os.environ.get("COMFY_DIR", r"D:\tiff-images\ComfyUI_windows_portable"))
 OUT_DIR = COMFY_DIR / "ComfyUI" / "output"
 UNET_DIR = COMFY_DIR / "ComfyUI" / "models" / "unet"
+_engine_proc = None   # handle to the ComfyUI subprocess we launched (None = none of ours running)
 
 # ── model registry: maps a "mode" to its unet file + defaults ─────────────
 # Three model PATHS sharing one ComfyUI instance, not one engine:
@@ -1739,6 +1768,7 @@ async def ensure_engine() -> bool:
     on, turns on'). Cold boot on his card ≈ 20-60s; we wait up to 90.
     Guarded by a lock so two concurrent image requests can't double-launch
     ComfyUI and fight over the 8GB VRAM."""
+    global _engine_proc
     if await _engine_up():
         return True
     if not COMFY_DIR.exists():
@@ -1747,16 +1777,31 @@ async def ensure_engine() -> bool:
         if await _engine_up():     # booted while we waited on the lock
             return True
         import subprocess
+        # If a ComfyUI we launched is still alive, it's mid-boot — don't double-launch
+        # (two instances fight over the 8GB VRAM). Just wait on the existing one. If
+        # our previous launch already exited, clear the dead handle and relaunch.
+        if _engine_proc is not None and _engine_proc.poll() is None:
+            for _ in range(45):
+                await asyncio.sleep(2)
+                if await _engine_up():
+                    return True
+            return False
+        _engine_proc = None
         try:
-            subprocess.Popen(
+            _engine_proc = subprocess.Popen(
                 [str(COMFY_DIR / "python_embeded" / "python.exe"), "-s", "ComfyUI\\main.py",
                  "--windows-standalone-build", "--listen", "127.0.0.1", "--port", "8188", "--lowvram"],
                 cwd=str(COMFY_DIR), creationflags=0x08000000,  # CREATE_NO_WINDOW
             )
         except Exception:
+            _engine_proc = None
             return False
         for _ in range(45):
             await asyncio.sleep(2)
+            # the process died on its own — stop waiting the full 90s, surface failure
+            if _engine_proc.poll() is not None:
+                _engine_proc = None
+                return False
             if await _engine_up():
                 return True
     return False
@@ -2131,6 +2176,8 @@ async def image_gen(req: Request):
     ref_name = ""
     if has_ref:
         import base64
+        if "," not in ref_b64:
+            return JSONResponse({"error": "malformed reference image (not a valid data URI)"}, status_code=400)
         try:
             raw = base64.b64decode(ref_b64.split(",", 1)[1])
             fname = f"pinkref-{uuid.uuid4().hex[:10]}.png"
@@ -2355,13 +2402,22 @@ EDIT_OUT    = EDITOR_DIR / "exports"      # rendered deliverables
 for _d in (EDITOR_DIR, EDIT_PROJ, EDIT_CACHE, EDIT_OUT):
     _d.mkdir(exist_ok=True)
 
-FFMPEG  = _shutil.which("ffmpeg")  or r"C:\Users\koonc\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-full_build\bin\ffmpeg.exe"
-FFPROBE = _shutil.which("ffprobe") or FFMPEG.replace("ffmpeg.exe", "ffprobe.exe")
+# ffmpeg/ffprobe must be on PATH (portable across machines — no hardcoded user dir).
+FFMPEG  = _shutil.which("ffmpeg")  or "ffmpeg"
+FFPROBE = _shutil.which("ffprobe") or "ffprobe"
+
+
+def _ffmpeg_missing() -> bool:
+    """True if ffmpeg/ffprobe aren't resolvable on PATH — editor endpoints return a
+    clear 'ffmpeg not found' error instead of an opaque FileNotFoundError mid-render."""
+    return _shutil.which("ffmpeg") is None or _shutil.which("ffprobe") is None
 _NOWIN = 0x08000000  # CREATE_NO_WINDOW — no console flash on subprocess calls
 
 EDIT_MEDIA: dict[str, dict] = {}          # mid -> full record (incl. server-only src path)
 EDIT_MEDIA_FILE = EDITOR_DIR / "media.json"
 EXPORT_JOBS: dict[str, dict] = {}         # jid -> {status,progress,out_path,error,proc}
+_media_lock = asyncio.Lock()              # serialize EDIT_MEDIA read-modify-write (no orphaned cache writes)
+_jobs_lock = asyncio.Lock()               # serialize EXPORT_JOBS access (WS frame loop vs HTTP cancel)
 
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv", ".ts"}
 _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma"}
@@ -2507,22 +2563,32 @@ async def _build_cache(mid: str):
     src = m["src"]; kind = m["kind"]; dur = m.get("dur", 0)
     cdir = EDIT_CACHE / mid
     cdir.mkdir(exist_ok=True)
+    cache = {}
     try:
         await asyncio.to_thread(_gen_poster, src, cdir / "poster.jpg", kind, dur)
-        m.setdefault("cache", {})["poster"] = (cdir / "poster.jpg").exists()
+        cache["poster"] = (cdir / "poster.jpg").exists()
         if kind == "video":
             await asyncio.to_thread(_gen_proxy, src, cdir / "proxy.mp4", m.get("has_audio"))
-            m["cache"]["proxy"] = (cdir / "proxy.mp4").exists()
+            cache["proxy"] = (cdir / "proxy.mp4").exists()
             strip_n = await asyncio.to_thread(_gen_filmstrip, src, cdir / "strip.jpg", dur)
             if strip_n:
-                m["cache"]["strip"] = strip_n
+                cache["strip"] = strip_n
         if m.get("has_audio") or kind == "audio":
             await asyncio.to_thread(_gen_peaks, src, cdir / "peaks.json")
-            m["cache"]["peaks"] = (cdir / "peaks.json").exists()
-        m["ready"] = True
-        _save_media_reg()
+            cache["peaks"] = (cdir / "peaks.json").exists()
+        # commit the cache flags + ready under the lock so a concurrent editor_import
+        # (which assigns EDIT_MEDIA[mid] and re-saves) can't orphan this write
+        async with _media_lock:
+            cur = EDIT_MEDIA.get(mid)
+            if cur is not None:
+                cur.setdefault("cache", {}).update(cache)
+                cur["ready"] = True
+                _save_media_reg()
     except Exception:
-        m["ready"] = True  # never wedge the UI on a cache miss
+        async with _media_lock:
+            cur = EDIT_MEDIA.get(mid)
+            if cur is not None:
+                cur["ready"] = True  # never wedge the UI on a cache miss
 
 
 @app.post("/api/editor/pick")
@@ -2554,6 +2620,8 @@ async def editor_pick():
 async def editor_import(req: Request):
     """Register one or more source files: probe, assign a stable id, kick off
     background cache (proxy/thumbs/peaks). Returns client-safe media records."""
+    if _ffmpeg_missing():
+        return JSONResponse({"error": "ffmpeg not found — install ffmpeg and make sure ffmpeg/ffprobe are on your PATH"}, status_code=500)
     body = await req.json()
     paths = body.get("paths") or []
     out = []
@@ -2563,8 +2631,11 @@ async def editor_import(req: Request):
             continue
         mid = _hashlib.sha1(path.lower().encode("utf-8")).hexdigest()[:16]
         ext = os.path.splitext(path)[1].lower()
-        if mid in EDIT_MEDIA and EDIT_MEDIA[mid].get("ready"):
-            out.append(_media_public(EDIT_MEDIA[mid]));  continue
+        async with _media_lock:
+            existing = EDIT_MEDIA.get(mid)
+            ready = existing.get("ready") if existing else False
+        if existing and ready:
+            out.append(_media_public(existing));  continue
         info = _probe(path) or {}
         kind = _kind_for(ext)
         if kind == "video" and not info.get("has_video"):
@@ -2579,8 +2650,9 @@ async def editor_import(req: Request):
             "vcodec": info.get("vcodec", ""), "acodec": info.get("acodec", ""),
             "cache": {}, "ready": False, "ts": int(time.time()),
         }
-        EDIT_MEDIA[mid] = rec
-        _save_media_reg()
+        async with _media_lock:
+            EDIT_MEDIA[mid] = rec
+            _save_media_reg()
         _fire(_build_cache(mid))
         out.append(_media_public(rec))
     return {"media": out}
@@ -2701,6 +2773,37 @@ def _esc_dt(s: str) -> str:
     return s
 
 
+_DEFAULT_FONT = "C\\:/Windows/Fonts/arialbd.ttf"
+_FONT_DIRS = (Path("C:/Windows/Fonts"), Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts",
+              Path("/usr/share/fonts"), Path("/Library/Fonts"), Path.home() / ".fonts")
+
+
+def _safe_font(raw) -> str:
+    """Validate a client-supplied drawtext font path before it's injected into the
+    ffmpeg filter string. Untrusted, unescaped input here is a filter-injection hole
+    (a quote in the path breaks out of fontfile='...' and appends arbitrary options).
+    Whitelist: must be a real .ttf/.otf file under a known fonts dir and contain no
+    characters that could escape the quoted filter token. Anything else → default."""
+    if not raw or not isinstance(raw, str):
+        return _DEFAULT_FONT
+    # reject quotes/control chars that could escape the quoted fontfile token
+    if any(ch in raw for ch in ("'", '"', ";", "[", "]", ",", "\n", "\r")):
+        return _DEFAULT_FONT
+    try:
+        p = Path(raw.replace("\\:", ":"))   # accept the pre-escaped colon form too
+        if p.suffix.lower() not in (".ttf", ".otf", ".ttc"):
+            return _DEFAULT_FONT
+        if not p.is_file():
+            return _DEFAULT_FONT
+        rp = p.resolve()
+        if not any(str(rp).lower().startswith(str(d.resolve()).lower()) for d in _FONT_DIRS if str(d)):
+            return _DEFAULT_FONT
+        # build an ffmpeg-safe fontfile token: forward slashes, escaped colon, no quotes
+        return str(rp).replace("\\", "/").replace(":", "\\:")
+    except Exception:
+        return _DEFAULT_FONT
+
+
 def _build_export_cmd(tl: dict, out_path: str, settings: dict):
     W = int(tl.get("width", 1920)); H = int(tl.get("height", 1080))
     FPS = float(tl.get("fps", 30)) or 30.0
@@ -2769,7 +2872,7 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
         fc.append(f"[{last}][{lbl}]overlay=enable='between(t,{pos:.3f},{pos+d:.3f})':eof_action=pass[{nl}]")
         last = nl; n += 1
 
-    FONT = settings.get("font", "C\\:/Windows/Fonts/arialbd.ttf")
+    FONT = _safe_font(settings.get("font"))
     for t in texts:
         pos = t.get("start", 0) / FPS; d = max(0.04, t.get("dur", 0) / FPS)
         txt = _esc_dt(t.get("text", "")); size = int(t.get("size", 72))
@@ -2828,11 +2931,24 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
 
 async def _run_export(jid: str, cmd: list, total_sec: float):
     job = EXPORT_JOBS[jid]
+    proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, creationflags=_NOWIN)
-        job["proc"] = proc
+        async with _jobs_lock:
+            job["proc"] = proc
         assert proc.stdout is not None
+        # drain stderr CONCURRENTLY so ffmpeg never blocks on a full stderr pipe while
+        # we read only stdout (that deadlock is what left a zombie on cancel mid-read).
+        err_chunks = []
+
+        async def _drain_err():
+            if proc.stderr is None:
+                return
+            async for eline in proc.stderr:
+                err_chunks.append(eline.decode("utf-8", "ignore"))
+
+        err_task = asyncio.create_task(_drain_err())
         async for line in proc.stdout:
             s = line.decode("utf-8", "ignore").strip()
             if s.startswith("out_time_us=") or s.startswith("out_time_ms="):
@@ -2846,7 +2962,11 @@ async def _run_export(jid: str, cmd: list, total_sec: float):
             elif s == "progress=end":
                 job["progress"] = 0.99
         await proc.wait()
-        err = (await proc.stderr.read()).decode("utf-8", "ignore") if proc.stderr else ""
+        try:
+            await err_task          # finish draining stderr even on non-zero exit
+        except Exception:
+            pass
+        err = "".join(err_chunks)
         if proc.returncode == 0 and os.path.isfile(job["out_path"]):
             job["status"] = "done"; job["progress"] = 1.0
             job["size"] = os.path.getsize(job["out_path"])
@@ -2858,11 +2978,24 @@ async def _run_export(jid: str, cmd: list, total_sec: float):
     except Exception as e:
         job["status"] = "error"; job["error"] = str(e)
     finally:
-        job["proc"] = None
+        # reap the process so a terminate()'d (cancelled) ffmpeg can't linger as a zombie
+        if proc is not None and proc.returncode is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            try:
+                await proc.wait()
+            except Exception:
+                pass
+        async with _jobs_lock:
+            job["proc"] = None
 
 
 @app.post("/api/editor/export")
 async def editor_export(req: Request):
+    if _ffmpeg_missing():
+        return JSONResponse({"error": "ffmpeg not found — install ffmpeg and make sure ffmpeg/ffprobe are on your PATH"}, status_code=500)
     body = await req.json()
     tl = body.get("timeline") or {}
     settings = body.get("settings") or {}
@@ -2889,13 +3022,15 @@ async def editor_export_status(jid: str):
 
 @app.post("/api/editor/export/{jid}/cancel")
 async def editor_export_cancel(jid: str):
-    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
-    if not job:
-        return JSONResponse({"error": "unknown job"}, status_code=404)
-    job["status"] = "cancelled"
-    if job.get("proc"):
+    async with _jobs_lock:
+        job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+        if not job:
+            return JSONResponse({"error": "unknown job"}, status_code=404)
+        job["status"] = "cancelled"
+        proc = job.get("proc")
+    if proc:
         try:
-            job["proc"].terminate()
+            proc.terminate()
         except Exception:
             pass
     return {"ok": True}
@@ -2976,6 +3111,10 @@ async def export_frames(ws: WebSocket):
     fdir.mkdir(parents=True, exist_ok=True)
     n = 0
     try:
+        if _ffmpeg_missing():
+            try: await ws.send_json({"type": "error", "text": "ffmpeg not found — install ffmpeg and make sure ffmpeg/ffprobe are on your PATH"})
+            except Exception: pass
+            return
         init = json.loads(await ws.receive_text())
         W = int(init["w"]); H = int(init["h"]); FPS = float(init.get("fps", 30)) or 30.0
         total = int(init.get("total", 0)); settings = init.get("settings") or {}
@@ -2989,7 +3128,9 @@ async def export_frames(ws: WebSocket):
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
-                EXPORT_JOBS[jid]["status"] = "cancelled"; break
+                async with _jobs_lock:
+                    EXPORT_JOBS[jid]["status"] = "cancelled"
+                break
             b = msg.get("bytes")
             if b is not None:
                 (fdir / f"f_{n:06d}.jpg").write_bytes(b); n += 1
@@ -3000,10 +3141,14 @@ async def export_frames(ws: WebSocket):
             if txt:
                 ctl = json.loads(txt)
                 if ctl.get("type") == "cancel":
-                    EXPORT_JOBS[jid]["status"] = "cancelled"; break
+                    async with _jobs_lock:
+                        EXPORT_JOBS[jid]["status"] = "cancelled"
+                    break
                 if ctl.get("type") == "eof":
                     break
-        if EXPORT_JOBS[jid]["status"] == "cancelled" or n == 0:
+        async with _jobs_lock:
+            _cancelled = EXPORT_JOBS[jid]["status"] == "cancelled"
+        if _cancelled or n == 0:
             if n == 0:
                 EXPORT_JOBS[jid]["status"] = "error"; EXPORT_JOBS[jid]["error"] = "no frames received"
                 try: await ws.send_json({"type": "error", "text": "no frames received"})
@@ -3034,10 +3179,12 @@ async def export_frames(ws: WebSocket):
         EXPORT_JOBS[jid]["progress"] = 0.7
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
                                                     stderr=asyncio.subprocess.PIPE, creationflags=_NOWIN)
-        EXPORT_JOBS[jid]["proc"] = proc
+        async with _jobs_lock:
+            EXPORT_JOBS[jid]["proc"] = proc
         err = (await proc.stderr.read()).decode("utf-8", "ignore") if proc.stderr else ""
         await proc.wait()
-        EXPORT_JOBS[jid]["proc"] = None
+        async with _jobs_lock:
+            EXPORT_JOBS[jid]["proc"] = None
         if proc.returncode == 0 and os.path.isfile(out_path):
             EXPORT_JOBS[jid]["status"] = "done"; EXPORT_JOBS[jid]["progress"] = 1.0
             EXPORT_JOBS[jid]["size"] = os.path.getsize(out_path)
@@ -3052,8 +3199,9 @@ async def export_frames(ws: WebSocket):
         try: await ws.send_json({"type": "error", "text": str(e)})
         except Exception: pass
     finally:
-        if jid in EXPORT_JOBS:
-            EXPORT_JOBS[jid]["proc"] = None
+        async with _jobs_lock:
+            if jid in EXPORT_JOBS:
+                EXPORT_JOBS[jid]["proc"] = None
         try: await ws.close()
         except Exception: pass
         try: _shutil.rmtree(jobdir, ignore_errors=True)   # drop the frame scratch, keep the mp4

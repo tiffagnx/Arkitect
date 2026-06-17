@@ -1,6 +1,6 @@
 declare name "Telephone";
 declare author "LOONEY VISION";
-declare description "Lo-fi bandpass (600Hz–3.2kHz), wet/dry. The Pink Room 'Telephone'.";
+declare description "Lo-fi bandpass (600Hz–3.2kHz), wet/dry. The ARKITECT 'Telephone'.";
 import("stdfaust.lib");
 
 amt  = hslider("AMT[style:knob]", 1, 0, 1, 0.01);

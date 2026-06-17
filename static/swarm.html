@@ -158,10 +158,15 @@ function applyPreset() {
   const p = PRESETS[+$("preset").value]; if (!p) return;
   if (p.name !== "Custom") { $("fName").value = p.name; $("fBase").value = p.base_url; $("fModel").value=""; $("fModel").placeholder = (p.models_hint||"").split(",")[0].trim(); }
   else { $("fName").value=""; $("fBase").value=""; }
-  const link = p.key_url ? ` · <a href="${p.key_url}" target="_blank" rel="noopener">get a free key ↗</a>` : "";
-  $("presetHint").innerHTML = (p.free && p.free!=="—" ? `${p.free}. ` : "") +
+  const hintText = (p.free && p.free!=="—" ? `${p.free}. ` : "") +
     (p.models_hint ? `models: ${p.models_hint}.` : "") +
-    (p.native_web && p.native_web!=="no" && p.native_web!=="?" ? ` · can browse: ${p.native_web}` : "") + link;
+    (p.native_web && p.native_web!=="no" && p.native_web!=="?" ? ` · can browse: ${p.native_web}` : "");
+  const hintEl = $("presetHint"); hintEl.textContent = hintText;
+  if (p.key_url) {
+    hintEl.appendChild(document.createTextNode(" · "));
+    const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = "get a free key ↗"; hintEl.appendChild(a);
+  }
   syncGrounded(true);
 }
 function syncGrounded(fromPreset) {
@@ -204,7 +209,7 @@ async function loadProviders() {
 }
 async function saveProvider(payload) {
   const r = await fetch("/api/swarm/providers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json()).catch(()=>({error:"failed"}));
-  loadProviders(); return r;
+  await loadProviders(); return r;
 }
 
 // ── add form ────────────────────────────────────────────────────────────────
@@ -237,17 +242,23 @@ async function runSwarm() {
   try {
     const res = await fetch("/api/research-swarm",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({ question, local_model:$("localModel").value, effort:"low", messages:[{role:"user",content:question}] })});
+    if (!res.ok) throw new Error(`swarm failed (${res.status})`);
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf="";
-    while (true) {
-      const {done,value} = await reader.read(); if (done) break;
-      buf += dec.decode(value,{stream:true}); const lines = buf.split("\n\n"); buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue; let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
-        if (ev.type==="step") addStep(ev.icon, ev.text);
-        else if (ev.type==="delta") { $("answer").textContent += ev.text; }
-        else if (ev.type==="sources") { (ev.items||[]).forEach((s,i)=>{ const a=document.createElement("a"); a.href=s.url; a.target="_blank"; a.rel="noopener"; a.textContent=`[${i+1}] ${s.title||s.url}`; $("srcs").appendChild(a); }); }
-        else if (ev.type==="error") { const d=document.createElement("div"); d.className="err"; d.textContent="⚠ "+ev.text; $("steps").appendChild(d); }
+    try {
+      while (true) {
+        const {done,value} = await reader.read(); if (done) break;
+        buf += dec.decode(value,{stream:true}); const lines = buf.split("\n\n"); buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue; let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+          if (ev.type==="step") addStep(ev.icon, ev.text);
+          else if (ev.type==="delta") { $("answer").textContent += ev.text; }
+          else if (ev.type==="sources") { (ev.items||[]).forEach((s,i)=>{ const a=document.createElement("a"); a.href=s.url; a.target="_blank"; a.rel="noopener"; a.textContent=`[${i+1}] ${s.title||s.url}`; $("srcs").appendChild(a); }); }
+          else if (ev.type==="error") { const d=document.createElement("div"); d.className="err"; d.textContent="⚠ "+ev.text; $("steps").appendChild(d); }
+        }
       }
+      buf += dec.decode();
+    } finally {
+      try { await reader.cancel(); } catch {}
     }
   } catch (e) { const d=document.createElement("div"); d.className="err"; d.textContent="⚠ "+e.message; $("steps").appendChild(d); }
   running = false; $("runBtn").disabled = false;

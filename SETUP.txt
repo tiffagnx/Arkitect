@@ -1,5 +1,5 @@
 ==========================================================
-   TIFF'S PINK ROOM  --  HOW TO START IT
+   ARKITECT  --  HOW TO START IT
 ==========================================================
 
   >>>  Double-click:   START HERE.bat   <<<
@@ -10,14 +10,14 @@
      - installs Python (if you don't have it)
      - installs LM Studio, the AI engine (if you don't have it)
      - downloads the AI model (a few GB - this is the slow part)
-     - opens Tiff's Pink Room in your web browser
+     - opens ARKITECT in your web browser
 
   While it works:
      - If Windows pops up asking "Do you want to allow this?"
        -> click YES.
      - The first run takes a while (it's downloading a few GB).
        A black window shows what it's doing. Let it cook.
-     - When your browser opens to the Pink Room, you're in.
+     - When your browser opens to ARKITECT, you're in.
 
   Every time after the first:  just double-click START HERE
   again and it opens in a few seconds.
