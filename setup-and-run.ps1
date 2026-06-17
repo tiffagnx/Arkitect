@@ -116,7 +116,7 @@ try {
     $sc = $ws.CreateShortcut($lnk)
     $sc.TargetPath = Join-Path $Root "START HERE.bat"
     $sc.WorkingDirectory = $Root
-    $ico = Join-Path $Root "static\tec.ico"
+    $ico = Join-Path $Root "static\kit.ico"
     if(Test-Path $ico){ $sc.IconLocation = $ico }
     $sc.Description = "ARKITECT - your local AI creative studio"
     $sc.Save()
