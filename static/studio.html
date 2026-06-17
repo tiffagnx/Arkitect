@@ -1294,11 +1294,16 @@ TIFF_PLUGINS.register({
   ],
   create(c) {
     const i=c.createGain(), o=c.createGain(), dry=c.createGain(), pre=c.createDelay(0.5), cv=c.createConvolver(), ret=c.createGain();
+    // high-end EDGE: a slow LFO on the wet tail so the reverb BREATHES instead of
+    // sitting there as static, metallic convolution — the line between "good" and Altiverb-grade.
+    const mod=c.createDelay(0.06), lfo=c.createOscillator(), lfoDepth=c.createGain();
+    lfo.type='sine'; lfo.frequency.value=0.8; lfoDepth.gain.value=0.0028; mod.delayTime.value=0.004;
+    lfo.connect(lfoDepth); lfoDepth.connect(mod.delayTime); try{ lfo.start(); }catch(e){}
     let size=2.2, tone=6000, bt=null;
     const bake=()=>{ try { cv.buffer = makeIR(c, size, tone); } catch {} };
     bake(); dry.gain.value=1; pre.delayTime.value=0.02; ret.gain.value=0.8;
-    i.connect(dry); dry.connect(o);                                       // dry pass-through
-    i.connect(pre); pre.connect(cv); cv.connect(ret); ret.connect(o);     // pre-delay → convolver → return
+    i.connect(dry); dry.connect(o);                                              // dry pass-through
+    i.connect(pre); pre.connect(cv); cv.connect(mod); mod.connect(ret); ret.connect(o);  // pre-delay → convolver → modulated tail → return
     return { input:i, output:o, set(id,v){
       if(id==='size'){ size=v; clearTimeout(bt); bt=setTimeout(bake,140); }
       else if(id==='tone'){ tone=v; clearTimeout(bt); bt=setTimeout(bake,140); }
