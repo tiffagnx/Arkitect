@@ -9,21 +9,21 @@
 <style>
   /* ── room aesthetic — tokens copied verbatim from index.html ── */
   :root {
-    --pink: #E91E8C; --teal: #00D1C4; --violet: #8B5CF6;
-    --bg0: #07050C; --bg1: #16111E; --panel: rgba(14,10,20,0.72);
-    --hairline: rgba(255,255,255,0.08); --text: #F2EDF4; --dim: rgba(220,210,228,0.55);
+    --pink: #3E9CB8; --teal: #2BB6A8; --violet: #7C8AA5;
+    --bg0: #0C0D10; --bg1: #15161A; --panel: rgba(24,25,30,0.86);
+    --hairline: rgba(255,255,255,0.07); --text: #E9EAED; --dim: rgba(198,201,208,0.55);
   }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
   body {
     font-family: Inter, system-ui, sans-serif; color: var(--text); overflow: hidden;
-    background: radial-gradient(1200px 700px at 30% -10%, #221330 0%, var(--bg1) 45%, var(--bg0) 100%);
+    background: radial-gradient(1200px 700px at 30% -10%, #181922 0%, var(--bg1) 45%, var(--bg0) 100%);
   }
   /* drifting aurora + film grain — the room breathes */
   .aura { position: fixed; inset: -20%; pointer-events: none; z-index: 0; filter: blur(90px); opacity: .5; }
   .aura div { position: absolute; width: 44vw; height: 44vw; border-radius: 50%; }
-  .aura .a1 { background: radial-gradient(circle, rgba(233,30,140,.16), transparent 65%); animation: drift1 26s ease-in-out infinite alternate; left: 4%; top: 8%; }
-  .aura .a2 { background: radial-gradient(circle, rgba(139,92,246,.13), transparent 65%); animation: drift2 32s ease-in-out infinite alternate; right: 2%; top: 30%; }
+  .aura .a1 { background: radial-gradient(circle, rgba(62,156,184,.16), transparent 65%); animation: drift1 26s ease-in-out infinite alternate; left: 4%; top: 8%; }
+  .aura .a2 { background: radial-gradient(circle, rgba(124,138,165,.13), transparent 65%); animation: drift2 32s ease-in-out infinite alternate; right: 2%; top: 30%; }
   .aura .a3 { background: radial-gradient(circle, rgba(0,209,196,.08), transparent 65%); animation: drift1 38s ease-in-out infinite alternate-reverse; left: 36%; bottom: -6%; }
   @keyframes drift1 { to { transform: translate(7vw, 5vh) scale(1.15); } }
   @keyframes drift2 { to { transform: translate(-6vw, -4vh) scale(0.9); } }
@@ -35,7 +35,7 @@
   /* ── topbar ── */
   .topbar { display: flex; align-items: center; gap: 11px; padding: 14px 20px; border-bottom: 1px solid var(--hairline); }
   .topbar h1 { font-family: Oxanium; font-size: 16px; letter-spacing: .14em; font-weight: 700;
-    background: linear-gradient(100deg, #FF8FC9, var(--pink) 40%, var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    background: linear-gradient(100deg, #8FD4E4, var(--pink) 40%, var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .topbar .sub { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; margin-top: 2px; }
   .titlewrap { display: flex; flex-direction: column; }
   select.model { margin-left: auto; max-width: 320px; padding: 8px 12px; border-radius: 10px; outline: none; cursor: pointer;
@@ -44,13 +44,13 @@
   .statuspill { font: 500 10px 'Space Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
     padding: 6px 12px; border-radius: 99px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); }
   .statuspill.bad { color: #FF8FA0; border-color: rgba(255,90,110,.45); }
-  .statuspill.live { color: #FFD6EA; border-color: rgba(233,30,140,.5); background: rgba(233,30,140,.1); }
+  .statuspill.live { color: #CFE6EE; border-color: rgba(62,156,184,.5); background: rgba(62,156,184,.1); }
 
   /* ── the avatar stage ── */
   .arena { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
   .avatarframe { position: relative; display: flex; flex-direction: column; align-items: center; }
   .glow { position: absolute; inset: -8% -14% 4%; border-radius: 40%; pointer-events: none; z-index: 0;
-    background: radial-gradient(circle at 50% 60%, rgba(233,30,140,.28), rgba(139,92,246,.12) 50%, transparent 72%);
+    background: radial-gradient(circle at 50% 60%, rgba(62,156,184,.28), rgba(124,138,165,.12) 50%, transparent 72%);
     filter: blur(34px); opacity: .85; transition: opacity .25s; }
   .glow.live { opacity: 1; animation: arenapulse 1.4s ease-in-out infinite; }
   @keyframes arenapulse { 50% { opacity: .65; transform: scale(1.04); } }
@@ -61,7 +61,7 @@
   .caption { position: relative; z-index: 1; max-width: 680px; margin: 0 auto 4px; padding: 0 24px; min-height: 1.6em;
     text-align: center; font-size: 15px; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
   .caption:empty::after { content: ""; }
-  .caption b { color: #FFD6EA; }
+  .caption b { color: #CFE6EE; }
   .caption code { font-family: 'Space Mono'; font-size: 12.5px; background: rgba(0,0,0,.4); border-radius: 6px; padding: 1px 6px; color: #9BF0E8; }
 
   /* ── input dock — lifted from index.html ── */
@@ -71,18 +71,18 @@
   .inputrow { display: flex; gap: 10px; align-items: flex-end; padding: 10px;
     background: var(--panel); backdrop-filter: blur(26px); border: 1px solid var(--hairline); border-radius: 22px;
     transition: border-color .2s, box-shadow .2s; }
-  .inputrow:focus-within { border-color: rgba(233,30,140,.5); box-shadow: 0 0 0 3px rgba(233,30,140,.1), 0 14px 50px rgba(0,0,0,.4); }
+  .inputrow:focus-within { border-color: rgba(62,156,184,.5); box-shadow: 0 0 0 3px rgba(62,156,184,.1), 0 14px 50px rgba(0,0,0,.4); }
   textarea { flex: 1; min-width: 0; border: none; outline: none; resize: none; background: transparent; color: var(--text);
     font: 400 14.5px Inter; line-height: 1.5; max-height: 160px; padding: 8px 6px; }
   .send { width: 44px; height: 44px; min-width: 44px; border: none; border-radius: 50%; cursor: pointer; font-size: 17px;
-    color: #14040E; background: linear-gradient(135deg, #FF73BE, var(--pink)); box-shadow: 0 0 16px rgba(233,30,140,.45);
+    color: #14040E; background: linear-gradient(135deg, #6FC0D8, var(--pink)); box-shadow: 0 0 16px rgba(62,156,184,.45);
     transition: transform .1s, box-shadow .15s; display: flex; align-items: center; justify-content: center; }
   .send:hover { transform: scale(1.06); }
   .send.stop { background: #2A1318; color: #FF8FA0; border: 1.5px solid rgba(255,90,110,.55); box-shadow: none; }
   .mic { background: rgba(255,255,255,.07); color: #D8CCE4; box-shadow: none; border: 1px solid var(--hairline); font-size: 15px; }
-  .mic.listening { background: linear-gradient(135deg, #FF73BE, var(--pink)); color: #14040E; box-shadow: 0 0 16px rgba(233,30,140,.45); }
+  .mic.listening { background: linear-gradient(135deg, #6FC0D8, var(--pink)); color: #14040E; box-shadow: 0 0 16px rgba(62,156,184,.45); }
 
-  ::-webkit-scrollbar { width: 9px; } ::-webkit-scrollbar-thumb { background: rgba(233,30,140,.25); border-radius: 99px; }
+  ::-webkit-scrollbar { width: 9px; } ::-webkit-scrollbar-thumb { background: rgba(62,156,184,.25); border-radius: 99px; }
 </style>
 </head>
 <body>
@@ -91,7 +91,7 @@
 
 <div class="stage">
   <div class="topbar">
-    <a class="pr-back" href="/">← ARKITECT</a>
+    <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
     <div class="titlewrap">
       <h1>TALKING TIFF</h1>
       <span class="sub">face to face · local · live</span>
@@ -303,7 +303,7 @@ function drawPlaceholderOrb(ts, yOff, loud) {
   grad.addColorStop(0.55, "#E91E8C");
   grad.addColorStop(1, "rgba(92,11,57,0.15)");
   ctx.save();
-  ctx.shadowColor = "rgba(233,30,140,0.7)";
+  ctx.shadowColor = "rgba(62,156,184,0.7)";
   ctx.shadowBlur = 40 + loud * 90;
   ctx.fillStyle = grad;
   ctx.beginPath();
@@ -564,5 +564,6 @@ $("mic").onclick = () => {
 })();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
+<script src="/static/tec-mascot.js"></script>
 </body>
 </html>

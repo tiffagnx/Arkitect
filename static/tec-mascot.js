@@ -6,7 +6,7 @@
   if (window.__tecMascot || document.querySelector(".tec-mascot")) return;
   window.__tecMascot = true;
 
-  const COLS = 6, ROWS = 2, FRAMES = COLS * ROWS;
+  const COLS = 12, ROWS = 1, FRAMES = COLS * ROWS;
   const FPS = 6;       // idle cadence
   const VIEW = 72;     // rendered px
 

@@ -5,16 +5,16 @@
 <title>Images — ARKITECT</title>
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
-  :root { --pink:#E91E8C; --teal:#00D1C4; --bg0:#07050C; --bg1:#16111E; --panel:rgba(14,10,20,0.72);
-          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.55); }
   * { box-sizing:border-box; margin:0; }
   body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text);
-         background: radial-gradient(1200px 700px at 30% -10%, #221330 0%, var(--bg1) 45%, var(--bg0) 100%); }
+         background: radial-gradient(1200px 700px at 30% -10%, #181922 0%, var(--bg1) 45%, var(--bg0) 100%); }
   .top { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--hairline); }
   .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
-  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top a:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
   .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
-    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,#8B5CF6); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    background:linear-gradient(100deg,#8FD4E4,var(--pink) 40%,#7C8AA5); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .top select { margin-left:auto; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.045);
     color:var(--text); border:1px solid var(--hairline); font:500 12px Inter; outline:none; }
   .top select option { background:var(--bg1); }
@@ -24,16 +24,16 @@
   .modes button { border:none; background:transparent; color:var(--dim); cursor:pointer; padding:7px 16px;
     border-radius:10px; font:600 11.5px Oxanium; letter-spacing:.1em; transition:all .14s; }
   .modes button:hover { color:var(--text); }
-  .modes button.on { color:#14040E; background:linear-gradient(135deg,#FF73BE,var(--pink));
-    box-shadow:0 0 14px rgba(233,30,140,.4); }
+  .modes button.on { color:#14040E; background:linear-gradient(135deg,#6FC0D8,var(--pink));
+    box-shadow:0 0 14px rgba(62,156,184,.4); }
   .modeHint { font:400 11px 'Space Mono'; color:var(--dim); margin:0 0 12px 4px; min-height:15px; }
   .bar { display:flex; gap:10px; align-items:flex-end; padding:10px; background:var(--panel);
     backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:20px; }
-  .bar:focus-within { border-color:rgba(233,30,140,.5); }
+  .bar:focus-within { border-color:rgba(62,156,184,.5); }
   textarea { flex:1; border:none; outline:none; resize:none; background:transparent; color:var(--text);
     font:400 14.5px Inter; line-height:1.5; max-height:120px; padding:8px 6px; }
   .go { width:46px; height:46px; min-width:46px; border:none; border-radius:50%; cursor:pointer; font-size:18px;
-    color:#14040E; background:linear-gradient(135deg,#FF73BE,var(--pink)); box-shadow:0 0 16px rgba(233,30,140,.45); }
+    color:#14040E; background:linear-gradient(135deg,#6FC0D8,var(--pink)); box-shadow:0 0 16px rgba(62,156,184,.45); }
   .go:disabled { opacity:.5; }
   .polish { height:46px; padding:0 14px; border:1px solid rgba(0,209,196,.5); border-radius:23px; cursor:pointer;
     background:rgba(0,209,196,.08); color:#00D1C4; font:600 11.5px Oxanium; letter-spacing:.06em; white-space:nowrap; transition:all .14s; }
@@ -42,25 +42,25 @@
   .status { font:400 11.5px 'Space Mono'; color:var(--dim); min-height:18px; padding:8px 4px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:8px; }
   .tile { position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); transition:transform .12s, border-color .12s; }
-  .tile:hover { transform:translateY(-2px); border-color:rgba(233,30,140,.5); }
+  .tile:hover { transform:translateY(-2px); border-color:rgba(62,156,184,.5); }
   .tile a { display:block; }
   .grid img { width:100%; display:block; aspect-ratio:1; object-fit:cover; }
-  .fresh { border-color:var(--pink) !important; box-shadow:0 0 22px rgba(233,30,140,.35); }
+  .fresh { border-color:var(--pink) !important; box-shadow:0 0 22px rgba(62,156,184,.35); }
   .tileBtns { position:absolute; bottom:0; left:0; right:0; display:flex; gap:6px; padding:8px;
     background:linear-gradient(0deg, rgba(7,5,12,.82), rgba(7,5,12,0)); opacity:0; transition:opacity .14s; pointer-events:none; }
   .tile:hover .tileBtns { opacity:1; pointer-events:auto; }
-  .tileBtns button { flex:1; border:1px solid rgba(233,30,140,.4); background:rgba(20,4,14,.6); backdrop-filter:blur(6px);
+  .tileBtns button { flex:1; border:1px solid rgba(62,156,184,.4); background:rgba(20,4,14,.6); backdrop-filter:blur(6px);
     color:var(--text); cursor:pointer; padding:6px 8px; border-radius:999px; font:600 10.5px Oxanium; letter-spacing:.06em; transition:all .12s; }
-  .tileBtns button:hover { background:linear-gradient(135deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent; }
+  .tileBtns button:hover { background:linear-gradient(135deg,#6FC0D8,var(--pink)); color:#14040E; border-color:transparent; }
   .tileBtns button:disabled { opacity:.45; cursor:default; }
   .tileBtns button.del { flex:0 0 34px; border-color:rgba(255,90,90,.5); font-size:13px; }
   .tileBtns button.del:hover { background:linear-gradient(135deg,#FF6B6B,#E0245E); color:#fff; border-color:transparent; }
-  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(62,156,184,.25); border-radius:99px; }
 </style>
 </head>
 <body>
 <div class="top">
-  <a class="pr-back" href="/">← ARKITECT</a>
+  <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
   <h1>🎨 IMAGES</h1>
   <select id="size" title="Aspect ratio. FLUX renders ~1 megapixel; photo mode then upscales ~2x, so finals land well above 1080p.">
     <option value="1024x1024">1:1 Square · 1024</option>
@@ -94,7 +94,7 @@
     <button id="polishUndo" style="border:none; background:none; color:var(--dim); cursor:pointer; font:500 11px Inter; text-decoration:underline;">↩ undo</button>
   </div>
   <div id="refRow" style="display:none; align-items:center; gap:10px; padding:8px 4px;">
-    <img id="refThumb" style="width:54px; height:54px; object-fit:cover; border-radius:10px; border:1px solid rgba(233,30,140,.5);" alt="" />
+    <img id="refThumb" style="width:54px; height:54px; object-fit:cover; border-radius:10px; border:1px solid rgba(62,156,184,.5);" alt="" />
     <div id="strengthCtl" style="display:flex; align-items:center; gap:10px; flex:1;">
       <span style="font:400 11px 'Space Mono'; color:var(--dim);">starting from this image · change:</span>
       <input type="range" id="strength" min="0.3" max="0.9" step="0.05" value="0.6" style="flex:1; max-width:180px; accent-color:#E91E8C;" />
@@ -312,5 +312,6 @@ const _genOrig = generate;
 generate = async (over) => { $("polishRow").style.display = "none"; return _genOrig(over); };
 </script>
 <script src="/static/pinkroom-nav.js"></script>
+<script src="/static/tec-mascot.js"></script>
 </body>
 </html>

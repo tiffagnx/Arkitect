@@ -5,19 +5,19 @@
 <title>Research Swarm — ARKITECT</title>
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
-  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --bg0:#07050C; --bg1:#16111E;
-          --panel:rgba(14,10,20,0.72); --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --violet:#7C8AA5; --bg0:#0C0D10; --bg1:#15161A;
+          --panel:rgba(24,25,30,0.86); --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.55); }
   * { box-sizing:border-box; margin:0; }
   body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text); padding:0 0 80px;
-         background: radial-gradient(1200px 700px at 30% -10%, #221330 0%, var(--bg1) 45%, var(--bg0) 100%); }
+         background: radial-gradient(1200px 700px at 30% -10%, #181922 0%, var(--bg1) 45%, var(--bg0) 100%); }
   .top { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--hairline); position:sticky; top:0; backdrop-filter:blur(20px); background:rgba(7,5,12,.6); z-index:10; }
   .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
-  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top a:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
   .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
-    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    background:linear-gradient(100deg,#8FD4E4,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .wrap { max-width:880px; margin:0 auto; padding:26px 20px; display:flex; flex-direction:column; gap:26px; }
   .intro { font:400 13.5px Inter; line-height:1.65; color:var(--dim); }
-  .intro b { color:#FFC6E6; }
+  .intro b { color:#CFE6EE; }
   .sec { background:var(--panel); border:1px solid var(--hairline); border-radius:18px; padding:18px 18px 20px; backdrop-filter:blur(24px); }
   .sec > h2 { font:700 11px 'Space Mono'; letter-spacing:.22em; color:var(--dim); text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
   .sec > h2 .count { color:var(--teal); }
@@ -34,7 +34,7 @@
   .slot .tag { font:600 8.5px 'Space Mono'; padding:2px 6px; border-radius:6px; letter-spacing:.04em; }
   .slot .tag.on { background:rgba(91,227,139,.12); color:#7fe8a6; } .slot .tag.no { background:rgba(255,255,255,.06); color:var(--dim); }
   .addbtn { margin-top:13px; font:600 12px Inter; padding:9px 14px; border-radius:11px; cursor:pointer; color:#14040E;
-    background:linear-gradient(120deg,#FF73BE,var(--pink)); border:none; box-shadow:0 4px 16px rgba(233,30,140,.3); }
+    background:linear-gradient(120deg,#6FC0D8,var(--pink)); border:none; box-shadow:0 4px 16px rgba(62,156,184,.3); }
   .empty { color:var(--dim); font:400 12.5px Inter; padding:8px 2px; }
   /* add form */
   .form { display:none; margin-top:14px; border-top:1px solid var(--hairline); padding-top:15px; flex-direction:column; gap:11px; }
@@ -43,7 +43,7 @@
   .field label { font:600 10px 'Space Mono'; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; }
   .field input, .field select { width:100%; padding:9px 11px; border-radius:10px; background:rgba(255,255,255,.04);
     color:var(--text); border:1px solid var(--hairline); font:400 13px Inter; outline:none; }
-  .field input:focus, .field select:focus { border-color:rgba(233,30,140,.5); }
+  .field input:focus, .field select:focus { border-color:rgba(62,156,184,.5); }
   .field select option { background:var(--bg1); }
   .field .hint { font:400 10.5px Inter; color:var(--dim); line-height:1.5; }
   .field .hint a { color:var(--teal); }
@@ -55,7 +55,7 @@
   .frow .field { flex:1; min-width:180px; }
   .formbtns { display:flex; gap:8px; align-items:center; }
   .formbtns button { font:600 12px Inter; padding:9px 15px; border-radius:10px; cursor:pointer; border:1px solid var(--hairline); background:rgba(255,255,255,.05); color:var(--text); }
-  .formbtns .save { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border:none; }
+  .formbtns .save { background:linear-gradient(120deg,#6FC0D8,var(--pink)); color:#14040E; border:none; }
   .formbtns .ghost { color:var(--dim); }
   .teststatus { font:400 11.5px 'Space Mono'; color:var(--dim); }
   .teststatus.ok { color:#7fe8a6; } .teststatus.bad { color:#FF8FA3; }
@@ -64,9 +64,9 @@
   .runrow .field { flex:1; min-width:200px; }
   textarea#q { width:100%; min-height:60px; max-height:160px; resize:vertical; padding:11px 12px; border-radius:12px;
     background:rgba(255,255,255,.04); color:var(--text); border:1px solid var(--hairline); font:400 13.5px Inter; line-height:1.5; outline:none; }
-  textarea#q:focus { border-color:rgba(233,30,140,.5); }
+  textarea#q:focus { border-color:rgba(62,156,184,.5); }
   .runbtn { font:700 12.5px Inter; padding:11px 18px; border-radius:12px; cursor:pointer; color:#14040E; white-space:nowrap;
-    background:linear-gradient(120deg,#FF73BE,var(--pink)); border:none; box-shadow:0 4px 16px rgba(233,30,140,.32); }
+    background:linear-gradient(120deg,#6FC0D8,var(--pink)); border:none; box-shadow:0 4px 16px rgba(62,156,184,.32); }
   .runbtn:disabled { opacity:.5; cursor:default; }
   .out { margin-top:6px; }
   .steps { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
@@ -77,12 +77,12 @@
   .srcs a { font:400 11.5px Inter; color:var(--teal); text-decoration:none; word-break:break-all; }
   .srcs a:hover { text-decoration:underline; }
   .err { color:#FF8FA3; font:400 12.5px Inter; }
-  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(62,156,184,.25); border-radius:99px; }
 </style>
 </head>
 <body>
 <div class="top">
-  <a class="pr-back" href="/">← ARKITECT</a>
+  <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
   <h1>🛰 RESEARCH SWARM</h1>
 </div>
 <div class="wrap">
@@ -267,5 +267,6 @@ async function runSwarm() {
 loadPresets(); loadModels(); loadProviders();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
+<script src="/static/tec-mascot.js"></script>
 </body>
 </html>
