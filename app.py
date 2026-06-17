@@ -62,7 +62,7 @@ VOICE_URL = "http://127.0.0.1:8123"
 DATA.mkdir(exist_ok=True)
 SESS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Tiff's Pink Room", docs_url=None, redoc_url=None)
+app = FastAPI(title="ARKITECT", docs_url=None, redoc_url=None)
 
 PERSONA = """You are Tiff.
 
@@ -1790,7 +1790,7 @@ def _ksampler(model_in, pos_in, latent_in, seed, steps, denoise=1.0, scheduler="
 
 def _tail(wf: dict) -> dict:
     wf["8"] = {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}}
-    wf["9"] = {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "pink-room"}}
+    wf["9"] = {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "arkitect"}}
     return wf
 
 
@@ -1878,7 +1878,7 @@ def _tail_upscaled(wf: dict) -> dict:
     wf["14"] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": UPSCALE_MODEL}}
     wf["15"] = {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["14", 0], "image": ["8", 0]}}
     wf["16"] = {"class_type": "ImageScaleBy", "inputs": {"image": ["15", 0], "upscale_method": "lanczos", "scale_by": 0.5}}
-    wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["16", 0], "filename_prefix": "pink-room"}}
+    wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["16", 0], "filename_prefix": "arkitect"}}
     return wf
 
 
@@ -1932,9 +1932,9 @@ def build_zimage(prompt: str, w: int, h: int, seed: int) -> dict:
         wf["14"] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": UPSCALE_MODEL}}
         wf["15"] = {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["14", 0], "image": ["8", 0]}}
         wf["16"] = {"class_type": "ImageScaleBy", "inputs": {"image": ["15", 0], "upscale_method": "lanczos", "scale_by": 0.5}}
-        wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["16", 0], "filename_prefix": "pink-room"}}
+        wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["16", 0], "filename_prefix": "arkitect"}}
     else:
-        wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "pink-room"}}
+        wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "arkitect"}}
     return wf
 
 
@@ -2534,7 +2534,7 @@ async def editor_pick():
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
         "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
-        "fs=filedialog.askopenfilenames(title='Import media — Pink Room Editor',"
+        "fs=filedialog.askopenfilenames(title='Import media — ARKITECT Editor',"
         "filetypes=[('Media','*.mp4 *.mov *.mkv *.webm *.avi *.m4v *.mpg *.mpeg *.wmv "
         "*.mp3 *.wav *.m4a *.aac *.flac *.ogg *.opus *.png *.jpg *.jpeg *.gif *.webp *.bmp *.tif *.tiff'),"
         "('All files','*.*')])\n"

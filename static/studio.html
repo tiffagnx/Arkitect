@@ -3331,7 +3331,7 @@ $("exportBtn").onclick = async () => {
     const rendered = await oc.startRendering();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(bufferToWavBlob(rendered));
-    a.download = "pink-room-mix.wav"; a.click();
+    a.download = "arkitect-mix.wav"; a.click();
   } catch (e) { alert("Export failed: " + e.message); }
   $("exportBtn").textContent = "⬇ Export WAV"; $("exportBtn").disabled = false;
 };
