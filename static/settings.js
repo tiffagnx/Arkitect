@@ -49,6 +49,10 @@
     background:linear-gradient(120deg,#5FB4CE,#3E9CB8);border:none;box-shadow:0 4px 16px rgba(62,156,184,.3);}
   .as-formhead{font:700 12px Oxanium,sans-serif;letter-spacing:.08em;color:#CFE6EE;margin:10px 0 2px;}
   .as-form{display:flex;flex-direction:column;gap:11px;margin-top:4px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;}
+  .as-advtoggle{align-self:flex-start;background:none;border:none;cursor:pointer;color:rgba(198,201,208,.6);font:500 11px Inter;padding:2px 0;text-align:left;}
+  .as-advtoggle:hover{color:#9CD3E4;}
+  .as-adv{display:none;flex-direction:column;gap:11px;}
+  .as-adv.open{display:flex;}
   .as-form.open{display:flex;}
   .as-field{display:flex;flex-direction:column;gap:5px;}
   .as-field label{font:600 10px 'Space Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(198,201,208,.6);}
@@ -91,12 +95,15 @@
           <div class="as-formhead">＋ Add a provider</div>
           <div class="as-form" id="asForm">
             <div class="as-field"><label>Provider</label><select id="asPreset"></select><div class="h" id="asHint"></div></div>
-            <div class="as-frow">
-              <div class="as-field"><label>Name</label><input id="asName" placeholder="Groq" /></div>
-              <div class="as-field"><label>Model</label><input id="asModel" placeholder="llama-3.3-70b-versatile" /></div>
+            <div class="as-field"><label>API key — your own free key</label><input id="asKey" type="password" placeholder="paste your key here" autocomplete="off" /></div>
+            <button type="button" class="as-advtoggle" id="asAdvToggle">⚙ Advanced — name, model &amp; URL (auto-filled, leave them) ▾</button>
+            <div class="as-adv" id="asAdv">
+              <div class="as-frow">
+                <div class="as-field"><label>Name</label><input id="asName" placeholder="Groq" /></div>
+                <div class="as-field"><label>Model</label><input id="asModel" placeholder="llama-3.3-70b-versatile" /></div>
+              </div>
+              <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
             </div>
-            <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
-            <div class="as-field"><label>API key (your own free key)</label><input id="asKey" type="password" placeholder="paste your key" autocomplete="off" /></div>
             <div class="as-btns">
               <button class="save" id="asSave">Save</button>
               <button id="asTest">Test</button>
@@ -126,7 +133,7 @@
   }
   function applyPreset() {
     const p = PRESETS[+$("asPreset").value]; if (!p) return;
-    if (p.name !== "Custom") { $("asName").value = p.name; $("asBase").value = p.base_url; $("asModel").value = ""; $("asModel").placeholder = (p.models_hint || "").split(",")[0].trim(); }
+    if (p.name !== "Custom") { $("asName").value = p.name; $("asBase").value = p.base_url; $("asModel").value = (p.models_hint || "").split(",")[0].trim(); }
     else { $("asName").value = ""; $("asBase").value = ""; }
     const hint = (p.free && p.free !== "—" ? `${p.free}. ` : "") + (p.models_hint ? `models: ${p.models_hint}.` : "");
     const el = $("asHint"); el.textContent = hint;
@@ -158,6 +165,7 @@
   async function load() { loadPresets(); loadProviders(); }
 
   $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus(""); };
+  $("asAdvToggle").onclick = () => { $("asAdv").classList.toggle("open"); };
   $("asTest").onclick = async () => {
     const body = { base_url: $("asBase").value.trim(), model: $("asModel").value.trim(), api_key: $("asKey").value.trim() };
     if (!body.base_url || !body.model || !body.api_key) { setStatus("fill in base URL, model and key first", "bad"); return; }
