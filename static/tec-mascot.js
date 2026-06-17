@@ -7,7 +7,7 @@
   window.__tecMascot = true;
 
   const COLS = 12, ROWS = 1, FRAMES = COLS * ROWS;
-  const FPS = 6;       // idle cadence
+  const FPS = 3.2;     // idle cadence — slow + calm
   const VIEW = 72;     // rendered px
 
   const css = `
