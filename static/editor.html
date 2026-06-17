@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>Leprince Visual Labs — ARKITECT</title>
+<title>LePrince Visual Labs — ARKITECT</title>
 <style>
 /* ─────────────────────────────────────────────────────────────────────────
    THE EDITOR — bespoke pro NLE. Palette matches the Studio (graphite + steel-
@@ -268,14 +268,9 @@ body.mode-simple .director-only{display:none!important}
   <div class="top">
     <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
     <div class="rooms">
-      <div class="brand" id="roomsBtn" style="cursor:pointer">
+      <div class="brand">
         <span class="mk">🎬</span>
-        <span>Leprince Visual Labs<br><small>ARKITECT</small></span>
-      </div>
-      <div class="rooms-menu" id="roomsMenu">
-        <a href="/">💬 Chat</a><a href="/static/studio.html">🎚 Studio</a>
-        <a href="/static/images.html">🖼 Images</a><a href="/static/build.html">🛠 Builder</a>
-        <a href="/static/bit16.html">👾 16-Bit</a><a href="/static/talk.html">🎙 Talk</a>
+        <span>LePrince Visual Labs<br><small>ARKITECT</small></span>
       </div>
     </div>
     <div class="proj"><input id="projName" value="Untitled" spellcheck="false"/></div>
@@ -1038,8 +1033,7 @@ $('#tHome').onclick=()=>{stop();setPlayhead(0,true);};
 $('#tEnd').onclick=()=>{stop();setPlayhead(timelineFrames(),true);};
 $('#tPrev').onclick=()=>{stop();setPlayhead(playhead-1);};
 $('#tNext').onclick=()=>{stop();setPlayhead(playhead+1);};
-$('#roomsBtn').onclick=e=>{e.stopPropagation();$('#roomsMenu').classList.toggle('open');};
-document.addEventListener('click',e=>{if(!$('#roomsMenu').contains(e.target)&&e.target!==$('#roomsBtn'))$('#roomsMenu').classList.remove('open');});
+// room-switcher dropdown removed — the back pill goes home
 
 // ── KEYBOARD ───────────────────────────────────────────────────────────
 window.addEventListener('keydown',e=>{
