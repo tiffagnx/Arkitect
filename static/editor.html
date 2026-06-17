@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>The Editor — Pink Room</title>
+<title>The Editor — ARKITECT</title>
 <style>
 /* ─────────────────────────────────────────────────────────────────────────
    THE EDITOR — bespoke pro NLE. Palette matches the Studio (graphite + steel-
@@ -60,6 +60,8 @@ input,select{font-family:inherit;color:inherit}
 .tbtn{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:var(--surf);
   border:1px solid var(--line);font-weight:600;font-size:12px;color:var(--dim);transition:.12s}
 .tbtn:hover{background:var(--surf2);color:var(--txt);border-color:var(--line)}
+.pr-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--dim);padding:7px 12px;border:1px solid var(--line);border-radius:10px;font:600 12px var(--ui);background:rgba(255,255,255,.03);transition:.12s}
+.pr-back:hover{color:var(--txt);border-color:var(--cy-line);background:rgba(62,156,184,.10)}
 .tbtn svg{width:14px;height:14px;opacity:.85}
 .tbtn.cta{background:linear-gradient(135deg,#3E9CB8,#2d7d96);color:#06222b;border-color:transparent;
   box-shadow:0 2px 12px rgba(62,156,184,.4);font-weight:800}
@@ -264,10 +266,11 @@ body.mode-simple .director-only{display:none!important}
 
   <!-- TOP BAR -->
   <div class="top">
+    <a class="pr-back" href="/">← ARKITECT</a>
     <div class="rooms">
       <div class="brand" id="roomsBtn" style="cursor:pointer">
         <span class="mk">🎬</span>
-        <span>The Editor<br><small>Pink Room</small></span>
+        <span>The Editor<br><small>ARKITECT</small></span>
       </div>
       <div class="rooms-menu" id="roomsMenu">
         <a href="/">💬 Chat</a><a href="/static/studio.html">🎚 Studio</a>

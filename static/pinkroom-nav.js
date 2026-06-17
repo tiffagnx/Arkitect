@@ -1,56 +1,77 @@
-/* ── PINK ROOM — shared room switcher + status pill ───────────────────────
+/* ── ARKITECT — shared room switcher + status pill ────────────────────────
    One file, included on every page (<script src="/static/pinkroom-nav.js">).
-   Self-injects a floating launcher so the four+ pages feel like ONE app:
-   jump between rooms from anywhere, see brain/engine status at a glance.
-   Scoped `pr-` class names so it never collides with a page's own styles. */
+   Self-injects a floating launcher so the rooms feel like ONE app: jump
+   between rooms from anywhere, see brain/engine status at a glance.
+   Scoped `pr-` class names so it never collides with a page's own styles.
+   Also defines the shared `a.pr-back` button used by every room's header. */
 (function () {
   const ROOMS = [
-    { icon: "💬", name: "Chat",     href: "/" },
-    { icon: "🎚", name: "Studio",   href: "/static/studio.html" },
-    { icon: "🎬", name: "Editor",   href: "/static/editor.html" },
-    { icon: "🛠", name: "Builder",  href: "/static/build.html" },
-    { icon: "🖼", name: "Images",   href: "/static/images.html" },
-    { icon: "🛰", name: "Swarm",    href: "/static/swarm.html" },
-    { icon: "👾", name: "16-Bit",   href: "/static/bit16.html" },
+    { icon: "💬", name: "Chat",      href: "/" },
+    { icon: "🎚", name: "Studio",    href: "/static/studio.html" },
+    { icon: "🎬", name: "Editor",    href: "/static/editor.html" },
+    { icon: "🛠", name: "Builder",   href: "/static/build.html" },
+    { icon: "🖼", name: "Images",    href: "/static/images.html" },
+    { icon: "🛰", name: "Swarm",     href: "/static/swarm.html" },
+    { icon: "👾", name: "16-Bit",    href: "/static/bit16.html" },
     { icon: "🎙", name: "Talk Live", href: "/static/talk.html" },
   ];
   const here = location.pathname.replace(/\/+$/, "") || "/";
   const isHere = (h) => (h === "/" ? here === "/" : here.endsWith(h.split("/").pop()));
 
   const css = `
-  .pr-fab{position:fixed;right:16px;bottom:16px;z-index:99999;width:46px;height:46px;border-radius:50%;
-    border:1px solid rgba(255,255,255,.12);cursor:pointer;font-size:20px;color:#14040E;
-    background:linear-gradient(120deg,#FF73BE,#E91E8C);box-shadow:0 4px 18px rgba(233,30,140,.45);
-    display:flex;align-items:center;justify-content:center;transition:transform .12s;}
-  .pr-fab:hover{transform:translateY(-2px) scale(1.05);}
-  .pr-menu{position:fixed;right:16px;bottom:72px;z-index:99999;min-width:188px;padding:8px;border-radius:16px;
-    background:rgba(14,10,20,.92);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.1);
-    box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;flex-direction:column;gap:3px;
-    font-family:Inter,system-ui,sans-serif;animation:prRise .15s ease-out;}
+  /* shared back button — identical in every room (ARKITECT steel) */
+  a.pr-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;cursor:pointer;
+    padding:7px 13px;border-radius:10px;font:600 12px Inter,system-ui,sans-serif;letter-spacing:.02em;
+    color:rgba(206,210,218,.72);background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.10);transition:color .12s,border-color .12s,background .12s,transform .12s;}
+  a.pr-back:hover{color:#E9EAED;border-color:rgba(95,180,206,.55);background:rgba(62,156,184,.10);transform:translateY(-1px);}
+  a.pr-back:active{transform:translateY(0);}
+
+  /* floating launcher */
+  .pr-fab{position:fixed;right:18px;bottom:18px;z-index:99999;width:48px;height:48px;border-radius:14px;
+    border:1px solid rgba(255,255,255,.14);cursor:pointer;font:800 19px Oxanium,sans-serif;color:#0B1417;
+    background:linear-gradient(135deg,#6FC0D8,#3E9CB8 62%,#2C7E97);
+    box-shadow:0 6px 20px rgba(62,156,184,.40),0 1px 0 rgba(255,255,255,.25) inset;
+    display:flex;align-items:center;justify-content:center;transition:transform .14s,box-shadow .14s;}
+  .pr-fab:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(62,156,184,.55),0 1px 0 rgba(255,255,255,.3) inset;}
+  .pr-fab:active{transform:translateY(0) scale(.97);}
+
+  .pr-menu{position:fixed;right:18px;bottom:78px;z-index:99999;min-width:204px;padding:9px;border-radius:18px;
+    background:linear-gradient(180deg,rgba(26,27,33,.96),rgba(18,19,24,.96));
+    backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 24px 60px rgba(0,0,0,.55),0 2px 0 rgba(255,255,255,.06) inset,0 0 0 1px rgba(0,0,0,.3);
+    display:none;flex-direction:column;gap:2px;font-family:Inter,system-ui,sans-serif;
+    animation:prRise .18s cubic-bezier(.2,.8,.2,1);transform-origin:bottom right;}
   .pr-menu.open{display:flex;}
-  @keyframes prRise{from{opacity:0;transform:translateY(8px);}}
-  .pr-hdr{font:700 8.5px 'Space Mono',monospace;letter-spacing:.22em;color:rgba(220,210,228,.5);
-    text-transform:uppercase;padding:4px 10px 6px;}
-  .pr-link{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;cursor:pointer;
-    text-decoration:none;color:rgba(220,210,228,.7);font:600 13px Inter;transition:all .1s;}
-  .pr-link:hover{background:rgba(255,255,255,.06);color:#F2EDF4;}
-  .pr-link.cur{background:rgba(233,30,140,.14);color:#FFD6EA;cursor:default;}
-  .pr-link .pr-ic{font-size:15px;width:18px;text-align:center;}
-  .pr-status{display:flex;gap:12px;padding:8px 11px 4px;margin-top:3px;border-top:1px solid rgba(255,255,255,.08);
-    font:500 10px 'Space Mono',monospace;color:rgba(220,210,228,.55);}
+  @keyframes prRise{from{opacity:0;transform:translateY(10px) scale(.97);}}
+
+  .pr-hdr{font:800 12px Oxanium,sans-serif;letter-spacing:.34em;text-indent:.34em;text-align:center;
+    color:#CFE6EE;padding:7px 8px 9px;margin-bottom:4px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    text-shadow:0 0 14px rgba(62,156,184,.35);}
+
+  .pr-link{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:11px;cursor:pointer;
+    text-decoration:none;color:rgba(206,210,218,.74);font:600 13px Inter;transition:background .1s,color .1s;}
+  .pr-link:hover{background:rgba(255,255,255,.05);color:#F2F4F6;}
+  .pr-link.cur{background:rgba(62,156,184,.14);color:#CFE6EE;cursor:default;}
+  .pr-link .pr-ic{font-size:15px;width:19px;text-align:center;opacity:.92;}
+
+  .pr-status{display:flex;gap:14px;padding:9px 11px 4px;margin-top:4px;border-top:1px solid rgba(255,255,255,.08);
+    font:500 10px 'Space Mono',monospace;letter-spacing:.04em;color:rgba(206,210,218,.55);}
   .pr-status b{font-weight:500;}
-  .pr-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:#777;vertical-align:middle;}
-  .pr-dot.on{background:#5BE38B;box-shadow:0 0 6px rgba(91,227,139,.7);}
-  .pr-dot.off{background:#FF6B6B;}
+  .pr-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#5a5f66;vertical-align:middle;}
+  .pr-dot.on{background:#46D6A8;box-shadow:0 0 7px rgba(70,214,168,.7);}
+  .pr-dot.off{background:#E06A6E;}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
   const fab = document.createElement("button");
-  fab.className = "pr-fab"; fab.title = "Rooms"; fab.textContent = "◆";
+  fab.className = "pr-fab"; fab.title = "Rooms"; fab.textContent = "A";
   const menu = document.createElement("div");
   menu.className = "pr-menu";
   menu.innerHTML =
-    `<div class="pr-hdr">Pink Room</div>` +
+    `<div class="pr-hdr">ARKITECT</div>` +
     ROOMS.map(r => `<a class="pr-link${isHere(r.href) ? " cur" : ""}" ${isHere(r.href) ? "" : `href="${r.href}"`}>
         <span class="pr-ic">${r.icon}</span>${r.name}</a>`).join("") +
     `<div class="pr-status"><span><span class="pr-dot" id="prBrain"></span>brain</span>
@@ -68,8 +89,8 @@
   }
 
   function mount() {
-    // pages with the full left sidebar (the home/chat page) already have nav + status
-    // lights there — don't add a duplicate floating popup on top of it.
+    // the home/chat page has its own left sidebar nav + status lights —
+    // don't stack a duplicate floating popup on top of it.
     if (document.querySelector("aside.side")) return;
     document.body.appendChild(fab); document.body.appendChild(menu); poll();
     setInterval(() => { if (menu.classList.contains("open")) poll(); }, 12000);
