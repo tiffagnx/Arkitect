@@ -66,6 +66,9 @@
       ctx.drawImage(img, f.sx, f.sy, f.w, f.h, (VIEW - dw) / 2, VIEW - dh, dw, dh); // center x, plant feet
       requestAnimationFrame(draw);
     }
+    // home has a left sidebar + bottom input — stand Tec on the send bubble (bottom-right)
+    const _aside = document.querySelector("aside.side");
+    if (_aside) { wrap.style.left = "auto"; wrap.style.right = "20px"; wrap.style.bottom = "88px"; }
     document.body.appendChild(wrap);
     requestAnimationFrame(() => wrap.classList.add("in"));
     requestAnimationFrame(draw);

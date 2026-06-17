@@ -59,6 +59,12 @@
     background: rgba(255,255,255,.035); border: 1px solid var(--hairline); transition: all .12s; }
   .ghostbtn:hover { color: var(--text); border-color: rgba(62,156,184,.45); }
   .ghostbtn.on { color: #B9FFF8; border-color: rgba(0,209,196,.5); background: rgba(0,209,196,.08); }
+  .raillabel { font: 700 9px 'Space Mono', monospace; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); opacity: .55; padding: 8px 16px 5px; }
+  .roomrail { padding: 0 12px 8px; display: flex; flex-direction: column; gap: 3px; }
+  .roomlink { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 10px; text-decoration: none; color: var(--dim); font: 600 12.5px Inter; letter-spacing: .01em; border: 1px solid transparent; transition: background .14s, color .14s, border-color .14s, transform .1s; }
+  .roomlink:hover { background: rgba(255,255,255,.045); color: var(--text); border-color: var(--hairline); transform: translateX(2px); }
+  .roomlink .ri { width: 26px; height: 26px; min-width: 26px; display: grid; place-items: center; font-size: 13.5px; border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); transition: background .14s, border-color .14s; }
+  .roomlink:hover .ri { background: rgba(62,156,184,.16); border-color: rgba(62,156,184,.45); }
 
   /* ── main ── */
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -191,13 +197,13 @@
     <div class="brand"><img class="brandlogo" src="/static/arkitect-logo.png" alt="ARKITECT" draggable="false" /><small>local · private · yours</small></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
-    <div style="padding: 0 14px 6px; display: flex; flex-direction: column; gap: 6px;">
-      <a class="ghostbtn" href="/static/build.html" style="text-decoration:none; text-align:center; display:block;">🛠 The Builder</a>
-      <a class="ghostbtn" href="/static/studio.html" style="text-decoration:none; text-align:center; display:block;">🎚 The Studio</a>
-      <a class="ghostbtn" href="/static/editor.html" style="text-decoration:none; text-align:center; display:block;">🎬 The Editor</a>
-      <a class="ghostbtn" href="/static/images.html" style="text-decoration:none; text-align:center; display:block;">🎨 Images</a>
-      <a class="ghostbtn" href="/static/bit16.html" style="text-decoration:none; text-align:center; display:block;">👾 The 16-Bit Room</a>
-      <a class="ghostbtn" href="/static/talk.html" style="text-decoration:none; text-align:center; display:block;">🎙 Talk Live</a>
+    <div class="raillabel">Rooms</div>
+    <div class="roomrail">
+      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprints</span></a>
+      <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>Demartin Audio Labs</span></a>
+      <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>Leprince Visual Labs</span></a>
+      <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
+      <a class="roomlink" href="/static/bit16.html"><span class="ri">👾</span><span>Bit1Six</span></a>
     </div>
     <div class="sidefoot">
       <div id="prStatus" style="display:flex; gap:16px; justify-content:center; padding:2px 0 8px; font:600 10px Inter; letter-spacing:.06em; color:var(--dim);">
@@ -235,7 +241,7 @@
           <option value="high">🔥 Deep</option>
         </select>
         <button class="mode" id="swarmToggle" title="Send research across your own free LLM keys (set them up in Swarm)" style="display:none">🛰 Swarm</button>
-        <span class="hint" id="hint">enter to send · shift+enter = new line</span>
+        <span class="hint" id="hint" style="display:none">enter to send · shift+enter = new line</span>
       </div>
       <div class="chips" id="chips"></div>
       <div class="inputrow" id="inputrow">
