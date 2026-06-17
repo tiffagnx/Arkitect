@@ -14,8 +14,8 @@
     /* text — four levels, never more */
     --text:#f2f3f5; --text-2:#b4b8bf; --text-3:#8b8f97; --text-4:#5a5e66;
     /* accent — pink, refined + disciplined (≈5% of pixels) */
-    --accent:#ec4899; --accent-hover:#f472b6; --accent-press:#db2777;
-    --accent-soft:rgba(236,72,153,.12); --accent-line:rgba(236,72,153,.34); --accent-text:#f9a8d4;
+    --accent:#3E9CB8; --accent-hover:#5FB4CE; --accent-press:#2C7E97;
+    --accent-soft:rgba(62,156,184,.12); --accent-line:rgba(62,156,184,.34); --accent-text:#9CD3E4;
     /* secondary identity — plugin mode reads as a different room */
     --cyan:#36d6e7; --cyan-soft:rgba(54,214,231,.12); --cyan-line:rgba(54,214,231,.34);
     /* semantic — muted, not candy */
@@ -230,7 +230,7 @@
 <body>
 <div class="app" id="app">
   <div class="topbar">
-    <a class="pr-back" href="/">← ARKITECT</a>
+    <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
     <span class="brand">THE <b>BUILDER</b></span>
     <div class="modeseg" id="modeseg">
       <div class="thumb"></div>
@@ -1011,5 +1011,6 @@ try{ ${pluginCode} }catch(e){ parent.postMessage({__builder:true,type:'plugin-re
 renderSeed(); updateBuildLabel(); applyMenuMode();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
+<script src="/static/tec-mascot.js"></script>
 </body>
 </html>

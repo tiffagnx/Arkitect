@@ -266,7 +266,7 @@ body.mode-simple .director-only{display:none!important}
 
   <!-- TOP BAR -->
   <div class="top">
-    <a class="pr-back" href="/">← ARKITECT</a>
+    <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
     <div class="rooms">
       <div class="brand" id="roomsBtn" style="cursor:pointer">
         <span class="mk">🎬</span>
@@ -1204,5 +1204,7 @@ fitScreen();renderTimeline();refreshInspector();loadExistingMedia();
     if(p&&p.tracks&&p.tracks.some(t=>t.clips.length))loadProject(p);}}catch{}})();
 window.addEventListener('resize',fitScreen);
 </script>
+<script src="/static/pinkroom-nav.js"></script>
+<script src="/static/tec-mascot.js"></script>
 </body>
 </html>
