@@ -558,11 +558,19 @@ async def chat(req: Request):
                 else:
                     msgs[i]["content"] = (c or "") + mem
                 break
+    # Quick / Balanced / Deep dial. These local finetunes (gemma/qwen "aggressive")
+    # blank out on high native reasoning_effort, so we keep the RAW dial low (reliable)
+    # and express depth through an instruction the model actually follows.
+    _effort = body.get("effort", "low")
+    _effort_hint = {
+        "low":  "\n\nKeep this reply tight and quick.",
+        "high": "\n\nTake your time on this one — think it through and give a thorough, complete answer.",
+    }.get(_effort, "")
     payload = {
         "model": model,
-        "messages": [{"role": "system", "content": system}] + msgs,
+        "messages": [{"role": "system", "content": system + _effort_hint}] + msgs,
         "temperature": float(body.get("temperature", 0.95 if mode == "write" else 0.85)),
-        "reasoning_effort": body.get("effort", "low"),  # thinking dial: low/medium/high
+        "reasoning_effort": "low",
         "stream": True,
     }
 
