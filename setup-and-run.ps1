@@ -108,11 +108,38 @@ Info "Loading the model onto your graphics card..."
 & $LMS load $model -c 16384 --gpu max -y 2>$null
 Good "Brain: loaded."
 
+# ---------- 5.5 desktop shortcut (so it's one click from now on) ----------
+try {
+  $lnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "ARKITECT.lnk"
+  if(-not (Test-Path $lnk)){
+    $ws = New-Object -ComObject WScript.Shell
+    $sc = $ws.CreateShortcut($lnk)
+    $sc.TargetPath = Join-Path $Root "START HERE.bat"
+    $sc.WorkingDirectory = $Root
+    $ico = Join-Path $Root "static\tec.ico"
+    if(Test-Path $ico){ $sc.IconLocation = $ico }
+    $sc.Description = "ARKITECT - your local AI creative studio"
+    $sc.Save()
+    Good "Put an ARKITECT shortcut on your desktop (the little guy)."
+  }
+} catch { }
+
 # ---------- 6. launch ----------
 Write-Host ""
 Good "Opening ARKITECT in your browser..."
 # open the browser a few seconds after the server starts (detached)
-Start-Process "powershell" -ArgumentList "-NoProfile","-Command","Start-Sleep 7; Start-Process 'http://localhost:7777'" -WindowStyle Hidden
+# open ARKITECT in its OWN app window (no tabs/address bar) once the server warms — detached
+$arkUrl  = "http://localhost:7777"
+$arkProf = "$env:LOCALAPPDATA\ARKITECT\app-window"
+$arkEdge = @("$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe","${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$arkChrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe","${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe","$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$arkBrowser = if($arkEdge){ $arkEdge } elseif($arkChrome){ $arkChrome } else { $null }
+if($arkBrowser){
+  $launch = "Start-Sleep 7; Start-Process '$arkBrowser' -ArgumentList '--app=$arkUrl','--user-data-dir=$arkProf','--window-size=1500,950'"
+} else {
+  $launch = "Start-Sleep 7; Start-Process '$arkUrl'"
+}
+Start-Process "powershell" -ArgumentList "-NoProfile","-Command",$launch -WindowStyle Hidden
 Write-Host ""
 Head "=================================================="
 Head "  ARKITECT is running."

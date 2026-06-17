@@ -15,13 +15,13 @@
   body { height:100vh; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:var(--text);
          background: radial-gradient(1100px 600px at 50% -18%, #1C1E24 0%, var(--bg1) 55%, var(--bg0) 100%); }
 
-  .top { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); }
+  .top { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); flex-wrap:nowrap; overflow-x:auto; }
   .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
   .top a:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
   .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
     background:linear-gradient(100deg,#7FC4D8,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .clock { font:600 13px 'Space Mono'; color:var(--teal); margin-left:8px; min-width:86px; }
-  .tbtn { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer;
+  .tbtn { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer; flex:none; white-space:nowrap;
     background:rgba(255,255,255,.045); color:var(--text); font:600 12.5px Inter; transition:all .12s; }
   .tbtn:hover { border-color:rgba(62,156,184,.5); }
   .tbtn.hot { background:linear-gradient(120deg,#5FB4CE,var(--pink)); color:#14040E; border-color:transparent;
@@ -32,7 +32,7 @@
     box-shadow:0 0 0 0 rgba(255,90,110,.5); animation:recpulse 1s infinite; }
   @keyframes recpulse { 0%{box-shadow:0 0 0 0 rgba(255,90,110,.55)} 100%{box-shadow:0 0 0 9px rgba(255,90,110,0)} }
   .countin { font:700 22px 'Space Mono'; color:#D9A4A7; min-width:30px; text-align:center; }
-  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; flex:none; }
   .rec-warn { font:500 10px Inter; color:#FFC46B; line-height:1.45; margin-top:6px; }
   .rec-warn.bad { color:#E58A8E; }
   .lat-grid { display:grid; grid-template-columns:1fr auto; gap:3px 8px; font:500 10px 'Space Mono'; }
@@ -99,7 +99,8 @@
   .ts-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(62,156,184,.28), rgba(62,156,184,.10)); border-right:1px solid rgba(62,156,184,.55); z-index:0; }
   .ts-slots { display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1; min-height:0; }
   .ts-slot { font:600 9.5px 'Space Mono'; border-radius:5px; padding:3px 7px; display:flex; align-items:center; gap:6px; flex:none; }
-  .ts-slot.add { background:rgba(255,255,255,.03); border:1px dashed var(--hairline); color:var(--dim); cursor:pointer; outline:none; -webkit-appearance:none; appearance:none; }
+  .ts-slot.add { background:rgba(255,255,255,.03); border:1px dashed var(--hairline); color:var(--dim); cursor:pointer; outline:none; -webkit-appearance:none; appearance:none; color-scheme:dark; }
+  select, option { color-scheme:dark; }   /* native dropdown popups render dark, not white-on-white on Windows */
   .ts-slot.add:hover { border-color:rgba(62,156,184,.5); color:#9FCFDD; }
   .ts-slot.filled { background:rgba(124,138,165,.14); border:1px solid rgba(124,138,165,.38); color:#C9D2E0; }
   .ts-slot.filled.byp { opacity:.45; }
@@ -152,14 +153,14 @@
   .io-lbl { font:700 9px 'Space Mono'; letter-spacing:.12em; color:var(--dim); flex:none; }
   .io-out { flex:1; padding:6px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#DCE7EC; font:600 11px Inter; cursor:pointer; }
   /* EDIT / MIX toggle */
-  .vtoggle { display:inline-flex; border:1px solid var(--hairline); border-radius:9px; overflow:hidden; margin-left:6px; }
-  .vt { padding:7px 14px; background:transparent; border:none; cursor:pointer; color:var(--dim); font:700 10px 'Space Mono'; letter-spacing:.12em; }
+  .vtoggle { display:inline-flex; border:1px solid var(--hairline); border-radius:9px; overflow:hidden; margin-left:6px; flex:none; }
+  .vt { padding:7px 14px; background:transparent; border:none; cursor:pointer; color:var(--dim); font:700 10px 'Space Mono'; letter-spacing:.12em; flex:none; white-space:nowrap; }
   .vt.on { background:rgba(62,156,184,.22); color:#DCE7EC; }
   /* zoom / snap controls */
-  .zoomctl { display:inline-flex; align-items:center; gap:4px; margin-left:8px; }
+  .zoomctl { display:inline-flex; align-items:center; gap:4px; margin-left:8px; flex:none; }
   .zb { padding:6px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 11px 'Space Mono'; cursor:pointer; }
-  .toolsel { display:inline-flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; margin-right:5px; }
-  .tb { padding:6px 9px; background:transparent; border:none; border-right:1px solid var(--hairline); cursor:pointer; color:var(--dim); font:600 13px Inter; line-height:1; }
+  .toolsel { display:inline-flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; margin-right:5px; flex:none; }
+  .tb { padding:6px 9px; background:transparent; border:none; border-right:1px solid var(--hairline); cursor:pointer; color:var(--dim); font:600 13px Inter; line-height:1; flex:none; white-space:nowrap; }
   .tb:last-child { border-right:none; }
   .tb.on { background:rgba(62,156,184,.2); color:#9FCFDD; }
   .tb:hover { color:var(--text); }
@@ -270,6 +271,15 @@
   .ins-add { margin-left:auto; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline);
     border-radius:7px; font:500 10px Inter; padding:3px 7px; outline:none; cursor:pointer; }
   .ins-add option { background:var(--bg1); }
+  .ins-add:hover { border-color:rgba(62,156,184,.5); color:#9FCFDD; }
+  /* custom dark plugin picker — replaces the white native <select> popups; painted in the panel grey */
+  .pmenu { position:fixed; z-index:99999; min-width:174px; max-height:62vh; overflow-y:auto; padding:5px;
+    background:#1C1D24; border:1px solid rgba(255,255,255,.10); border-radius:12px;
+    box-shadow:0 20px 56px rgba(0,0,0,.64); animation:pmRise .12s ease-out; }
+  @keyframes pmRise { from{opacity:0; transform:translateY(-5px);} to{opacity:1; transform:none;} }
+  .pmenu-g { font:700 8px 'Space Mono'; letter-spacing:.22em; color:rgba(198,201,208,.42); padding:8px 9px 3px; text-transform:uppercase; }
+  .pmenu-i { font:600 11px 'Space Mono'; color:#C9D2E0; padding:6px 10px; border-radius:7px; cursor:pointer; white-space:nowrap; }
+  .pmenu-i:hover { background:rgba(62,156,184,.16); color:#CFE6EE; }
   .ins { border:1px solid var(--hairline); border-radius:11px; padding:8px 10px; margin-bottom:6px;
     background:rgba(62,156,184,.045); animation:rise .18s ease-out; }
   .ins-h { display:flex; align-items:center; gap:6px; margin-bottom:7px; }
@@ -304,7 +314,12 @@
   .send-add option { background:var(--bg1); }
   /* floating plugin window */
   .plugwin { position:fixed; z-index:300; min-width:268px; max-width:360px;
-    background:#160e1e; border:1px solid rgba(62,156,184,.4); border-radius:13px; box-shadow:0 18px 64px rgba(0,0,0,.7); overflow:hidden; }
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,0) 13%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.013) 0 2px, rgba(0,0,0,.02) 2px 4px),
+      linear-gradient(160deg, #21232B 0%, #16171C 46%, #101116 100%);
+    border:1px solid rgba(62,156,184,.4); border-radius:14px;
+    box-shadow:0 18px 64px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(0,0,0,.42); overflow:hidden; }
   .pw-bar { display:flex; align-items:center; gap:9px; padding:9px 12px; cursor:move; user-select:none;
     background:linear-gradient(120deg,rgba(62,156,184,.24),rgba(124,138,165,.16)); border-bottom:1px solid var(--hairline); }
   .pw-title { font:700 12px Oxanium; letter-spacing:.06em; color:#E4F1F5; }
@@ -322,27 +337,36 @@
     color:#14040E; background:linear-gradient(120deg,#5FB4CE,var(--pink) 55%,var(--violet)); border:none; box-shadow:0 4px 16px rgba(62,156,184,.32); }
   .verb-open:hover { box-shadow:0 5px 24px rgba(62,156,184,.55); }
   .verbwin { position:fixed; left:150px; top:120px; z-index:320; width:328px;
-    background:radial-gradient(130% 90% at 28% -10%, #2c1334 0%, #160e1e 68%); border:1px solid rgba(62,156,184,.42); border-radius:17px;
-    box-shadow:0 24px 74px rgba(0,0,0,.74), 0 0 46px rgba(62,156,184,.13); overflow:hidden; }
+    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0) 16%), linear-gradient(160deg, #21232B 0%, #16171C 50%, #101116 100%); border:1px solid rgba(62,156,184,.42); border-radius:17px;
+    box-shadow:0 24px 74px rgba(0,0,0,.74), 0 0 46px rgba(62,156,184,.13), inset 0 1px 0 rgba(255,255,255,.06); overflow:hidden; }
   .vw-bar { display:flex; align-items:baseline; gap:9px; padding:14px 17px 12px; cursor:move; user-select:none; border-bottom:1px solid var(--hairline); }
-  .vw-title { font:700 17px Oxanium; letter-spacing:.15em; background:linear-gradient(100deg,#7FC4D8,var(--pink) 45%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .vw-title { font:700 17px Oxanium; letter-spacing:.15em; background:linear-gradient(100deg,#9FD4E4,#5FB4CE 50%,#3E9CB8); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .vw-sub { font:400 8.5px 'Space Mono'; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
   .vw-x { margin-left:auto; background:rgba(0,0,0,.32); border:none; color:#D9A4A7; width:23px; height:23px; border-radius:7px; cursor:pointer; font-size:12px; }
   .vw-x:hover { background:var(--pink); color:#fff; }
   .vw-body { display:flex; justify-content:space-around; gap:6px; padding:24px 16px 18px; }
   .vw-knob { display:flex; flex-direction:column; align-items:center; gap:12px; }
-  .vw-knob output { font:600 11px 'Space Mono'; color:var(--teal); min-height:14px; }
+  .vw-knob output { font:600 11px 'Space Mono'; color:var(--teal); min-height:14px;
+    padding:2px 8px; border-radius:5px; background:rgba(0,0,0,.34); box-shadow:inset 0 1px 2px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04); letter-spacing:.04em; }
   .vw-knob label { font:700 8.5px 'Space Mono'; letter-spacing:.13em; color:var(--dim); }
   .vknob { width:58px; height:58px; border-radius:50%; cursor:ns-resize; position:relative;
-    background:radial-gradient(62% 62% at 50% 34%, #2B2E36, #16171C 76%);
-    border:1px solid rgba(62,156,184,.5); box-shadow:0 5px 16px rgba(0,0,0,.55), inset 0 1px 2px rgba(255,255,255,.09), 0 0 16px rgba(62,156,184,.16); }
+    background:
+      radial-gradient(64% 64% at 50% 30%, #3A3E48 0%, #23252C 54%, #15161B 100%),
+      conic-gradient(from 90deg, #2a2c34, #3c4049, #24262d, #3c4049, #2a2c34);
+    background-blend-mode:overlay, normal;
+    border:1px solid rgba(62,156,184,.5);
+    box-shadow:0 6px 18px rgba(0,0,0,.6), inset 0 2px 3px rgba(255,255,255,.14), inset 0 -3px 6px rgba(0,0,0,.55), 0 0 18px rgba(62,156,184,.14); }
+  .vknob::before { content:''; position:absolute; inset:-7px; border-radius:50%; pointer-events:none;
+    background:repeating-conic-gradient(from 215deg, rgba(225,235,240,.28) 0 1.3deg, transparent 1.3deg 30deg);
+    -webkit-mask:radial-gradient(closest-side, transparent 73%, #000 75%); mask:radial-gradient(closest-side, transparent 73%, #000 75%); }
   .vknob:hover { border-color:rgba(62,156,184,.85); }
   .vknob-ind { position:absolute; left:50%; top:7px; width:3px; height:19px; margin-left:-1.5px; border-radius:2px;
     background:linear-gradient(#BFE0EA,var(--pink)); transform-origin:50% 22px; box-shadow:0 0 7px rgba(62,156,184,.9); }
   .vw-foot { font:400 8.5px 'Space Mono'; letter-spacing:.04em; color:var(--dim); text-align:center; padding:0 0 14px; }
   /* plugin faceplate (knobs, not sliders) — same look as TIFF VERB for EVERY plugin */
   .fxface { min-width:0; width:auto; }
-  .fxface .pw-bar { align-items:baseline; padding:13px 15px 11px; border-bottom:1px solid var(--hairline); }
+  .fxface .pw-bar { align-items:baseline; padding:13px 15px 11px; border-bottom:1px solid rgba(0,0,0,.5);
+    background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)); box-shadow:inset 0 -1px 0 rgba(255,255,255,.05); }
   .fx-knobs { display:grid; grid-template-columns:repeat(3,82px); gap:18px 12px; padding:22px 20px 20px; justify-content:center; }
   .fx-knobs .vw-knob { gap:9px; }
   .fx-knobs .vw-knob label { text-transform:uppercase; }
@@ -1163,6 +1187,52 @@ TIFF_PLUGINS.register({
   }
 });
 
+/* ── Cleanup — the "one button to clean a recording" plugin. One pass:
+   rumble/handling cut + 60/50Hz de-hum (notch cascade) + dead-air gate (reuses the
+   tiff-gate worklet) + gentle de-hiss shelf. Best on voice / dialogue. ── */
+TIFF_PLUGINS.register({
+  name: 'Cleanup',
+  subtitle: 'rumble · hum · dead-air · hiss — one pass',
+  foot: 'best on voice / dialogue · GATE = the silence floor · AMOUNT = how hard it scrubs · HUM 0=off · 1=60Hz · 2=50Hz',
+  params: [
+    { id:'amt',  label:'Amount',  min:0,   max:1,   value:0.5  },
+    { id:'gate', label:'Gate dB', min:-80, max:-20, value:-45  },
+    { id:'hum',  label:'De-Hum',  min:0,   max:2,   value:1    },
+    { id:'hiss', label:'De-Hiss', min:0,   max:1,   value:0.35 },
+  ],
+  create(c){
+    const i=c.createGain(), o=c.createGain();
+    // 1) rumble / handling / AC cut
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=75; hp.Q.value=0.707;
+    // 2) de-hum — fundamental + 2 harmonics
+    const n1=c.createBiquadFilter(), n2=c.createBiquadFilter(), n3=c.createBiquadFilter();
+    [n1,n2,n3].forEach(n=>{ n.type='notch'; });
+    const setHum=(mode)=>{ const base = mode<0.5 ? 0 : (mode<1.5 ? 60 : 50);
+      if(!base){ [n1,n2,n3].forEach(n=>{ n.Q.value=0.0001; }); }
+      else { n1.frequency.value=base; n2.frequency.value=base*2; n3.frequency.value=base*3; [n1,n2,n3].forEach(n=>{ n.Q.value=20; }); } };
+    setHum(1);
+    // 3) dead-air gate — reuse the worklet, fall back gracefully if it isn't loaded
+    let gate=null;
+    try {
+      gate=new AudioWorkletNode(c,'tiff-gate',{numberOfInputs:1,numberOfOutputs:1,channelCount:2,channelCountMode:'explicit',channelInterpretation:'speakers',outputChannelCount:[2]});
+      const g=(id,v)=>{ const p=gate.parameters.get(id); if(p) p.setValueAtTime(v,c.currentTime); };
+      g('threshold',-45); g('hysteresis',6); g('range',-25); g('ratio',4.5); g('attack',1); g('hold',80); g('release',200); g('knee',4);
+    } catch(e){ gate=null; }
+    // 4) de-hiss — gentle top-end tame (light by default so it doesn't dull the voice)
+    const hiss=c.createBiquadFilter(); hiss.type='highshelf'; hiss.frequency.value=8500; hiss.gain.value=-3.5;
+    let head=i; const link=(node)=>{ if(node){ head.connect(node); head=node; } };
+    link(hp); link(n1); link(n2); link(n3); link(gate); link(hiss);
+    head.connect(o);
+    const setGate=(id,v)=>{ if(!gate) return; const p=gate.parameters.get(id); if(p) p.setValueAtTime(v,c.currentTime); };
+    return { input:i, output:o, set(id,v){
+      if(id==='amt'){ setGate('range', -8 - v*34); setGate('ratio', 2 + v*5); }
+      else if(id==='gate'){ setGate('threshold', v); }
+      else if(id==='hum'){ setHum(v); }
+      else if(id==='hiss'){ hiss.gain.setTargetAtTime(-(v*10), c.currentTime, 0.02); }
+    } };
+  }
+});
+
 /* ── Transient Shaper — worklet attack/sustain shaper (fast vs body envelope
    followers), wet/dry mix ── */
 TIFF_PLUGINS.register({
@@ -1960,6 +2030,32 @@ function bindStripCtl(t, el, key, min, max, dflt, fmt, fill){
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); };
   el.ondblclick=(e)=>{ e.stopPropagation(); setV(dflt); draw(); };
 }
+// custom dark plugin picker — replaces the native white <select> popups.
+// masterFirst=true → groups MASTERING then OTHER; false → non-master plugins, flat.
+function openPluginMenu(anchorEl, masterFirst, onPick, onTune){
+  document.querySelectorAll(".pmenu").forEach(m=>m.remove());
+  const menu=document.createElement("div"); menu.className="pmenu";
+  const mast=TIFF_PLUGINS.list.filter(p=>p.master), other=TIFF_PLUGINS.list.filter(p=>!p.master);
+  const grp=(label,plugs)=>{ if(!plugs.length) return;
+    if(label){ const g=document.createElement("div"); g.className="pmenu-g"; g.textContent=label; menu.appendChild(g); }
+    plugs.forEach(p=>{ const it=document.createElement("div"); it.className="pmenu-i"; it.textContent=p.name;
+      it.onmousedown=(e)=>e.stopPropagation();
+      it.onclick=(e)=>{ e.stopPropagation(); menu.remove(); onPick(p.name); }; menu.appendChild(it); }); };
+  if(onTune){ // pitch editor (Melodyne) — opens the Tune window for this track's clip, not an insert
+    const g=document.createElement("div"); g.className="pmenu-g"; g.textContent="PITCH"; menu.appendChild(g);
+    const it=document.createElement("div"); it.className="pmenu-i"; it.textContent="🎵 Tune (Melodyne)"; it.style.color="#9FCFDD";
+    it.onmousedown=(e)=>e.stopPropagation();
+    it.onclick=(e)=>{ e.stopPropagation(); menu.remove(); onTune(); }; menu.appendChild(it);
+  }
+  if(masterFirst){ grp("MASTERING",mast); grp("OTHER",other); } else { grp("",other); }
+  document.body.appendChild(menu);
+  const r=anchorEl.getBoundingClientRect(), mw=menu.offsetWidth, mh=menu.offsetHeight;
+  let left=r.left, top=r.bottom+3;
+  if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
+  if(top+mh>window.innerHeight-8) top=Math.max(8, r.top-mh-3);
+  menu.style.left=Math.max(8,left)+"px"; menu.style.top=top+"px";
+  setTimeout(()=>{ const close=(ev)=>{ if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener("mousedown",close); } }; document.addEventListener("mousedown",close); },0);
+}
 // inline insert SLOTS A–E on the track strip
 function renderStripSlots(t, host){
   if(!host) return; host.innerHTML=""; t.inserts=t.inserts||[];
@@ -1972,11 +2068,10 @@ function renderStripSlots(t, host){
       s.querySelector(".ts-sx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(t); t.inserts.splice(i,1); renderStripSlots(t,host); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); };
       host.appendChild(s);
     } else {
-      const sel=document.createElement("select"); sel.className="ts-slot add"; sel.title="add a plugin to this slot";
-      sel.innerHTML=`<option value="">＋ insert</option>`+TIFF_PLUGINS.list.filter(p=>!p.master).map(p=>`<option>${p.name}</option>`).join("");
-      sel.onmousedown=(e)=>e.stopPropagation();
-      sel.onchange=(e)=>{ if(e.target.value){ t.inserts.push({name:e.target.value,params:{}}); renderStripSlots(t,host); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); } };
-      host.appendChild(sel);
+      const b=document.createElement("div"); b.className="ts-slot add"; b.title="add a plugin to this slot"; b.textContent="＋ insert";
+      b.onmousedown=(e)=>e.stopPropagation();
+      b.onclick=(e)=>{ e.stopPropagation(); openPluginMenu(b, false, (name)=>{ t.inserts.push({name,params:{}}); const ni=t.inserts.length-1; renderStripSlots(t,host); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); openPluginWindow(t, ni); }, ()=>openTune(t)); };
+      host.appendChild(b);
     }
   }
 }
@@ -2073,12 +2168,7 @@ function laneUi(t) {
 const _fmt = (v) => Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 100) / 100;
 const _step = (p) => p.id === "mode" ? 1 : ((p.max - p.min) > 100 ? 1 : ((p.max - p.min) >= 4 ? 0.1 : 0.01));
 
-function fillAddSelect(t) {
-  const sel = document.querySelector(`#chan .ins-add`);
-  if (!sel) return;
-  sel.innerHTML = `<option value="">+ add effect…</option>` +
-    TIFF_PLUGINS.list.map(p => `<option value="${p.name}">${p.name}</option>`).join("");
-}
+function fillAddSelect(t) { /* legacy no-op — the insert picker is now the custom dark menu (openPluginMenu), not a native <select> */ }
 
 function addInsert(t, name) {
   if (!name) return;
@@ -2264,12 +2354,10 @@ function renderMasterSlots(host){
       s.querySelector(".ts-sx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(masterTrack); masterTrack.inserts.splice(i,1); renderMasterSlots(host); if(playing) restartPlayback(); if(selTrackId==='__master__') renderChannel(masterTrack); };
       host.appendChild(s);
     } else {
-      const sel=document.createElement("select"); sel.className="ts-slot add"; sel.title="add a mastering plugin";
-      const mast=TIFF_PLUGINS.list.filter(p=>p.master), other=TIFF_PLUGINS.list.filter(p=>!p.master);
-      sel.innerHTML=`<option value="">＋ insert</option><optgroup label="MASTERING">${mast.map(p=>`<option>${p.name}</option>`).join("")}</optgroup><optgroup label="OTHER">${other.map(p=>`<option>${p.name}</option>`).join("")}</optgroup>`;
-      sel.onmousedown=(e)=>e.stopPropagation();
-      sel.onchange=(e)=>{ if(e.target.value){ masterTrack.inserts.push({name:e.target.value,params:{}}); renderMasterSlots(host); if(playing) restartPlayback(); if(selTrackId==='__master__') renderChannel(masterTrack); } };
-      host.appendChild(sel);
+      const b=document.createElement("div"); b.className="ts-slot add"; b.title="add a mastering plugin"; b.textContent="＋ insert";
+      b.onmousedown=(e)=>e.stopPropagation();
+      b.onclick=(e)=>{ e.stopPropagation(); openPluginMenu(b, true, (name)=>{ masterTrack.inserts.push({name,params:{}}); const ni=masterTrack.inserts.length-1; renderMasterSlots(host); if(playing) restartPlayback(); if(selTrackId==='__master__') renderChannel(masterTrack); openPluginWindow(masterTrack, ni); }); };
+      host.appendChild(b);
     }
   }
 }
@@ -2318,13 +2406,13 @@ function renderMasterChannel(panel){
   html+=`<div class="chan-knobs"><div class="cknob-wrap"><output id="cko-m-vol"></output><div class="cknob" id="ckn-m-vol"><span class="cknob-ind"></span></div><label>VOLUME</label></div>`+
         `<div class="cknob-wrap"><output id="cko-m-ceil"></output><div class="cknob" id="ckn-m-ceil"><span class="cknob-ind"></span></div><label>CEILING</label></div></div>`;
   html+=`<div class="chan-section">Mastering chain <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none">EQ → comp → maximizer</span></div>`;
-  html+=`<div class="ins-rack"><div class="ins-bar"><span class="ins-title">master inserts</span><select class="ins-add"></select></div><div class="ins-list" id="inslist-__master__"></div></div>`;
+  html+=`<div class="ins-rack"><div class="ins-bar"><span class="ins-title">master inserts</span><button class="ins-add" type="button">+ add mastering plugin…</button></div><div class="ins-list" id="inslist-__master__"></div></div>`;
   html+=`<div class="chan-hint">This is the final stage — everything sums here. Aim for the loudest point around −1 dB on the ceiling. Keep the Maximizer last.</div>`;
   panel.innerHTML=html;
   bindMasterKnob("ckn-m-vol","cko-m-vol", 0, 1.4, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), 0.9);
   bindMasterKnob("ckn-m-ceil","cko-m-ceil", -12, 0, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1)+'dB', -1);
-  fillMasterAddSelect(); renderInserts(masterTrack);
-  panel.querySelector(".ins-add").onchange=(e)=>{ if(e.target.value){ addInsert(masterTrack, e.target.value); e.target.value=""; } };
+  renderInserts(masterTrack);
+  panel.querySelector(".ins-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, true, (name)=>addInsert(masterTrack, name)); };
 }
 ensureMasterLane();   // master track is always present at the bottom of the edit window
 
@@ -2367,11 +2455,11 @@ function renderChannel(t){
     html+=`<div class="chan-actions"><button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
     html+=`<div class="chan-section" style="border-top:none;padding-top:2px">Bus · double-click a knob to reset</div><div class="chan-knobs">`;
     params.forEach(([k,lbl])=>html+=`<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
-    html+=`</div><div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">stack plugins here</span><select class="ins-add"><option value="">+ add effect…</option></select></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
+    html+=`</div><div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">stack plugins here</span><button class="ins-add" type="button">+ add effect…</button></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
     panel.innerHTML=html;
     params.forEach(([k])=>makeChanKnob(t,k));
-    fillAddSelect(t); renderInserts(t);
-    panel.querySelector(".ins-add").onchange=(e)=>{ addInsert(t,e.target.value); e.target.value=""; };
+    renderInserts(t);
+    panel.querySelector(".ins-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>addInsert(t,name), ()=>openTune(t)); };
     const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
     const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
     return;
@@ -3114,7 +3202,7 @@ function buildStrip(t, auxes){
     <div class="ms-top"><span class="cdot" style="background:${t.color}"></span><span class="ms-nm" title="double-click to rename">${t.name}</span></div>
     ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
     <div class="ms-lbl">Inserts</div><div class="ms-inlist"></div>
-    <select class="ms-add"><option value="">+ fx</option>${TIFF_PLUGINS.list.map(p=>`<option>${p.name}</option>`).join("")}</select>
+    <button class="ms-add" type="button">+ fx</button>
     ${isAux?``:`<div class="ms-lbl">Output</div><select class="ms-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select>`}
     <div class="ms-knobrow"><div class="ms-pan"><div class="cknob sm" id="msp-${t.id}"><span class="cknob-ind"></span></div><label>PAN</label></div>
       <div class="ms-mscol"><button class="msbtn m${t.muted?' on':''}" data-a="m">M</button><button class="msbtn s${t.solo?' on':''}" data-a="s">S</button></div></div>
@@ -3122,7 +3210,7 @@ function buildStrip(t, auxes){
     <div class="ms-db" id="msdb-${t.id}"></div>`;
   const inlist=el.querySelector(".ms-inlist");
   (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":""); r.textContent=ins.name; r.title="open "+ins.name; r.onclick=()=>openPluginWindow(t,i); inlist.appendChild(r); });
-  el.querySelector(".ms-add").onchange=(e)=>{ if(e.target.value){ addInsert(t,e.target.value); renderMixWindow(); } };
+  el.querySelector(".ms-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>{ addInsert(t,name); renderMixWindow(); }, ()=>openTune(t)); };
   const outSel=el.querySelector(".ms-out"); if(outSel) outSel.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); };
   bindMiniPan(t, el.querySelector(`#msp-${t.id}`));
   el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });

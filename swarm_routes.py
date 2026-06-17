@@ -1,11 +1,11 @@
 """
-TIFF'S PINK ROOM — RESEARCH SWARM (bring-your-own-key). New, self-contained.
+ARKITECT — RESEARCH SWARM (bring-your-own-key). New, self-contained.
 
 Her local brain (Gemma on an 8GB card) is capped. The open web is full of
-stronger LLMs with FREE API tiers. This module lets ANYONE running the Pink Room
+stronger LLMs with FREE API tiers. This module lets ANYONE running the ARKITECT
 add their OWN free keys (Groq, OpenRouter, Gemini, Mistral, Cerebras...) and fan a
 research question out across them: each external brain writes its own searches,
-reads pages WE fetch (most free models can't browse — so the Pink Room does the
+reads pages WE fetch (most free models can't browse — so the ARKITECT does the
 surfing, exactly like the existing /api/research), and hands back a short cited
 digest. Her LOCAL model then merges the digests into one answer in her voice — so
 she can answer things her little brain never could alone.
@@ -115,14 +115,14 @@ class ProviderError(Exception):
 async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 700,
                         temperature: float = 0.3) -> str:
     """One non-streaming chat call to any OpenAI-compatible provider. This is the
-    ONLY new primitive — everything else reuses the Pink Room's existing helpers.
+    ONLY new primitive — everything else reuses the ARKITECT's existing helpers.
     Raises RateLimited on 429 (caller rotates to the next slot) and ProviderError
     otherwise."""
     base = (slot["base_url"] or "").rstrip("/")
     url = f"{base}/chat/completions"
     headers = {"Authorization": f"Bearer {slot['api_key']}", "Content-Type": "application/json",
                # OpenRouter likes these for attribution; every other provider ignores them.
-               "HTTP-Referer": "http://localhost", "X-Title": "Tiff Pink Room"}
+               "HTTP-Referer": "http://localhost", "X-Title": "Tiff ARKITECT"}
     body = {
         "model": slot["model"],
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],

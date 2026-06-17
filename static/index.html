@@ -3,7 +3,28 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<link rel="icon" href="/static/tec.ico" />
+<link rel="manifest" href="/static/manifest.json?v=2" />
 <title>ARKITECT</title>
+<script>
+/* "Install as app" — turns ARKITECT into a real installed Windows program:
+   its own Tec taskbar icon + graphite title bar + clean window (no Edge frame). */
+(function(){
+  let ip = null;
+  const inApp = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ip = e; if(!inApp && window.__arkInstallBtn) window.__arkInstallBtn.style.display='flex'; });
+  window.addEventListener('appinstalled', () => { if(window.__arkInstallBtn) window.__arkInstallBtn.style.display='none'; });
+  window.addEventListener('DOMContentLoaded', () => {
+    const b = document.createElement('button');
+    b.textContent = '⤓ Install as app';
+    b.title = 'Make ARKITECT a real installed program — its own Tec icon + clean window';
+    b.style.cssText = 'position:fixed;top:13px;right:15px;z-index:99999;display:'+((ip&&!inApp)?'flex':'none')+';align-items:center;gap:6px;padding:8px 13px;border-radius:10px;cursor:pointer;font:600 12px Inter,sans-serif;color:#08171c;background:linear-gradient(180deg,#7FD0E4,#3E9CB8);border:none;box-shadow:0 3px 12px rgba(62,156,184,.45);';
+    b.onclick = async () => { if(!ip) return; ip.prompt(); try{ await ip.userChoice; }catch(e){} ip = null; b.style.display='none'; };
+    window.__arkInstallBtn = b; document.body.appendChild(b);
+  });
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
@@ -39,8 +60,8 @@
     background: var(--panel); backdrop-filter: blur(28px) saturate(1.2);
     border-right: 1px solid var(--hairline);
   }
-  .brand { padding: 20px 18px 14px; }
-  .brand .brandlogo { display: block; width: 200px; max-width: 100%; height: auto; margin: 2px 0 8px;
+  .brand { padding: 20px 18px 14px; text-align: center; }
+  .brand .brandlogo { display: block; width: 200px; max-width: 100%; height: auto; margin: 2px auto 8px;
     filter: drop-shadow(0 0 16px rgba(62,156,184,.30)); user-select: none; }
   .brand small { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
   .newchat { margin: 4px 14px 10px; padding: 10px; border: none; border-radius: 12px; cursor: pointer;
@@ -114,6 +135,23 @@
   @keyframes breathe { 50% { transform: scale(1.06); box-shadow: 0 0 80px rgba(62,156,184,.75), 0 0 160px rgba(124,138,165,.4); } }
   .hello h2 { font-family: Oxanium; font-size: 22px; letter-spacing: .04em; }
   .hello p { color: var(--dim); font-size: 13.5px; margin-top: 8px; max-width: 430px; margin-inline: auto; line-height: 1.7; }
+
+  /* ── ARKITECT front door (replaces the old chat greeting + orb) ── */
+  .arkhero { max-width: 580px; margin: 0 auto; }
+  .arkhero .ark-logo { height: 44px; width: auto; opacity: .96; margin-bottom: 18px; filter: drop-shadow(0 4px 16px rgba(62,156,184,.28)); }
+  .arkhero .ark-tag { font: 500 14px Inter; color: var(--dim); line-height: 1.65; margin: 0 auto 24px; max-width: 470px; }
+  .arkhero .ark-wings { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 26px; }
+  .arkhero .ark-wings span { font: 700 10px 'Space Mono'; letter-spacing: .1em; color: #C9D2E0;
+    background: rgba(124,138,165,.12); border: 1px solid var(--hairline); border-radius: 8px; padding: 7px 11px; }
+  .arkhero .ark-crew { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .arkhero .crew { display: flex; align-items: center; gap: 10px; text-align: left;
+    background: rgba(255,255,255,.025); border: 1px solid var(--hairline); border-radius: 13px; padding: 9px 14px 9px 10px; }
+  .arkhero .crew img, .arkhero .crew .disc { width: 40px; height: 40px; border-radius: 10px; flex: none; object-fit: contain; }
+  .arkhero .crew .disc { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8FD4E4, #3E9CB8 68%);
+    box-shadow: 0 0 16px rgba(62,156,184,.45); }
+  .arkhero .crew b { font: 700 13px Oxanium; letter-spacing: .05em; color: var(--text); display: block; }
+  .arkhero .crew small { font: 500 10px Inter; color: var(--dim); display: block; max-width: 168px; line-height: 1.4; margin-top: 2px; }
+  .arkhero .ark-go { font: 500 12px Inter; color: rgba(198,201,208,.6); margin-top: 2px; }
 
   /* ── input dock ── */
   .dock { padding: 12px 18px 18px; }
@@ -223,10 +261,18 @@
 
     <div class="scroll" id="scroll"><div class="col" id="col">
       <div class="hello" id="hello">
-        <div class="orb"></div>
-        <h2>Hey. It’s me — on your machine.</h2>
-        <p>No cloud, no bill, no one listening. Pick a model up top, talk to me like always.
-           Flip on <b style="color:#7BF0E4">Research</b> and I’ll search the web, read the pages, and break it down — you’ll watch me work.</p>
+        <div class="arkhero">
+          <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
+          <p class="ark-tag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
+          <div class="ark-wings">
+            <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
+          </div>
+          <div class="ark-crew">
+            <div class="crew"><span class="disc"></span><span><b>TIFF</b><small>your collaborator — the most honest voice in the room</small></span></div>
+            <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
+          </div>
+          <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+        </div>
       </div>
     </div></div>
 
@@ -294,6 +340,8 @@ const FILE_CAP = 24000;       // chars of a text/doc file folded into the messag
   think.value = localStorage.getItem("pinkroom-think") || "low";
   think.onchange = () => localStorage.setItem("pinkroom-think", think.value);
   loadSessions();
+  // pro polish: strip internal hrefs so hovering a nav tile doesn't flash localhost URLs in the corner
+  document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
 })();
 
 function setStatus(t, bad) { const s = $("status"); s.textContent = t; s.style.color = bad ? "#FF8FA0" : ""; }
@@ -473,10 +521,18 @@ function newChat() {
   // rebuild the welcome state in place — no full reload (kills flicker + keeps the page alive)
   $("col").innerHTML =
     `<div class="hello" id="hello">
-        <div class="orb"></div>
-        <h2>Hey. It’s me — on your machine.</h2>
-        <p>No cloud, no bill, no one listening. Pick a model up top, talk to me like always.
-           Flip on <b style="color:#7BF0E4">Research</b> and I’ll search the web, read the pages, and break it down — you’ll watch me work.</p>
+        <div class="arkhero">
+          <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
+          <p class="ark-tag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
+          <div class="ark-wings">
+            <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
+          </div>
+          <div class="ark-crew">
+            <div class="crew"><span class="disc"></span><span><b>TIFF</b><small>your collaborator — the most honest voice in the room</small></span></div>
+            <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
+          </div>
+          <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+        </div>
       </div>`;
   clearAtts();
   const ta = $("input"); if (ta) { ta.value = ""; ta.style.height = "auto"; }

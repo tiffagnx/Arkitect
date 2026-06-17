@@ -9,7 +9,7 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 $lms = "$env:USERPROFILE\.lmstudio\bin\lms.exe"
-$room = "C:\Users\koonc\Desktop\Projects\pink-room"
+$room = Split-Path -Parent $MyInvocation.MyCommand.Path
 $model = "google/gemma-4-e4b"
 
 # 1. LM Studio server (idempotent — returns fast if already running)
@@ -42,5 +42,14 @@ if (-not $up) {
   }
 }
 
-# 4. Walk in
-Start-Process "http://localhost:7777"
+# 4. Walk in — open in ARKITECT's OWN app window (no tabs, no address bar), not a browser tab.
+$url = "http://localhost:7777"
+$edge = @("$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe","${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$chrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe","${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe","$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$browser = if($edge){ $edge } elseif($chrome){ $chrome } else { $null }
+if($browser){
+  $prof = "$env:LOCALAPPDATA\ARKITECT\app-window"
+  Start-Process $browser -ArgumentList "--app=$url",("--user-data-dir=`"{0}`"" -f $prof),"--window-size=1500,950"
+} else {
+  Start-Process $url
+}

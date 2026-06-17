@@ -18,4 +18,12 @@
   a.pr-back img{height:14px;width:auto;display:block;opacity:.95;}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  // force the app-window (Edge/Chrome --app mode) title bar to graphite, overriding the OS accent color
+  if(!document.querySelector('meta[name="theme-color"]')){ const tc = document.createElement("meta"); tc.name = "theme-color"; tc.content = "#0C0D10"; document.head.appendChild(tc); }
+  // app/taskbar icon = Tec (matches the desktop shortcut), not the generic Edge icon
+  if(!document.querySelector('link[rel="icon"]')){ const ic = document.createElement("link"); ic.rel = "icon"; ic.href = "/static/tec.ico"; document.head.appendChild(ic); }
+  // pro polish: strip internal hrefs so hovering a button doesn't flash localhost URLs in the corner
+  document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
+  // load Kit, the in-room build-bot helper (kit-helper.js self-skips the main chat + non-rooms)
+  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
 })();

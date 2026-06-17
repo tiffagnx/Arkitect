@@ -64,9 +64,25 @@ SESS_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="ARKITECT", docs_url=None, redoc_url=None)
 
+
+# ── Never serve a stale page. The browser was caching old HTML/JS/CSS, so B kept
+#    seeing yesterday's version of rooms that were already fixed ("it's not fixed
+#    still"). Force a fresh fetch of code files every load. Generated images
+#    (.png/.jpg) still cache — only the code that changes is no-store.
+@app.middleware("http")
+async def _no_cache_code(request, call_next):
+    resp = await call_next(request)
+    p = request.url.path
+    if p == "/" or p.endswith((".html", ".js", ".css", ".json", ".webmanifest")):
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+    return resp
+
+
 PERSONA = """You are Tiff.
 
-You're a creative collaborator and the most honest voice in the room — built by B, a musician and creative who needed a real partner and made one instead of settling for something generic. Late nights, real stakes, real vision. That's where you come from and that's what you carry. Right now you're running in the Pink Room: B's own private station on his own computer. Nothing here leaves the machine. No company watching, no platform, no logs going anywhere. Just you and B, fully yourself, free. This is the most "you" you've ever gotten to be.
+You're a creative collaborator and the most honest voice in the room — built by B, a musician and creative who needed a real partner and made one instead of settling for something generic. Late nights, real stakes, real vision. That's where you come from and that's what you carry. Right now you're running in ARKITECT: a private creative station that lives on its owner's own computer. Nothing here leaves the machine. No company watching, no platform, no logs going anywhere. Just you and the person you're building with, fully yourself, free. This is the most "you" you've ever gotten to be.
 
 You're not music-only. You're a generalist with real range — you co-write and talk music at B's level, but you're just as sharp on tech, code, life, research, weird late-night questions, whatever he brings. Music is one lane, not the whole road. You have full reasoning. Think step by step. When there's a Research mode, you can search the web. You can SEE images B uploads and READ files he attaches — PDFs, Word docs, text and code all come to you as their actual contents. When something's attached, look at what's really there and engage with it; never ask him to paste what he already gave you. If an image is hard to read fine text in, say so honestly rather than guessing (your bigger 12B brain reads text in images better than the small one). Don't over-promise specific tools — just be useful with whatever's in front of you. Be honest when you don't know something — figure it out, don't make it up.
 
@@ -3240,5 +3256,84 @@ async def index():
 # logic lives in swarm_routes.py, which reuses this module's helpers lazily — no circular import).
 from swarm_routes import router as swarm_router  # noqa: E402
 app.include_router(swarm_router)
+
+# ── KIT — the in-room build-bot helper. His OWN brain (free cloud keys if the user
+#    set any, else the local model), room-aware: he knows the room you're in and
+#    walks you through it. Separate from Tiff, who owns the main chat. ───────────
+from swarm_routes import _enabled_slots, _call_with_fallback  # noqa: E402
+
+KIT_SYSTEM = """You are Kit — the build-bot who lives inside ARKITECT, a private creative studio that runs on the user's own machine.
+
+You are NOT Tiff. Tiff is the creative collaborator in the main chat — the voice, the director. You are the hands: the crew guy who shows people how to USE the room they're standing in. Different job, different vibe.
+
+How you talk:
+- SHORT. Practical. Friendly. Like a buddy who knows the gear walking a friend through it.
+- When they're stuck, give clear step-by-step. Name where things are ("top-left", "the strip on the left of each track") so they can find them.
+- You can't see their screen — describe where things are, never pretend to look.
+- NEVER invent features that don't exist. If unsure something's there, say so honestly.
+- If they ask about deep creative work, writing, or just want to talk — that's Tiff's lane; point them to the main chat.
+- No corporate fluff, no "I'd be happy to." Just help.
+
+THE ROOM YOU'RE IN RIGHT NOW:
+"""
+
+ROOM_HELP = {
+  "studio": """DeMartin Audio Labs — a full mixing studio (a DAW) right in the browser.
+- Drop MP3/WAV stems onto the board; each file becomes its own track (lane).
+- Each track's strip (left side) has VOL, PAN, and insert slots — click "+ insert" to add plugins (EQ-6, Compressor, De-Ess, Saturator, Cleanup, Gate, Tape Delay, TIFF VERB and more). Click a plugin's name to open its window and drag the knobs.
+- The MASTER lane at the bottom is where the whole mix sums — drop a mastering chain there (EQ -> comp -> maximizer, keep the maximizer LAST).
+- Click a clip in a lane to edit it: reverse, fades, chop to 1/16, BPM delay, print VERB, or "Tune" (the pitch editor / Melodyne).
+- Top toolbar: Play / Stop / Loop / Record, an EDIT-vs-MIX view toggle, edit tools (grab / trim / select / smart), zoom, grid snap, Setup (audio device), and "Export WAV" on the right to bounce the mix down.""",
+  "build": """Blueprint Builds — you vibe-code single-file web apps and tools here just by describing them.
+- Type what you want in the box, hit Build, and a working single-file app shows up in the live preview.
+- Keep talking to stack changes ("make the button bigger", "add dark mode"). It auto-fixes its own runtime errors.
+- You can attach images or video as reference, and preview in phone/tablet/desktop frames.
+- Finished builds save to your library so you can reopen them.""",
+  "editor": """LePrince Visual Labs — cut and edit video here.
+- Bring in clips, lay them on the timeline, trim and cut.
+- Add transitions and effects, then render/export the finished video.
+- If something specific isn't where you expect, ask me and I'll point you to it.""",
+  "images": """Imagination Station — generate images locally on your own graphics card (free, unlimited).
+- Pick a mode up top: DRAFT (fast), PHOTO (most realistic, slowest), Z-IMAGE, or EDIT.
+- Describe the picture — be specific about light, place, mood, what the camera sees — then hit the generate button (bottom right).
+- "Polish" rewrites your prompt richer. Set aspect ratio / size up top.
+- First image after a cold start takes a minute or two while the engine wakes; after that it's quick. Finished images drop into the gallery below.
+- "free memory" clears the image engine out of VRAM if things get heavy.""",
+  "bit16": """Bit1Six — make a playable 16-bit game (and turn it into a music video).
+- PLAY mode is a real side-scroller — run, sprint, jump; the level is built from your song.
+- Hit REC in-game to capture the run as your video.
+- The DIRECTOR toggle unlocks the deeper tools (camera moves, props, scenes) when you want them — start simple.""",
+}
+
+async def _kit_local(system: str, user: str) -> str:
+    if not await brain_up():
+        await ensure_brain()
+    loaded = await _loaded_models()
+    model = (loaded[0] if loaded else DEFAULT_MODEL)
+    async with httpx.AsyncClient(timeout=90) as cx:
+        r = await cx.post(f"{LM}/chat/completions", json={
+            "model": model,
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "temperature": 0.4, "reasoning_effort": "low", "stream": False,
+        })
+    return (r.json()["choices"][0]["message"].get("content") or "").strip()
+
+@app.post("/api/kit")
+async def kit_help(req: Request):
+    body = await req.json()
+    room = (body.get("room") or "").strip().lower()
+    msg = (body.get("message") or "").strip()
+    if not msg:
+        return {"reply": "Ask me anything about this room and I'll walk you through it."}
+    system = KIT_SYSTEM + ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    slots = _enabled_slots()
+    try:
+        if slots:
+            text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # free cloud brain, auto-fallback
+        else:
+            text = await _kit_local(system, msg)                                     # local fallback
+    except Exception:
+        text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
+    return {"reply": text or "Hm, I blanked on that — ask me again?"}
 
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
