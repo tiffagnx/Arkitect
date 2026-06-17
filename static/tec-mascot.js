@@ -6,8 +6,10 @@
   if (window.__tecMascot || document.querySelector(".tec-mascot")) return;
   window.__tecMascot = true;
 
-  const COLS = 12, ROWS = 1, FRAMES = COLS * ROWS;
-  const FPS = 3.2;     // idle cadence — slow + calm
+  const COLS = 9, ROWS = 1, FRAMES = COLS * ROWS;
+  const FPS = 3.6;     // idle cadence — slow + dreamy
+  // playback order — dwell on the eyes-shut frames (4,5,6) so Kit drifts into the music and stays a while
+  const SEQ = [0,0,0, 1,2, 3, 4,5,6, 6,5,6,5,6,6, 7,8, 0,0];
   const VIEW = 72;     // rendered px
 
   const css = `
@@ -56,11 +58,11 @@
     let maxH = 1; for (const f of frames) if (f.h > maxH) maxH = f.h;
     const scale = (VIEW * 0.94) / maxH;
 
-    let cur = 0, last = 0;
+    let si = 0, last = 0;
     function draw(ts) {
       if (!last) last = ts;
-      if (ts - last >= 1000 / FPS) { cur = (cur + 1) % FRAMES; last = ts; }
-      const f = frames[cur];
+      if (ts - last >= 1000 / FPS) { si = (si + 1) % SEQ.length; last = ts; }
+      const f = frames[SEQ[si]] || frames[0];
       const dw = f.w * scale, dh = f.h * scale;
       ctx.clearRect(0, 0, VIEW, VIEW);
       ctx.drawImage(img, f.sx, f.sy, f.w, f.h, (VIEW - dw) / 2, VIEW - dh, dw, dh); // center x, plant feet
@@ -85,5 +87,5 @@
     requestAnimationFrame(draw);
   };
   img.onerror = () => {};   // sheet missing -> no mascot, no error
-  img.src = "/static/tec-sprites.png";
+  img.src = "/static/kit-sprites.png";
 })();

@@ -21,6 +21,9 @@
     font:700 12px Oxanium,sans-serif; letter-spacing:.06em; box-shadow:0 6px 20px rgba(0,0,0,.5); transition:transform .14s,box-shadow .14s; }
   .kit-fab:hover { transform:translateY(-2px); box-shadow:0 9px 26px rgba(62,156,184,.4); border-color:rgba(120,182,205,.75); }
   .kit-fab canvas { width:28px; height:28px; display:block; }
+  .kit-fab.in-bar { position:static; height:34px; border-radius:10px; padding:0 12px 0 7px; margin-left:6px; flex:none; box-shadow:none; }
+  .kit-fab.in-bar canvas { width:24px; height:24px; }
+  .kit-win.from-bar { bottom:auto; top:62px; }
   .kit-win { position:fixed; right:18px; bottom:70px; z-index:9997; width:340px; max-width:92vw; display:none; flex-direction:column;
     max-height:min(560px,80vh); border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
     background:linear-gradient(160deg,#21232B,#15161B 60%,#101116); box-shadow:0 22px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
@@ -56,8 +59,9 @@
     const ctx = cv.getContext("2d");
     const img = new Image();
     let frames = [], scale = 1, cur = 0, last = 0, speed = fps;
+    const SEQ = [0,0,0,1,2,3,4,5,6,6,5,6,5,6,6,7,8,0,0];   // dwell on eyes-shut (the music) — same as the home mascot
     img.onload = () => {
-      const COLS = 12, cw = Math.floor(img.width / COLS), ch = img.height;
+      const COLS = 9, cw = Math.floor(img.width / COLS), ch = img.height;
       const tmp = document.createElement("canvas"); tmp.width = cw; tmp.height = ch;
       const tctx = tmp.getContext("2d", { willReadFrequently: true });
       for (let i = 0; i < COLS; i++) {
@@ -74,11 +78,11 @@
       requestAnimationFrame(draw);
     };
     img.onerror = () => {};
-    img.src = "/static/tec-sprites.png";
+    img.src = "/static/kit-sprites.png";
     function draw(ts) {
       if (!last) last = ts;
-      if (ts - last >= 1000 / speed) { cur = (cur + 1) % (frames.length || 1); last = ts; }
-      const f = frames[cur];
+      if (ts - last >= 1000 / speed) { cur = (cur + 1) % SEQ.length; last = ts; }
+      const f = frames[SEQ[cur]] || frames[0];
       if (f) { const dw = f.w * scale, dh = f.h * scale; ctx.clearRect(0, 0, view, view); ctx.drawImage(img, f.sx, f.sy, f.w, f.h, (view - dw) / 2, view - dh, dw, dh); }
       requestAnimationFrame(draw);
     }
@@ -108,7 +112,8 @@
   const fabSpr = makeSprite(28, 3);
   const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Ask Kit about this room";
   fab.appendChild(fabSpr.cv); const lbl = document.createElement("span"); lbl.textContent = "Ask Kit"; fab.appendChild(lbl);
-  document.body.appendChild(fab);
+  const _bar = document.querySelector(".top");
+  if (_bar) { fab.classList.add("in-bar"); win.classList.add("from-bar"); _bar.appendChild(fab); } else { document.body.appendChild(fab); }
   fab.onclick = () => { win.classList.toggle("open"); if (win.classList.contains("open")) input.focus(); };
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
 

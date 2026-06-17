@@ -32,7 +32,16 @@
     box-shadow:0 0 0 0 rgba(255,90,110,.5); animation:recpulse 1s infinite; }
   @keyframes recpulse { 0%{box-shadow:0 0 0 0 rgba(255,90,110,.55)} 100%{box-shadow:0 0 0 9px rgba(255,90,110,0)} }
   .countin { font:700 22px 'Space Mono'; color:#D9A4A7; min-width:30px; text-align:center; }
-  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; flex:none; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; flex:none; position:relative; }
+  /* File dropdown — collapses tracks / plugins / save / load / export / setup into one menu */
+  .filemenu { position:fixed; z-index:9999; display:none; flex-direction:column; min-width:210px; padding:6px;
+    background:#1C1D24; border:1px solid rgba(255,255,255,.1); border-radius:12px; box-shadow:0 20px 54px rgba(0,0,0,.62); }
+  .filemenu.open { display:flex; }
+  .filemenu .tbtn { display:block; width:100%; text-align:left; border:none; background:transparent; border-radius:7px; padding:8px 11px; }
+  .filemenu .tbtn:hover { background:rgba(62,156,184,.16); border-color:transparent; }
+  .fm-sep { height:1px; background:rgba(255,255,255,.08); margin:5px 4px; }
+  /* transport — compact; it doesn't need to hog the bar */
+  #play, #stop, #loop, #rec { padding:5px 10px; font-size:12px; }
   .rec-warn { font:500 10px Inter; color:#FFC46B; line-height:1.45; margin-top:6px; }
   .rec-warn.bad { color:#E58A8E; }
   .lat-grid { display:grid; grid-template-columns:1fr auto; gap:3px 8px; font:500 10px 'Space Mono'; }
@@ -428,8 +437,7 @@
 </head>
 <body>
 <div class="top">
-  <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span><img src="/static/arkitect-logo.png" alt="ARKITECT" /></a>
-  <h1>🎚 DEMARTIN AUDIO LABS</h1>
+  <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
   <span class="clock" id="clock">0:00.0</span>
   <button class="tbtn hot" id="play">▶ Play</button>
   <button class="tbtn" id="stop">■ Stop</button>
@@ -453,13 +461,18 @@
     <button class="zb on" id="snapBtn" title="snap clip moves to the grid">⌗ Snap</button>
   </div>
   <div class="right">
-    <button class="tbtn" id="setupBtn" title="Output device · record · tempo · latency">⚙ Setup</button>
-    <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
-    <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
-    <button class="tbtn" id="addAuxBtn" title="Add an FX bus — an aux track you stack plugins on and send stems to">+ FX Bus</button>
-    <button class="tbtn" id="saveBtn" title="Save this mix (survives a refresh)">💾 Save</button>
-    <button class="tbtn" id="loadBtn" title="Load a saved mix">📂 Load</button>
-    <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
+    <button class="tbtn fileBtn" id="fileBtn" title="Tracks · plugins · save / load · export">≡ File ▾</button>
+    <div class="filemenu" id="fileMenu">
+      <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
+      <button class="tbtn" id="addAuxBtn" title="Add an FX bus — an aux track you stack plugins on and send stems to">+ FX Bus</button>
+      <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
+      <div class="fm-sep"></div>
+      <button class="tbtn" id="saveBtn" title="Save this mix (survives a refresh)">💾 Save mix</button>
+      <button class="tbtn" id="loadBtn" title="Load a saved mix">📂 Load mix</button>
+      <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
+      <div class="fm-sep"></div>
+      <button class="tbtn" id="setupBtn" title="Output device · record · tempo · latency">⚙ Setup (audio)</button>
+    </div>
   </div>
 </div>
 <span id="saveNote" style="position:fixed;bottom:12px;right:16px;font:500 11px 'Space Mono';color:var(--teal);z-index:50;pointer-events:none"></span>
@@ -3294,6 +3307,10 @@ $("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>d
 $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
 $("setupBtn").onclick = (e) => { e.stopPropagation(); $("rail").classList.toggle("open"); $("setupBtn").classList.toggle("on", $("rail").classList.contains("open")); };
 document.addEventListener("mousedown", (e) => { const r=$("rail"); if(r.classList.contains("open") && !e.target.closest("#rail,#setupBtn")){ r.classList.remove("open"); $("setupBtn").classList.remove("on"); } });
+// File dropdown — open/close; auto-close after an action (but stay open for Load's saved-mixes sub-menu)
+$("fileBtn").onclick = (e) => { e.stopPropagation(); const fm = $("fileMenu"); const open = !fm.classList.contains("open"); fm.classList.toggle("open", open); $("fileBtn").classList.toggle("on", open); if (open) { const r = e.currentTarget.getBoundingClientRect(); fm.style.top = (r.bottom + 7) + "px"; fm.style.right = (window.innerWidth - r.right) + "px"; } };
+$("fileMenu").addEventListener("click", (e) => { const t = e.target.closest("button,label"); if (t && t.id !== "loadBtn") setTimeout(() => { $("fileMenu").classList.remove("open"); $("fileBtn").classList.remove("on"); }, 0); });
+document.addEventListener("mousedown", (e) => { if (!e.target.closest("#fileBtn,#fileMenu")) { $("fileMenu").classList.remove("open"); $("fileBtn").classList.remove("on"); } });
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
 $("tracks").addEventListener("wheel", (e) => {
   if (viewMode === 'mix') return;
