@@ -1061,6 +1061,42 @@ function showWaveMenu(t, wv, e){
   m.style.top  = Math.min(e.clientY, window.innerHeight-320)+"px";
   m.classList.add("on");
 }
+// TRACK context menu (right-click the track strip) — New / Rename / Duplicate / Delete (Pro Tools-style)
+function duplicateTrack(t){
+  const nt = { id: rid(), type: t.type||'audio', name: (t.name||'Track')+" copy",
+    gain: t.gain, pan: t.pan, eq:{lo:t.eq.lo, mid:t.eq.mid, hi:t.eq.hi}, comp: t.comp, send: t.send,
+    inserts: (t.inserts||[]).map(ins=>({ name:ins.name, params:{...(ins.params||{})}, bypassed:!!ins.bypassed })),
+    muted: !!t.muted, solo: false, color: nextStemColor(),
+    input: t.input||'none', output: t.output||'master',
+    sends: (t.sends||[]).map(s=>({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp })),
+    src:null, live:null };
+  if(t.type==='aux'){ const b=nextFreePoolBus(); nt.inputBus=b.id; nt.input=b.id; nt.color=b.color; }   // a fresh bus for the copied return
+  else { nt.clips = clipsOf(t).map(cl=>({ id:rid(), buffer:cl.buffer, start:cl.start, muted:!!cl.muted, name:cl.name }));
+         nt.buffer = (nt.clips[0] && nt.clips[0].buffer) || t.buffer || null; }
+  const i = tracks.indexOf(t); tracks.splice(i+1, 0, nt);
+  if(nt.type==='aux') auxLaneUi(nt); else laneUi(nt);
+  const od=document.getElementById('lane-'+t.id), nd=document.getElementById('lane-'+nt.id);          // sit the copy right under the original
+  if(od && nd && od.nextSibling!==nd) od.parentNode.insertBefore(nd, od.nextSibling);
+  ensureMasterLane(); selectTrack(nt);
+  if(playing) restartPlayback(); refreshSendMenus();
+  $("drop").style.display = tracks.length ? "none" : "flex";
+  flash("Duplicated “"+(t.name||'track')+"”");
+  return nt;
+}
+function showTrackMenu(t, e){
+  e.preventDefault(); e.stopPropagation(); selectTrack(t);
+  const m=ctxMenuEl(); m.innerHTML="";
+  const add=(label,fn,enabled=true)=>{ const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
+  const sep=()=>{ const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
+  add("✛  New track…", ()=>openNewTracksDialog());
+  add("✎  Rename…", ()=>{ const nm=document.querySelector('#lane-'+t.id+' .ts-name'); renameTrack(t, nm); });
+  add("⧉  Duplicate", ()=>duplicateTrack(t));
+  sep();
+  add("🗑  Delete", ()=>{ const x=document.querySelector('#lane-'+t.id+' .ts-x'); if(x) x.click(); });
+  m.style.left = Math.min(e.clientX, window.innerWidth-220)+"px";
+  m.style.top  = Math.min(e.clientY, window.innerHeight-200)+"px";
+  m.classList.add("on");
+}
 document.addEventListener("click", hideMenu);
 document.addEventListener("scroll", hideMenu, true);
 let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
@@ -2548,6 +2584,7 @@ function laneUi(t) {
   $("tracks").appendChild(d);
   drawLane(t); updateZoomUi();
   d.onclick = (e) => { if (!e.target.closest(".ts-x,.ts-btn,.ts-ctl,.ts-slots,.ts-name,.wave")) selectTrack(t); };
+  const _strip = d.querySelector(".tstrip"); if(_strip) _strip.oncontextmenu = (e) => showTrackMenu(t, e);
   const nm = d.querySelector(".ts-name"); nm.ondblclick = (e) => { e.stopPropagation(); renameTrack(t, nm); };
   d.querySelector(".ts-x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
