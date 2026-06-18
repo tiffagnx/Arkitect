@@ -2872,7 +2872,7 @@ function laneUi(t) {
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
     if (!cl) { selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty → playhead
-    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t);
+    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t); seek(atTime);   // drop the edit cursor right where you click the clip
     const sx = e.clientX;
     const leftX = r.left + ((cl.start - scrollT)/vd)*r.width, rightX = r.left + ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
     // TRIM: only with the Trim tool (nearest edge), or Smart tool when right on an edge
@@ -4330,8 +4330,9 @@ function tickUi() {
     const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
     drawLane(t);
     const g = cv.getContext("2d");
-    const x = t2x(p, cv.width); if (x < -2 || x > cv.width + 2) return;   // playhead off the visible window
-    g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;
+    const x = t2x(p, cv.width); if (x < -2 || x > cv.width + 2) return;   // edit cursor / playhead off the visible window
+    if (playing) { g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2; }        // solid white playhead while rolling
+    else { const b = 0.4 + 0.45 * Math.sin(performance.now() / 240); g.strokeStyle = "rgba(130,205,255," + b.toFixed(2) + ")"; g.lineWidth = 1.6; }   // blinking edit cursor when stopped (where the next take lands)
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
   if (viewMode !== 'mix') drawRuler();                  // ruler ticks + moving playhead marker
