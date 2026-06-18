@@ -1226,6 +1226,8 @@ function showWaveMenu(t, wv, e){
     add("⟿  BPM delay", ()=>clipFx_bpmDelay(t,cl));
     add("⋮⋮  Chop (1/16)", ()=>clipFx_chop(t,cl));
     add("⌫  Delete fades", ()=>{ if(!cl.fadeIn && !cl.fadeOut){ flash("No fades on this clip — drag a top corner to make one"); return; } pushUndoClips(t,"Delete fades"); cl.fadeIn=0; cl.fadeOut=0; drawLane(t); if(playing) restartPlayback(); flash("Fades cleared"); });
+    { const _SH=['lin','pow','scv'], _SN={lin:'Standard',pow:'Equal-Power',scv:'S-Curve'};
+      add("◢◣  Fade shape: "+_SN[cl.fadeInShape||'lin'], ()=>{ const nx=_SH[(_SH.indexOf(cl.fadeInShape||'lin')+1)%3]; cl.fadeInShape=nx; cl.fadeOutShape=nx; drawLane(t); if(playing) restartPlayback(); flash("Fade shape: "+_SN[nx]); }); }
     sep();
     add("⚙  AudioSuite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
   } else { const cx=e.clientX, cy=e.clientY; add("✨  Generate a sound here…", ()=>openSfxPrompt(t, atTime, cx, cy)); }
@@ -4029,7 +4031,15 @@ function drawGrid(g, W, H){
 // one CHANNEL drawn as a filled peak waveform inside the vertical band [yT, yB] (Pro Tools look).
 // mid = the channel's zero-crossing line; cap keeps peaks inside the band. Reads real min/max
 // peaks per pixel, so at deep zoom (i1<=i0) it still plots the single sample under the pixel.
-function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur){
+// fade SHAPES — Standard(linear) · Equal-Power(sin) · S-Curve(smoothstep). ONE source, shared by the
+// audio ramp (setValueCurveAtTime), the waveform taper, and the drawn fade line so they always match.
+function _shapeCurve(shape, u){ u = u<0?0 : u>1?1 : u;
+  if(shape==='pow') return Math.sin(u*Math.PI/2);            // equal-power
+  if(shape==='scv') return u*u*(3-2*u);                      // S-curve (smoothstep)
+  return u;                                                  // 'lin' / default = standard linear
+}
+function _fadeGain(shape, x, dir){ return _shapeCurve(shape||'lin', dir==='out' ? 1-x : x); }
+function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh){
   const N=data.length, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*vZoom;
   fi=fi||0; fo=fo||0; dur=dur||0;
   g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();         // zero line (subtle)
@@ -4039,10 +4049,10 @@ function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur){
     let i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); if(i1<=i0) i1=i0+1;
     let mn=1,mx=-1; for(let j=i0;j<i1 && j<N;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
     if(mx<mn){ mn=0; mx=0; }
-    let env=1;                                                          // FADE envelope → the WAVEFORM itself tapers across the fade (matches the audio ramp + Pro Tools)
+    let env=1;                                                          // FADE envelope → the WAVEFORM tapers across the fade, shape-matched to the audio
     if(dur>0){ const tt=(px/w)*dur;
-      if(fi>0 && tt<fi) env=tt/fi;
-      if(fo>0 && tt>dur-fo) env=Math.min(env,(dur-tt)/fo);
+      if(fi>0 && tt<fi) env=_fadeGain(inSh, tt/fi, 'in');
+      if(fo>0 && tt>dur-fo) env=Math.min(env, _fadeGain(outSh, (tt-(dur-fo))/fo, 'out'));
       env = env<0?0 : env>1?1 : env; }
     const top=Math.max(-cap,Math.min(cap, mx*amp*env)), bot=Math.max(-cap,Math.min(cap, mn*amp*env));
     g.moveTo(x0+px, mid-top); g.lineTo(x0+px, mid-bot+0.6);             // +0.6 so flat (silent) lines still show
@@ -4051,16 +4061,16 @@ function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur){
 }
 // one clip's waveform inside its box [x0, x0+w], on-screen part only. Stereo buffers render a
 // DUAL waveform (channel 0 on top, channel 1 on the bottom); mono renders one centered band.
-function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo){
+function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo, inSh, outSh){
   const W=g.canvas.width, pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0)), dur=buf.duration;
   if(buf.numberOfChannels>1){
     const split=(yT+yB)/2;
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb, fi, fo, dur);
-    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb, fi, fo, dur);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb, fi, fo, dur, inSh, outSh);
+    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb, fi, fo, dur, inSh, outSh);
     g.strokeStyle="rgba(255,255,255,0.05)"; g.lineWidth=1; g.beginPath();   // channel divider
     g.moveTo(x0+pa, split); g.lineTo(x0+pb, split); g.stroke();
   } else {
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh);
   }
 }
 // LIVE record waveform — while capturing, draw the incoming audio as a growing red wave on the armed
@@ -4097,7 +4107,7 @@ function drawLane(t){
     const showBar = fw>34, nbH = showBar?NB:0;                              // hide name bar on slivers
     g.fillStyle="#0d0e13"; g.fillRect(fx,0,fw,H);                          // OPAQUE base so overlapping clips fully cover each other (no see-through bleed)
     g.fillStyle=hexA(t.color, seld?0.22:0.13); g.fillRect(fx,0,fw,H);       // subtle track-color tint over the opaque base (keeps the bright waveform popping)
-    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, cl.fadeIn||0, cl.fadeOut||0);   // waveform sits below the name bar + visually tapers across its fades
+    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, cl.fadeIn||0, cl.fadeOut||0, cl.fadeInShape, cl.fadeOutShape);   // waveform tapers across its fades, shape-matched
     // ── clip name bar across the top (Pro Tools) ──
     if(showBar){
       g.fillStyle=hexA(t.color, seld?0.78:0.6); g.fillRect(fx,0,fw,nbH);
@@ -4111,11 +4121,11 @@ function drawLane(t){
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
     // ── fades: diagonal taper + shaded region (overlap two clips & fade each = a crossfade, no click) ──
-    const fiPx=(cl.fadeIn||0)/vd*W, foPx=(cl.fadeOut||0)/vd*W;
-    if(fiPx>1){ g.fillStyle="rgba(8,9,13,0.14)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x+fiPx,0); g.lineTo(x,H); g.closePath(); g.fill();
-      g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(x,H-1); g.lineTo(x+fiPx,1); g.stroke(); }
-    if(foPx>1){ const xr=x+w; g.fillStyle="rgba(8,9,13,0.14)"; g.beginPath(); g.moveTo(xr,0); g.lineTo(xr-foPx,0); g.lineTo(xr,H); g.closePath(); g.fill();
-      g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(xr-foPx,1); g.lineTo(xr,H-1); g.stroke(); }
+    const fiPx=(cl.fadeIn||0)/vd*W, foPx=(cl.fadeOut||0)/vd*W;   // fade lines follow the chosen shape (curved for Equal-Power / S-Curve)
+    if(fiPx>1){ g.strokeStyle="rgba(255,255,255,0.62)"; g.lineWidth=1.4; g.beginPath();
+      for(let px=0;px<=fiPx;px+=2){ const yy=(H-1)-_fadeGain(cl.fadeInShape,px/fiPx,'in')*(H-2); px===0?g.moveTo(x+px,yy):g.lineTo(x+px,yy); } g.stroke(); }
+    if(foPx>1){ const xr=x+w; g.strokeStyle="rgba(255,255,255,0.62)"; g.lineWidth=1.4; g.beginPath();
+      for(let px=0;px<=foPx;px+=2){ const yy=(H-1)-_fadeGain(cl.fadeOutShape,px/foPx,'out')*(H-2); px===0?g.moveTo((xr-foPx)+px,yy):g.lineTo((xr-foPx)+px,yy); } g.stroke(); }
     if(seld){                                                                // PT-style fade HANDLES: a little square at each top corner of the SELECTED clip — drag it to pull a fade
       const hs=7, inHX=x+fiPx, outHX=(x+w)-foPx;
       const dh=(hx)=>{ if(hx < x-3 || hx > x+w+3) return; g.fillStyle="rgba(255,255,255,0.95)"; g.fillRect(hx-hs/2,1,hs,hs); g.strokeStyle="rgba(8,9,13,0.85)"; g.lineWidth=1; g.strokeRect(hx-hs/2+0.5,1.5,hs-1,hs-1); };
@@ -4221,12 +4231,16 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
       let playCtx = null;
       if (clipStartCtx >= when) { src.start(clipStartCtx, 0); playCtx = clipStartCtx; }   // clip starts in the future → from its head
       else { const into = when - clipStartCtx; if (into < cl.buffer.duration - 0.01) { src.start(when, Math.max(0, Math.min(into, cl.buffer.duration - 0.01))); playCtx = when; } }  // transport already inside → start partway in
-      if (playCtx != null && (fi > 0 || fo > 0)) {                  // schedule the fade envelope on the per-clip gain (live + offline bounce)
+      if (playCtx != null && (fi > 0 || fo > 0)) {                  // schedule the fade envelope (shape-matched) on the per-clip gain — live + offline bounce
+        const NC=48, curveOf=(sh,dir)=>{ const a=new Float32Array(NC); for(let i=0;i<NC;i++) a[i]=G*_fadeGain(sh,i/(NC-1),dir); return a; };
         if (fi > 0 && playCtx < clipStartCtx + fi) {
-          cg.gain.setValueAtTime(playCtx <= clipStartCtx + 0.0005 ? 0 : G * ((playCtx - clipStartCtx) / fi), playCtx);
-          cg.gain.linearRampToValueAtTime(G, clipStartCtx + fi);
+          try { if (playCtx <= clipStartCtx + 0.0005) cg.gain.setValueCurveAtTime(curveOf(cl.fadeInShape,'in'), clipStartCtx, fi); else throw 0; }
+          catch(e){ cg.gain.setValueAtTime(playCtx <= clipStartCtx + 0.0005 ? 0 : G * ((playCtx - clipStartCtx) / fi), playCtx); cg.gain.linearRampToValueAtTime(G, clipStartCtx + fi); }
         }
-        if (fo > 0) { cg.gain.setValueAtTime(G, Math.max(playCtx, endCtx - fo)); cg.gain.linearRampToValueAtTime(0, endCtx); }
+        if (fo > 0) { const foStart = Math.max(playCtx, endCtx - fo);
+          try { if (foStart <= endCtx - fo + 0.0005) cg.gain.setValueCurveAtTime(curveOf(cl.fadeOutShape,'out'), foStart, fo); else throw 0; }
+          catch(e){ cg.gain.setValueAtTime(G, foStart); cg.gain.linearRampToValueAtTime(0, endCtx); }
+        }
       }
       srcs.push(src);
     }
@@ -4907,7 +4921,7 @@ async function buildProjectPayload(title) {
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
-      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), fadeIn: cl.fadeIn||0, fadeOut: cl.fadeOut||0, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), fadeIn: cl.fadeIn||0, fadeOut: cl.fadeOut||0, fadeInShape: cl.fadeInShape||'lin', fadeOutShape: cl.fadeOutShape||'lin', wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
     }
     trackData.push(td);
   }
@@ -5120,7 +5134,7 @@ async function applyProjectPayload(proj) {
         continue;
       }
       let clips = [];
-      const _decClips = async (arr) => { const out=[]; for (const cd of arr) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); out.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1), fadeIn: cd.fadeIn||0, fadeOut: cd.fadeOut||0 }); } return out; };
+      const _decClips = async (arr) => { const out=[]; for (const cd of arr) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); out.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1), fadeIn: cd.fadeIn||0, fadeOut: cd.fadeOut||0, fadeInShape: cd.fadeInShape||'lin', fadeOutShape: cd.fadeOutShape||'lin' }); } return out; };
       try {
         if (Array.isArray(td.takes) && td.takes.length) {        // compat: a session saved with the old take format → load the active take's clips
           clips = await _decClips(td.takes[Math.max(0, Math.min(td.takeIdx || 0, td.takes.length - 1))]);
