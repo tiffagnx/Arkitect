@@ -4299,10 +4299,26 @@ function buildMasterStrip(){
   const el=document.createElement("div"); el.className="mstrip master";
   el.innerHTML=`
     <div class="ms-top"><span class="ms-nm master">MASTER</span></div>
-    <div class="ms-lbl">Limiter</div><div class="ms-lim" id="msLim">${(+$("mLim").value).toFixed(1)} dB</div>
+    <div class="ms-lbl">Master FX</div><div class="ms-inlist" id="msmInserts"></div>
+    <button class="ms-add" type="button">+ fx</button>
+    <div class="ms-lbl">Ceiling</div>
+    <div class="ms-eq"><div class="ms-eqk"><output></output><div class="cknob xs" id="msmCeil"><span class="cknob-ind"></span></div><label>CEIL</label></div></div>
     <div class="ms-spacer"></div>
     <div class="ms-fader"><div class="ms-meter master"><i></i></div><div class="ms-slot" id="msf-master"><div class="ms-cap red"></div></div></div>
     <div class="ms-db" id="msdb-master"></div>`;
+  // master FX rack — the mastering chain (mastering plugins listed first), each row bypass/open/remove
+  masterTrack.inserts = masterTrack.inserts || [];
+  const inlist=el.querySelector("#msmInserts");
+  masterTrack.inserts.forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":"");
+    r.innerHTML=`<button class="ms-inpow" title="bypass on / off"></button><span class="ms-innm" title="open ${ins.name}">${ins.name}</span><span class="ms-inx" title="remove">✕</span>`;
+    r.querySelector(".ms-innm").onclick=(e)=>{ e.stopPropagation(); openPluginWindow(masterTrack,i); };
+    r.querySelector(".ms-inpow").onclick=(e)=>{ e.stopPropagation(); ins.bypassed=!ins.bypassed; if(playing) restartPlayback(); renderMixWindow(); if(selTrackId==='__master__') renderChannel(masterTrack); };
+    r.querySelector(".ms-inx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(masterTrack); masterTrack.inserts.splice(i,1); if(playing) restartPlayback(); renderMixWindow(); if(selTrackId==='__master__') renderChannel(masterTrack); };
+    inlist.appendChild(r); });
+  el.querySelector(".ms-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, true, (name)=>{ masterTrack.inserts.push({name,params:{},bypassed:false}); const ni=masterTrack.inserts.length-1; if(playing) restartPlayback(); renderMixWindow(); if(selTrackId==='__master__') renderChannel(masterTrack); openPluginWindow(masterTrack, ni); }); };
+  // editable ceiling — drives the limiter threshold (the loudest point; aim ~−1 dB)
+  const ck=el.querySelector("#msmCeil"), co=ck.parentElement.querySelector("output");
+  bindStripKnob(ck, co, -12, 0, 0.1, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1), -1);
   bindMixFader(el.querySelector("#msf-master"), el.querySelector("#msdb-master"),
     ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9, gdbStr);
   return el;
