@@ -626,6 +626,14 @@
   .modal-btn { padding:8px 18px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer; background:rgba(255,255,255,.05); color:var(--text); font:600 12px Inter; }
   .modal-btn:hover { border-color:rgba(62,156,184,.5); }
   .modal-btn.go { background:linear-gradient(120deg,#5FB4CE,var(--pink)); color:#0C0D10; border-color:transparent; }
+  /* visible TEMPO · KEY on the top bar */
+  .tempokey .tk-rows { display:flex; flex-direction:column; gap:3px; }
+  .tempokey .tk-r { display:flex; align-items:center; gap:4px; }
+  .tk-bpm { width:46px; background:rgba(0,0,0,.34); border:1px solid var(--hairline); color:#7FE0C6; font:700 13px 'Space Mono'; border-radius:6px; padding:2px 3px; text-align:center; outline:none; }
+  .tk-bpm::-webkit-inner-spin-button, .tk-bpm::-webkit-outer-spin-button { opacity:.3; }
+  .tk-key { flex:1; min-width:40px; text-align:center; font:700 12px 'Space Mono'; color:#E8A6C2; background:rgba(0,0,0,.3); border:1px solid var(--hairline); border-radius:6px; padding:2px 5px; }
+  .tk-b { font:700 8px 'Space Mono'; letter-spacing:.04em; color:var(--dim); background:rgba(255,255,255,.05); border:1px solid var(--hairline); border-radius:6px; padding:3px 5px; cursor:pointer; }
+  .tk-b:hover { color:#9FCFDD; border-color:rgba(62,156,184,.5); }
 </style>
 </head>
 <body>
@@ -633,6 +641,12 @@
 <div class="top">
   <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
   <div class="tgroup counter"><span class="tg-l">COUNTER</span><span class="clock" id="clock">1|1  0:00.0</span></div>
+  <div class="tgroup tempokey"><span class="tg-l">TEMPO · KEY</span>
+    <span class="tk-rows">
+      <span class="tk-r"><input class="tk-bpm" id="bpmTop" type="number" min="40" max="240" step="1" value="120" title="project tempo (BPM) — type it, or TAP / AUTO"><button class="tk-b" id="bpmTapTop" title="tap the beat 4+ times in time">TAP</button><button class="tk-b" id="bpmAutoTop" title="auto-detect tempo from the selected clip">AUTO</button></span>
+      <span class="tk-r"><span class="tk-key" id="keyTop" title="musical key of the selected clip">—</span><button class="tk-b" id="keyDetTop" title="detect the key of the selected clip">KEY</button></span>
+    </span>
+  </div>
   <div class="tgroup"><span class="tg-l">TRANSPORT</span>
     <span class="transport" id="transport">
       <span class="tp-row">
@@ -5402,8 +5416,21 @@ function feedbackWatch(level) {
 // ── TEMPO / KEY / COUNT-IN — typed BPM + TAP + AUTO, key detect, segmented count-in ──
 $("tsNum").oninput = $("tsNum").onchange = () => { tsNum = Math.max(1, Math.min(16, Math.round(+$("tsNum").value || 4))); $("tsNum").value = tsNum; relayoutAll(); };
 $("tsDen").onchange = () => { tsDen = +$("tsDen").value || 4; relayoutAll(); };
-$("recBpm").oninput  = () => relayoutAll();   // curTempo() reads recBpm live; redraw the grid
-$("recBpm").onchange = () => { const v = Math.max(40, Math.min(240, Math.round(+$("recBpm").value || 120))); $("recBpm").value = v; relayoutAll(); };
+$("recBpm").oninput  = () => { relayoutAll(); syncTopTempoKey(); };   // curTempo() reads recBpm live; redraw the grid + mirror to the top bar
+$("recBpm").onchange = () => { const v = Math.max(40, Math.min(240, Math.round(+$("recBpm").value || 120))); $("recBpm").value = v; relayoutAll(); syncTopTempoKey(); };
+// ── visible TEMPO + KEY on the top bar — mirrors the (formerly hidden) #recBpm / #keyVal and forwards
+//    TAP / AUTO / KEY to the existing handlers, so there's still ONE source of truth (#recBpm / detectKey) ──
+function syncTopTempoKey(){
+  const bt=$("bpmTop"); if(bt && document.activeElement!==bt) bt.value = Math.round(curTempo());
+  const kt=$("keyTop"), kv=$("keyVal"); if(kt) kt.textContent = (kv && kv.textContent) ? kv.textContent : "—";
+}
+if($("bpmTop")){
+  $("bpmTop").onchange  = () => { let v=Math.max(40,Math.min(240,Math.round(parseFloat($("bpmTop").value)||120))); $("bpmTop").value=v; $("recBpm").value=v; $("recBpm").dispatchEvent(new Event('input')); };
+  $("bpmTapTop").onclick  = () => { $("tapBtn").click(); syncTopTempoKey(); };
+  $("bpmAutoTop").onclick = () => { $("autoBpmBtn").click(); setTimeout(syncTopTempoKey, 90); };
+  $("keyDetTop").onclick  = () => { $("autoKeyBtn").click(); setTimeout(syncTopTempoKey, 90); };
+  syncTopTempoKey();
+}
 $("countSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
   $("countSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
   $("countBars").value = b.dataset.n;
