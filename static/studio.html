@@ -107,7 +107,7 @@
   .lane.muted { opacity:.45; }
   /* per-track control strip (Pro Tools edit-window: Track-Color strip + controls LEFT of the waveform) */
   .tcolor { width:4px; flex:none; align-self:stretch; }                                    /* PT Track-Color view: color strip, left-most */
-  .tstrip { width:150px; flex:none; border-right:1px solid var(--hairline); padding:6px 7px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }
+  .tstrip { width:108px; flex:none; border-right:1px solid var(--hairline); padding:6px 7px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }   /* cut tight at the M button — no empty space (Pro Tools) */
   .ts-top { display:flex; align-items:center; gap:6px; position:relative; }
   .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }    /* master lane keeps its color dot */
   .ts-name { font:600 11.5px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text;
@@ -2671,7 +2671,7 @@ function ensureColHeader(){
   const tr=$("tracks"); if(!tr) return;
   let h=document.getElementById('colHeader');
   if(!h){ h=document.createElement('div'); h.id='colHeader'; h.className='col-header';
-    h.innerHTML=`<div class="chh" style="width:154px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
+    h.innerHTML=`<div class="chh" style="width:112px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
     tr.insertBefore(h, tr.firstChild);
   }
   h.style.display = tracks.length ? 'flex' : 'none';
