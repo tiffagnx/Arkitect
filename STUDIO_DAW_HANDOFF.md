@@ -127,6 +127,33 @@ pink-room→arkitect.**
   screenshots hang while `preview_eval` still responds, `preview_stop`+`preview_start` the `arkitect-studio`
   config (port 7791) for a fresh renderer.
 
+**Autonomous batch (2026-06-18, owner napping — explicit "keep working down the road"):** all browser-verified, committed:
+- **Opaque clips** (df3af88): clip body now paints a solid base (`#0d0e13`) + a track-color tint in `drawLane`
+  (was `hexA(color,0.10)` see-through) → overlapping stems fully cover, no bleed.
+- **Overlap = overwrite** (751f7ea): `resolveOverlaps(t, moved)` runs on clip-drop (grab/move up handler) — the
+  covered audio of lower clips is trimmed/split/removed (PT overwrite). Recording still COEXISTS (not overwritten).
+- **TEMPO · KEY on the top bar** (115fc45): new `.tgroup` after COUNTER — typeable BPM + TAP + AUTO + key DETECT;
+  `syncTopTempoKey()` mirrors the formerly-hidden `#recBpm`/`#keyVal`; forwards to existing `#tapBtn`/`#autoBpmBtn`/`#autoKeyBtn` (ONE source of truth).
+- **Fade shapes** (c6ddab6): `_shapeCurve`/`_fadeGain` (lin/pow/scv) drive the audio ramp (`setValueCurveAtTime`,
+  linear fallback in try/catch), the waveform taper (`drawWaveBand`), AND the drawn fade line — all matched. Right-click
+  ▸ "Fade shape" cycles Standard→Equal-Power→S-Curve; serialized as `fadeInShape`/`fadeOutShape`.
+
+**Big discoveries (so we don't rebuild):** **Auto-Tune ALREADY EXISTS** — `openTune` (5533) is a real Melodyne-style
+pitch editor (detectPitchTrack→segmentNotes→piano-roll→snap-to-key→`fxPitchBuf` retune→print). **Auto-mix** already
+FFT-analyzes + applies bounded EQ/comp/de-ess (the seed for "Vocal Doctor"). `clipFx_chop` (1/16 stutter) + `clipFx_bpmDelay`
+are ALREADY tempo-synced (read `curTempo()`).
+
+**RESEARCHED, awaiting owner green-light (3 workflows ran; full plans in the run task-outputs):**
+(1) **FX-Throw bar** — contextual one-tap beat-locked throws on a selection (reuse `separateAtSelection` + the clip
+render-FX + `placePopup`/`armPopupClickaway`), + a Stutter Painter. (2) **Tempo-synced render-FX engine** — generalize
+`clipFx_chop`/`clipFx_bpmDelay` with a NOTE-DIVISION picker (`FX_DIVS` + `divSec(div)`); keep the old fns as wrappers.
+(3) **Auto-Tune as its OWN plugin** (key + a strength knob natural→hard; SEPARATE from Melodyne — owner insisted they're
+different tools). (4) **Vocal Doctor** — one-button analyze→full bounded chain (EQ/de-ess/comp/sat + a reverb SEND + a
+slap-delay SEND) + a "Your Edge" panel whose sliders are clamped to a safe band around the Doctor's baseline (owner's
+"can't wreck the quality" idea); idempotent Doctor auxes; keep the honesty contract. (5) **drag-the-curve custom fade +
+Batch-Fades dialog** (owner was mid-explaining the PT dialog). Owner wants all of it but hasn't approved builds — PRESENT
+the plan first, build one slice at a time.
+
 ## ENGINE MAP (grep for current line numbers — they shift)
 - `buildTrackGraph(c,t,when,offset,isOffline)`: per clip → **per-clip GainNode (cl.gain + fade ramps)**
   → `inG` → eq(lo/mid/hi) → inserts → comp → pan → fader → meter → dest; sends tap comp(pre)/fader(post)
