@@ -604,7 +604,8 @@ function hexA(hex, a){ const m = (hex||"#3E9CB8").replace("#",""); return `rgba(
    ═══════════════════════════════════════════════════════════════════════ */
 function rid(){ return Math.random().toString(36).slice(2); }
 let selClip = null;        // {trackId, clipId} — the clip currently under edit
-const UNDO = [];           // [{trackId, clips:[{id,buffer,start}]}] snapshots
+const UNDO = [];           // [{trackId, clips:[{id,buffer,start}], label}] snapshots (newest last)
+const REDO = [];           // forward stack — filled by undoLast, cleared on any fresh edit
 let _toastT;
 function flash(m){ let e=document.getElementById("toast"); if(!e){ e=document.createElement("div"); e.id="toast"; e.className="toast"; document.body.appendChild(e); } e.textContent=m; e.classList.add("on"); clearTimeout(_toastT); _toastT=setTimeout(()=>e.classList.remove("on"),1800); }
 function clipsOf(t){
@@ -613,13 +614,36 @@ function clipsOf(t){
   return t.clips;
 }
 function syncPrimary(t){ if(t.clips && t.clips.length){ t.buffer = t.clips[0].buffer; t.offset = t.clips[0].start; } }
-function pushUndoClips(t){ UNDO.push({ trackId:t.id, clips: clipsOf(t).map(c=>({id:c.id,buffer:c.buffer,start:c.start})) }); if(UNDO.length>80) UNDO.shift(); }
+function _snapClips(t){ return clipsOf(t).map(c=>({id:c.id,buffer:c.buffer,start:c.start})); }
+function pushUndoClips(t, label){ UNDO.push({ trackId:t.id, label:label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
 function undoLast(){
   const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
   const t = tracks.find(x=>x.id===u.trackId); if(!t){ flash("Nothing to undo"); return; }
+  REDO.push({ trackId:t.id, label:u.label||"", clips:_snapClips(t) });   // remember current state so Redo can re-apply it
   t.clips = u.clips.map(c=>({id:c.id,buffer:c.buffer,start:c.start}));
   syncPrimary(t); selClip=null; drawLane(t);
-  if(playing) restartPlayback(); flash("Undid the last edit");
+  if(playing) restartPlayback(); flash(u.label ? "Undo: "+u.label : "Undid the last edit");
+  if(selTrackId===t.id) renderChannel(t);
+}
+function redoLast(){
+  const r = REDO.pop(); if(!r){ flash("Nothing to redo"); return; }
+  const t = tracks.find(x=>x.id===r.trackId); if(!t){ flash("Nothing to redo"); return; }
+  UNDO.push({ trackId:t.id, label:r.label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift();
+  t.clips = r.clips.map(c=>({id:c.id,buffer:c.buffer,start:c.start}));
+  syncPrimary(t); selClip=null; drawLane(t);
+  if(playing) restartPlayback(); flash(r.label ? "Redo: "+r.label : "Redid the edit");
+  if(selTrackId===t.id) renderChannel(t);
+}
+// Duplicate the selected clip — drops a copy immediately after it (PT Ctrl+D).
+function duplicateClip(){
+  if(!selClip){ flash("Select a clip to duplicate"); return; }
+  const t = tracks.find(x=>x.id===selClip.trackId); if(!t){ flash("Select a clip to duplicate"); return; }
+  const cl = clipsOf(t).find(c=>c.id===selClip.clipId); if(!cl){ flash("Select a clip to duplicate"); return; }
+  pushUndoClips(t, "Duplicate");
+  const nc = { id:rid(), buffer:cl.buffer, start: cl.start + cl.buffer.duration };
+  t.clips.splice(t.clips.indexOf(cl)+1, 0, nc);
+  syncPrimary(t); selClip={trackId:t.id, clipId:nc.id}; drawLane(t);
+  if(playing) restartPlayback(); flash("Duplicated clip");
   if(selTrackId===t.id) renderChannel(t);
 }
 // keep [f1,f2] of a buffer (fractions). sample-accurate splice for Separate.
@@ -4450,11 +4474,24 @@ function laneUiTake(t, placeAt) {
     "setView('edit')": () => viewMode === "edit",
     "#loop":           () => !!loop,
   };
+  // greyed-out state for dynamic items (re-evaluated every time a menu opens), keyed "menuId|label"
+  const DISABLE = {
+    "edit|Undo": () => !UNDO.length,
+    "edit|Redo": () => !REDO.length,
+  };
+  // dynamic labels — e.g. "Undo Duplicate" / "Redo Duplicate"
+  const LABELFN = {
+    "edit|Undo": () => UNDO.length ? ("Undo " + (UNDO[UNDO.length-1].label || "")).trim() : "Undo",
+    "edit|Redo": () => REDO.length ? ("Redo " + (REDO[REDO.length-1].label || "")).trim() : "Redo",
+  };
 
   // resolve a click action for an item, or null = render greyed.
   // titleEl = the top-level menu button (anchors pop-ups like the load list).
   function actionFor(menuId, it, parentLabel, titleEl){
     const L = it.label || "";
+    // Phase 2 — Edit cluster (built on the clip/undo engine)
+    if (menuId === "edit" && L === "Redo") return () => redoLast();
+    if ((menuId === "edit" || menuId === "clip") && L === "Duplicate") return () => duplicateClip();
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => addAux();          // re-home the FX-bus capability
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
@@ -4475,13 +4512,17 @@ function laneUiTake(t, placeAt) {
       row.className = "mb-item";
       const hasSub = !!(it.submenu && it.submenu.length);
       const act = hasSub ? null : actionFor(menu.id, it, parentLabel, titleEl);
-      if (!hasSub && !act) row.classList.add("mb-dis");
+      const key = menu.id + "|" + it.label;
+      const df = DISABLE[key];
+      const greyed = (!hasSub && !act) || (df ? df() : false);
+      if (greyed) row.classList.add("mb-dis");
 
       const chk = document.createElement("span"); chk.className = "mb-chk";
       const cf = CHECK[it.mapsTo]; chk.textContent = (cf && cf()) ? "✓" : "";
       row.appendChild(chk);
 
-      const lab = document.createElement("span"); lab.className = "mb-lab"; lab.textContent = it.label;
+      const lab = document.createElement("span"); lab.className = "mb-lab";
+      lab.textContent = LABELFN[key] ? LABELFN[key]() : it.label;
       row.appendChild(lab);
 
       if (hasSub) { const a = document.createElement("span"); a.className = "mb-arrow"; a.textContent = "›"; row.appendChild(a); }
@@ -4503,7 +4544,7 @@ function laneUiTake(t, placeAt) {
           flyouts.push(fly);
         }
       });
-      if (act) row.addEventListener("click", (e) => { e.stopPropagation(); closeAll(); act(); });
+      if (act && !greyed) row.addEventListener("click", (e) => { e.stopPropagation(); closeAll(); act(); });
 
       panel.appendChild(row);
       if (it.separator_after) { const sep = document.createElement("div"); sep.className = "mb-sep"; panel.appendChild(sep); }
