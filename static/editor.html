@@ -1037,14 +1037,31 @@ function mediaWH(c){
   else{const v=vels[c.id];if(v&&v.videoWidth)return {sw:v.videoWidth,sh:v.videoHeight};}
   return null;
 }
+function isTextClip(c){return c.text!=null&&!c.solid&&c.mediaId==null;}
+// the layer's transform pivot (= its on-screen center) in backing px
+function layerCenter(c,W,H){
+  const k=stageK(W,H),fr=playhead-c.start;
+  if(isTextClip(c)){
+    const ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+    const baseX=ox+((c.x==null?project.width/2:c.x))*k, baseY=oy+((c.y==null?project.height*0.82:c.y))*k;
+    return {x:baseX+pval(c,'posX',fr,0)*k, y:baseY+pval(c,'posY',fr,0)*k};
+  }
+  return {x:W/2+pval(c,'posX',fr,0)*k, y:H/2+pval(c,'posY',fr,0)*k};
+}
 function clipQuad(c,W,H){
-  const wh=mediaWH(c);if(!wh)return null;
-  const {k}=stageBox(W,H),fr=playhead-c.start;
-  const stW=project.width*k,stH=project.height*k,s=Math.min(stW/wh.sw,stH/wh.sh),w=wh.sw*s,h=wh.sh*s;
-  const tx=W/2+pval(c,'posX',fr,0)*k,ty=H/2+pval(c,'posY',fr,0)*k;
-  const rot=pval(c,'rotation',fr,0)*Math.PI/180,sc=pval(c,'scale',fr,1),cos=Math.cos(rot),sin=Math.sin(rot);
-  return [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([x,y])=>{
-    const X=x*sc,Y=y*sc;return {x:tx+X*cos-Y*sin,y:ty+X*sin+Y*cos};});
+  const {k}=stageBox(W,H),fr=playhead-c.start,ctr=layerCenter(c,W,H);
+  const rot=pval(c,'rotation',fr,0)*Math.PI/180,cos=Math.cos(rot),sin=Math.sin(rot);
+  let hw,hh;
+  if(isTextClip(c)){
+    const sz=((c.size||72)*k)*pval(c,'scale',fr,1);
+    sctx.save();sctx.font=`700 ${sz}px Inter, system-ui, sans-serif`;const tw=sctx.measureText(c.text||' ').width;sctx.restore();
+    hw=Math.max(8,tw/2);hh=Math.max(8,sz*0.62);
+  }else{
+    const wh=mediaWH(c);if(!wh)return null;
+    const stW=project.width*k,stH=project.height*k,s=Math.min(stW/wh.sw,stH/wh.sh),sc=pval(c,'scale',fr,1);
+    hw=wh.sw*s*sc/2;hh=wh.sh*s*sc/2;
+  }
+  return [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([x,y])=>({x:ctr.x+x*cos-y*sin,y:ctr.y+x*sin+y*cos}));
 }
 const HANDLE_CSS=9;
 function handlePoints(q){const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
@@ -1056,7 +1073,10 @@ function pointInQuad(px,py,q){let inside=false;
   for(let i=0,j=3;i<4;j=i++){const xi=q[i].x,yi=q[i].y,xj=q[j].x,yj=q[j].y;
     if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
 function trackOf(c){return project.tracks.find(t=>t.clips.includes(c));}
-function pickLayerAt(x,y,W,H){const act=activeVideoClips(playhead).slice().reverse();
+function pickLayerAt(x,y,W,H){
+  const texts=activeTexts(playhead); // text renders on top of video → pick first
+  for(let i=texts.length-1;i>=0;i--){const q=clipQuad(texts[i],W,H);if(q&&pointInQuad(x,y,q))return {clip:texts[i],track:trackOf(texts[i])};}
+  const act=activeVideoClips(playhead).slice().reverse();
   for(const o of act){const q=clipQuad(o.c,W,H);if(q&&pointInQuad(x,y,q))return {clip:o.c,track:trackOf(o.c)};}return null;}
 function drawSelOverlay(ctx,W,H){
   if(tool!=='select')return;const sc=selClip();if(!sc||!sc.clip||sc.track.kind==='audio')return;
@@ -1066,7 +1086,7 @@ function drawSelOverlay(ctx,W,H){
   ctx.beginPath();ctx.moveTo(q[0].x,q[0].y);for(let i=1;i<4;i++)ctx.lineTo(q[i].x,q[i].y);ctx.closePath();ctx.stroke();
   const s=HANDLE_CSS*sx;ctx.fillStyle='#0b0c10';
   for(const h of handlePoints(q)){ctx.fillRect(h.p.x-s/2,h.p.y-s/2,s,s);ctx.strokeRect(h.p.x-s/2,h.p.y-s/2,s,s);}
-  const fr=playhead-sc.clip.start,k=stageK(W,H),ax=W/2+pval(sc.clip,'posX',fr,0)*k,ay=H/2+pval(sc.clip,'posY',fr,0)*k,r=6*sx;
+  const _ctr=layerCenter(sc.clip,W,H),ax=_ctr.x,ay=_ctr.y,r=6*sx;
   ctx.strokeStyle='rgba(217,164,65,.9)';
   ctx.beginPath();ctx.moveTo(ax-r,ay);ctx.lineTo(ax+r,ay);ctx.moveTo(ax,ay-r);ctx.lineTo(ax,ay+r);ctx.stroke();
   ctx.beginPath();ctx.arc(ax,ay,r*0.7,0,7);ctx.stroke();ctx.restore();
@@ -1089,8 +1109,8 @@ screen.addEventListener('pointerdown',e=>{
 });
 function startMove(e,sc,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start,{k}=stageBox(W,H);
   vdrag={mode:'move',c,p0,posX0:pval(c,'posX',fr,0),posY0:pval(c,'posY',fr,0),k};}
-function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start,k=stageK(W,H);
-  const pivot={x:W/2+pval(c,'posX',fr,0)*k,y:H/2+pval(c,'posY',fr,0)*k};
+function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start;
+  const pivot=layerCenter(c,W,H);
   vdrag={mode:'scale',c,handle,pivot,d0:Math.hypot(p0.x-pivot.x,p0.y-pivot.y)||1,scale0:pval(c,'scale',fr,1)};}
 screen.addEventListener('pointermove',e=>{
   if(!vdrag){ // cursor affordance
