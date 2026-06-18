@@ -110,8 +110,8 @@
   .tstrip { width:108px; flex:none; border-right:1px solid var(--hairline); padding:6px 7px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }   /* cut tight at the M button — no empty space (Pro Tools) */
   .ts-top { display:flex; align-items:center; gap:6px; position:relative; }
   .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }    /* master lane keeps its color dot */
-  .ts-name { font:600 11.5px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text;
-    background:rgba(255,255,255,.05); border:1px solid var(--hairline); border-radius:5px; padding:3px 8px; }   /* PT highlights the track name */
+  .ts-name { font:600 11.5px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text; text-align:center;
+    background:rgba(255,255,255,.05); border:1px solid var(--hairline); border-radius:5px; padding:3px 8px; }   /* PT highlights the track name (centered) */
   .ts-name:hover { border-color:rgba(62,156,184,.45); color:#EAF4F8; }
   .ts-x { position:absolute; right:1px; top:50%; transform:translateY(-50%); background:rgba(20,22,28,.85); border:none; color:var(--dim); width:17px; height:17px; border-radius:5px; cursor:pointer; font-size:11px; opacity:0; transition:opacity .12s; z-index:2; }
   .lane:hover .ts-x { opacity:.55; }
@@ -160,8 +160,8 @@
   .lc-cell.filled.byp { opacity:.42; }
   .lc-let { font:700 7.5px 'Space Mono'; color:rgba(160,168,182,.5); width:7px; flex:none; text-transform:lowercase; text-align:center; }
   .lc-nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .lc-io .io-sel { width:100%; padding:3px 6px; font:600 9.5px Inter; border-radius:5px; }
-  .lc-io .ts-ctl { min-height:0; padding:3px 7px; }
+  .lc-io .io-sel { width:100%; padding:3px 6px; font:600 9.5px Inter; border-radius:5px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lc-io .ts-ctl { min-height:0; padding:3px 7px; align-items:center; text-align:center; }   /* center VOL/PAN value in its box */
   .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
   .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:17px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
