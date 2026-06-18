@@ -2437,13 +2437,13 @@ function openRoutePopup(anchorEl, kind, t, slot, onChange){
     (kind==='input'?IF_INPUTS:IF_OUTPUTS).forEach(p=> row(p.label,"", cur==='if:'+p.id, ()=>commit('if:'+p.id)) );
   }
   grp("bus");
-  if(!buses.length) row("(no buses — make an FX bus)","dis", false, ()=>{});
-  buses.forEach(b=>{
-    const blocked=(kind==='send'||kind==='output') && wouldFeedback(t,b.id);
-    const it=row(b.name, blocked?"dis":"", cur===b.id, ()=>{ if(blocked) return flash("Can't — “"+b.name+"” feeds back into this track"); commit(b.id); });
+  for(let n=1;n<=BUS_POOL_STEREO;n++){
+    const id=poolBusId(n), nm=poolBusName(n);
+    const blocked=(kind==='send'||kind==='output') && wouldFeedback(t,id);
+    const used=!!busById(id);                                   // materialized = in use somewhere (shows a · marker)
+    const it=row(nm+(used?"  ·":""), blocked?"dis":"", cur===id, ()=>{ if(blocked) return flash("Can't — “"+nm+"” feeds back into this track"); ensurePoolBus(n); commit(id); });
     if(blocked) it.title="Would create a feedback loop";
-  });
-  row("＋ New Bus…","new", false, ()=>{ const b=addBus(null,true); commit(b.id); });
+  }
 
   if(kind==='send'){
     const s=sendInSlot(t,slot);
@@ -2750,6 +2750,14 @@ function addBus(name, stereo){
               name: name || nextBusName(stereo), stereo: stereo !== false, color: nextStemColor() };
   buses.push(b); return b;
 }
+// PT-style FIXED NUMBERED BUS POOL — you PICK Bus 1-2 / 3-4 / … (not "create a named bus"). A pool bus
+// materializes into the registry on first use; the engine + save/load route by id, so nothing else changes.
+const BUS_POOL_STEREO = 16;                                   // Bus 1-2 … 31-32 (stereo pairs)
+function poolBusId(n){ return "bus_st_" + n; }
+function poolBusName(n){ return "Bus " + (2*n-1) + "-" + (2*n); }
+function ensurePoolBus(n){ const id = poolBusId(n); let b = busById(id);
+  if(!b){ b = { id, name: poolBusName(n), stereo: true, color: nextStemColor() }; buses.push(b); } return b; }
+function nextFreePoolBus(){ for(let n=1;n<=BUS_POOL_STEREO;n++){ if(!busById(poolBusId(n))) return ensurePoolBus(n); } return ensurePoolBus(BUS_POOL_STEREO); }
 function removeBus(id){
   buses = buses.filter(b => b.id !== id);
   tracks.forEach(t => {                                  // scrub every dead-bus reference
@@ -2788,12 +2796,11 @@ function refreshAllRouting(){
 
 function addAux(){
   // An Aux Input track. It LISTENS to a bus (its input). A bus is routing, not a track.
-  const bus = addBus(null, true);
+  const bus = nextFreePoolBus();                          // grab the next open numbered bus (Bus 1-2, then 3-4, …)
   const t = { id: rid(), name: "Aux " + (tracks.filter(x=>x.type==='aux').length+1), type:'aux',
     inputBus: bus.id, input: bus.id, output: 'master', sends: [],
     gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: bus.color };
-  bus.name = t.name;                                     // keep the bus name in lockstep on create
-  tracks.push(t); auxLaneUi(t); refreshSendMenus();
+  tracks.push(t); auxLaneUi(t); refreshSendMenus();      // bus keeps its numbered name (e.g. Bus 3-4); the aux is "Aux 1"
   if (playing) restartPlayback();
   flash("Aux + bus “" + bus.name + "” created — send tracks to it, then stack FX on the aux");
   return t;
@@ -2828,7 +2835,7 @@ function renderSends(t){
   const vf=window.viewFlags;
   const showAE=(vf&&vf.edit&&vf.edit.sendsAE!==undefined)?vf.edit.sendsAE:true;
   const showFJ=(vf&&vf.edit&&vf.edit.sendsFJ!==undefined)?vf.edit.sendsFJ:false;
-  let html=`<div class="ins-bar"><span class="ins-title">Sends</span>${buses.length?'':`<span class="send-hint">click a slot → ＋ New Bus, or + FX Bus</span>`}</div>`;
+  let html=`<div class="ins-bar"><span class="ins-title">Sends</span>${buses.length?'':`<span class="send-hint">click a slot → pick a Bus</span>`}</div>`;
   if(showAE) html+=`<div class="send-banklbl">A–E</div>`+sendsBankHtml(t,BANK_AE);
   if(showFJ) html+=`<div class="send-banklbl">F–J</div>`+sendsBankHtml(t,BANK_FJ);
   host.innerHTML=html;
