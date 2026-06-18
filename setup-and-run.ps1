@@ -10,6 +10,48 @@ function Info($m){ Write-Host $m -ForegroundColor Gray }
 function Warn($m){ Write-Host $m -ForegroundColor Yellow }
 function Good($m){ Write-Host $m -ForegroundColor Green }
 
+# ---------- 0. APPLY a staged update (from the in-app updater), if any ----------
+# The app downloads a new release into _update\staged\ while it's running; the
+# actual file swap happens HERE, with the server down, so nothing is ever locked
+# or half-written. Your data\ and venv\ are never touched, and a rollback zip is
+# saved first. Runs only when a staged update is present — otherwise a no-op.
+$AppliedUpdate = $false
+$updDir  = Join-Path $Root "_update"
+$staged  = Join-Path $updDir "staged"
+$pending = Join-Path $updDir "pending.json"
+if ((Test-Path $pending) -and (Test-Path $staged)) {
+  $ver = "?"
+  try { $info = Get-Content $pending -Raw | ConvertFrom-Json; if ($info.version) { $ver = $info.version } } catch { }
+  Write-Host ""
+  Head "Installing ARKITECT update (v$ver)..."
+  if ((Test-Path (Join-Path $staged "app.py")) -and (Test-Path (Join-Path $staged "static"))) {
+    try {
+      $ts = Get-Date -Format "yyyyMMdd-HHmmss"
+      # rollback safety net: zip the current code (NOT data/venv) before overwriting
+      $backup = Join-Path $updDir ("backup-" + $ts + ".zip")
+      $keep = @("venv","data","_update",".git","__pycache__")
+      $toBackup = Get-ChildItem -Path $Root -Force | Where-Object { $keep -notcontains $_.Name }
+      if ($toBackup) {
+        try { Compress-Archive -Path ($toBackup.FullName) -DestinationPath $backup -Force -ErrorAction Stop }
+        catch { Warn "  (couldn't write a rollback zip - continuing anyway)" }
+      }
+      # copy the new files over the install; skip the user's data/venv and our own working dirs
+      robocopy $staged $Root /E /XD (Join-Path $staged "data") (Join-Path $staged "venv") (Join-Path $staged "_update") (Join-Path $staged ".git") /NFL /NDL /NJH /NJS /NP | Out-Null
+      if ($LASTEXITCODE -ge 8) { Warn "  (some files may not have copied - rollback zip is in _update)" }
+      Remove-Item $staged  -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item $pending -Force -ErrorAction SilentlyContinue
+      $AppliedUpdate = $true
+      Good "Update installed (v$ver).  Rollback copy: _update\backup-$ts.zip"
+    } catch {
+      Warn "Update install hit a snag: $($_.Exception.Message). Launching the current version."
+    }
+  } else {
+    Warn "Staged update looked incomplete - skipped. Launching the current version."
+    Remove-Item $pending -Force -ErrorAction SilentlyContinue
+  }
+  Write-Host ""
+}
+
 Write-Host ""
 Head "=================================================="
 Head "        ARKITECT  -  setup + launch"
@@ -79,6 +121,10 @@ if(-not (Test-Path "$Root\venv\Scripts\python.exe")){
   Good "Environment: ready."
 }
 $VENV = "$Root\venv\Scripts\python.exe"
+if ($AppliedUpdate) {                       # an update may have changed requirements.txt — keep deps in sync
+  Info "Syncing dependencies after the update..."
+  & $VENV -m pip install -r "$Root\requirements.txt" --quiet
+}
 
 # ---------- 4. LM Studio (the AI engine) ----------
 $LMS = "$env:USERPROFILE\.lmstudio\bin\lms.exe"

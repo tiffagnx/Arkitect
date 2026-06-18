@@ -6331,7 +6331,7 @@ function laneUiTake(t, placeAt) {
         '<div class="modal-body">' + body + '</div>' +
         '<div class="modal-foot">' +
           '<button class="modal-btn" id="updClose">Close</button>' +
-          (info ? '<button class="modal-btn go" id="updGet">Download v' + esc(info.version) + '</button>'
+          (info ? '<button class="modal-btn go" id="updGet">Download &amp; install v' + esc(info.version) + '</button>'
                 : '<button class="modal-btn" id="updRecheck">Check again</button>') +
         '</div>' +
       '</div>';
@@ -6340,10 +6340,46 @@ function laneUiTake(t, placeAt) {
     ov.querySelector(".modal-x").onclick = close;
     ov.querySelector("#updClose").onclick = close;
     ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
-    const get = ov.querySelector("#updGet"); if (get) get.onclick = () => { window.open(info.url, "_blank", "noopener"); close(); };
+    const get = ov.querySelector("#updGet"); if (get) get.onclick = () => stageUpdate(info);
     const re  = ov.querySelector("#updRecheck"); if (re) re.onclick = () => { close(); checkForUpdates(true); };
   }
   window.openUpdatesDialog = openUpdatesDialog;
+
+  // Download the new build, save the session, stage it, then offer a one-tap restart.
+  // The swap itself happens on relaunch (the launcher applies it with the server down).
+  async function stageUpdate(info){
+    if (!info) return;
+    const dlg  = () => document.getElementById("updDlg");
+    const setBody = h => { const b = dlg() && dlg().querySelector(".modal-body"); if (b) b.innerHTML = h; };
+    const setFoot = h => { const f = dlg() && dlg().querySelector(".modal-foot"); if (f) f.innerHTML = h; };
+    if (!info.asset){ window.open(info.url || ("https://github.com/" + REPO + "/releases/latest"), "_blank", "noopener"); return; }
+    setFoot('<button class="modal-btn" disabled>Saving your session…</button>');
+    try { if (typeof autosave === "function") await autosave("update"); } catch(e){}
+    setFoot('<button class="modal-btn" disabled>Downloading v' + esc(info.version) + '…</button>');
+    try {
+      const r = await fetch("/api/studio/update/stage", { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ url: info.asset, version: info.version }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "staging failed");
+      setBody('<div class="upd-new">ARKITECT v' + esc(info.version) + ' is ready to install.</div>' +
+              '<div class="upd-hint">Your session is saved. ARKITECT restarts to finish — your audio, sessions and settings all stay exactly where they are.</div>');
+      setFoot('<button class="modal-btn" id="updLater">Later</button><button class="modal-btn go" id="updRestart">Restart now</button>');
+      const later = document.getElementById("updLater");
+      if (later) later.onclick = () => { const d = dlg(); if (d) d.remove(); flash("Update installs next time you open ARKITECT ✓"); };
+      const rest = document.getElementById("updRestart");
+      if (rest) rest.onclick = async () => {
+        setFoot('<button class="modal-btn" disabled>Restarting…</button>');
+        try { await fetch("/api/studio/update/restart", { method:"POST" }); } catch(e){}
+        setBody('<div class="upd-ok">Restarting ARKITECT…</div>' +
+                '<div class="upd-hint">If it doesn’t come back in a few seconds, just close this window and open ARKITECT again — the update is already installed.</div>');
+      };
+    } catch(e){
+      setBody('<div class="upd-new">Couldn’t auto-install this one.</div><div class="upd-hint">' + esc(e.message) + '</div>');
+      setFoot('<button class="modal-btn" id="updClose3">Close</button><button class="modal-btn go" id="updOpen">Open download page</button>');
+      const c = document.getElementById("updClose3"); if (c) c.onclick = () => { const d = dlg(); if (d) d.remove(); };
+      const o = document.getElementById("updOpen"); if (o) o.onclick = () => window.open(info.url || ("https://github.com/" + REPO + "/releases/latest"), "_blank", "noopener");
+    }
+  }
 
   // restore a previously-found update from cache (so a reload keeps the badge without re-hitting GitHub)
   try {

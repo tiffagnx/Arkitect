@@ -16,6 +16,9 @@ verify-*.png
 # Build output ZIPs
 *.zip
 
+# In-app updater working dir (downloaded/staged release + rollback backups)
+_update/
+
 # OS junk
 Thumbs.db
 .DS_Store

@@ -2803,6 +2803,126 @@ async def studio_bounce(req: Request):
         return JSONResponse({"error": f"bounce write failed: {e}"}, status_code=500)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTO-UPDATER (pass 2) — stage a GitHub release ZIP, then apply it on the NEXT
+# launch (setup-and-run.ps1 does the swap while the server is down, so the running
+# process never overwrites itself). The user's data/ and venv/ are always preserved
+# and a rollback zip is written before anything is touched.
+# ══════════════════════════════════════════════════════════════════════════════
+def _stage_update_from_zip(zip_path: Path, version: str, base: Path) -> dict:
+    """Extract a downloaded release ZIP into <base>/_update/staged/ and drop a
+    pending.json marker. Guards against zip-slip and rejects anything that doesn't
+    look like ARKITECT. Returns {version, files}."""
+    import zipfile
+    import shutil
+    upd = base / "_update"
+    raw = upd / "raw"
+    staged = upd / "staged"
+    for p in (raw, staged):
+        if p.exists():
+            shutil.rmtree(p, ignore_errors=True)
+    upd.mkdir(parents=True, exist_ok=True)
+    raw.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path) as z:
+        rb = raw.resolve()
+        for name in z.namelist():
+            dest = (raw / name).resolve()
+            if dest != rb and rb not in dest.parents:   # zip-slip: entry escapes the staging dir
+                raise ValueError(f"unsafe zip entry: {name}")
+        z.extractall(raw)
+    entries = list(raw.iterdir())
+    # GitHub source zipballs nest everything under one top folder; flat release ZIPs don't
+    root_dir = entries[0] if (len(entries) == 1 and entries[0].is_dir()) else raw
+    if not (root_dir / "app.py").exists() or not (root_dir / "static").is_dir():
+        raise ValueError("that ZIP doesn't look like ARKITECT (no app.py / static)")
+    if staged.exists():
+        shutil.rmtree(staged, ignore_errors=True)
+    shutil.move(str(root_dir), str(staged))
+    shutil.rmtree(raw, ignore_errors=True)
+    count = sum(1 for _ in staged.rglob("*"))
+    (upd / "pending.json").write_text(
+        json.dumps({"version": version, "ts": int(time.time())}), encoding="utf-8")
+    return {"version": version, "files": count}
+
+
+@app.post("/api/studio/update/stage")
+async def studio_update_stage(req: Request):
+    """Download a release ZIP (GitHub asset or zipball URL) and stage it for install
+    on the next launch. Body: {url, version}. Nothing is swapped while we're running."""
+    import tempfile
+    body = await req.json()
+    url = (body.get("url") or "").strip()
+    version = (body.get("version") or "").strip() or "?"
+    if not url.lower().startswith(("http://", "https://")):
+        return JSONResponse({"error": "bad update url"}, status_code=400)
+    tmp = None
+    try:
+        fd, tmp = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        async with httpx.AsyncClient(follow_redirects=True, timeout=180) as cx:
+            async with cx.stream("GET", url, headers={"User-Agent": "ARKITECT-Updater"}) as r:
+                if r.status_code != 200:
+                    return JSONResponse({"error": f"download failed (HTTP {r.status_code})"}, status_code=502)
+                with open(tmp, "wb") as f:
+                    async for chunk in r.aiter_bytes(1 << 16):
+                        f.write(chunk)
+        res = await asyncio.to_thread(_stage_update_from_zip, Path(tmp), version, ROOT)
+        return {"ok": True, **res}
+    except Exception as e:
+        return JSONResponse({"error": f"staging failed: {e}"}, status_code=500)
+    finally:
+        if tmp:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+
+
+@app.get("/api/studio/update/status")
+async def studio_update_status():
+    """Tell the UI whether an update is staged and waiting for the next launch."""
+    pj = ROOT / "_update" / "pending.json"
+    staged = ROOT / "_update" / "staged"
+    if pj.exists() and staged.is_dir():
+        try:
+            info = json.loads(pj.read_text(encoding="utf-8"))
+        except Exception:
+            info = {}
+        return {"pending": True, "version": info.get("version", "?"), "ts": info.get("ts", 0)}
+    return {"pending": False}
+
+
+@app.post("/api/studio/update/restart")
+async def studio_update_restart():
+    """Best-effort relaunch: a detached PowerShell waits for this server to free
+    port 7777, then runs START HERE.bat (which applies the staged update at startup).
+    If anything goes wrong, closing + reopening ARKITECT does exactly the same thing."""
+    import subprocess
+    bat = ROOT / "START HERE.bat"
+    if not bat.exists():
+        return JSONResponse({"error": "launcher not found — close and reopen ARKITECT to finish"}, status_code=200)
+    ps = (
+        "$p=7777; for($i=0;$i -lt 60;$i++){ "
+        "$b=Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue; "
+        "if(-not $b){ break }; Start-Sleep -Milliseconds 500 } "
+        f"Start-Process -FilePath '{bat}' -WorkingDirectory '{ROOT}'"
+    )
+    try:
+        flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        subprocess.Popen(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            creationflags=flags, cwd=str(ROOT),
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        return JSONResponse({"error": f"couldn't spawn relauncher: {e} — close and reopen ARKITECT"}, status_code=200)
+
+    async def _bye():
+        await asyncio.sleep(1.2)   # let the HTTP response flush first
+        os._exit(0)
+    _fire(_bye())
+    return {"ok": True}
+
+
 @app.post("/api/editor/import")
 async def editor_import(req: Request):
     """Register one or more source files: probe, assign a stable id, kick off
