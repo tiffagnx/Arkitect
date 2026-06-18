@@ -4322,6 +4322,7 @@ function dataUrlToArrayBuffer(dataUrl) {
 }
 
 let currentProjectId = null;   // set after first save / after a load → re-saves UPDATE in place instead of duplicating
+let _lastTitle = "mix";        // remembered title so auto-backup can save without prompting
 // after a load, normalize routing to the new model: legacy aux-id outputs → that aux's bus, legacy
 // {toAux} sends → that aux's bus + a free slot, fill defaults, drop sends whose bus no longer exists.
 function migrateLegacySends(){
@@ -4362,7 +4363,7 @@ async function buildProjectPayload(title) {
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
-      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
     }
     trackData.push(td);
   }
@@ -4376,6 +4377,10 @@ async function buildProjectPayload(title) {
     verb: {
       vSize: parseFloat($("vSize").value), vTone: parseFloat($("vTone").value),
       vPre: parseFloat($("vPre").value), vRet: parseFloat($("vRet").value),
+    },
+    session: {                                              // the song's spine — must survive a reload
+      bpm: parseFloat($("recBpm").value) || 120,
+      grid: gridNote, snap: !!snapOn, loop: !!loop,
     },
     tracks: trackData,
   };
@@ -4398,10 +4403,34 @@ async function saveProject() {
     const j = await res.json();
     if (!j.ok) throw new Error(j.error || "save rejected");
     currentProjectId = j.id;   // next save updates THIS project instead of spawning a duplicate
+    _lastTitle = title;
     studioStatus("Saved “" + title + "” ✓");
   } catch (e) { studioStatus("Save failed: " + e.message, true); }
   $("saveBtn").disabled = false;
 }
+
+/* ── AUTO-BACKUP — never lose a take. Every few minutes (and right after a take lands)
+   we silently re-save the whole session in place. If the session was never saved, it
+   backs up to a stable "autosave" slot so a tab crash / accidental close can't wipe the
+   work. No prompt, no UI disruption — just a quiet status tick. ── */
+let _autosaveBusy = false;
+async function autosave(reason){
+  if (_autosaveBusy || !tracks.length || (typeof REC === 'object' && REC.capturing)) return;   // never autosave mid-take
+  _autosaveBusy = true;
+  try {
+    const payload = await buildProjectPayload(_lastTitle || "autosave");
+    if (!currentProjectId) payload.id = "autosave";          // stable backup slot until the user does a real Save As
+    const res = await fetch("/api/studio/projects", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+    const j = await res.json();
+    if (j && j.ok) {
+      if (!currentProjectId) currentProjectId = j.id;
+      const t = new Date(); const hh = String(t.getHours()).padStart(2,'0'), mm = String(t.getMinutes()).padStart(2,'0');
+      studioStatus("Auto-backed up ✓ " + hh + ":" + mm);
+    }
+  } catch (e) { /* a failed backup must never interrupt the session */ }
+  _autosaveBusy = false;
+}
+setInterval(() => autosave("timer"), 5 * 60 * 1000);          // every 5 minutes (owner's ask)
 
 /* LOAD — fetch a project, restore master/verb, then rebuild every track THROUGH
    the existing track-creation path (laneUi/renderInserts/applyTrack). */
@@ -4443,6 +4472,14 @@ async function loadProject(id) {
       el.dispatchEvent(new Event("input"));   // refreshes the readout
       el.dispatchEvent(new Event("change"));  // applies to the live bus / re-bakes IR
     });
+    // restore the SESSION SPINE (tempo / grid / snap / loop) before tracks draw so the grid lines up
+    if (proj.session) {
+      if (proj.session.bpm != null && $("recBpm")) { $("recBpm").value = proj.session.bpm; $("recBpm").dispatchEvent(new Event("input")); }
+      if (proj.session.grid != null) { gridNote = proj.session.grid; if ($("gridSel")) $("gridSel").value = String(proj.session.grid); }
+      if (proj.session.snap != null) { snapOn = !!proj.session.snap; if ($("snapBtn")) $("snapBtn").classList.toggle("on", snapOn); }
+      if (proj.session.loop != null) { loop = !!proj.session.loop; if ($("loop")) $("loop").classList.toggle("on", loop); }
+    }
+    _lastTitle = proj.title || _lastTitle;
 
     // rebuild each saved track through the real track path
     for (const td of (proj.tracks || [])) {
@@ -4467,7 +4504,7 @@ async function loadProject(id) {
       }
       let clips = [];
       try {
-        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined }); } }
+        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1) }); } }
         else if (td.wav) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); clips.push({ id: rid(), buffer: b, start: td.offset || 0 }); }   // old single-buffer save
       } catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
       if (!clips.length) { studioStatus("Skipped an empty track", true); continue; }
@@ -5200,6 +5237,7 @@ function stopRecording() {
     if (playing) restartPlayback();
     $("drop").style.display = "none";
     setWarn(`Take landed on “${armed.name}” at ${placeAt.toFixed(3)}s (${(roundTrip() * 1000).toFixed(1)}ms comp).`, false);
+    autosave("take");                                    // back up the moment a performance lands
     return;
   }
   // make it a stereo-friendly track buffer (mono → both channels handled by panner)
@@ -5214,6 +5252,7 @@ function stopRecording() {
   laneUiTake(t, placeAt);
   $("drop").style.display = "none";
   setWarn(`Take landed at ${placeAt.toFixed(3)}s, compensated ${(roundTrip() * 1000).toFixed(1)}ms for round-trip latency.`, false);
+  autosave("take");                                      // back up the moment a performance lands
 }
 
 /* ── LOOPBACK CALIBRATION — the honest way to measure round trip ──
