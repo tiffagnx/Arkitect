@@ -735,6 +735,14 @@ function toggleClipMute(){
   drawLane(t); if(playing) restartPlayback(); flash(turnOn?"Muted clip":"Unmuted clip");
   if(selTrackId===t.id) renderChannel(t);
 }
+// Rename the selected clip (shows on the clip; name round-trips through undo)
+function renameClip(){
+  if(!selClip){ flash("Select a clip to rename"); return; }
+  const t=tracks.find(x=>x.id===selClip.trackId), cl=t&&clipsOf(t).find(x=>x.id===selClip.clipId);
+  if(!cl){ flash("Select a clip to rename"); return; }
+  const name=prompt("Clip name:", cl.name||t.name||""); if(name===null) return;
+  pushUndoClips(t,"Rename clip"); cl.name=name.trim(); drawLane(t); flash("Renamed clip");
+}
 // keep [f1,f2] of a buffer (fractions). sample-accurate splice for Separate.
 function bufSlice(buf, f1, f2){
   const sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
@@ -3231,8 +3239,10 @@ function drawLane(t){
     drawClipWave(g, cl.buffer, x, w, H, t.color);
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
-    if(cl.muted){ g.fillStyle="rgba(10,11,14,0.55)"; g.fillRect(fx,0,fw,H);  // muted clip → dim + tag
-      g.fillStyle="rgba(233,234,237,0.78)"; g.font="700 9px 'Space Mono'"; g.textBaseline="top"; g.fillText("MUTED", fx+5, 4); }
+    if(cl.muted){ g.fillStyle="rgba(10,11,14,0.55)"; g.fillRect(fx,0,fw,H); }   // muted clip → dim
+    g.textBaseline="top"; g.font="700 9px 'Space Mono'";
+    if(cl.name){ g.fillStyle = cl.muted ? "rgba(233,234,237,0.6)" : hexA(t.color,0.95); g.fillText(cl.name, fx+5, 4); }
+    if(cl.muted){ g.fillStyle="rgba(233,234,237,0.78)"; g.fillText("MUTED", fx+5, cl.name?16:4); }
   }
   if(SEL && SEL.trackId===t.id){                                            // selection highlight (Select tool)
     const x1=t2x(Math.min(SEL.a,SEL.b),W), x2=t2x(Math.max(SEL.a,SEL.b),W);
@@ -4588,6 +4598,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "edit" && L === "Redo") return () => redoLast();
     if ((menuId === "edit" || menuId === "clip") && L === "Duplicate") return () => duplicateClip();
     if ((menuId === "edit" || menuId === "clip") && /^Mute/.test(L)) return () => toggleClipMute();
+    if (menuId === "clip" && /^Rename/.test(L)) return () => renameClip();
     if (menuId === "edit" && L === "Cut")   return onSel(t => cutCmd(t));
     if (menuId === "edit" && L === "Copy")  return onSel(t => copyCmd(t));
     if (menuId === "edit" && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
