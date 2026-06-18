@@ -283,10 +283,17 @@
   .ms-badge { font:700 8px 'Space Mono'; letter-spacing:.12em; color:var(--teal); }
   .ms-lbl { font:700 8px 'Space Mono'; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; margin-top:3px; }
   .ms-inlist { display:flex; flex-direction:column; gap:3px; }
-  .ms-in { font:600 9.5px 'Space Mono'; color:#C9B6E8; background:rgba(124,138,165,.12); border:1px solid rgba(124,138,165,.3);
-    border-radius:6px; padding:3px 6px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ms-in:hover { border-color:rgba(62,156,184,.6); color:#DCE7EC; }
-  .ms-in.byp { opacity:.45; text-decoration:line-through; }
+  .ms-in { display:flex; align-items:center; gap:5px; font:600 9.5px 'Space Mono'; color:#C9B6E8; background:rgba(124,138,165,.12); border:1px solid rgba(124,138,165,.3);
+    border-radius:6px; padding:3px 5px; }
+  .ms-in:hover { border-color:rgba(62,156,184,.6); }
+  .ms-innm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+  .ms-in:hover .ms-innm { color:#DCE7EC; }
+  .ms-inpow { width:9px; height:9px; flex:none; border-radius:50%; padding:0; border:1px solid var(--hairline); cursor:pointer;
+    background:#34D399; box-shadow:0 0 6px rgba(52,211,153,.5); }
+  .ms-in.byp .ms-inpow { background:#5a5a66; box-shadow:none; }
+  .ms-in.byp .ms-innm { opacity:.5; text-decoration:line-through; }
+  .ms-inx { flex:none; color:#FF7A93; cursor:pointer; opacity:.5; font-size:10px; line-height:1; }
+  .ms-inx:hover { opacity:1; }
   .ms-add, .ms-out { width:100%; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E8D6E8; font:600 10px Inter; cursor:pointer; }
   .ms-knobrow { display:flex; align-items:flex-end; justify-content:space-between; gap:6px; margin-top:4px; }
   .ms-pan { display:flex; flex-direction:column; align-items:center; gap:5px; }
@@ -4225,7 +4232,12 @@ function buildStrip(t, auxes){
     <div class="ms-fader"><div class="ms-meter"><i></i></div><div class="ms-slot" id="msf-${t.id}"><div class="ms-cap"></div></div></div>
     <div class="ms-db" id="msdb-${t.id}"></div>`;
   const inlist=el.querySelector(".ms-inlist");
-  (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":""); r.textContent=ins.name; r.title="open "+ins.name; r.onclick=()=>openPluginWindow(t,i); inlist.appendChild(r); });
+  (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":"");
+    r.innerHTML=`<button class="ms-inpow" title="bypass on / off"></button><span class="ms-innm" title="open ${ins.name}">${ins.name}</span><span class="ms-inx" title="remove">✕</span>`;
+    r.querySelector(".ms-innm").onclick=(e)=>{ e.stopPropagation(); openPluginWindow(t,i); };
+    r.querySelector(".ms-inpow").onclick=(e)=>{ e.stopPropagation(); ins.bypassed=!ins.bypassed; renderMixWindow(); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); };
+    r.querySelector(".ms-inx").onclick=(e)=>{ e.stopPropagation(); closeTrackWindows(t); t.inserts.splice(i,1); renderMixWindow(); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); };
+    inlist.appendChild(r); });
   el.querySelector(".ms-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>{ addInsert(t,name); renderMixWindow(); }, ()=>openTune(t)); };
   el.querySelectorAll(".ms-iosel").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(e.currentTarget, b.dataset.io, t, null, ()=>renderMixWindow()); });
   const mss=el.querySelector("#mssends-"+t.id); if(mss){ mss.innerHTML=`<div class="send-banklbl">A–E</div>`+sendsBankHtml(t,BANK_AE)+`<div class="send-banklbl">F–J</div>`+sendsBankHtml(t,BANK_FJ); bindSendBank(mss,t); }
