@@ -82,9 +82,25 @@
 
   /* tracks */
   .tracks { flex:1; overflow-y:auto; padding:12px 14px 32px; display:flex; flex-direction:column; gap:10px; }
-  .drop { border:2px dashed rgba(62,156,184,.35); border-radius:18px; padding:38px 20px; text-align:center;
-    color:var(--dim); font-size:13.5px; cursor:pointer; transition:all .15s; }
-  .drop:hover, .drop.over { border-color:var(--pink); color:var(--text); background:rgba(62,156,184,.05); }
+  /* first-run hero — fills the canvas + invites you in (no more empty black void) */
+  .drop { flex:1; min-height:340px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border:2px dashed rgba(62,156,184,.30); border-radius:18px; text-align:center; color:var(--dim);
+    cursor:pointer; transition:border-color .15s, background .15s; }
+  .drop:hover { border-color:rgba(62,156,184,.55); background:rgba(62,156,184,.04); }
+  .drop.over { border-color:var(--pink); background:rgba(62,156,184,.10); }
+  .drop-hero { display:flex; flex-direction:column; align-items:center; gap:12px; max-width:580px; padding:24px; }
+  .drop-spark { font-size:30px; color:var(--pink); filter:drop-shadow(0 0 14px rgba(62,156,184,.5)); }
+  .drop-h1 { font:700 22px Oxanium; color:#E9EEF2; }
+  .drop-h2 { font:400 13px Inter; color:var(--dim); margin-top:-3px; line-height:1.5; }
+  .drop-actions { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-top:6px; }
+  .drop-btn { padding:9px 15px; border-radius:10px; background:rgba(255,255,255,.05); border:1px solid var(--hairline);
+    color:#DCE7EC; font:600 12.5px Inter; cursor:pointer; transition:all .12s; }
+  .drop-btn:hover { border-color:rgba(62,156,184,.6); background:rgba(62,156,184,.10); color:#fff; transform:translateY(-1px); }
+  .drop-btn.rec { color:#E58A8E; border-color:rgba(229,138,142,.4); }
+  .drop-btn.rec:hover { border-color:rgba(229,138,142,.85); background:rgba(229,138,142,.12); color:#fff; }
+  .drop-btn.ghost { color:var(--dim); }
+  .drop-tip { font:400 11px 'Space Mono'; color:rgba(198,201,208,.42); margin-top:8px; }
+  .drop-tip b { color:var(--teal); }
   .lane { display:flex; align-items:stretch; border:1px solid var(--hairline); border-radius:12px; background:var(--panel);
     backdrop-filter:blur(18px); overflow:hidden; margin-bottom:8px; animation:rise .25s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
@@ -633,7 +649,20 @@
   </div>
 
   <div class="tracks" id="tracks">
-    <div class="drop" id="drop">Drop your stems here — vocals, beat, anything (MP3 / WAV)<br/><span style="font:400 11px 'Space Mono';color:var(--dim)">each file becomes a lane on the board</span></div>
+    <div class="drop" id="drop">
+    <div class="drop-hero">
+      <div class="drop-spark">◆</div>
+      <div class="drop-h1">What's up — let's make something.</div>
+      <div class="drop-h2">Drop your stems anywhere here — vocals, beat, anything (MP3 / WAV). Each file becomes a lane.</div>
+      <div class="drop-actions">
+        <button class="drop-btn" id="qsAdd">＋ Add stems</button>
+        <button class="drop-btn" id="qsTrack">＋ New track</button>
+        <button class="drop-btn rec" id="qsRec">● Record a take</button>
+        <button class="drop-btn ghost" id="qsOpen">📂 Open a session</button>
+      </div>
+      <div class="drop-tip">or hit <b>Space</b> to play · the slider down low zooms the whole timeline</div>
+    </div>
+  </div>
   </div>
 
   <div class="chan" id="chan"><div class="empty">Click a track to mix it.<br>Its volume, pan, EQ, comp, inserts and sends show here — off the lane, so you can edit the wave.</div></div>
@@ -2265,7 +2294,7 @@ async function addFiles(files) {
     tracks.push(t);
     laneUi(t);
   }
-  $("drop").style.display = tracks.length ? "none" : "block";
+  $("drop").style.display = tracks.length ? "none" : "flex";
   if (playing) restartPlayback();
 }
 
@@ -2295,7 +2324,7 @@ function createTracks(count, format, type){
     flash(`${nice} tracks need a system that's not built yet — coming soon`);
     return;
   }
-  $("drop").style.display = tracks.length ? "none" : "block";
+  $("drop").style.display = tracks.length ? "none" : "flex";
   if(playing) restartPlayback();
 }
 function closeNewTracksDialog(){ const d = document.getElementById("ntDlg"); if(d) d.remove(); }
@@ -2514,7 +2543,7 @@ function laneUi(t) {
   const nm = d.querySelector(".ts-name"); nm.ondblclick = (e) => { e.stopPropagation(); renameTrack(t, nm); };
   d.querySelector(".ts-x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
-    $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "block"; };
+    $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "flex"; };
   const mb = d.querySelector(".ts-btn.m"), sb = d.querySelector(".ts-btn.s");
   mb.classList.toggle("on", t.muted); sb.classList.toggle("on", t.solo);
   mb.onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; mb.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
@@ -3963,7 +3992,11 @@ function makeKnob(id){
 
 /* ── files in ── */
 $("addfiles").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
-$("drop").onclick = () => $("addfiles").click();
+$("drop").onclick = (e) => { if (e.target.id === "drop") $("addfiles").click(); };   // click the bare canvas = add stems; buttons below have their own handlers
+$("qsAdd").onclick   = (e) => { e.stopPropagation(); $("addfiles").click(); };
+$("qsTrack").onclick = (e) => { e.stopPropagation(); openNewTracksDialog(); };
+$("qsRec").onclick   = (e) => { e.stopPropagation(); $("rec").click(); };
+$("qsOpen").onclick  = (e) => { e.stopPropagation(); openLoadMenu($("qsOpen")); };
 document.body.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
 document.body.addEventListener("dragleave", () => $("drop").classList.remove("over"));
 document.body.addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("over");
@@ -4245,7 +4278,7 @@ async function loadProject(id) {
     refreshSendMenus();                 // now that all buses exist, render every stem's sends
     ensureMasterLane();                 // show the Master Fader lane iff this session has one (removes a stale one otherwise)
     applyMix();                         // re-apply mute/solo across ALL tracks once loaded (solo is global — per-track applyTrack during the loop saw partial state)
-    $("drop").style.display = tracks.length ? "none" : "block";
+    $("drop").style.display = tracks.length ? "none" : "flex";
     studioStatus("Loaded “" + (proj.title || id) + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
 }
