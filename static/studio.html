@@ -127,6 +127,12 @@
   .ts-btn.r.on { background:rgba(229,86,91,.28); color:#FF6B72; border-color:rgba(229,86,91,.7); box-shadow:0 0 8px rgba(229,86,91,.4); }
   .lm-meter { width:9px; flex:none; align-self:stretch; min-height:40px; background:rgba(0,0,0,.5); border:1px solid var(--hairline); border-radius:3px; position:relative; overflow:hidden; }
   .lm-meter i { position:absolute; left:0; right:0; bottom:0; height:0%; background:linear-gradient(0deg,#3E9CB8,#F5A623 72%,#FF5A6E); transition:height .05s linear; }
+  /* take (playlist) selector — appears only when a track has more than one take */
+  .ts-take { display:flex; align-items:center; gap:2px; }
+  .ts-take .tk-lb { flex:1; text-align:center; font:700 8px 'Space Mono'; letter-spacing:.04em; color:#E6B878; background:rgba(217,164,65,.14); border:1px solid rgba(217,164,65,.4); border-radius:4px; padding:2px 3px; cursor:pointer; overflow:hidden; white-space:nowrap; }
+  .ts-take .tk-lb:hover { background:rgba(217,164,65,.24); }
+  .ts-take .tk-pv, .ts-take .tk-nx { flex:none; width:14px; height:16px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); border-radius:4px; cursor:pointer; font-size:10px; line-height:1; padding:0; }
+  .ts-take .tk-pv:hover, .ts-take .tk-nx:hover { color:#E6B878; border-color:rgba(217,164,65,.5); }
   /* shared mix-control widget (also used by the right channel panel + master strip — keep) */
   .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:5px 8px; cursor:ns-resize; overflow:hidden; min-width:0; min-height:40px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
   .ts-ctl.drag { border-color:rgba(62,156,184,.7); box-shadow:0 0 10px rgba(62,156,184,.25); }
@@ -765,6 +771,27 @@ function clipsOf(t){
   return t.clips;
 }
 function syncPrimary(t){ if(t.clips && t.clips.length){ t.buffer = t.clips[0].buffer; t.offset = t.clips[0].start; } }
+/* ── TAKES (playlists) — alternate recordings stacked on a track; only the ACTIVE take plays.
+   t.clips is ALWAYS the live active take. t.takes[t.takeIdx] is resynced from t.clips before any
+   switch/save, so every existing edit/engine/undo path keeps working untouched on t.clips. ── */
+function ensureTakes(t){ if(!Array.isArray(t.takes)||!t.takes.length){ t.takes=[clipsOf(t)]; t.takeIdx=0; }
+  if(t.takeIdx==null||t.takeIdx<0||t.takeIdx>=t.takes.length) t.takeIdx=0; return t.takes; }
+function syncTake(t){ if(Array.isArray(t.takes)&&t.takeIdx!=null) t.takes[t.takeIdx]=t.clips; }   // stash live array back into its slot
+function setTake(t, j){ ensureTakes(t); if(j<0||j>=t.takes.length||j===t.takeIdx) return; syncTake(t);
+  t.takeIdx=j; t.clips=t.takes[j]; syncPrimary(t); selClip=null; drawLane(t); renderTakeChip(t);
+  if(playing) restartPlayback(); flash("Take "+(j+1)+" / "+t.takes.length); }
+function newTake(t, clips){ ensureTakes(t); syncTake(t); t.takes.push(clips); t.takeIdx=t.takes.length-1;
+  t.clips=clips; syncPrimary(t); renderTakeChip(t); }
+function renderTakeChip(t){
+  const el=document.getElementById('take-'+t.id); if(!el) return;
+  const n=(t.takes&&t.takes.length)||1;
+  if(n<=1){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='flex';
+  el.innerHTML=`<button class="tk-pv" title="previous take">‹</button><span class="tk-lb" title="click = next take">TAKE ${t.takeIdx+1}/${n}</span><button class="tk-nx" title="next take">›</button>`;
+  el.querySelector('.tk-pv').onclick=(e)=>{ e.stopPropagation(); setTake(t,(t.takeIdx-1+n)%n); };
+  el.querySelector('.tk-nx').onclick=(e)=>{ e.stopPropagation(); setTake(t,(t.takeIdx+1)%n); };
+  el.querySelector('.tk-lb').onclick=(e)=>{ e.stopPropagation(); setTake(t,(t.takeIdx+1)%n); };
+}
 function _snapClips(t){ return clipsOf(t).map(c=>({...c})); }   // shallow-copy ALL clip props (muted/name/gain too) so undo/redo round-trips them
 function pushUndoClips(t, label){ UNDO.push({ trackId:t.id, label:label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
 function undoLast(){
@@ -2791,6 +2818,7 @@ function laneUi(t) {
           <div class="ts-row">
             <button class="ts-btn r" title="record-enable (arm) — your next take records onto this track">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button>
           </div>
+          <div class="ts-take" id="take-${t.id}" style="display:none"></div>
         </div>
         <div class="lm-meter" title="track level"><i></i></div>
       </div>
@@ -2818,6 +2846,7 @@ function laneUi(t) {
   bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, gdbStr, true);
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
   renderLaneCols(t);
+  renderTakeChip(t);
   const _li=d.querySelector('.lio-in'); if(_li) _li.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(_li,'input',t,null,()=>renderLaneCols(t)); };
   const _lo=d.querySelector('.lio-out'); if(_lo) _lo.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(_lo,'output',t,null,()=>renderLaneCols(t)); };
   ensureColHeader();
@@ -4477,9 +4506,15 @@ async function buildProjectPayload(title) {
       inputBus: t.inputBus || null,
       sends: (t.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
     };
-    if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
-      td.clips = [];
-      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+    if (t.type !== 'aux') {                                  // stems carry their clips (+ alternate takes), each with its own timeline start
+      const dumpClips = async (cls) => { const out = []; for (const cl of cls) out.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) }); return out; };
+      syncTake(t);                                           // reflect the live active take into its slot before dumping
+      if (Array.isArray(t.takes) && t.takes.length > 1) {    // multi-take: save every take/playlist so comping survives a reload
+        td.takeIdx = t.takeIdx || 0; td.takes = [];
+        for (const tk of t.takes) td.takes.push(await dumpClips(tk));
+      } else {
+        td.clips = await dumpClips(clipsOf(t));              // single take → unchanged shape (no save bloat)
+      }
     }
     trackData.push(td);
   }
@@ -4685,9 +4720,15 @@ async function applyProjectPayload(proj) {
         renderInserts(t);
         continue;
       }
-      let clips = [];
+      let clips = [], takes = null, takeIdx = 0;
+      const _decClips = async (arr) => { const out=[]; for (const cd of arr) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); out.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1) }); } return out; };
       try {
-        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1) }); } }
+        if (Array.isArray(td.takes) && td.takes.length) {        // multi-take: rebuild every take/playlist
+          takes = []; for (const tk of td.takes) takes.push(await _decClips(tk));
+          takeIdx = Math.max(0, Math.min(td.takeIdx || 0, takes.length - 1));
+          clips = takes[takeIdx];
+        }
+        else if (td.clips && td.clips.length) { clips = await _decClips(td.clips); }
         else if (td.wav) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); clips.push({ id: rid(), buffer: b, start: td.offset || 0 }); }   // old single-buffer save
       } catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
       if (!clips.length) { studioStatus("Skipped an empty track", true); continue; }
@@ -4710,6 +4751,7 @@ async function applyProjectPayload(proj) {
         sends: (td.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
         src: null, live: null,
       };
+      if (takes) { t.takes = takes; t.takeIdx = takeIdx; }   // restore alternate takes (playlists)
       tracks.push(t);
       laneUi(t);                       // builds the lane + binds knobs + draws wave
       // sync the freshly-built lane's controls to the saved values
@@ -5413,15 +5455,24 @@ function stopRecording() {
   // If a track is record-ARMED, the take lands there as a new clip (overdub / comp); otherwise it spawns its own TAKE lane.
   const armed = tracks.find(x => x.armed && x.type !== 'aux' && x.type !== 'master');
   if (armed) {
-    if (typeof pushUndoClips === 'function') pushUndoClips(armed, "Record take");
-    const cl = { id: rid(), buffer: buf, start: placeAt, name: "take " + ((clipsOf(armed).length || 0) + 1) };
-    clipsOf(armed).push(cl);
+    const end = placeAt + buf.duration;
+    // does this pass overlap audio already on the active take? if so it's a RE-TAKE → stack it as a
+    // new take (playlist) instead of summing both. A non-overlapping pass (overdub) just appends.
+    const overlaps = clipsOf(armed).some(c => c.start < end - 0.0001 && (c.start + c.buffer.duration) > placeAt + 0.0001);
+    const cl = { id: rid(), buffer: buf, start: placeAt, name: "take" };
+    if (overlaps) {
+      newTake(armed, [cl]);                              // a fresh take/playlist holding just this pass
+      setWarn(`New take ${armed.takeIdx + 1} on “${armed.name}” — flip takes with the chip on the track.`, false);
+    } else {
+      if (typeof pushUndoClips === 'function') pushUndoClips(armed, "Record take");
+      clipsOf(armed).push(cl); syncTake(armed);
+      setWarn(`Take landed on “${armed.name}” at ${placeAt.toFixed(3)}s (${(roundTrip() * 1000).toFixed(1)}ms comp).`, false);
+    }
     if (!armed.buffer) armed.buffer = buf;
     if (typeof syncPrimary === 'function') syncPrimary(armed);
     drawLane(armed);
     if (playing) restartPlayback();
     $("drop").style.display = "none";
-    setWarn(`Take landed on “${armed.name}” at ${placeAt.toFixed(3)}s (${(roundTrip() * 1000).toFixed(1)}ms comp).`, false);
     autosave("take");                                    // back up the moment a performance lands
     return;
   }
