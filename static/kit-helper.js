@@ -106,7 +106,7 @@
     if (who === "kit") d.innerHTML = fmt(text); else d.textContent = text;
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
   }
-  addMsg("kit", `Hey — I'm Kit. I know my way around ${ROOMS[room]}. Stuck on anything? Ask me and I'll walk you through it.`);
+  addMsg("kit", `Yo — I'm Kit. I know my way around ${ROOMS[room]}. Stuck on anything? Ask me and I'll walk you through it.`);
 
   // ── floating "Yo, Kit" button ──
   const fabSpr = makeSprite(28, 3);

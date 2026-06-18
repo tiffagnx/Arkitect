@@ -482,6 +482,9 @@
     border-bottom:2px solid transparent; white-space:nowrap; transition:color .1s, background .1s, border-color .1s; }
   .mb-title:hover { color:var(--text); }
   .mb-title.on { color:#fff; background:rgba(62,156,184,.10); border-bottom-color:var(--pink); }
+  /* Kit rides the menu bar next to Help — matches LePrince Visual Labs exactly */
+  .kit-mount { display:flex; align-items:center; }
+  .menubar .kit-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
   .mb-panel { z-index:9999; min-width:240px; max-height:calc(100vh - 64px); overflow-y:auto; overflow-x:hidden;
     padding:5px; background:#1C1D24; border:1px solid rgba(255,255,255,.1); border-radius:10px;
     box-shadow:0 20px 54px rgba(0,0,0,.62); }
@@ -5129,6 +5132,7 @@ function laneUiTake(t, placeAt) {
     b.addEventListener("mouseenter", () => { if (openIdx !== null && openIdx !== i) openAt(i); });
     titles[i] = b; bar.appendChild(b);
   });
+  const _kitMount = document.createElement("span"); _kitMount.className = "kit-mount"; bar.appendChild(_kitMount);   // Kit's slot, right after Help (kit-helper.js mounts here, matching Visual Labs)
   document.addEventListener("mousedown", (e) => { const t = e.target; if (t.closest && !t.closest("#menubar") && !t.closest(".mb-panel")) closeAll(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && openIdx !== null) closeAll(); });
 
