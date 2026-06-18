@@ -2472,7 +2472,10 @@ function openRoutePopup(anchorEl, kind, t, slot, onChange){
 
   if(kind==='input'||kind==='output'){
     grp("interface");
-    (kind==='input'?IF_INPUTS:IF_OUTPUTS).forEach(p=> row(p.label,"", cur==='if:'+p.id, ()=>commit('if:'+p.id)) );
+    (kind==='input'?IF_INPUTS:IF_OUTPUTS).forEach(p=>{ const it=row(ifLabel(p.id,p.label),"", cur==='if:'+p.id, ()=>commit('if:'+p.id));
+      const pen=document.createElement("span"); pen.textContent="✎"; pen.title="rename"; pen.style.cssText="float:right;opacity:.45;margin-left:8px";
+      pen.onmousedown=ev=>ev.stopPropagation(); pen.onclick=ev=>{ ev.stopPropagation(); renameInterface(p.id, p.label, ()=>openRoutePopup(anchorEl, kind, t, slot, onChange)); };
+      it.appendChild(pen); });
   }
   grp("bus");
   for(let n=1;n<=BUS_POOL_STEREO;n++){
@@ -2844,13 +2847,19 @@ const IF_INPUTS = [
   {id:'adat56',label:'ADAT 5-6'},{id:'adat78',label:'ADAT 7-8'},{id:'aux1',label:'AUX 1'},{id:'aux2',label:'AUX 2'},
 ];
 const IF_OUTPUTS = [{id:'an12',label:'Analog 1-2'},{id:'an34',label:'Analog 3-4'}];
+// interface paths are RENAMABLE like Pro Tools (owner's custom "BRYANS MIC"); overrides persist globally
+let IF_NAMES = {}; try { IF_NAMES = JSON.parse(localStorage.getItem('arkitect_if_names') || '{}'); } catch {}
+function ifLabel(id, def){ return IF_NAMES[id] || def || id; }
+function renameInterface(id, def, after){ const cur = IF_NAMES[id] || def || id;
+  const nm = prompt('Rename this input/output (like “BRYANS MIC”):', cur);
+  if(nm && nm.trim()){ IF_NAMES[id] = nm.trim(); try { localStorage.setItem('arkitect_if_names', JSON.stringify(IF_NAMES)); } catch {} if(after) after(); } }
 function dbOf(v){ return v<=0 ? "-∞" : (20*Math.log10(v)).toFixed(1)+" dB"; }
 // resolve a track I/O field to a display label
 function ioLabel(t, which){
   const v = which==='input' ? (t.type==='aux' ? t.inputBus : t.input) : t.output;
   if(!v || v==='none') return which==='output' ? 'Master' : 'No Input';
   if(v==='master') return 'Master';
-  if(typeof v==='string' && v.indexOf('if:')===0){ const p=[...IF_INPUTS,...IF_OUTPUTS].find(x=>'if:'+x.id===v); return p?p.label:'—'; }
+  if(typeof v==='string' && v.indexOf('if:')===0){ const p=[...IF_INPUTS,...IF_OUTPUTS].find(x=>'if:'+x.id===v); return p?ifLabel(p.id,p.label):'—'; }
   const b = busById(v); return b ? b.name : '—';
 }
 // re-render routing surfaces + restart audio if a topology field changed
