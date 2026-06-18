@@ -352,6 +352,9 @@
   .bdlg-note { font:400 10.5px Inter; color:var(--dim); margin:4px 0 14px; line-height:1.5; }
   .bdlg-note.bad { color:#E58A8E; }
   .bdlg-btns { display:flex; justify-content:flex-end; gap:8px; }
+  .lane.inactive { opacity:.5; filter:grayscale(.65); }
+  .lane.frozen .tstrip { box-shadow:inset 3px 0 0 #6fd3ff; }
+  .mstrip.inactive { opacity:.4; filter:grayscale(.6); }
   .ctxmenu { position:fixed; z-index:200; display:none; min-width:188px; padding:5px;
     background:#160e1e; border:1px solid var(--hairline); border-radius:11px; box-shadow:0 14px 44px rgba(0,0,0,.62); }
   .ctxmenu.on { display:block; }
@@ -1226,6 +1229,13 @@ function showTrackMenu(t, e){
   add("⧉  Duplicate", ()=>duplicateTrack(t));
   sep();
   add("✨  Auto-mix", ()=>runAutoMix(t, null), !!t.buffer);   // Auto-mix lived in the (removed) right panel — keep it reachable here
+  sep();
+  add("⬇  Bounce…", ()=>bounceTrackStem(t), t.type!=='aux');
+  add(t.frozen?"❄  Unfreeze track":"❄  Freeze track", ()=>freezeTrack(t), t.type!=='aux');
+  add("⤓  Commit (print FX)", ()=>commitTrack(t), t.type!=='aux' && !!clipsOf(t).length);
+  add(t.inactive?"◌  Make Active":"●  Make Inactive", ()=>setTrackInactive(t));
+  add("⊘  Hide", ()=>hideTrack(t));
+  if(tracks.some(x=>x.hidden)) add("▦  Show all tracks", ()=>showAllTracks());
   sep();
   add("🗑  Delete", ()=>{ const x=document.querySelector('#lane-'+t.id+' .ts-x'); if(x) x.click(); });
   m.style.left = Math.min(e.clientX, window.innerWidth-220)+"px";
@@ -4196,7 +4206,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
 }
 function applyTrackTo(t, n) {
   const anySolo = tracks.some(x => x.solo);
-  const audible = !t.muted && (!anySolo || t.solo);
+  const audible = !t.muted && !t.inactive && (!anySolo || t.solo);
   n.fader.gain.value = audible ? t.gain : 0;
   n.pan.pan.value = t.pan;
   n.lo.gain.value = t.eq.lo; n.mid.gain.value = t.eq.mid; n.hi.gain.value = t.eq.hi;
@@ -4231,7 +4241,7 @@ function renderMixWindow(){
   const win = $("mixwin"); win.innerHTML = "";
   if (!tracks.length){ win.innerHTML = `<div class="empty" style="margin:auto">No tracks yet — drop stems in the Edit view.</div>`; if(masterTrack.present) win.appendChild(buildMasterStrip()); return; }
   const auxes = tracks.filter(t=>t.type==='aux');
-  tracks.forEach(t => win.appendChild(buildStrip(t, auxes)));
+  tracks.forEach(t => { if (t.hidden) return; win.appendChild(buildStrip(t, auxes)); });
   if(masterTrack.present) win.appendChild(buildMasterStrip());
 }
 function renameTrack(t, span){ const n = prompt("Rename track:", t.name); if(n && n.trim()){ t.name=n.trim(); if(span) span.textContent=t.name;
@@ -4280,7 +4290,7 @@ function showFloatingSummary(text){
 }
 function buildStrip(t, auxes){
   const isAux = t.type==='aux';
-  const el=document.createElement("div"); el.className="mstrip"+(isAux?" aux":"")+(t.muted?" muted":""); el.dataset.id=t.id;
+  const el=document.createElement("div"); el.className="mstrip"+(isAux?" aux":"")+(t.muted?" muted":"")+(t.inactive?" inactive":""); el.dataset.id=t.id;
   el.innerHTML=`
     <div class="ms-top"><span class="cdot" style="background:${t.color}"></span><span class="ms-nm" title="double-click to rename">${t.name}</span></div>
     ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
@@ -4596,7 +4606,7 @@ function bufferToWavBlob(audioBuffer, bitDepth) {
    offline to a file. Reuses the EXACT live graph (setupBusNodes + buildTrackGraph +
    buildMasterChain), so a bounce can never diverge from playback. Supports 16/24-bit
    WAV, a target sample rate, and a time range (whole session or the Select selection). ── */
-async function renderBounce({ source = 'master', startT = 0, endT = null, sampleRate = null } = {}) {
+async function renderBounce({ source = 'master', startT = 0, endT = null, sampleRate = null, tap = 'post' } = {}) {
   ensureCtx();
   const sr = sampleRate || ctx.sampleRate;
   if (endT == null) endT = contentDur();
@@ -4619,7 +4629,7 @@ async function renderBounce({ source = 'master', startT = 0, endT = null, sample
   tracks.forEach(t => { lives[t.id] = buildTrackGraph(oc, t, 0, startT, true); });   // when=0, offset=startT → render the range from transport startT
   buildMasterChain(oc, true);
   if (source === 'master') lim.connect(oc.destination);                              // ONLY the chosen source reaches the destination
-  else if (source.indexOf('track:') === 0) { const lv = lives[source.slice(6)]; if (lv && lv.fader) lv.fader.connect(oc.destination); }
+  else if (source.indexOf('track:') === 0) { const lv = lives[source.slice(6)]; const node = lv && (tap === 'pre' ? lv.comp : lv.fader); if (node) node.connect(oc.destination); }   // tap:'pre' = post inserts/EQ/comp, PRE pan+fader (for Commit/Freeze)
   else if (source.indexOf('bus:') === 0)   { const bn = oc._busNodes && oc._busNodes[source.slice(4)]; if (bn) bn.connect(oc.destination); }
   const rendered = await oc.startRendering();
   try { oc._ins?.forEach(n => n?.dispose?.()); oc._ins = []; } catch {}
@@ -4691,6 +4701,59 @@ function openBounceDialog() {
   };
 }
 $("exportBtn").onclick = () => openBounceDialog();
+
+/* ── TRACK OPS — Bounce a stem · Commit (print the inserts/EQ/comp to a new clip) ·
+   Freeze (reversible Commit) · Make Inactive · Hide. Commit/Freeze reuse the offline
+   render, tapping PRE pan/fader (tap:'pre') so pan & fader stay live afterward. ── */
+function _trackEnd(t){ let e=0; for(const cl of clipsOf(t)) e=Math.max(e, cl.start + cl.buffer.duration); return e; }
+function bounceTrackStem(t){ openBounceDialog(); const s=document.getElementById('bSrc'); if(s) s.value='track:'+t.id; }
+async function commitTrack(t){
+  if(t.type==='aux'){ flash("Commit a stem track, not a bus"); return; }
+  const end=_trackEnd(t); if(end<=0){ flash("Nothing to commit on “"+(t.name||'track')+"”"); return; }
+  flash("Committing “"+(t.name||'track')+"”…");
+  const buf=await renderBounce({ source:'track:'+t.id, tap:'pre', startT:0, endT:end });
+  t.clips=[{ id:rid(), buffer:buf, start:0, name:(t.name||'track')+' (committed)' }]; t.buffer=buf;
+  t.eq={lo:0,mid:0,hi:0}; t.comp=0; t.inserts=[];
+  closeTrackWindows(t); drawLane(t); renderLaneCols(t);
+  if(selTrackId===t.id) renderChannel(t); if(viewMode==='mix') renderMixWindow(); if(playing) restartPlayback();
+  flash("Committed “"+(t.name||'track')+"” — inserts & EQ printed to a new clip");
+}
+async function freezeTrack(t){
+  if(t.type==='aux'){ flash("Freeze a stem track, not a bus"); return; }
+  const lane=()=>document.getElementById('lane-'+t.id);
+  if(t.frozen){                                                            // UNFREEZE — restore the stashed clips/processing
+    const f=t._frozen||{};
+    if(f.clips){ t.clips=f.clips.map(c=>({ id:rid(), buffer:c.buffer, start:c.start, muted:!!c.muted, name:c.name, gain:c.gain, fadeIn:c.fadeIn, fadeOut:c.fadeOut })); t.buffer=(t.clips[0]&&t.clips[0].buffer)||t.buffer; }
+    if(f.eq) t.eq={...f.eq}; if(f.comp!=null) t.comp=f.comp; t.inserts=(f.inserts||[]).map(i=>({name:i.name,params:{...i.params},bypassed:!!i.bypassed}));
+    t.frozen=false; t._frozen=null; lane()&&lane().classList.remove('frozen');
+    drawLane(t); renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(viewMode==='mix') renderMixWindow(); if(playing) restartPlayback();
+    flash("Unfroze “"+(t.name||'track')+"”"); return;
+  }
+  const end=_trackEnd(t); if(end<=0){ flash("Nothing to freeze"); return; }
+  flash("Freezing “"+(t.name||'track')+"”…");
+  const buf=await renderBounce({ source:'track:'+t.id, tap:'pre', startT:0, endT:end });
+  t._frozen={ clips:clipsOf(t).map(cl=>({ buffer:cl.buffer, start:cl.start, muted:!!cl.muted, name:cl.name, gain:cl.gain, fadeIn:cl.fadeIn, fadeOut:cl.fadeOut })), eq:{...t.eq}, comp:t.comp, inserts:(t.inserts||[]).map(i=>({name:i.name,params:{...i.params},bypassed:!!i.bypassed})) };
+  t.clips=[{ id:rid(), buffer:buf, start:0, name:(t.name||'track')+' ❄' }]; t.buffer=buf;
+  t.eq={lo:0,mid:0,hi:0}; t.comp=0; t.inserts=[]; t.frozen=true; closeTrackWindows(t);
+  lane()&&lane().classList.add('frozen'); drawLane(t); renderLaneCols(t);
+  if(selTrackId===t.id) renderChannel(t); if(viewMode==='mix') renderMixWindow(); if(playing) restartPlayback();
+  flash("Froze “"+(t.name||'track')+"” ❄ — Unfreeze to edit again");
+}
+function setTrackInactive(t){
+  t.inactive=!t.inactive;
+  const d=document.getElementById('lane-'+t.id); if(d) d.classList.toggle('inactive', t.inactive);
+  applyTrack(t); if(playing) restartPlayback(); if(viewMode==='mix') renderMixWindow();
+  flash((t.inactive?'Made inactive — ':'Reactivated — ')+(t.name||'track'));
+}
+function hideTrack(t){
+  t.hidden=true; const d=document.getElementById('lane-'+t.id); if(d) d.style.display='none';
+  if(viewMode==='mix') renderMixWindow();
+  flash("Hid “"+(t.name||'track')+"” — right-click a track ▸ Show all tracks to bring it back");
+}
+function showAllTracks(){
+  tracks.forEach(t=>{ t.hidden=false; const d=document.getElementById('lane-'+t.id); if(d) d.style.display=''; });
+  if(viewMode==='mix') renderMixWindow(); flash("All tracks shown");
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SAVE / LOAD PROJECT — a mix survives a refresh. Audio fully restores: each
@@ -5886,6 +5949,10 @@ function laneUiTake(t, placeAt) {
     if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
     if (menuId === "file"        && (/^Save As/.test(L) || /^Save Copy/.test(L))) return () => saveSessionToFolder();   // save a real session FOLDER on your disk
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => openNewTracksDialog();   // real PT New Tracks dialog
+    if (menuId === "track"       && /^Make (Inactive|Active)/.test(L)) return onTrack(t => setTrackInactive(t));
+    if (menuId === "track"       && /^Freeze/.test(L))            return onTrack(t => freezeTrack(t));
+    if (menuId === "track"       && /^Commit/.test(L))            return onTrack(t => commitTrack(t));
+    if (menuId === "track"       && /^Bounce/.test(L))            return onTrack(t => bounceTrackStem(t));
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
     if (menuId === "help"        && /Update/i.test(L))         return () => flash("ARKITECT is up to date ✓");
     if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT — DeMartin Audio Labs · in-browser DAW");
