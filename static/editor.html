@@ -741,13 +741,13 @@ function clipEl(track,c){
   }else if(t==='v'){
     if(m&&m.cache&&m.cache.strip)el.style.backgroundImage=`url(/api/editor/media/${c.mediaId}/strip)`,el.style.backgroundSize='100% 100%';
     else if(m&&m.cache&&m.cache.poster)el.style.backgroundImage=`url(/api/editor/media/${c.mediaId}/poster)`,el.style.backgroundSize='cover';
-    el.innerHTML=`<div class="cl-lbl">${esc(m?m.name:'clip')}</div>`;
+    el.innerHTML=`<div class="cl-lbl">${esc(c.name||(m?m.name:'clip'))}${c.reversed?' ↺':''}${c.freeze!=null?' ❄':''}</div>`;
     if(c.transIn&&!isKeyed(c,'opacity'))el.innerHTML+=`<div class="fade" style="width:${c.transIn*ppf}px"></div>`;
     if(c.transOut&&!isKeyed(c,'opacity'))el.innerHTML+=`<div class="fade r" style="width:${c.transOut*ppf}px"></div>`;
   }else if(t==='t'){
-    el.innerHTML=`<div class="cl-lbl">${esc(c.text||'Title')}</div>`;
+    el.innerHTML=`<div class="cl-lbl">${esc(c.name||c.text||'Title')}</div>`;
   }else{
-    el.innerHTML=`<div class="cl-lbl">${esc(m?m.name:'audio')}</div><canvas class="wf"></canvas>`;
+    el.innerHTML=`<div class="cl-lbl">${esc(c.name||(m?m.name:'audio'))}</div><canvas class="wf"></canvas>`;
     drawClipWave(el,c);
   }
   el.innerHTML+=`<div class="handle l"></div><div class="handle r"></div>`;
@@ -876,6 +876,14 @@ function videoFor(c){
   const v=document.createElement('video');v.src=`/api/editor/media/${c.mediaId}/proxy`;
   v.preload='auto';v.muted=true;v.playsInline=true;vels[c.id]=v;return v;
 }
+// source frame for a clip at timeline frame f — honors Time-Reverse + Freeze Frame.
+// Default (no reverse/freeze) === c.in + (f - c.start), so export stays byte-identical.
+function clipSrcFrame(c,f){
+  const local=f-c.start;
+  if(c.freeze!=null)return (c.in||0)+c.freeze;
+  const l=c.reversed?((c.dur-1)-local):local;
+  return (c.in||0)+l;
+}
 function activeVideoClips(f){
   const out=[];
   project.tracks.forEach((t,ti)=>{if(t.kind!=='video')return;
@@ -946,7 +954,7 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
     let src,sw,sh;
     if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))continue;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
     else{const v=(srcOverride&&srcOverride[c.id])||videoFor(c);
-      if(!srcOverride&&!playing){const want=(c.in+(f-c.start))/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
+      if(!srcOverride&&!playing){const want=clipSrcFrame(c,f)/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
       if(!(v.readyState>=2&&v.videoWidth))continue;src=v;sw=v.videoWidth;sh=v.videoHeight;}
     drawClip(ctx,c,f,src,sw,sh,W,H);
   }
@@ -1094,9 +1102,12 @@ function syncPlay(start){
   const wantIds=new Set();
   for(const {c,img} of act){if(img)continue;const v=videoFor(c);wantIds.add(c.id);
     v.muted=!(c.audio!==false);if(c.audio!==false)v.volume=clamp(c.volume==null?1:c.volume,0,1);
-    const want=(c.in+(f-c.start))/fps;
-    if(start||Math.abs(v.currentTime-want)>0.25){try{v.currentTime=want;}catch{}}
-    v.play().catch(()=>{});}
+    const want=clipSrcFrame(c,f)/fps;
+    if(c.reversed||c.freeze!=null){ // can't real-time play these — seek per frame instead
+      if(Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}try{v.pause();}catch{}
+    }else{
+      if(start||Math.abs(v.currentTime-want)>0.25){try{v.currentTime=want;}catch{}}
+      v.play().catch(()=>{});}}
   for(const id in vels)if(!wantIds.has(id)){try{vels[id].pause();}catch{}}
   const wantA=new Set();
   for(const t of project.tracks)if(t.kind==='audio')for(const c of t.clips)
@@ -1487,7 +1498,7 @@ function seekActiveVideos(f,fps,srcMap){
   const jobs=[];
   for(const t of project.tracks){if(t.kind!=='video')continue;
     for(const c of t.clips){if(f<c.start||f>=c.start+c.dur)continue;const m=MEDIA[c.mediaId];if(!m||m.kind==='image')continue;
-      const v=srcMap[c.id];if(!v)continue;const want=(c.in+(f-c.start))/fps;
+      const v=srcMap[c.id];if(!v)continue;const want=clipSrcFrame(c,f)/fps;
       if(Math.abs(v.currentTime-want)<1e-3)continue;
       jobs.push(new Promise(res=>{let done=false;const d=()=>{if(done)return;done=true;v.removeEventListener('seeked',d);res();};
         v.addEventListener('seeked',d);try{v.currentTime=want;}catch{res();}
@@ -1690,6 +1701,27 @@ window.addEventListener('resize',fitScreen);
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.solid).length,0)+1;
     const c={id:uid(),solid:true,name:'Solid '+n,color:'#6a6a6a',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Solid “'+c.name+'” added');}
+  function clipDisplayName(track,c){return c.name||(track.kind==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
+  function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    const cur=clipDisplayName(s.track,s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
+    s.clip.name=(n.trim()||cur);renderTimeline();refreshInspector();save();toast('Renamed');}
+  function centerInView(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    writeProp(s.clip,'posX',0);writeProp(s.clip,'posY',0);refreshInspector();drawFrame();save();toast('Centered in view');}
+  function arrangeSel(dir){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(s.track.kind!=='video')return toast('Arrange applies to video layers',1);
+    const vids=project.tracks.filter(t=>t.kind==='video');const idx=vids.indexOf(s.track);
+    let ni=dir==='front'?vids.length-1:dir==='back'?0:dir==='fwd'?idx+1:idx-1;ni=clamp(ni,0,vids.length-1);
+    if(ni===idx)return toast(vids.length<2?'Only one video track':'Already there',1);
+    const dst=vids[ni],ci=s.track.clips.indexOf(s.clip);s.track.clips.splice(ci,1);dst.clips.push(s.clip);
+    sel={trackId:dst.id,clipId:s.clip.id};renderTimeline();refreshInspector();drawFrame();save();toast('Moved to '+dst.name);}
+  function timeReverseSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(s.track.kind!=='video'||s.clip.solid)return toast('Time-Reverse needs a video layer',1);
+    s.clip.reversed=!s.clip.reversed;renderTimeline();drawFrame();save();toast('Time-Reverse '+(s.clip.reversed?'ON':'off'));}
+  function freezeFrameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(s.track.kind!=='video'||s.clip.solid)return toast('Freeze Frame needs a video layer',1);
+    if(s.clip.freeze!=null){s.clip.freeze=null;toast('Freeze off');}
+    else{s.clip.freeze=clamp(playhead-s.clip.start,0,Math.max(0,s.clip.dur-1));toast('Frozen @ frame '+s.clip.freeze);}
+    drawFrame();save();}
   function addKeyframeSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
     toggleKeyHere(s.clip,'opacity');refreshInspector();drawFrame();save();toast('Opacity keyframe @ playhead');}
   function setEaseSel(ez,label){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
@@ -1790,6 +1822,17 @@ window.addEventListener('resize',fitScreen);
     if(menuId==='layer'&&/^Text$/i.test(L))return ()=>$('#addText').click();
     if(menuId==='layer'&&/^Solid/i.test(L))return ()=>newSolid();
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
+    if(menuId==='layer'){
+      if(/^Rename$/i.test(L))return renameSel;
+      if(/^Duplicate$/i.test(L))return duplicateSel;
+      if(/^Center In View$/i.test(L))return centerInView;
+      if(/Forward$/i.test(L))return ()=>arrangeSel('fwd');
+      if(/to Front$/i.test(L))return ()=>arrangeSel('front');
+      if(/Backward$/i.test(L))return ()=>arrangeSel('bwd');
+      if(/to Back$/i.test(L))return ()=>arrangeSel('back');
+      if(/^Time-Reverse Layer$/i.test(L))return timeReverseSel;
+      if(/^Freeze Frame$/i.test(L))return freezeFrameSel;
+    }
     if(menuId==='edit'&&LABEL_COLORS.hasOwnProperty(L))return ()=>setLabel(L);
     if(menuId==='view'&&/^(Full|Half|Third|Quarter)$/.test(L))return ()=>setResolution(L);
     if(menuId==='view'&&/^Custom/.test(L))return ()=>setResolution('Custom');
@@ -1848,7 +1891,7 @@ window.addEventListener('resize',fitScreen);
       if(hasSub){const a=document.createElement('span');a.className='mb-arrow';a.textContent='›';row.appendChild(a);}
       else if(it.shortcut){const s=document.createElement('span');s.className='mb-sc';s.textContent=it.shortcut;row.appendChild(s);}
       if(it.behavior)row.title=it.behavior;
-      row.addEventListener('mouseenter',()=>{clearFly(level+1);
+      row.addEventListener('mouseenter',()=>{clearFly(level);
         if(hasSub){const r=row.getBoundingClientRect();const fly=buildPanel(menu,subItems,level+1);document.body.appendChild(fly);
           const fr=fly.getBoundingClientRect();let left=r.right-3,top=r.top-5;
           if(left+fr.width>innerWidth)left=Math.max(4,r.left-fr.width+3);
@@ -1919,6 +1962,8 @@ window.addEventListener('resize',fitScreen);
       const node={label:'Effect',feasibility:'buildable-now',separator_after:true,submenu:effect.items};
       if(at>=0)items.splice(at+1,0,node);else items.push(node);
     }
+    items.push({label:'Duplicate',shortcut:'Ctrl+D',feasibility:'buildable-now',separator_after:false});
+    items.push({label:'Rename',feasibility:'buildable-now',separator_after:false});
     return {id:'layer',title:'',items};
   }
   const stageEl=document.querySelector('.stage');
