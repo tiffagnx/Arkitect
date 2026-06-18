@@ -31,10 +31,15 @@ Wired menu actions: File New/Open/Save/Save As/Increment & Save/Revert/Export ·
 - **Overlays reworked**: AE's 5 separate toggles (Title/Action Safe, Proportional Grid, Grid, Guides, Rulers), ALL OFF by default, via the monitor ▦ dropdown. Plus earlier session-1 items (undo/redo, Composition Settings, label colors, Open Recent, Resolution, menu bar/tools/workspaces).
 - **Bug fix**: submenu-overlap in the menu renderer (`clearFly(level)` not `level+1`).
 
+## Shipped since (2026-06-18, all verified)
+- **Frame-level timeline zoom** (commit `0aaa8fe`) — the headline cut-accuracy fix. Zoom slider now `1–120 px/frame` (was 2–60); `applyPpf(centerFrame)` keeps the playhead centered; **Ctrl/Alt + wheel** zooms toward the cursor (`tlWheelZoom`); **`+` / `−`** keys zoom on the playhead. `renderRuler` is frame-aware: picks a "nice" major interval (`1,2,5,10,fps,fps·2…`) so the first tick ≥72px wins, and draws a **per-frame subtick** on every frame once `ppf≥7` (capped at ≤2600 frames on screen). At high zoom one second spreads across the whole timeline → land a cut on any single frame. Verified: ppf=24 → 720 subticks + 181 majors; ppf=4 → 0 subticks. Visually confirmed on 7777 (ruler showed `00:00:00:00·:02·:04…` = frame-level).
+- **Monochrome tool-rail icons** (commit `c4887f7`) — replaced the colorful emoji glyphs with one-color line SVGs (`currentColor`, graphite/steel-cyan scheme). `TOOL_ICONS` map keyed by exact tool name; `buildTools` sets `innerHTML` from it; fixed the boot bug (`setActiveTool('Selection')`, was `'Selection Tool'`). Verified: 14 tools, all SVG, no emoji, Selection active.
+- **Layer right-click menu starts at Mask** (commit `3b405f3`) + **Inspector Scale X / Scale Y fields** (commit `5929dfc`) — non-uniform scale is now editable by number, not just edge-drag.
+
 ## Still open (next session)
 1. **Draggable anchor point** + non-uniform edge scale on rotated layers — needs the `drawClip` pivot-matrix rewrite + position compensation (interaction-model.md §1.10). Crosshair is a read-only indicator today.
 2. **Export AUDIO volume automation** — preview honors keyed `volume`; the server muxer (`app.py`, the OTHER track's file) reads scalar volume. Coordinate with that owner.
-3. **Optional polish**: swap the precise researched `context-comp`/`context-layer` ordering in (configs in `ae-config/`); inspector Scale X / Scale Y fields; live "Undo X / Redo Y" labels.
+3. **Optional polish**: swap the precise researched `context-comp`/`context-layer` ordering in (configs in `ae-config/`); live "Undo X / Redo Y" labels; tune the zoom *feel* if the owner wants (slider range/speed, zoom-to-playhead vs zoom-to-cursor).
 4. **Bigger build-outs** (still greyed, honest): real Effect *stack* (vs the 5 fixed filters), Solid/Adjustment/Null beyond Solid, masks/pen/shapes/paint/roto/puppet, precompose/nesting, real Render Queue, 3D. Show them for fidelity; don't fake them.
 
 ## Gotchas
