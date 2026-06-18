@@ -271,7 +271,7 @@
   .tk-seg button { padding:5px 11px; background:transparent; border:none; color:var(--dim); font:700 10px 'Space Mono'; cursor:pointer; }
   .tk-seg button.on { background:rgba(62,156,184,.22); color:#DCE7EC; }
   /* MIX WINDOW — console strips */
-  .mixwin { flex:1; display:flex; gap:10px; padding:16px; overflow-x:auto; align-items:flex-start; }
+  .mixwin { flex:1; display:flex; gap:10px; padding:16px; overflow:auto; align-items:flex-start; }
   .mstrip { width:128px; flex:none; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.025);
     border:1px solid var(--hairline); border-radius:12px; padding:11px 9px; }
   .mstrip.muted { opacity:.5; }
@@ -295,6 +295,16 @@
   .ms-inx { flex:none; color:#FF7A93; cursor:pointer; opacity:.5; font-size:10px; line-height:1; }
   .ms-inx:hover { opacity:1; }
   .ms-add, .ms-out { width:100%; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E8D6E8; font:600 10px Inter; cursor:pointer; }
+  .ms-auto { width:100%; margin-top:2px; padding:5px 7px; border-radius:7px; cursor:pointer; font:700 9.5px 'Space Mono'; letter-spacing:.03em;
+    color:#CFE0EA; border:1px solid rgba(124,138,165,.45); background:linear-gradient(120deg,rgba(62,156,184,.16),rgba(124,138,165,.18)); }
+  .ms-auto:hover { border-color:rgba(62,156,184,.6); color:#E4F1F5; }
+  .ms-auto.busy { opacity:.7; cursor:progress; }
+  .ms-eq { display:flex; gap:3px; }
+  .ms-eqk { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .ms-eqk output { font:600 7px 'Space Mono'; color:var(--teal); height:9px; line-height:9px; }
+  .ms-eqk label { font:700 6.5px 'Space Mono'; letter-spacing:.06em; color:var(--dim); }
+  .cknob.xs { width:25px; height:25px; }
+  .cknob.xs .cknob-ind { top:3px; height:8px; transform-origin:50% 9px; }
   .ms-knobrow { display:flex; align-items:flex-end; justify-content:space-between; gap:6px; margin-top:4px; }
   .ms-pan { display:flex; flex-direction:column; align-items:center; gap:5px; }
   .ms-pan label { font:700 7px 'Space Mono'; letter-spacing:.1em; color:var(--dim); }
@@ -3734,7 +3744,12 @@ function _gini(arr) {
    Every value is CLAMPED. Reasons cite the measured number.
    ========================================================================= */
 async function autoMix(track) {
-  const m = await measure(track && track.buffer ? track.buffer : track);
+  let _src = track && track.buffer ? track.buffer : track;
+  if (track && !track.buffer && typeof clipsOf === 'function') {   // recorded/clip tracks have no track-level buffer — analyze the longest clip
+    const cs = clipsOf(track) || [];
+    if (cs.length) { const big = cs.slice().sort((a,b)=>((b.buffer&&b.buffer.duration)||0)-((a.buffer&&a.buffer.duration)||0))[0]; if (big && big.buffer) _src = big.buffer; }
+  }
+  const m = await measure(_src);
   if (!m.ok) {
     return { moves: [], summary: `Could not measure this track (${m.notes.join(' ')}). No moves made.`, notes: m.notes };
   }
@@ -4217,12 +4232,41 @@ function bindMixFader(slot, dbEl, getV, setV, min, max, dflt, fmt){ if(!slot) re
   cap.onmousedown=grab; slot.onmousedown=grab;
   slot.ondblclick=()=>{ setV(dflt); draw(); };
 }
+// element-based mini knob for the MIX strip (EQ lo/mid/hi + comp) — cknob structure
+function bindStripKnob(knobEl, outEl, min, max, step, getV, setV, fmt, dflt){
+  if(!knobEl) return; const ind=knobEl.querySelector('.cknob-ind'), range=(max-min)||1;
+  const draw=()=>{ const v=getV(); ind.style.transform=`rotate(${(-135+((v-min)/range)*270).toFixed(1)}deg)`; if(outEl) outEl.textContent=fmt(v); };
+  draw();
+  knobEl.onmousedown=(e)=>{ e.preventDefault(); e.stopPropagation(); const sy=e.clientY, sv=getV();
+    const mv=(ev)=>{ let v=sv+(sy-ev.clientY)/150*range; v=Math.max(min,Math.min(max,v)); v=Math.round(v/step)*step; setV(v); draw(); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
+  knobEl.ondblclick=(e)=>{ e.stopPropagation(); setV(dflt); draw(); };
+}
+// Auto-mix reasoning, surfaced as a floating card so it's visible in the MIX view (the per-lane panel is hidden there)
+function showFloatingSummary(text){
+  let p=document.getElementById('mixAiSummary');
+  if(!p){ p=document.createElement('div'); p.id='mixAiSummary'; p.className='ai-summary';
+    p.style.cssText='position:fixed;z-index:9000;top:78px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 40px));box-shadow:0 18px 50px rgba(0,0,0,.55)';
+    document.body.appendChild(p); }
+  p.innerHTML=`<div class="ai-summary-h">✨ Auto-mix — what I measured &amp; why <button class="ai-summary-x" title="dismiss">✕</button></div><div class="ai-summary-body"></div>`;
+  p.querySelector('.ai-summary-body').textContent=text;
+  p.querySelector('.ai-summary-x').onclick=()=>p.remove();
+}
 function buildStrip(t, auxes){
   const isAux = t.type==='aux';
   const el=document.createElement("div"); el.className="mstrip"+(isAux?" aux":"")+(t.muted?" muted":""); el.dataset.id=t.id;
   el.innerHTML=`
     <div class="ms-top"><span class="cdot" style="background:${t.color}"></span><span class="ms-nm" title="double-click to rename">${t.name}</span></div>
     ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
+    ${isAux?``:`<button class="ms-auto" type="button" title="Analyze &amp; propose bounded EQ/comp moves — real FFT">✨ Auto-mix</button>
+    <div class="ms-lbl">EQ / Dyn</div>
+    <div class="ms-eq">
+      <div class="ms-eqk"><output></output><div class="cknob xs" data-k="lo"><span class="cknob-ind"></span></div><label>LO</label></div>
+      <div class="ms-eqk"><output></output><div class="cknob xs" data-k="mid"><span class="cknob-ind"></span></div><label>MID</label></div>
+      <div class="ms-eqk"><output></output><div class="cknob xs" data-k="hi"><span class="cknob-ind"></span></div><label>HI</label></div>
+      <div class="ms-eqk"><output></output><div class="cknob xs" data-k="comp"><span class="cknob-ind"></span></div><label>CMP</label></div>
+    </div>`}
     <div class="ms-lbl">Inserts</div><div class="ms-inlist"></div>
     <button class="ms-add" type="button">+ fx</button>
     <div class="ms-lbl">I/O</div><button class="ms-iosel" data-io="input" title="track input">${ioLabel(t,'input')}</button><button class="ms-iosel" data-io="output" title="track output">${ioLabel(t,'output')}</button>
@@ -4245,6 +4289,9 @@ function buildStrip(t, auxes){
   el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });
   const nm=el.querySelector(".ms-nm"); nm.ondblclick=()=>renameTrack(t,nm);
   bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 1.0, gdbStr);
+  el.querySelectorAll('.ms-eq .ms-eqk').forEach(w=>{ const kn=w.querySelector('.cknob'), o=w.querySelector('output'), k=kn.dataset.k; const [min,max]=KRANGE[k];
+    bindStripKnob(kn,o,min,max,KSTEP[k],()=>trackVal(t,k),v=>{ setTrackVal(t,k,v); applyTrack(t); },v=>fmtK(k,v),0); });
+  const _au=el.querySelector('.ms-auto'); if(_au) _au.onclick=async(e)=>{ e.stopPropagation(); await runAutoMix(t,e.currentTarget); renderMixWindow(); const _ln=$("lane-"+t.id), _b=_ln&&_ln.querySelector('.ai-summary-body'); if(_b) showFloatingSummary(_b.textContent); };
   el.onclick=(e)=>{ if(!e.target.closest("button,select,.cknob,.ms-slot,.ms-in")) { selectTrack(t); } };
   return el;
 }
