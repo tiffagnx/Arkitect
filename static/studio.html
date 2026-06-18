@@ -4284,6 +4284,14 @@ document.addEventListener("keydown", (e) => {
   if(e.key==="Home"){ e.preventDefault(); seek(0); scrollT=0; relayoutAll(); }
   else if(e.key==="End"){ e.preventDefault(); seek(contentDur()); }
   else if(e.key==="Enter"){ if(!tracks.length) return; e.preventDefault(); addMarker(); }
+  else if(e.key==="," || e.key===".") {                  // NUDGE the selected clip by one grid step (tighten a comp)
+    if(!selClip) return; const t=tracks.find(x=>x.id===selClip.trackId); const cl=t&&clipsOf(t).find(c=>c.id===selClip.clipId);
+    if(!t||!cl) return; e.preventDefault();
+    pushUndoClips(t,"Nudge"); const step=gridStep();
+    cl.start = Math.max(0, cl.start + (e.key==="." ? step : -step));
+    syncPrimary(t); drawLane(t); if(playing) restartPlayback();
+    flash("Nudge "+(e.key==="." ? "→" : "←")+" "+Math.round(step*1000)+"ms");
+  }
 });
 $("vEdit").onclick = () => setView('edit');
 $("vMix").onclick  = () => setView('mix');
