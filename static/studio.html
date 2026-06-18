@@ -980,8 +980,9 @@ function zMax(){ return Math.max(50, maxDur()/MIN_VIEW); }   // DYNAMIC ceiling:
 let laneHMin=44, laneHMax=260;                     // vertical-zoom (global lane-height) bounds
 function sliderToZoom(s){ s=Math.max(0,Math.min(100,s)); const zx=zMax(); return ZMIN*Math.pow(zx/ZMIN, s/100); }   // 0=fit, 100=deepest (log feel)
 function zoomToSlider(z){ const zx=zMax(); z=Math.max(ZMIN,Math.min(zx,z)); return 100*Math.log(z/ZMIN)/Math.log(zx/ZMIN); }
-function fitZoom(){ return 1; }                    // Fit = viewDur()==maxDur() ⟺ whole session fills the canvas (zoom 1; ZMIN goes further out to a sliver)
-function fitSession(){ scrollT=0; setZoom(fitZoom()); }
+function fitZoom(){ return 1; }                    // zoom 1 = the whole ~20-min session/timeline in view
+function fitSession(){ scrollT=0; setZoom(fitZoom()); }   // see the entire session (lots of empty space — zoom out all the way)
+function fitContent(){ scrollT=0; const c=contentDur(); setZoom(maxDur()/(c>1 ? c*1.06 : 60)); }   // frame your MATERIAL (or a 60s working window when empty) — the useful default view
 function setVZoom(h){ setLaneH(Math.max(laneHMin, Math.min(laneHMax, h))); }   // every lane height up/down together
 function zoomToSelection(){
   if(!SEL){ flash('Make a selection first (⌶ Select tool)'); return; }
@@ -2427,6 +2428,7 @@ async function addFiles(files) {
     laneUi(t);
   }
   $("drop").style.display = tracks.length ? "none" : "flex";
+  fitContent();                                    // frame the imported material (not a sliver in the 20-min session)
   if (playing) restartPlayback();
 }
 
@@ -4195,7 +4197,7 @@ function buildMasterStrip(){
 
 /* ── transport ── */
 function contentDur() { let m=0; for(const t of tracks){ for(const cl of clipsOf(t)) m=Math.max(m, cl.start+cl.buffer.duration); } return m; }   // true end of recorded material
-function maxDur() { return Math.max(contentDur(), 30); }   // TIMELINE length: always ≥30s so there's room to move the cursor & record into empty space
+function maxDur() { return Math.max(contentDur(), 1200); }   // TIMELINE length: a real ~20-minute session by default — tons of empty space past the material to record into (grows if content runs longer)
 function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
 let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet module);
                    // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
@@ -4292,7 +4294,7 @@ $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>d
 // whole-view zoom bar (task #1): horizontal log-mapped zoom, vertical lane-height zoom, fit-session
 $("hzoomSlider").oninput = (e) => setZoom(sliderToZoom(parseFloat(e.target.value)));
 $("vzoomSlider").oninput = (e) => setVZoom(parseInt(e.target.value,10));
-$("zFit").onclick = () => fitSession();
+$("zFit").onclick = () => fitContent();   // ⤢ frames your material; zoom out (H −) to see the whole empty session
 $("setupBtn").onclick = (e) => { e.stopPropagation(); $("rail").classList.toggle("open"); $("setupBtn").classList.toggle("on", $("rail").classList.contains("open")); };
 document.addEventListener("mousedown", (e) => { const r=$("rail"); if(r.classList.contains("open") && !e.target.closest("#rail,#setupBtn")){ r.classList.remove("open"); $("setupBtn").classList.remove("on"); } });
 // File dropdown — open/close; auto-close after an action (but stay open for Load's saved-mixes sub-menu)
@@ -4780,6 +4782,7 @@ async function applyProjectPayload(proj) {
     ensureMasterLane();                 // show the Master Fader lane iff this session has one (removes a stale one otherwise)
     applyMix();                         // re-apply mute/solo across ALL tracks once loaded (solo is global — per-track applyTrack during the loop saw partial state)
     $("drop").style.display = tracks.length ? "none" : "flex";
+    fitContent();                       // frame the loaded material
     studioStatus("Loaded “" + (proj.title || "session") + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
 }
