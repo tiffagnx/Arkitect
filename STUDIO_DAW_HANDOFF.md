@@ -169,6 +169,22 @@ pink-room→arkitect.**
     update against a live test release on his machine (confirm the detached restart lands cleanly; tidy the leftover
     old console window).
 
+**VOCAL DOCTOR — BUILT 2026-06-18 (owner picked it first off the gated list; commits 1cd5b84 + 161dd4c, browser-verified).**
+One 🩺 button on each MIX strip (next to ✨ Auto-mix) → analyzes the selected vocal (reuses `measure()`/`detectType()`)
+and builds a full **ready chain**, then opens a draggable **"Your Edge"** panel. Chain (corrective-first, idempotent):
+**EQ-6** (HPF + mud cut + presence + air, from the measured tilt/bands) → **De-Ess** (freq = measured sib peak) →
+**Compressor** (crest-driven, parallel mix) → **Saturator** (light tube) → **Slap** (a NEW native parallel-mix slap-delay
+plugin — also in the insert picker for everyone) + a tasteful **global reverb send** (`t.send`). The "Your Edge" panel has
+6 macro sliders — **Bright / Warm / Smooth / De-Ess / Space / Throw** — each CLAMPED to a safe band around the Doctor's
+setting (center = baseline), so the owner can shape it but "can't wreck it." Honest readout card explains what was measured
++ built. **Idempotent across re-run AND save/load** via a `params.__doc` tag (rides in params, so no serialization change;
+re-running replaces only Doctor inserts and never touches the user's own). Engine reuse map: `vdPlan`/`vdBuildChain`/
+`vdApplyMacro`/`vdOpenPanel`/`runVocalDoctor` live right after `showFloatingSummary` (~line 4420+); `VDOC_CHAIN` +
+`VDOC_MACROS` drive it. **Follow-ups if owner wants:** route slap/verb as real aux sends (currently slap is a parallel
+insert, verb is the global send); an Edit-view / right-click entry (today it's MIX-strip only). NOTE: screenshots of the
+panel kept wedging the preview renderer (environmental) — verified instead by DOM-inspection eval (button present, 5→6
+inserts, 6 bounded macros, idempotency, user-insert preservation) + 0 console errors.
+
 **Big discoveries (so we don't rebuild):** **Auto-Tune ALREADY EXISTS** — `openTune` (5533) is a real Melodyne-style
 pitch editor (detectPitchTrack→segmentNotes→piano-roll→snap-to-key→`fxPitchBuf` retune→print). **Auto-mix** already
 FFT-analyzes + applies bounded EQ/comp/de-ess (the seed for "Vocal Doctor"). `clipFx_chop` (1/16 stutter) + `clipFx_bpmDelay`
@@ -179,9 +195,7 @@ are ALREADY tempo-synced (read `curTempo()`).
 render-FX + `placePopup`/`armPopupClickaway`), + a Stutter Painter. (2) **Tempo-synced render-FX engine** — generalize
 `clipFx_chop`/`clipFx_bpmDelay` with a NOTE-DIVISION picker (`FX_DIVS` + `divSec(div)`); keep the old fns as wrappers.
 (3) **Auto-Tune as its OWN plugin** (key + a strength knob natural→hard; SEPARATE from Melodyne — owner insisted they're
-different tools). (4) **Vocal Doctor** — one-button analyze→full bounded chain (EQ/de-ess/comp/sat + a reverb SEND + a
-slap-delay SEND) + a "Your Edge" panel whose sliders are clamped to a safe band around the Doctor's baseline (owner's
-"can't wreck the quality" idea); idempotent Doctor auxes; keep the honesty contract. (5) **drag-the-curve custom fade +
+different tools). (4) ~~**Vocal Doctor**~~ — **DONE 2026-06-18** (see the VOCAL DOCTOR section above). (5) **drag-the-curve custom fade +
 Batch-Fades dialog** (owner was mid-explaining the PT dialog). Owner wants all of it but hasn't approved builds — PRESENT
 the plan first, build one slice at a time.
 
