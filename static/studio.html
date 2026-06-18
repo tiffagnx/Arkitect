@@ -4060,7 +4060,8 @@ function drawLane(t){
     const seld = selClip && selClip.trackId===t.id && selClip.clipId===cl.id;
     const fx=Math.max(0,x), fw=Math.min(W,x+w)-fx;
     const showBar = fw>34, nbH = showBar?NB:0;                              // hide name bar on slivers
-    g.fillStyle=hexA(t.color, seld?0.20:0.10); g.fillRect(fx,0,fw,H);       // clip body tint
+    g.fillStyle="#0d0e13"; g.fillRect(fx,0,fw,H);                          // OPAQUE base so overlapping clips fully cover each other (no see-through bleed)
+    g.fillStyle=hexA(t.color, seld?0.22:0.13); g.fillRect(fx,0,fw,H);       // subtle track-color tint over the opaque base (keeps the bright waveform popping)
     drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, cl.fadeIn||0, cl.fadeOut||0);   // waveform sits below the name bar + visually tapers across its fades
     // ── clip name bar across the top (Pro Tools) ──
     if(showBar){
