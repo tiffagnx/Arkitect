@@ -2031,7 +2031,9 @@ window.addEventListener('resize',fitScreen);
   function layerContextMenu(){
     const layer=window.AE_MENUS.find(m=>m.id==='layer');
     const effect=window.AE_MENUS.find(m=>m.id==='effect');
-    const items=layer?layer.items.slice():[];
+    let items=layer?layer.items.slice():[];
+    const mi=items.findIndex(it=>/^Mask$/i.test(it.label)); // AE's layer right-click starts at Mask (New etc. belong to the empty-area menu)
+    if(mi>0)items=items.slice(mi);
     if(effect){
       // insert Effect ▸ (full category tree) after Layer Styles, else append
       const at=items.findIndex(it=>/^Layer Styles/i.test(it.label));
