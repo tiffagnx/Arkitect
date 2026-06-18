@@ -4028,6 +4028,24 @@ function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo){
     drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur);
   }
 }
+// LIVE record waveform — while capturing, draw the incoming audio as a growing red wave on the armed
+// lane (Pro Tools draws the take as it records, not only after you stop).
+function drawLiveTake(g, t, W, H, NB){
+  if(!(REC.capturing && REC.liveTrack===t && REC.livePeaks && REC.livePeaks.length)) return;
+  const dur = REC.liveSamples / (REC.capRate||44100);
+  const x0 = t2x((REC.liveStart||0), W), x1 = t2x((REC.liveStart||0)+dur, W);
+  if(x1 < -2 || x0 > W+2) return;
+  const yT=NB+1, yB=H-2, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*(typeof vZoom!=='undefined'?vZoom:1);
+  const peaks=REC.livePeaks, n=peaks.length, span=Math.max(1, x1-x0);
+  g.fillStyle="rgba(255,90,110,0.10)"; g.fillRect(Math.max(0,x0), 0, Math.min(W,x1)-Math.max(0,x0), H);    // recording region tint
+  g.strokeStyle="rgba(255,120,135,0.95)"; g.lineWidth=1; g.beginPath();
+  for(let px=Math.max(0,Math.floor(x0)); px<Math.min(W,Math.ceil(x1)); px++){
+    const pi=Math.min(n-1, Math.floor((px-x0)/span*n)); const h=Math.min(cap, (peaks[pi]||0)*amp);
+    g.moveTo(px, mid-h); g.lineTo(px, mid+h+0.6);
+  }
+  g.stroke();
+  g.strokeStyle="rgba(255,70,90,0.95)"; g.lineWidth=2; g.beginPath(); g.moveTo(x1,0); g.lineTo(x1,H); g.stroke();   // the record head (leading edge)
+}
 // draw a whole lane: clips on the [scrollT, scrollT+viewDur] timeline window
 function drawLane(t){
   const cv=document.querySelector(`#lane-${t.id} .wave`); if(!cv) return;
@@ -4080,6 +4098,7 @@ function drawLane(t){
     }
     if(cl.muted){ g.fillStyle="rgba(233,234,237,0.8)"; g.font="700 9px 'Space Mono'"; g.textBaseline="top"; g.fillText("MUTED", fx+5, nbH+3); }
   }
+  drawLiveTake(g, t, W, H, NB);                                             // live recording wave (only while capturing on this lane)
   if(SEL && SEL.trackId===t.id){                                            // selection highlight (Select tool)
     const x1=t2x(Math.min(SEL.a,SEL.b),W), x2=t2x(Math.max(SEL.a,SEL.b),W);
     g.fillStyle="rgba(95,180,206,0.18)"; g.fillRect(x1,0,x2-x1,H);
@@ -5731,6 +5750,8 @@ function beginCapture() {
   const c = ctx;
   REC.chunks = []; REC.capRate = c.sampleRate; REC.capturing = true;
   REC.captureFirstCtxTime = null;
+  REC.liveTrack = tracks.find(x => x.armed && x.type!=='aux' && x.type!=='master') || null;   // LIVE record-waveform preview state
+  REC.liveStart = REC.capTransportStart || 0; REC.livePeaks = []; REC.liveSamples = 0;
   const proc = c.createScriptProcessor(2048, 1, 1);
   REC.recProc = proc;
   proc.onaudioprocess = (e) => {
@@ -5741,7 +5762,9 @@ function beginCapture() {
     if (REC.captureFirstCtxTime == null) {
       REC.captureFirstCtxTime = c.currentTime - (2048 / c.sampleRate);
     }
-    REC.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    const blk = e.inputBuffer.getChannelData(0);
+    REC.chunks.push(new Float32Array(blk));
+    if (REC.liveTrack) { let pk=0; for (let i=0;i<blk.length;i+=4){ const a=blk[i]<0?-blk[i]:blk[i]; if(a>pk)pk=a; } REC.livePeaks.push(pk); REC.liveSamples += blk.length; }   // feed the live waveform
   };
   // ScriptProcessor must be pulled by the graph to fire; route through a muted
   // gain to destination so it ticks WITHOUT adding the mic to the output (that
@@ -5757,6 +5780,7 @@ function beginCapture() {
 function stopRecording() {
   if (!REC.capturing) return;
   REC.capturing = false;
+  REC.liveTrack = null; REC.livePeaks = []; REC.liveSamples = 0;   // drop the live preview — the real clip takes over below
   try { REC.srcNode.disconnect(REC.recProc); } catch {}
   try { REC.recProc.disconnect(); REC.captureSink.disconnect(); } catch {}
   REC.recProc.onaudioprocess = null; REC.recProc = null;
