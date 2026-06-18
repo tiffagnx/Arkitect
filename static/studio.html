@@ -614,13 +614,13 @@ function clipsOf(t){
   return t.clips;
 }
 function syncPrimary(t){ if(t.clips && t.clips.length){ t.buffer = t.clips[0].buffer; t.offset = t.clips[0].start; } }
-function _snapClips(t){ return clipsOf(t).map(c=>({id:c.id,buffer:c.buffer,start:c.start})); }
+function _snapClips(t){ return clipsOf(t).map(c=>({...c})); }   // shallow-copy ALL clip props (muted/name/gain too) so undo/redo round-trips them
 function pushUndoClips(t, label){ UNDO.push({ trackId:t.id, label:label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
 function undoLast(){
   const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
   const t = tracks.find(x=>x.id===u.trackId); if(!t){ flash("Nothing to undo"); return; }
   REDO.push({ trackId:t.id, label:u.label||"", clips:_snapClips(t) });   // remember current state so Redo can re-apply it
-  t.clips = u.clips.map(c=>({id:c.id,buffer:c.buffer,start:c.start}));
+  t.clips = u.clips.map(c=>({...c}));
   syncPrimary(t); selClip=null; drawLane(t);
   if(playing) restartPlayback(); flash(u.label ? "Undo: "+u.label : "Undid the last edit");
   if(selTrackId===t.id) renderChannel(t);
@@ -629,7 +629,7 @@ function redoLast(){
   const r = REDO.pop(); if(!r){ flash("Nothing to redo"); return; }
   const t = tracks.find(x=>x.id===r.trackId); if(!t){ flash("Nothing to redo"); return; }
   UNDO.push({ trackId:t.id, label:r.label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift();
-  t.clips = r.clips.map(c=>({id:c.id,buffer:c.buffer,start:c.start}));
+  t.clips = r.clips.map(c=>({...c}));
   syncPrimary(t); selClip=null; drawLane(t);
   if(playing) restartPlayback(); flash(r.label ? "Redo: "+r.label : "Redid the edit");
   if(selTrackId===t.id) renderChannel(t);
@@ -722,6 +722,19 @@ function consolidateSelection(t){ const r=_selRange(t); if(!r){ flash("Make a se
   const nc={id:rid(), buffer, start:a}; t.clips.push(nc); t.clips.sort((x,y)=>x.start-y.start);
   syncPrimary(t); selClip={trackId:t.id,clipId:nc.id}; SEL=null; drawLane(t);
   if(playing) restartPlayback(); flash("Consolidated selection"); if(selTrackId===t.id) renderChannel(t); }
+// Mute/unmute clips — the Select range if there is one, else the selected clip
+function toggleClipMute(){
+  let targets = [];
+  if(SEL){ const t=tracks.find(x=>x.id===SEL.trackId); if(t){ const a=Math.min(SEL.a,SEL.b), b=Math.max(SEL.a,SEL.b);
+    targets = clipsOf(t).filter(c=> c.start < b && (c.start+c.buffer.duration) > a).map(c=>({t,c})); } }
+  if(!targets.length && selClip){ const t=tracks.find(x=>x.id===selClip.trackId), c=t&&clipsOf(t).find(x=>x.id===selClip.clipId); if(c) targets=[{t,c}]; }
+  if(!targets.length){ flash("Select a clip (or a range) to mute"); return; }
+  const t=targets[0].t, turnOn=targets.some(x=>!x.c.muted);   // any unmuted -> mute all; else unmute all
+  pushUndoClips(t, turnOn?"Mute clips":"Unmute clips");
+  targets.forEach(x=>{ x.c.muted = turnOn; });
+  drawLane(t); if(playing) restartPlayback(); flash(turnOn?"Muted clip":"Unmuted clip");
+  if(selTrackId===t.id) renderChannel(t);
+}
 // keep [f1,f2] of a buffer (fractions). sample-accurate splice for Separate.
 function bufSlice(buf, f1, f2){
   const sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
@@ -3218,6 +3231,8 @@ function drawLane(t){
     drawClipWave(g, cl.buffer, x, w, H, t.color);
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
+    if(cl.muted){ g.fillStyle="rgba(10,11,14,0.55)"; g.fillRect(fx,0,fw,H);  // muted clip → dim + tag
+      g.fillStyle="rgba(233,234,237,0.78)"; g.font="700 9px 'Space Mono'"; g.textBaseline="top"; g.fillText("MUTED", fx+5, 4); }
   }
   if(SEL && SEL.trackId===t.id){                                            // selection highlight (Select tool)
     const x1=t2x(Math.min(SEL.a,SEL.b),W), x2=t2x(Math.max(SEL.a,SEL.b),W);
@@ -3235,6 +3250,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   else {
     const transportZeroCtx = when - offset;                          // ctx time of transport pos 0
     for (const cl of clipsOf(t)) {                                   // one source PER clip, each at its own start
+      if (cl.muted) continue;                                        // muted clip → no source, plays silent
       const src = c.createBufferSource(); src.buffer = cl.buffer; src.connect(inG);
       const clipStartCtx = transportZeroCtx + cl.start;
       if (clipStartCtx >= when) src.start(clipStartCtx, 0);          // clip starts in the future → from its head
@@ -4571,6 +4587,7 @@ function laneUiTake(t, placeAt) {
     // Phase 2 — Edit cluster (built on the clip/undo engine)
     if (menuId === "edit" && L === "Redo") return () => redoLast();
     if ((menuId === "edit" || menuId === "clip") && L === "Duplicate") return () => duplicateClip();
+    if ((menuId === "edit" || menuId === "clip") && /^Mute/.test(L)) return () => toggleClipMute();
     if (menuId === "edit" && L === "Cut")   return onSel(t => cutCmd(t));
     if (menuId === "edit" && L === "Copy")  return onSel(t => copyCmd(t));
     if (menuId === "edit" && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
