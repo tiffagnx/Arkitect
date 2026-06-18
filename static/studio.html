@@ -3992,6 +3992,8 @@ function makeKnob(id){
 
 /* ── files in ── */
 $("addfiles").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
+// don't lose a take to an accidental refresh/close — browser confirms when there's work on the board
+window.addEventListener("beforeunload", (e) => { if (tracks.length) { e.preventDefault(); e.returnValue = ""; } });
 $("drop").onclick = (e) => { if (e.target.id === "drop") $("addfiles").click(); };   // click the bare canvas = add stems; buttons below have their own handlers
 $("qsAdd").onclick   = (e) => { e.stopPropagation(); $("addfiles").click(); };
 $("qsTrack").onclick = (e) => { e.stopPropagation(); openNewTracksDialog(); };
