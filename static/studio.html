@@ -4198,9 +4198,10 @@ function bindMiniPan(t, knob){ if(!knob) return; const ind=knob.querySelector('.
     document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
   knob.ondblclick=()=>{ t.pan=0; draw(); applyTrack(t); };
 }
-function bindMixFader(slot, dbEl, getV, setV, min, max, dflt){ if(!slot) return; const cap=slot.querySelector('.ms-cap');
+function bindMixFader(slot, dbEl, getV, setV, min, max, dflt, fmt){ if(!slot) return; const cap=slot.querySelector('.ms-cap');
+  fmt = fmt || (v=>v.toFixed(2));
   const H=()=>Math.max(1, slot.clientHeight-cap.clientHeight);
-  const draw=()=>{ const v=getV(); cap.style.bottom=(((v-min)/(max-min))*H())+'px'; if(dbEl) dbEl.textContent=v.toFixed(2); };
+  const draw=()=>{ const v=getV(); cap.style.bottom=(((v-min)/(max-min))*H())+'px'; if(dbEl) dbEl.textContent=fmt(v); };
   draw(); slot._draw=draw;
   const grab=(e)=>{ e.preventDefault(); const r=slot.getBoundingClientRect();
     const move=(ev)=>{ let f=1-(ev.clientY-r.top-cap.clientHeight/2)/H(); f=Math.max(0,Math.min(1,f)); setV(Math.round((min+f*(max-min))*100)/100); draw(); };
@@ -4227,11 +4228,11 @@ function buildStrip(t, auxes){
   (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":""); r.textContent=ins.name; r.title="open "+ins.name; r.onclick=()=>openPluginWindow(t,i); inlist.appendChild(r); });
   el.querySelector(".ms-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>{ addInsert(t,name); renderMixWindow(); }, ()=>openTune(t)); };
   el.querySelectorAll(".ms-iosel").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(e.currentTarget, b.dataset.io, t, null, ()=>renderMixWindow()); });
-  const mss=el.querySelector("#mssends-"+t.id); if(mss){ mss.innerHTML=sendsBankHtml(t,BANK_AE); bindSendBank(mss,t); }
+  const mss=el.querySelector("#mssends-"+t.id); if(mss){ mss.innerHTML=`<div class="send-banklbl">A–E</div>`+sendsBankHtml(t,BANK_AE)+`<div class="send-banklbl">F–J</div>`+sendsBankHtml(t,BANK_FJ); bindSendBank(mss,t); }
   bindMiniPan(t, el.querySelector(`#msp-${t.id}`));
   el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });
   const nm=el.querySelector(".ms-nm"); nm.ondblclick=()=>renameTrack(t,nm);
-  bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 0.9);
+  bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 1.0, gdbStr);
   el.onclick=(e)=>{ if(!e.target.closest("button,select,.cknob,.ms-slot,.ms-in")) { selectTrack(t); } };
   return el;
 }
@@ -4244,7 +4245,7 @@ function buildMasterStrip(){
     <div class="ms-fader"><div class="ms-meter master"><i></i></div><div class="ms-slot" id="msf-master"><div class="ms-cap red"></div></div></div>
     <div class="ms-db" id="msdb-master"></div>`;
   bindMixFader(el.querySelector("#msf-master"), el.querySelector("#msdb-master"),
-    ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9);
+    ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9, gdbStr);
   return el;
 }
 
