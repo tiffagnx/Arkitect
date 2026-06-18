@@ -62,10 +62,10 @@
   .inmeter i { display:block; height:100%; width:0%; transition:width .04s linear;
     background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 60%, var(--amber) 82%, #E5565B 95%); }
 
-  .body { display:flex; height:calc(100vh - 53px); }
+  .body { display:flex; height:calc(100vh - 83px); }   /* 53px transport row + 30px menu bar */
   /* console rail: master + verb */
   /* left rail collapsed into a top "Setup" dropdown — frees the full width for tracks */
-  .rail { position:fixed; left:12px; top:54px; bottom:12px; width:250px; z-index:70; display:none; flex-direction:column; gap:14px;
+  .rail { position:fixed; left:12px; top:84px; bottom:12px; width:250px; z-index:70; display:none; flex-direction:column; gap:14px;
     border:1px solid var(--hairline); border-radius:14px; background:rgba(20,21,26,.97); backdrop-filter:blur(22px);
     padding:14px; overflow-y:auto; box-shadow:0 22px 60px rgba(0,0,0,.6); }
   .rail.open { display:flex; }
@@ -433,9 +433,34 @@
   .load-del { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#FF7A93;
     border-radius:7px; font:700 10px 'Space Mono'; padding:3px 8px; cursor:pointer; transition:all .1s; }
   .load-del:hover { border-color:rgba(255,90,110,.6); background:rgba(255,90,110,.14); }
+
+  /* ── PRO TOOLS MENU BAR (Phase 1) ── the full 12-menu bar above the transport row,
+     data-driven from window.PT_MENUS (static/pt-menus.js). Steel/graphite; reuses the
+     dropdown look. The whole silhouette renders; only wired items are live, rest greyed. */
+  .menubar { position:relative; z-index:80; display:flex; align-items:stretch; height:30px; padding:0 6px;
+    background:var(--bg1); border-bottom:1px solid var(--hairline); user-select:none; flex:none; }
+  .mb-title { background:transparent; border:none; color:#AEB6C2; font:500 12.5px Inter; padding:0 11px; cursor:default;
+    border-bottom:2px solid transparent; white-space:nowrap; transition:color .1s, background .1s, border-color .1s; }
+  .mb-title:hover { color:var(--text); }
+  .mb-title.on { color:#fff; background:rgba(62,156,184,.10); border-bottom-color:var(--pink); }
+  .mb-panel { z-index:9999; min-width:240px; max-height:calc(100vh - 64px); overflow-y:auto; overflow-x:hidden;
+    padding:5px; background:#1C1D24; border:1px solid rgba(255,255,255,.1); border-radius:10px;
+    box-shadow:0 20px 54px rgba(0,0,0,.62); }
+  .mb-drop, .mb-fly { position:fixed; }
+  .mb-item { position:relative; display:flex; align-items:center; gap:10px; padding:6px 9px; border-radius:7px;
+    font:500 12.5px Inter; color:var(--text); cursor:default; white-space:nowrap; }
+  .mb-item:not(.mb-dis):hover { background:rgba(62,156,184,.16); }
+  .mb-chk { width:13px; flex:none; color:var(--pink); font-size:11px; text-align:center; }
+  .mb-lab { flex:1; }
+  .mb-sc  { font:500 10.5px 'Space Mono'; color:var(--dim); margin-left:auto; }
+  .mb-arrow { color:var(--dim); font-size:14px; line-height:1; margin-left:auto; }
+  .mb-item.mb-dis { color:rgba(198,201,208,.30); }
+  .mb-item.mb-dis .mb-sc { color:rgba(198,201,208,.18); }
+  .mb-sep { height:1px; background:rgba(255,255,255,.08); margin:5px 7px; }
 </style>
 </head>
 <body>
+<div class="menubar" id="menubar"></div>
 <div class="top">
   <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
   <span class="clock" id="clock">0:00.0</span>
@@ -461,7 +486,10 @@
     <button class="zb on" id="snapBtn" title="snap clip moves to the grid">⌗ Snap</button>
   </div>
   <div class="right">
-    <button class="tbtn fileBtn" id="fileBtn" title="Tracks · plugins · save / load · export">≡ File ▾</button>
+    <!-- legacy ≡ File ▾ trigger retired in favor of the real menu bar; kept hidden so its
+         children (#saveBtn/#loadBtn/#exportBtn/#setupBtn/#addAuxBtn + hidden file inputs) and
+         all their bindings keep working — the menu bar drives them programmatically. -->
+    <button class="tbtn fileBtn" id="fileBtn" title="Tracks · plugins · save / load · export" style="display:none">≡ File ▾</button>
     <div class="filemenu" id="fileMenu">
       <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
       <button class="tbtn" id="addAuxBtn" title="Add an FX bus — an aux track you stack plugins on and send stems to">+ FX Bus</button>
@@ -552,6 +580,8 @@
   <div class="mixwin" id="mixwin" style="display:none"></div>
 </div>
 
+<!-- Pro Tools menu spec (generated from studio-research/menu-config/*.json) — sets window.PT_MENUS / PT_CONTEXT -->
+<script src="/static/pt-menus.js"></script>
 <script>
 /* ═══════════ TIFF'S STUDIO ENGINE — Web Audio, all local, $0 ═══════════ */
 const $ = (id) => document.getElementById(id);
@@ -3646,14 +3676,16 @@ async function deleteProject(id, title, ev) {
 
 function closeLoadMenu() { const m = $("loadMenu"); if (m) m.remove(); }
 
-async function openLoadMenu() {
+let _loadAnchor = null;
+async function openLoadMenu(anchor) {
+  if (anchor) _loadAnchor = anchor;          // remember it so the in-place refresh re-anchors
   closeLoadMenu();
   const menu = document.createElement("div");
   menu.id = "loadMenu";
   menu.className = "load-menu";
   menu.innerHTML = `<div class="load-menu-h">Saved projects</div><div class="load-menu-body">loading…</div>`;
   // anchor under the Load button
-  const r = $("loadBtn").getBoundingClientRect();
+  const r = (_loadAnchor || $("loadBtn")).getBoundingClientRect();
   menu.style.top = (r.bottom + 6) + "px";
   menu.style.right = (window.innerWidth - r.right) + "px";
   document.body.appendChild(menu);
@@ -4377,6 +4409,169 @@ function laneUiTake(t, placeAt) {
   nudge.textContent = `@${placeAt.toFixed(2)}s`;
   head.insertBefore(nudge, head.querySelector(".chip.m"));
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRO TOOLS MENU BAR  (Phase 1) — data-driven from window.PT_MENUS
+   Renders all 12 menus as the authentic Pro Tools silhouette (items, separators,
+   ellipses, submenu arrows, checkmarks, right-aligned Windows shortcuts). Only the
+   verified "exists" capabilities are wired live; everything else renders greyed.
+   Later phases light items up by adding to BY_MAPSTO / actionFor.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function buildMenuBar(){
+  const bar = $("menubar");
+  if (!bar) return;
+  if (!window.PT_MENUS) { console.warn("[menu bar] PT_MENUS not loaded — /static/pt-menus.js missing?"); return; }
+
+  // current selected track (clip-context ops read selClip / SEL internally)
+  const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
+  const onTrack  = (fn) => () => { const t = curTrack(); if (!t) return flash("Select a track first"); fn(t); };
+
+  // the "exists" mapsTo values wired in Phase 1 (anything not here stays greyed)
+  const BY_MAPSTO = {
+    "saveProject()":          () => saveProject(),
+    "#exportBtn":             () => $("exportBtn").click(),
+    "addFiles()":             () => $("addfiles").click(),
+    "undoLast":               () => undoLast(),
+    "deleteSelection(t)":     onTrack(t => deleteSelection(t)),
+    "separateAtSelection(t)": onTrack(t => separateAtSelection(t)),
+    "openTune(t)":            onTrack(t => openTune(t)),
+    "openTune()":             onTrack(t => openTune(t)),
+    "setTool('trim')":        () => setTool("trim"),
+    "setTool('select')":      () => setTool("select"),
+    "setTool('grab')":        () => setTool("grab"),
+    "setTool('smart')":       () => setTool("smart"),
+    "#loop":                  () => $("loop").click(),
+    "setView('mix')":         () => setView("mix"),
+    "setView('edit')":        () => setView("edit"),
+  };
+  // live checkmark state for toggle / radio items
+  const CHECK = {
+    "setView('mix')":  () => viewMode === "mix",
+    "setView('edit')": () => viewMode === "edit",
+    "#loop":           () => !!loop,
+  };
+
+  // resolve a click action for an item, or null = render greyed.
+  // titleEl = the top-level menu button (anchors pop-ups like the load list).
+  function actionFor(menuId, it, parentLabel, titleEl){
+    const L = it.label || "";
+    if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
+    if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => addAux();          // re-home the FX-bus capability
+    if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
+    if (menuId === "marketplace" && /plug-?in/i.test(L))       return () => $("plugfile").click();
+    if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
+    return null;
+  }
+
+  // recursive panel builder; level 0 = dropdown, >0 = flyout
+  let flyouts = [];
+  const clearFly = (from) => { while (flyouts.length > from) { const f = flyouts.pop(); if (f && f.parentNode) f.remove(); } };
+
+  function buildPanel(menu, items, parentLabel, level, titleEl){
+    const panel = document.createElement("div");
+    panel.className = "mb-panel " + (level === 0 ? "mb-drop" : "mb-fly");
+    items.forEach(it => {
+      const row = document.createElement("div");
+      row.className = "mb-item";
+      const hasSub = !!(it.submenu && it.submenu.length);
+      const act = hasSub ? null : actionFor(menu.id, it, parentLabel, titleEl);
+      if (!hasSub && !act) row.classList.add("mb-dis");
+
+      const chk = document.createElement("span"); chk.className = "mb-chk";
+      const cf = CHECK[it.mapsTo]; chk.textContent = (cf && cf()) ? "✓" : "";
+      row.appendChild(chk);
+
+      const lab = document.createElement("span"); lab.className = "mb-lab"; lab.textContent = it.label;
+      row.appendChild(lab);
+
+      if (hasSub) { const a = document.createElement("span"); a.className = "mb-arrow"; a.textContent = "›"; row.appendChild(a); }
+      else if (it.shortcut) { const s = document.createElement("span"); s.className = "mb-sc"; s.textContent = it.shortcut; row.appendChild(s); }
+
+      if (it.behavior) row.title = it.behavior + (it.ptShortcut && it.ptShortcut !== it.shortcut ? "   ·   Pro Tools: " + it.ptShortcut : "");
+
+      row.addEventListener("mouseenter", () => {
+        clearFly(level + 1);
+        if (hasSub) {
+          const r = row.getBoundingClientRect();
+          const fly = buildPanel(menu, it.submenu, it.label, level + 1, titleEl);
+          document.body.appendChild(fly);
+          let left = r.right - 3, top = r.top - 5;
+          const fr = fly.getBoundingClientRect();
+          if (left + fr.width  > innerWidth)  left = Math.max(4, r.left - fr.width + 3);
+          if (top  + fr.height > innerHeight) top  = Math.max(34, innerHeight - fr.height - 6);
+          fly.style.left = left + "px"; fly.style.top = top + "px";
+          flyouts.push(fly);
+        }
+      });
+      if (act) row.addEventListener("click", (e) => { e.stopPropagation(); closeAll(); act(); });
+
+      panel.appendChild(row);
+      if (it.separator_after) { const sep = document.createElement("div"); sep.className = "mb-sep"; panel.appendChild(sep); }
+    });
+    return panel;
+  }
+
+  // top-level open / close
+  let openIdx = null, drop = null;
+  const titles = [];
+  function closeAll(){ clearFly(0); if (drop && drop.parentNode) drop.remove(); drop = null; titles.forEach(t => t.classList.remove("on")); openIdx = null; }
+  function openAt(i){
+    closeAll();
+    const m = window.PT_MENUS[i];
+    drop = buildPanel(m, m.items, null, 0, titles[i]);
+    document.body.appendChild(drop);
+    const r = titles[i].getBoundingClientRect();
+    const dr = drop.getBoundingClientRect();
+    let left = r.left; if (left + dr.width > innerWidth) left = Math.max(4, innerWidth - dr.width - 6);
+    drop.style.left = left + "px"; drop.style.top = r.bottom + "px";
+    titles[i].classList.add("on"); openIdx = i;
+  }
+
+  window.PT_MENUS.forEach((m, i) => {
+    const b = document.createElement("button");
+    b.className = "mb-title"; b.textContent = m.title;
+    b.addEventListener("click", (e) => { e.stopPropagation(); (openIdx === i) ? closeAll() : openAt(i); });
+    b.addEventListener("mouseenter", () => { if (openIdx !== null && openIdx !== i) openAt(i); });
+    titles[i] = b; bar.appendChild(b);
+  });
+  document.addEventListener("mousedown", (e) => { const t = e.target; if (t.closest && !t.closest("#menubar") && !t.closest(".mb-panel")) closeAll(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && openIdx !== null) closeAll(); });
+
+  /* central keyboard dispatcher — binds every WIRED item's safe shortcut.
+     Ctrl+Z stays owned by the existing global undo handler (avoids a double-fire). */
+  const norm = (combo) => {
+    if (!combo) return "";
+    const mods = { ctrl:false, alt:false, shift:false }; let key = "";
+    combo.split("+").forEach(p => {
+      const lp = p.trim().toLowerCase();
+      if (lp === "ctrl" || lp === "cmd" || lp === "control" || lp === "meta") mods.ctrl = true;
+      else if (lp === "alt" || lp === "opt" || lp === "option") mods.alt = true;
+      else if (lp === "shift") mods.shift = true;
+      else key = p.trim().length === 1 ? p.trim().toUpperCase() : p.trim();
+    });
+    return (mods.ctrl?"Ctrl+":"") + (mods.alt?"Alt+":"") + (mods.shift?"Shift+":"") + key;
+  };
+  const comboFromEvent = (e) => {
+    let key = e.key; if (key.length === 1) key = key.toUpperCase();
+    return ((e.ctrlKey||e.metaKey)?"Ctrl+":"") + (e.altKey?"Alt+":"") + (e.shiftKey?"Shift+":"") + key;
+  };
+  const SHORTCUTS = {};
+  function collect(menu, items, parentLabel){
+    items.forEach(it => {
+      if (it.submenu && it.submenu.length) return collect(menu, it.submenu, it.label);
+      const act = actionFor(menu.id, it, parentLabel, titles[menu._i]);
+      if (act && it.shortcut) { const n = norm(it.shortcut); if (n && n !== "Ctrl+Z") SHORTCUTS[n] = act; }
+    });
+  }
+  window.PT_MENUS.forEach((m, i) => { m._i = i; collect(m, m.items, null); });
+  document.addEventListener("keydown", (e) => {
+    if (/^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable) return;
+    const act = SHORTCUTS[comboFromEvent(e)];
+    if (act) { e.preventDefault(); act(); }
+  });
+
+  console.log("[menu bar] " + window.PT_MENUS.length + " menus rendered, " + Object.keys(SHORTCUTS).length + " shortcuts wired");
+})();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
 </body>
