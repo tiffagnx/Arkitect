@@ -30,6 +30,7 @@ Base before this work: `9c4de5e`. Commits added, newest last — all **verified 
 | `122b629` | **Edit 2c+** — Rename Clip (Clip menu; draws name on the clip). |
 | `bf2172d` | **New Tracks dialog** (Track→New): count · Mono/Stereo · type · timebase; creates real empty audio tracks + Aux Input tracks; Master/MIDI/etc. stubbed. **Killed the bogus "FX Bus" track concept.** |
 | `d135f5d` | **Bussing slice 1** — bus registry (`buses[]`, `addBus`/`removeBus`/`busById`), `addAux` now creates a PAIRED bus + sets `inputBus`/`input`/`output` + empty A–J `sends`, per-track `input`/`output` fields, helpers (`BANK_AE/FJ`, `sendInSlot`, `IF_INPUTS/OUTPUTS`, `dbOf`, `ioLabel`, `refreshAllRouting`). **Dormant — no audio-graph change yet, no regression.** |
+| `cc8bdaa` | **Bussing slice 2 — audio-graph routing (sends + buses now AUDIBLE).** `setupBusNodes(c)` builds one GainNode per bus before any track graph, shared by all 3 build sites (`playAll`/export/`scheduleTransportAt`) so WAV == playback. `buildTrackGraph`: Aux/bus-input track reads `inG` from its bus collector; Output generalized to route any track into `busNodes[output]` (audio + aux nested submixes; legacy aux-id fallback); the **A–J send taps** (PRE=tap `comp`, POST=tap `fader`) each with own level gain + `StereoPanner` → target bus node. `applyTrackTo` live-updates send level/pan/FMP (no rebuild). **`wouldFeedback(t,busId)`** denies cycles at build time. Resolution handles BOTH new `{slot,bus,…}` and legacy `{toAux,level}` sends → no regression. **Verified live** (stem→bus→aux return = audible; bus w/ no return = exact silence; send −INF→full raises RMS; feedback guard catches self + nested cycles). |
 
 **What works for a user right now:** open any of the 12 menus; Undo/Redo with labels; Duplicate;
 Cut/Copy/Paste; Insert Silence/Heal/Trim-to-Selection/Consolidate; Mute & Rename clips; Window
@@ -62,8 +63,36 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — Bussing slice 2 (audio-graph routing). Do this first.
-**Goal:** make sends + bus routing actually audible. Follow **`design/sends-bussing-io.md` §3 and
+## 3. THE NEXT TASK — Bussing slice 3 (the routing UI) + save/load migration. Do this first.
+> **Slice 2 (audio-graph routing) is DONE & shipped (`cc8bdaa`) and verified live.** The engine
+> now routes sends + buses correctly for BOTH the new `{slot,bus,…}` model and legacy `{toAux}`
+> sends. What's missing is the **UI to drive the new model** and **persistence**. Build, from
+> `design/sends-bussing-io.md` §4 + build steps 9–13, in committable sub-slices:
+>
+> - **3a — popup + send matrix.** `openRoutePopup(anchorEl, kind, t, slotOrNull, onChange)` (§4.1) +
+>   extract `placePopup`/`closeRoutePopups` from `openPluginMenu` (have it call them too). Add
+>   `assignRoute(kind,t,slot,id)` + `routeMatches`. Rewrite `renderSends` (currently the old
+>   `{toAux}` `<select>` at ~2618) to fixed **A-E / F-J** banks (§4.2), gated by `viewFlags?.edit?.sendsAE/FJ`
+>   (default AE on / FJ off until view-flags.md lands). Popup lists No-Send / interface / buses /
+>   ＋New Bus, marks current, greys feedback targets, has PRE/FMP + level mini-fader for sends.
+> - **3b — I/O selectors.** Replace the `<select>` Output in `renderChannel` (~2612 / `.io-out`) and
+>   `buildStrip` (~3367 / `.ms-out`) with click-to-open `.io-sel` buttons → `openRoutePopup`; add an
+>   **Input** selector above Output (audio + aux). Compact A-E/F-J sends region on the Mix strip
+>   gated by `viewFlags.mix.*`. Use a shared `sendsBankHtml(t,letters)` for both renderers.
+> - **3c — save/load migration.** `buildProjectPayload` already saves only `{toAux,level}` + `output`
+>   (~3796) — extend it with top-level `buses`, per-track `input`/`inputBus` + the rich `sends` shape.
+>   `loadProject`: restore `buses` FIRST (`busSeq=buses.length`), default-fill new fields, **migrate**
+>   legacy `{toAux,level}` → `{slot:<next free>, bus:<that aux's inputBus>, level, on:true}`. Accept an
+>   aux-id `output` (resolved via the §3.2 fallback already in the engine). Test a pre-change save.
+> - **3d — Master Fader as a created track** (owner model §4): remove the hardcoded MASTER lane,
+>   make it a real created track (New Tracks → Stereo → Master Fader) summing the mix. Most invasive —
+>   do last, verify hard.
+>
+> Verify each sub-slice in the browser; commit per slice. The §3 below is the (now-shipped) slice-2 spec,
+> kept for reference on how the engine routes.
+
+### (shipped) Slice 2 spec — how the engine routes, for reference
+**Goal:** make sends + bus routing actually audible. Followed **`design/sends-bussing-io.md` §3 and
 build steps 5–7** (it has exact code). Summary:
 
 1. **`setupBusNodes(c)` helper** — build a `busId → GainNode` map (`c._busNodes`) once, and reuse it in
