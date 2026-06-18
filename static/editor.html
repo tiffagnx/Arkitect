@@ -664,7 +664,7 @@ function tlWidthFrames(){return Math.max(timelineFrames()+FPS()*8, project.durat
 // ── TWIRL-DOWN PROPERTY ROWS (AE-style layer properties) ──
 const PROP_H=20;
 function clipPropGroups(track,c){
-  if(track.kind==='audio')return [{group:'Audio',rows:[{label:'Audio Levels'},{label:'Waveform'}]}];
+  if(track.kind==='audio')return [{group:'Audio',rows:[{label:'Audio Levels',fields:['volume']},{label:'Waveform'}]}];
   return [{group:'Transform',rows:[{label:'Position',fields:['posX','posY']},{label:'Scale',fields:['scale']},{label:'Rotation',fields:['rotation']},{label:'Opacity',fields:['opacity']}]}];
 }
 function clipRowCount(track,c){let n=0;for(const g of clipPropGroups(track,c))n+=1+g.rows.length;return n;}
@@ -835,7 +835,7 @@ function setPlayhead(f,scrollInto){
 }
 
 // ── ANIMATABLE PROPERTIES (P2 keyframe engine) ───────────────────────────
-const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,fxBlur:0,fxBright:1,fxContrast:1,fxSat:1,fxHue:0};
+const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,fxBlur:0,fxBright:1,fxContrast:1,fxSat:1,fxHue:0,volume:1};
 const KEYABLE=Object.keys(KDEF);
 const BLENDS=[['Normal','source-over'],['Add','lighter'],['Screen','screen'],['Multiply','multiply'],
   ['Overlay','overlay'],['Lighten','lighten'],['Darken','darken'],['Soft Light','soft-light'],
@@ -1152,7 +1152,7 @@ function syncPlay(start){
   const f=playhead,fps=FPS();const act=activeVideoClips(f);
   const wantIds=new Set();
   for(const {c,img} of act){if(img)continue;const v=videoFor(c);wantIds.add(c.id);
-    v.muted=!(c.audio!==false);if(c.audio!==false)v.volume=clamp(c.volume==null?1:c.volume,0,1);
+    v.muted=!(c.audio!==false);if(c.audio!==false)v.volume=clamp(pval(c,'volume',f-c.start,1),0,1);
     const want=clipSrcFrame(c,f)/fps;
     if(c.reversed||c.freeze!=null){ // can't real-time play these — seek per frame instead
       if(Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}try{v.pause();}catch{}
@@ -1164,7 +1164,7 @@ function syncPlay(start){
   for(const t of project.tracks)if(t.kind==='audio')for(const c of t.clips)
     if(f>=c.start&&f<c.start+c.dur){wantA.add(c.id);
       let a=audioEls[c.id];if(!a){a=new Audio(`/api/editor/media/${c.mediaId}/proxy`);audioEls[c.id]=a;}
-      a.volume=clamp(c.volume==null?1:c.volume,0,1);
+      a.volume=clamp(pval(c,'volume',f-c.start,1),0,1);
       const want=(c.in+(f-c.start))/fps;if(start||Math.abs(a.currentTime-want)>0.25){try{a.currentTime=want;}catch{}}
       a.play().catch(()=>{});}
   for(const id in audioEls)if(!wantA.has(id)){try{audioEls[id].pause();}catch{}}
@@ -1309,7 +1309,7 @@ function refreshInspector(){
       ${opaKeyed?`<div class="hint">Opacity is keyframed — edge fades follow the opacity curve.</div>`:numRow('Fade in (f)','tIn',clip.transIn||0)+numRow('Fade out (f)','tOut',clip.transOut||0)}
       <div class="row"><label>Use clip audio</label><button class="chip ${clip.audio!==false?'on':''}" id="cAud">${clip.audio!==false?'On':'Off'}</button></div></div>`}
     <div class="grp"><div class="gt">Level</div>
-      <div class="row"><label>Volume</label><input type="range" id="cVol" min="0" max="1.5" step="0.01" value="${clip.volume==null?1:clip.volume}"></div>
+      <div class="row"><label>Volume${isKeyed(clip,'volume')?' ◷':''}</label><input type="range" id="cVol" min="0" max="1.5" step="0.01" value="${isKeyed(clip,'volume')?pval(clip,'volume',playhead-clip.start,1):(clip.volume==null?1:clip.volume)}"></div>
       ${isAud?numRow('Fade in (f)','aFi',clip.audioFadeIn||0)+numRow('Fade out (f)','aFo',clip.audioFadeOut||0):''}</div>
     <button class="del-btn" id="cDel">Delete clip</button>`;
   bindNum('cStart',v=>{clip.start=Math.max(0,v|0);renderTimeline();save(true);});
@@ -1326,7 +1326,7 @@ function refreshInspector(){
     $('#cAud').onclick=()=>{clip.audio=!(clip.audio!==false)?false:true;refreshInspector();save(true);};
   }else{bindNum('aFi',v=>{clip.audioFadeIn=Math.max(0,v|0);save(true);});
         bindNum('aFo',v=>{clip.audioFadeOut=Math.max(0,v|0);save(true);});}
-  $('#cVol').oninput=e=>{clip.volume=+e.target.value;save(true);};
+  $('#cVol').oninput=e=>{writeProp(clip,'volume',+e.target.value);save(true);};
   $('#cDel').onclick=deleteSel;
 }
 function numRow(label,id,val){return `<div class="row"><label>${label}</label>
@@ -1775,6 +1775,26 @@ window.addEventListener('resize',fitScreen);
     drawFrame();save();}
   function flipH(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);s.clip.scaleX=-(s.clip.scaleX==null?1:s.clip.scaleX);refreshInspector();drawFrame();save();toast('Flip Horizontal');}
   function flipV(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);s.clip.scaleY=-(s.clip.scaleY==null?1:s.clip.scaleY);refreshInspector();drawFrame();save();toast('Flip Vertical');}
+  async function audioToKeyframes(){
+    const s=sc();if(!s||!s.clip)return toast('Select a video/title layer first',1);
+    if(s.track.kind==='audio')return toast('Select the LAYER to drive (video/title), not the audio clip',1);
+    const c=s.clip;
+    let aud=null; // audio clip overlapping this layer's time range
+    for(const t of project.tracks){if(t.kind!=='audio')continue;
+      for(const ac of t.clips){if(ac.start<c.start+c.dur&&ac.start+ac.dur>c.start){aud=ac;break;}}if(aud)break;}
+    if(!aud)return toast('No audio under this layer — drop an audio clip first',1);
+    let pk=[];try{pk=(await fetch('/api/editor/media/'+aud.mediaId+'/peaks').then(r=>r.json())).peaks||[];}catch(e){}
+    if(!pk.length)return toast('That audio has no waveform data',1);
+    const fps=FPS(),step=Math.max(1,Math.round(fps/8)),keys=[];
+    for(let f=0;f<c.dur;f+=step){
+      const aLocal=(c.start+f)-aud.start,frac=clamp(aLocal/Math.max(1,aud.dur),0,1);
+      const amp=pk[Math.min(pk.length-1,Math.floor(frac*pk.length))]||0;
+      keys.push({t:f,v:+(1+amp*0.4).toFixed(3),e:'ease'});
+    }
+    if(keys.length<2)return toast('Layer too short',1);
+    c.scale={k:keys};refreshInspector();renderTimeline();drawFrame();save();
+    toast('Audio → '+keys.length+' scale keyframes (beat-reactive)');
+  }
   function addKeyframeSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
     toggleKeyHere(s.clip,'opacity');refreshInspector();drawFrame();save();toast('Opacity keyframe @ playhead');}
   function setEaseSel(ez,label){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
@@ -1852,6 +1872,7 @@ window.addEventListener('resize',fitScreen);
     'animation|Easy Ease':()=>setEaseSel('ease','Easy Ease'),
     'animation|Easy Ease In':()=>setEaseSel('in','Easy Ease In'),
     'animation|Easy Ease Out':()=>setEaseSel('out','Easy Ease Out'),
+    'animation|Convert Audio to Keyframes':()=>audioToKeyframes(),
     'view|Zoom In':()=>zoomTimeline(1),'view|Zoom Out':()=>zoomTimeline(-1),
     'view|Show Grid':()=>{toggleOv('grid');toast('Grid '+(OV.grid?'on':'off'));},
     'view|Show Guides':()=>{toggleOv('guides');toast('Guides '+(OV.guides?'on':'off'));},
