@@ -595,7 +595,7 @@
   .menubar .kit-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
   .menubar .kit-fab.in-bar canvas { width:19px; height:19px; }   /* match the Visual Lab — keep Kit's face small + aligned in the bar (studio was missing this → Kit too big) */
   /* blank-slate hero: Kit's face instead of the abstract diamond (frame 0 of the 9-frame sprite sheet, gently floating) */
-  .drop-spark.kit { width:88px; height:88px; margin:0 auto 12px; background:url(/static/kit.png) center/contain no-repeat;   /* the WHOLE Kit (256² standalone, not the cropped sprite sheet) */
+  .drop-spark.kit { width:92px; height:92px; margin:0 auto 12px; background:url(/static/kit-hero.png) center/contain no-repeat;   /* the WHOLE transparent Kit "little guy" (no tile/icon bg) — ships in static/ */
     filter:drop-shadow(0 6px 18px rgba(62,156,184,.5)); animation:kitFloat 3.6s ease-in-out infinite; }
   @keyframes kitFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-5px); } }
   .drop-h1 { transition:opacity .32s ease; }   /* rotating-quote crossfade */
