@@ -2880,6 +2880,21 @@ function laneUi(t) {
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); return;
       }
     }
+    // FADES — grab a TOP corner of a clip and drag inward: left corner = fade-in, right corner = fade-out
+    if (cl) {
+      const ry = e.clientY - r.top, rx = e.clientX - r.left;
+      const clx = ((cl.start - scrollT)/vd)*r.width, clxR = ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
+      const startFade = (side) => {
+        selectTrack(t); selClip = { trackId:t.id, clipId:cl.id };
+        const sx = e.clientX, f0 = (side==='in' ? cl.fadeIn : cl.fadeOut) || 0; let ch = false;
+        const mv = (ev) => { if (!ch && Math.abs(ev.clientX - sx) > 2) { ch = true; pushUndoClips(t, side==='in'?"Fade in":"Fade out"); }
+          if (ch) { const dt = (ev.clientX - sx)/r.width*vd; let f = side==='in' ? f0 + dt : f0 - dt; f = Math.max(0, Math.min(cl.buffer.duration*0.95, f)); if(side==='in') cl.fadeIn=f; else cl.fadeOut=f; drawLane(t); } };
+        const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (ch) { if (playing) restartPlayback(); flash((side==='in'?"Fade in ":"Fade out ") + Math.round(((side==='in'?cl.fadeIn:cl.fadeOut)||0)*1000) + "ms"); } };
+        document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      };
+      if (ry < 14 && Math.abs(rx - clx) <= 18)  { startFade('in');  return; }
+      if (ry < 14 && Math.abs(rx - clxR) <= 18) { startFade('out'); return; }
+    }
     // SELECT: drag to highlight a time range (or Smart tool in the bottom strip of a clip)
     if (tool==='select' || (tool==='smart' && cl && (e.clientY-r.top) > r.height*0.62)) {
       SEL = { trackId:t.id, a:atTime, b:atTime }; drawLane(t);
@@ -3964,6 +3979,12 @@ function drawLane(t){
     }
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
+    // ── fades: diagonal taper + shaded region (overlap two clips & fade each = a crossfade, no click) ──
+    const fiPx=(cl.fadeIn||0)/vd*W, foPx=(cl.fadeOut||0)/vd*W;
+    if(fiPx>1){ g.fillStyle="rgba(8,9,13,0.34)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x+fiPx,0); g.lineTo(x,H); g.closePath(); g.fill();
+      g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(x,H-1); g.lineTo(x+fiPx,1); g.stroke(); }
+    if(foPx>1){ const xr=x+w; g.fillStyle="rgba(8,9,13,0.34)"; g.beginPath(); g.moveTo(xr,0); g.lineTo(xr-foPx,0); g.lineTo(xr,H); g.closePath(); g.fill();
+      g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(xr-foPx,1); g.lineTo(xr,H-1); g.stroke(); }
     if(cl.muted){ g.fillStyle="rgba(10,11,14,0.5)"; g.fillRect(fx,nbH,fw,H-nbH); }   // muted clip → dim the audio area
     // ── clip-gain badge, bottom-left (Pro Tools "0 dB") ──
     if(fw>30 && H>26){
@@ -4057,10 +4078,19 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     for (const cl of clipsOf(t)) {                                   // one source PER clip, each at its own start
       if (cl.muted) continue;                                        // muted clip → no source, plays silent
       const src = c.createBufferSource(); src.buffer = cl.buffer;
-      const cg = c.createGain(); cg.gain.value = (cl.gain==null?1:cl.gain); src.connect(cg); cg.connect(inG);   // per-clip gain — ride a loud word down
-      const clipStartCtx = transportZeroCtx + cl.start;
-      if (clipStartCtx >= when) src.start(clipStartCtx, 0);          // clip starts in the future → from its head
-      else { const into = when - clipStartCtx; if (into < cl.buffer.duration - 0.01) src.start(when, Math.max(0, Math.min(into, cl.buffer.duration - 0.01))); }  // transport already inside → start partway in
+      const G = (cl.gain==null?1:cl.gain); const cg = c.createGain(); cg.gain.value = G; src.connect(cg); cg.connect(inG);   // per-clip gain — ride a loud word down
+      const clipStartCtx = transportZeroCtx + cl.start, endCtx = clipStartCtx + cl.buffer.duration;
+      const fi = Math.max(0, cl.fadeIn||0), fo = Math.max(0, cl.fadeOut||0);   // fade in / out (overlap two clips + fade = crossfade, no click)
+      let playCtx = null;
+      if (clipStartCtx >= when) { src.start(clipStartCtx, 0); playCtx = clipStartCtx; }   // clip starts in the future → from its head
+      else { const into = when - clipStartCtx; if (into < cl.buffer.duration - 0.01) { src.start(when, Math.max(0, Math.min(into, cl.buffer.duration - 0.01))); playCtx = when; } }  // transport already inside → start partway in
+      if (playCtx != null && (fi > 0 || fo > 0)) {                  // schedule the fade envelope on the per-clip gain (live + offline bounce)
+        if (fi > 0 && playCtx < clipStartCtx + fi) {
+          cg.gain.setValueAtTime(playCtx <= clipStartCtx + 0.0005 ? 0 : G * ((playCtx - clipStartCtx) / fi), playCtx);
+          cg.gain.linearRampToValueAtTime(G, clipStartCtx + fi);
+        }
+        if (fo > 0) { cg.gain.setValueAtTime(G, Math.max(playCtx, endCtx - fo)); cg.gain.linearRampToValueAtTime(0, endCtx); }
+      }
       srcs.push(src);
     }
   }
@@ -4558,7 +4588,7 @@ async function buildProjectPayload(title) {
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
-      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, gain: (cl.gain==null?1:cl.gain), fadeIn: cl.fadeIn||0, fadeOut: cl.fadeOut||0, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
     }
     trackData.push(td);
   }
@@ -4765,7 +4795,7 @@ async function applyProjectPayload(proj) {
         continue;
       }
       let clips = [];
-      const _decClips = async (arr) => { const out=[]; for (const cd of arr) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); out.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1) }); } return out; };
+      const _decClips = async (arr) => { const out=[]; for (const cd of arr) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); out.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined, gain: (cd.gain!=null?cd.gain:1), fadeIn: cd.fadeIn||0, fadeOut: cd.fadeOut||0 }); } return out; };
       try {
         if (Array.isArray(td.takes) && td.takes.length) {        // compat: a session saved with the old take format → load the active take's clips
           clips = await _decClips(td.takes[Math.max(0, Math.min(td.takeIdx || 0, td.takes.length - 1))]);
