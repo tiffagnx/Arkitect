@@ -340,6 +340,18 @@
   .toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:99; opacity:0; transition:opacity .18s; pointer-events:none;
     background:rgba(20,8,20,.94); border:1px solid var(--hairline); color:#DCE7EC; font:500 12px Inter; padding:9px 16px; border-radius:11px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
   .toast.on { opacity:1; }
+  /* BOUNCE TO DISK dialog */
+  .bdlg-ov { position:fixed; inset:0; z-index:9500; display:flex; align-items:center; justify-content:center; background:rgba(8,5,12,.62); animation:rise .14s ease-out; }
+  .bdlg { width:360px; max-width:calc(100% - 32px); background:#160e1e; border:1px solid var(--hairline); border-radius:14px; padding:18px; box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  .bdlg-h { font:700 13px Oxanium; letter-spacing:.06em; color:#DCE7EC; margin-bottom:14px; }
+  .bdlg-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:9px; }
+  .bdlg-row > span { font:600 11px Inter; color:var(--dim); flex:none; width:84px; }
+  .bdlg-row select, .bdlg-row input { flex:1; min-width:0; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline); border-radius:8px; font:500 11.5px Inter; padding:6px 8px; outline:none; }
+  .bdlg-row select option { background:var(--bg1); }
+  .bdlg-row select:disabled { opacity:.4; }
+  .bdlg-note { font:400 10.5px Inter; color:var(--dim); margin:4px 0 14px; line-height:1.5; }
+  .bdlg-note.bad { color:#E58A8E; }
+  .bdlg-btns { display:flex; justify-content:flex-end; gap:8px; }
   .ctxmenu { position:fixed; z-index:200; display:none; min-width:188px; padding:5px;
     background:#160e1e; border:1px solid var(--hairline); border-radius:11px; box-shadow:0 14px 44px rgba(0,0,0,.62); }
   .ctxmenu.on { display:block; }
@@ -4555,58 +4567,109 @@ document.body.addEventListener("drop", (e) => { e.preventDefault(); $("drop").cl
 /* ── WAV ENCODER — 16-bit PCM, interleaved. Handles mono OR stereo (and clamps
    higher channel counts to 2) so the SAME helper encodes the offline-rendered
    stereo mix on EXPORT and each track's source AudioBuffer on SAVE. ── */
-function bufferToWavBlob(audioBuffer) {
+function bufferToWavBlob(audioBuffer, bitDepth) {
+  bitDepth = (bitDepth === 24) ? 24 : 16;        // 16-bit default keeps every existing caller (save + quick export) unchanged
   const nch = Math.min(2, audioBuffer.numberOfChannels);
   const len = audioBuffer.length, rate = audioBuffer.sampleRate;
-  const bytesPerFrame = nch * 2;                 // 16-bit
+  const bps = bitDepth / 8, bytesPerFrame = nch * bps;
   const ab = new ArrayBuffer(44 + len * bytesPerFrame), v = new DataView(ab);
   const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
   ws(0, "RIFF"); v.setUint32(4, 36 + len * bytesPerFrame, true); ws(8, "WAVE"); ws(12, "fmt ");
   v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, nch, true);
   v.setUint32(24, rate, true); v.setUint32(28, rate * bytesPerFrame, true);
-  v.setUint16(32, bytesPerFrame, true); v.setUint16(34, 16, true); ws(36, "data"); v.setUint32(40, len * bytesPerFrame, true);
+  v.setUint16(32, bytesPerFrame, true); v.setUint16(34, bitDepth, true); ws(36, "data"); v.setUint32(40, len * bytesPerFrame, true);
   const chans = [];
   for (let c = 0; c < nch; c++) chans.push(audioBuffer.getChannelData(c));
   let off = 44;
-  for (let i = 0; i < len; i++) {
-    for (let c = 0; c < nch; c++) {
-      v.setInt16(off, Math.max(-32768, Math.min(32767, chans[c][i] * 32767)), true); off += 2;
+  if (bitDepth === 16) {
+    for (let i = 0; i < len; i++) for (let c = 0; c < nch; c++) { v.setInt16(off, Math.max(-32768, Math.min(32767, chans[c][i] * 32767)), true); off += 2; }
+  } else {
+    for (let i = 0; i < len; i++) for (let c = 0; c < nch; c++) {            // 24-bit signed, little-endian
+      let s = Math.max(-1, Math.min(1, chans[c][i])); let q = Math.round(s * 8388607); if (q < 0) q += 16777216;
+      v.setUint8(off, q & 0xff); v.setUint8(off + 1, (q >> 8) & 0xff); v.setUint8(off + 2, (q >> 16) & 0xff); off += 3;
     }
   }
   return new Blob([ab], { type: "audio/wav" });
 }
 
-/* ── EXPORT — render the whole board offline to a WAV ── */
-$("exportBtn").onclick = async () => {
-  if (!tracks.length) return;
+/* ── BOUNCE TO DISK — render a chosen SOURCE (the whole mix, a stem track, or a bus)
+   offline to a file. Reuses the EXACT live graph (setupBusNodes + buildTrackGraph +
+   buildMasterChain), so a bounce can never diverge from playback. Supports 16/24-bit
+   WAV, a target sample rate, and a time range (whole session or the Select selection). ── */
+async function renderBounce({ source = 'master', startT = 0, endT = null, sampleRate = null } = {}) {
   ensureCtx();
-  $("exportBtn").textContent = "rendering…"; $("exportBtn").disabled = true;
-  try {
-    const dur = contentDur() + parseFloat($("vSize").value); // bounce only the material (+ verb tail), not the padded timeline
-    const oc = new OfflineAudioContext(2, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
-    await ensureWorklets(oc);   // worklet plugins must exist on the offline ctx or export bypasses them
-    // offline bus
-    oc._masterGain = oc.createGain(); oc._masterGain.gain.value = parseFloat($("mGain").value);
-    oc._masterSum = oc.createGain();                                  // sum -> master chain -> gain
-    const lim = oc.createDynamicsCompressor();
-    lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
-    lim.attack.value = 0.002; lim.release.value = 0.12;
-    oc._masterGain.connect(lim); lim.connect(oc.destination);
-    const conv = oc.createConvolver(); conv.buffer = makeIR(oc, parseFloat($("vSize").value), parseFloat($("vTone").value));
-    oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
-    const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
-    oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterSum);
-    setupBusNodes(oc);                                               // identical bus setup offline → export matches playback
-    tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
-    buildMasterChain(oc, true);                                       // master mastering chain on the export
-    const rendered = await oc.startRendering();
-    try { oc._ins?.forEach(n => n?.dispose?.()); oc._ins = []; } catch {}   // free the offline master insert nodes (no leak per export)
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(bufferToWavBlob(rendered));
-    a.download = "arkitect-mix.wav"; a.click();
-  } catch (e) { alert("Export failed: " + e.message); }
-  $("exportBtn").textContent = "⬇ Export WAV"; $("exportBtn").disabled = false;
-};
+  const sr = sampleRate || ctx.sampleRate;
+  if (endT == null) endT = contentDur();
+  const tail = (source === 'master') ? parseFloat($("vSize").value) : 0;     // the verb tail lives on the master bus only
+  const dur = Math.max(0.05, endT - startT) + tail;
+  const oc = new OfflineAudioContext(2, Math.ceil(sr * dur), sr);
+  await ensureWorklets(oc);                                                   // worklet plugins must exist on the offline ctx or they're bypassed
+  oc._masterGain = oc.createGain(); oc._masterGain.gain.value = parseFloat($("mGain").value);
+  oc._masterSum = oc.createGain();
+  const lim = oc.createDynamicsCompressor();
+  lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
+  lim.attack.value = 0.002; lim.release.value = 0.12;
+  oc._masterGain.connect(lim);
+  const conv = oc.createConvolver(); conv.buffer = makeIR(oc, parseFloat($("vSize").value), parseFloat($("vTone").value));
+  oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
+  const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
+  oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterSum);
+  setupBusNodes(oc);
+  const lives = {};
+  tracks.forEach(t => { lives[t.id] = buildTrackGraph(oc, t, 0, startT, true); });   // when=0, offset=startT → render the range from transport startT
+  buildMasterChain(oc, true);
+  if (source === 'master') lim.connect(oc.destination);                              // ONLY the chosen source reaches the destination
+  else if (source.indexOf('track:') === 0) { const lv = lives[source.slice(6)]; if (lv && lv.fader) lv.fader.connect(oc.destination); }
+  else if (source.indexOf('bus:') === 0)   { const bn = oc._busNodes && oc._busNodes[source.slice(4)]; if (bn) bn.connect(oc.destination); }
+  const rendered = await oc.startRendering();
+  try { oc._ins?.forEach(n => n?.dispose?.()); oc._ins = []; } catch {}
+  return rendered;
+}
+function bounceSourceOptions() {
+  const o = [{ v:'master', label:'Main Mix (Master)' }];
+  tracks.filter(t => t.type !== 'aux').forEach(t => o.push({ v:'track:'+t.id, label:'Stem · '+t.name }));
+  buses.forEach(b => o.push({ v:'bus:'+b.id, label:'Bus · '+b.name }));
+  return o;
+}
+function openBounceDialog() {
+  if (!tracks.length) { flash("Nothing to bounce — add a track first"); return; }
+  ensureCtx();
+  document.getElementById('bounceDlg')?.remove();
+  const hasSel = !!(SEL && Math.abs(SEL.a - SEL.b) > 0.05);
+  const ov = document.createElement('div'); ov.id = 'bounceDlg'; ov.className = 'bdlg-ov';
+  ov.innerHTML = `
+    <div class="bdlg">
+      <div class="bdlg-h">Bounce to Disk</div>
+      <label class="bdlg-row"><span>Source</span><select id="bSrc">${bounceSourceOptions().map(o=>`<option value="${o.v}">${o.label}</option>`).join("")}</select></label>
+      <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option></select></label>
+      <label class="bdlg-row"><span>Bit depth</span><select id="bBits"><option value="24">24-bit</option><option value="16">16-bit</option></select></label>
+      <label class="bdlg-row"><span>Sample rate</span><select id="bRate"><option value="">Project · ${Math.round(ctx.sampleRate)} Hz</option><option value="48000">48 000 Hz</option><option value="44100">44 100 Hz</option></select></label>
+      <label class="bdlg-row"><span>Range</span><select id="bRange"><option value="all">Whole session</option>${hasSel?`<option value="sel">Selection</option>`:``}</select></label>
+      <label class="bdlg-row"><span>File name</span><input id="bName" type="text" value="${(((_lastTitle||'mix')+'').replace(/[^\w\- ]/g,'').trim())||'mix'}"></label>
+      <div class="bdlg-note" id="bNote">Bounce reflects the current mutes / solos & plug-in settings.</div>
+      <div class="bdlg-btns"><button class="tbtn" id="bCancel">Cancel</button><button class="tbtn teal" id="bGo">Bounce</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.querySelector('#bCancel').onclick = () => ov.remove();
+  ov.querySelector('#bGo').onclick = async () => {
+    const go = ov.querySelector('#bGo'), note = ov.querySelector('#bNote');
+    go.disabled = true; go.textContent = 'rendering…';
+    try {
+      const source = ov.querySelector('#bSrc').value;
+      const bits = parseInt(ov.querySelector('#bBits').value, 10) || 24;
+      const rate = parseInt(ov.querySelector('#bRate').value, 10) || null;
+      let startT = 0, endT = contentDur();
+      if (ov.querySelector('#bRange').value === 'sel' && hasSel) { startT = Math.min(SEL.a, SEL.b); endT = Math.max(SEL.a, SEL.b); }
+      const buf = await renderBounce({ source, startT, endT, sampleRate: rate });
+      const name = ((ov.querySelector('#bName').value || 'mix').trim().replace(/[^\w\- ]/g,'')) || 'mix';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(bufferToWavBlob(buf, bits)); a.download = name + '.wav'; a.click();
+      flash('Bounced ' + name + '.wav (' + bits + '-bit)');
+      ov.remove();
+    } catch (e) { go.disabled = false; go.textContent = 'Bounce'; note.textContent = 'Bounce failed: ' + e.message; note.classList.add('bad'); }
+  };
+}
+$("exportBtn").onclick = () => openBounceDialog();
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SAVE / LOAD PROJECT — a mix survives a refresh. Audio fully restores: each
