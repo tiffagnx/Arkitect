@@ -321,6 +321,30 @@
   .send-lvl { flex:1; accent-color:var(--violet); height:4px; cursor:pointer; }
   .send-add { background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline); border-radius:7px; font:500 10.5px Inter; padding:3px 8px; margin-left:auto; }
   .send-add option { background:var(--bg1); }
+  /* routing popup (send / I/O selector) + A–E / F–J send banks — PT-compact */
+  .pmenu-i.on { background:rgba(62,156,184,.14); color:#CFE6EE; box-shadow:inset 3px 0 0 var(--pink); }
+  .pmenu-i.dis { color:rgba(198,201,208,.34); cursor:default; }
+  .pmenu-i.dis:hover { background:none; color:rgba(198,201,208,.34); }
+  .pmenu-i.new { color:#9BD8C9; }
+  .pmenu-fader { display:flex; align-items:center; gap:8px; padding:7px 10px 4px; }
+  .pmenu-fader input[type=range] { width:116px; accent-color:var(--pink); height:4px; cursor:pointer; }
+  .pf-db { font:600 10px 'Space Mono'; color:var(--dim); min-width:46px; text-align:right; }
+  .send-banklbl { font:700 9px 'Space Mono'; letter-spacing:.18em; color:var(--dim); margin:7px 0 3px; }
+  .send-bank { display:flex; flex-direction:column; gap:4px; }
+  .send-slot { display:flex; align-items:center; gap:7px; padding:4px 8px; border-radius:7px; background:rgba(124,138,165,.06); border:1px solid var(--hairline); }
+  .send-slot.filled { border-color:rgba(62,156,184,.32); }
+  .send-slot.off { opacity:.5; }
+  .ss-letter { font:700 10px 'Space Mono'; color:var(--dim); width:11px; flex:none; }
+  .send-slot.pre .ss-letter::after { content:'ᴾ'; color:var(--pink); }
+  .ss-name { font:600 11px Inter; color:#9AA6B5; min-width:64px; flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .send-slot.filled .ss-name { color:#CFE6EE; }
+  .ss-name:hover { color:#CFE6EE; }
+  .ss-lvl { width:60px; flex:none; accent-color:var(--pink); height:4px; cursor:pointer; }
+  .send-hint { margin-left:auto; font:400 9px 'Space Mono'; color:var(--dim); }
+  .io-sel { flex:1; padding:6px 9px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#DCE7EC; font:600 11px Inter; cursor:pointer; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .io-sel:hover { border-color:rgba(62,156,184,.5); }
+  .ms-iosel { width:100%; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E8D6E8; font:600 10px Inter; cursor:pointer; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ms-iosel:hover { border-color:rgba(62,156,184,.5); }
   /* floating plugin window */
   .plugwin { position:fixed; z-index:300; min-width:268px; max-width:360px;
     background:
@@ -2284,8 +2308,102 @@ function bindStripCtl(t, el, key, min, max, dflt, fmt, fill){
 }
 // custom dark plugin picker — replaces the native white <select> popups.
 // masterFirst=true → groups MASTERING then OTHER; false → non-master plugins, flat.
+/* ── ROUTING POPUP — Pro Tools send / I/O selector. Same anchored, auto-flipped, click-away
+   popup as openPluginMenu (helpers extracted + shared), but its rows are routing choices:
+   No-Send/No-Input / interface paths / buses / ＋New Bus — and for sends, PRE / FMP / ON +
+   a level mini-fader. Feedback targets are greyed (wouldFeedback). ── */
+function closeRoutePopups(){ document.querySelectorAll(".pmenu").forEach(m=>m.remove()); }
+function placePopup(menu, anchorEl){
+  const r=anchorEl.getBoundingClientRect(), mw=menu.offsetWidth, mh=menu.offsetHeight;
+  let left=r.left, top=r.bottom+3;
+  if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
+  if(top+mh>window.innerHeight-8) top=Math.max(8, r.top-mh-3);
+  menu.style.left=Math.max(8,left)+"px"; menu.style.top=top+"px";
+}
+function armPopupClickaway(menu){
+  setTimeout(()=>{ const close=(ev)=>{ if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener("mousedown",close); } }; document.addEventListener("mousedown",close); },0);
+}
+// mutate the model for a routing choice (id null='No Send/No Input', 'master', 'if:*', or a busId).
+// Pure data change — the caller restarts playback (topology changed) + re-renders the surface.
+function assignRoute(kind, t, slot, id){
+  if(kind==='input'){ if(t.type==='aux') t.inputBus=(id&&id!=='none')?id:null; else t.input=id||'none'; }
+  else if(kind==='output'){ t.output=id||'master'; }
+  else {                                                              // send slot
+    let s=sendInSlot(t, slot);
+    if(!id){ if(s) t.sends=(t.sends||[]).filter(x=>x!==s); }          // No Send → clear the slot
+    else if(!s){ (t.sends||(t.sends=[])).push({ slot, bus:id, level:0, pan:0, prefader:false, on:true, fmp:false }); }  // fresh = -INF, post, on
+    else { s.bus=id; if('toAux' in s) delete s.toAux; if(s.on===undefined) s.on=true; }   // reassign (migrate legacy in place)
+  }
+}
+function openRoutePopup(anchorEl, kind, t, slot, onChange){
+  closeRoutePopups();
+  const m=document.createElement("div"); m.className="pmenu route";
+  const grp=(label)=>{ const g=document.createElement("div"); g.className="pmenu-g"; g.textContent=label; m.appendChild(g); };
+  const row=(label, cls, on, fn)=>{ const i=document.createElement("div");
+    i.className="pmenu-i"+(cls?(" "+cls):"")+(on?" on":""); i.textContent=label;
+    i.onmousedown=e=>e.stopPropagation(); i.onclick=e=>{ e.stopPropagation(); fn(); }; m.appendChild(i); return i; };
+  const cur = kind==='input' ? (t.type==='aux'?t.inputBus:t.input)
+            : kind==='output' ? (t.output||'master')
+            : (sendInSlot(t,slot)||{}).bus;
+  const commit=(id)=>{ assignRoute(kind,t,slot,id); if(playing) restartPlayback(); onChange&&onChange(); closeRoutePopups(); };
+
+  grp(kind==='send'?("send "+slot):kind);
+  if(kind==='output') row("Master","", (cur==='master'||!cur), ()=>commit('master'));
+  else row(kind==='input'?"No Input":"No Send","", (kind==='input'?(cur==='none'||!cur):!cur), ()=>commit(null));
+
+  if(kind==='input'||kind==='output'){
+    grp("interface");
+    (kind==='input'?IF_INPUTS:IF_OUTPUTS).forEach(p=> row(p.label,"", cur==='if:'+p.id, ()=>commit('if:'+p.id)) );
+  }
+  grp("bus");
+  if(!buses.length) row("(no buses — make an FX bus)","dis", false, ()=>{});
+  buses.forEach(b=>{
+    const blocked=(kind==='send'||kind==='output') && wouldFeedback(t,b.id);
+    const it=row(b.name, blocked?"dis":"", cur===b.id, ()=>{ if(blocked) return flash("Can't — “"+b.name+"” feeds back into this track"); commit(b.id); });
+    if(blocked) it.title="Would create a feedback loop";
+  });
+  row("＋ New Bus…","new", false, ()=>{ const b=addBus(null,true); commit(b.id); });
+
+  if(kind==='send'){
+    const s=sendInSlot(t,slot);
+    if(s && s.bus){
+      const re=()=>openRoutePopup(anchorEl,kind,t,slot,onChange);    // reopen in place after a toggle
+      grp("send "+slot+" options");
+      row(s.prefader?"PRE  ✓ (pre-fader)":"POST (post-fader)","pre",!!s.prefader, ()=>{ s.prefader=!s.prefader; if(playing) restartPlayback(); onChange&&onChange(); re(); });
+      row(s.fmp?"FMP  ✓ (follow main pan)":"FMP  (off)","fmp",!!s.fmp, ()=>{ s.fmp=!s.fmp; applyTrack(t); onChange&&onChange(); re(); });
+      row(s.on===false?"OFF  (muted)":"ON  ✓","onoff",s.on!==false, ()=>{ s.on=(s.on===false); if(playing) restartPlayback(); onChange&&onChange(); re(); });
+      const f=document.createElement("div"); f.className="pmenu-fader"; const lv=(s.level!=null?s.level:0);
+      f.innerHTML=`<input type="range" min="0" max="2" step="0.01" value="${lv}"><span class="pf-db">${dbOf(lv)}</span>`;
+      const rng=f.querySelector("input"), db=f.querySelector(".pf-db");
+      rng.onmousedown=e=>e.stopPropagation();
+      rng.oninput=()=>{ s.level=parseFloat(rng.value); if(s._sg) s._sg.gain.value=(s.on===false?0:s.level); db.textContent=dbOf(s.level); };
+      m.appendChild(f);
+    }
+  }
+  document.body.appendChild(m); placePopup(m, anchorEl); armPopupClickaway(m);
+}
+// shared A–E / F–J send-bank renderer (used by renderSends + the Mix strip) + its event binder
+function sendsBankHtml(t, letters){
+  return `<div class="send-bank">`+letters.map(L=>{
+    const s=sendInSlot(t,L), b=(s&&s.bus)?busById(s.bus):null, assigned=!!b;
+    return `<div class="send-slot${assigned?' filled':''}${(s&&s.prefader)?' pre':''}${(s&&s.on===false)?' off':''}" data-slot="${L}">`+
+      `<span class="ss-letter">${L}</span>`+
+      `<span class="ss-name" title="assign send ${L}">${assigned?b.name:'—'}</span>`+
+      (assigned?`<input type="range" class="ss-lvl" min="0" max="2" step="0.01" value="${s.level!=null?s.level:0}" title="send level">`:'')+
+    `</div>`;
+  }).join("")+`</div>`;
+}
+function bindSendBank(host, t){
+  host.querySelectorAll(".send-slot").forEach(el=>{ const L=el.dataset.slot;
+    el.querySelector(".ss-name").onclick=(e)=>{ e.stopPropagation();
+      openRoutePopup(el,'send',t,L,()=>{ if(selTrackId===t.id) renderChannel(t); if(viewMode==='mix' && typeof renderMixWindow==='function') renderMixWindow(); }); };
+    const rng=el.querySelector(".ss-lvl");
+    if(rng){ rng.onmousedown=e=>e.stopPropagation();
+      rng.oninput=(e)=>{ const s=sendInSlot(t,L); if(!s) return; s.level=parseFloat(e.target.value); if(s._sg) s._sg.gain.value=(s.on===false?0:s.level); }; }
+  });
+}
 function openPluginMenu(anchorEl, masterFirst, onPick, onTune){
-  document.querySelectorAll(".pmenu").forEach(m=>m.remove());
+  closeRoutePopups();
   const menu=document.createElement("div"); menu.className="pmenu";
   const mast=TIFF_PLUGINS.list.filter(p=>p.master), other=TIFF_PLUGINS.list.filter(p=>!p.master);
   const grp=(label,plugs)=>{ if(!plugs.length) return;
@@ -2301,12 +2419,7 @@ function openPluginMenu(anchorEl, masterFirst, onPick, onTune){
   }
   if(masterFirst){ grp("MASTERING",mast); grp("OTHER",other); } else { grp("",other); }
   document.body.appendChild(menu);
-  const r=anchorEl.getBoundingClientRect(), mw=menu.offsetWidth, mh=menu.offsetHeight;
-  let left=r.left, top=r.bottom+3;
-  if(left+mw>window.innerWidth-8) left=window.innerWidth-mw-8;
-  if(top+mh>window.innerHeight-8) top=Math.max(8, r.top-mh-3);
-  menu.style.left=Math.max(8,left)+"px"; menu.style.top=top+"px";
-  setTimeout(()=>{ const close=(ev)=>{ if(!menu.contains(ev.target)){ menu.remove(); document.removeEventListener("mousedown",close); } }; document.addEventListener("mousedown",close); },0);
+  placePopup(menu, anchorEl); armPopupClickaway(menu);
 }
 // inline insert SLOTS A–E on the track strip
 function renderStripSlots(t, host){
@@ -2617,23 +2730,16 @@ function auxLaneUi(t){
 }
 function renderSends(t){
   const host = document.getElementById("sends-"+t.id); if(!host) return;
-  const auxes = tracks.filter(x => x.type === 'aux');
-  t.sends = (t.sends || []).filter(s => auxes.some(a => a.id === s.toAux));   // drop sends whose bus was removed
-  let html = `<div class="ins-bar"><span class="ins-title">Sends → FX bus</span>`;
-  const avail = auxes.filter(a => !t.sends.some(s => s.toAux === a.id));
-  if (auxes.length) html += `<select class="send-add"><option value="">+ send to…</option>${avail.map(a=>`<option value="${a.id}">${a.name}</option>`).join("")}</select>`;
-  else html += `<span style="margin-left:auto;font:400 9px 'Space Mono';color:var(--dim)">make an FX bus first (+ FX Bus, top-right)</span>`;
-  html += `</div><div class="send-list">`;
-  t.sends.forEach((s,i)=>{ const aux=auxes.find(a=>a.id===s.toAux);
-    html += `<div class="send-row" data-i="${i}"><span class="cdot" style="background:${aux.color}"></span><span class="send-name">${aux.name}</span><input type="range" class="send-lvl" min="0" max="1.2" step="0.01" value="${s.level}"><button class="ins-mini srm" title="remove send">✕</button></div>`; });
-  html += `</div>`;
-  host.innerHTML = html;
-  const sa = host.querySelector(".send-add");
-  if (sa) sa.onchange = (e) => { if(e.target.value){ t.sends.push({toAux:e.target.value, level:0.5}); renderSends(t); if(playing) restartPlayback(); } };
-  host.querySelectorAll(".send-row").forEach(row => { const i=+row.dataset.i;
-    row.querySelector(".send-lvl").oninput = (e) => { const v=parseFloat(e.target.value); t.sends[i].level=v; if(t.sends[i]._sg) t.sends[i]._sg.gain.value=v; };
-    row.querySelector(".srm").onclick = () => { t.sends.splice(i,1); renderSends(t); if(playing) restartPlayback(); };
-  });
+  // keep new {bus} sends whose bus still lives + legacy {toAux} sends whose aux lives (audible until migrated)
+  t.sends = (t.sends || []).filter(s => s.bus ? !!busById(s.bus) : (s.toAux ? tracks.some(a=>a.id===s.toAux&&a.type==='aux') : false));
+  const vf=window.viewFlags;
+  const showAE=(vf&&vf.edit&&vf.edit.sendsAE!==undefined)?vf.edit.sendsAE:true;
+  const showFJ=(vf&&vf.edit&&vf.edit.sendsFJ!==undefined)?vf.edit.sendsFJ:false;
+  let html=`<div class="ins-bar"><span class="ins-title">Sends</span>${buses.length?'':`<span class="send-hint">click a slot → ＋ New Bus, or + FX Bus</span>`}</div>`;
+  if(showAE) html+=`<div class="send-banklbl">A–E</div>`+sendsBankHtml(t,BANK_AE);
+  if(showFJ) html+=`<div class="send-banklbl">F–J</div>`+sendsBankHtml(t,BANK_FJ);
+  host.innerHTML=html;
+  bindSendBank(host, t);
 }
 function refreshSendMenus(){ tracks.filter(t => t.buffer).forEach(t => renderSends(t)); }
 $("addAuxBtn").onclick = addAux;
