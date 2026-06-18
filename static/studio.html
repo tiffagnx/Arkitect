@@ -2227,13 +2227,13 @@ function buildBus(c) {
   verb.predelay.connect(verb.convolver); verb.convolver.connect(verb.ret); verb.ret.connect(master.sum);
 }
 // the MASTER as a track: sums the whole mix, holds a mastering plugin chain. Knobs, not faders.
-const masterTrack = { id:'__master__', type:'master', name:'MASTER', gain:0.9, inserts:[], color:'#C8924A' };
+const masterTrack = { id:'__master__', type:'master', name:'MASTER', gain:0.9, inserts:[], color:'#C8924A', present:false, stereo:true };  // a CREATED track now (Track ▸ New ▸ Master Fader), not hardcoded
 // (re)build the master insert chain between the sum bus and the volume gain (real-time or offline)
 function buildMasterChain(c, isOffline){
   const sum = isOffline ? c._masterSum : master.sum, gain = isOffline ? c._masterGain : master.gain;
   try { sum.disconnect(); } catch {}                 // drop sum's current outputs (chain or direct)
   let tail = sum; const nodes = [];
-  for (const ins of (masterTrack.inserts || [])) {
+  for (const ins of (masterTrack.present ? (masterTrack.inserts || []) : [])) {   // no Master Fader → no master inserts (output sum still runs)
     const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
     if (!def || ins.bypassed) { nodes.push(null); continue; }
     try { const node = def.create(c); tail.connect(node.input); tail = node.output; def.params.forEach(pp => node.set(pp.id, ins.params[pp.id] ?? pp.value)); nodes.push(node); }
@@ -2282,8 +2282,13 @@ function createTracks(count, format, type){
     flash(`Added ${count} ${stereo?'stereo':'mono'} audio track${count>1?'s':''}`);
   } else if(type === 'aux'){
     for(let i=0;i<count;i++) addAux();   // addAux builds the FX-bus lane + refreshes send menus
+  } else if(type === 'master'){
+    if(masterTrack.present){ flash("There's already a Master Fader — one per session"); return; }
+    masterTrack.present = true; masterTrack.stereo = stereo;
+    ensureMasterLane(); selectTrack(masterTrack);
+    flash("Master Fader created — the whole mix sums here");
   } else {
-    const nice = {master:'Master Fader', vca:'VCA Master', midi:'MIDI', instrument:'Instrument', video:'Video'}[type] || type;
+    const nice = {vca:'VCA Master', midi:'MIDI', instrument:'Instrument', video:'Video'}[type] || type;
     flash(`${nice} tracks need a system that's not built yet — coming soon`);
     return;
   }
@@ -2820,11 +2825,12 @@ function renderMasterSlots(host){
   }
 }
 function ensureMasterLane(){
+  if(!masterTrack.present){ document.getElementById("lane-__master__")?.remove(); return; }   // created track — only show when present
   let d=document.getElementById("lane-__master__");
   if(!d){ d=document.createElement("div"); d.className="lane masterlane"; d.id="lane-__master__";
     d.innerHTML=`
       <div class="tstrip masterstrip">
-        <div class="ts-top"><span class="cdot" style="background:${masterTrack.color}"></span><span class="mbadge">MASTER</span></div>
+        <div class="ts-top"><span class="cdot" style="background:${masterTrack.color}"></span><span class="mbadge">MASTER</span><button class="ts-x" title="remove Master Fader" style="margin-left:auto">✕</button></div>
         <div class="ts-row">
           <div class="ts-ctl mvol" title="drag — master volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div>
           <div class="ts-ctl mceil" title="drag — limiter ceiling"><span class="ts-k">CEIL</span><b class="ts-v"></b></div>
@@ -2835,9 +2841,18 @@ function ensureMasterLane(){
     bindMasterStripCtl(d.querySelector(".ts-ctl.mvol"), 0, 1.4, 0.9, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), true);
     bindMasterStripCtl(d.querySelector(".ts-ctl.mceil"), -12, 0, -1, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1), false);
     renderMasterSlots(d.querySelector("#mslots"));
-    d.onclick=(e)=>{ if(!e.target.closest(".ts-ctl,.ts-slot,.ts-slots")) selectTrack(masterTrack); };
+    d.onclick=(e)=>{ if(!e.target.closest(".ts-ctl,.ts-slot,.ts-slots,.ts-x")) selectTrack(masterTrack); };
+    d.querySelector(".ts-x").onclick=(e)=>{ e.stopPropagation(); removeMasterFader(); };
   }
-  $("tracks").appendChild(d);   // always keep it pinned to the bottom
+  $("tracks").appendChild(d);   // keep the Master Fader pinned to the bottom when present
+}
+function removeMasterFader(){
+  masterTrack.present=false;
+  document.getElementById("lane-__master__")?.remove();
+  if(selTrackId==='__master__'){ selTrackId=null; $("chan").innerHTML=`<div class="empty">Click a track to mix it.</div>`; }
+  if(viewMode==='mix') renderMixWindow();
+  if(playing) restartPlayback();
+  flash("Master Fader removed — make one again with Track ▸ New ▸ Master Fader");
 }
 function bindMasterKnob(knobId,outId,min,max,getV,setV,fmt,dflt){
   const knob=document.getElementById(knobId), out=document.getElementById(outId); if(!knob) return;
@@ -2872,7 +2887,8 @@ function renderMasterChannel(panel){
   renderInserts(masterTrack);
   panel.querySelector(".ins-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, true, (name)=>addInsert(masterTrack, name)); };
 }
-ensureMasterLane();   // master track is always present at the bottom of the edit window
+// Master Fader is a CREATED track now (Track ▸ New ▸ Master Fader) — no longer auto-present.
+// The output sum/limiter (buildBus) always runs; ensureMasterLane() only shows a lane when present.
 
 // ── CHANNEL PANEL — the SELECTED track's mix controls (knobs w/ numbers + inserts + sends), off the lanes ──
 let selTrackId = null;
@@ -3716,10 +3732,10 @@ function setView(mode){
 }
 function renderMixWindow(){
   const win = $("mixwin"); win.innerHTML = "";
-  if (!tracks.length){ win.innerHTML = `<div class="empty" style="margin:auto">No tracks yet — drop stems in the Edit view.</div>`; win.appendChild(buildMasterStrip()); return; }
+  if (!tracks.length){ win.innerHTML = `<div class="empty" style="margin:auto">No tracks yet — drop stems in the Edit view.</div>`; if(masterTrack.present) win.appendChild(buildMasterStrip()); return; }
   const auxes = tracks.filter(t=>t.type==='aux');
   tracks.forEach(t => win.appendChild(buildStrip(t, auxes)));
-  win.appendChild(buildMasterStrip());
+  if(masterTrack.present) win.appendChild(buildMasterStrip());
 }
 function renameTrack(t, span){ const n = prompt("Rename track:", t.name); if(n && n.trim()){ t.name=n.trim(); if(span) span.textContent=t.name;
   const ln=document.querySelector("#lane-"+t.id+" .name"); if(ln) ln.textContent=t.name; if(selTrackId===t.id) renderChannel(t); } }
@@ -4068,7 +4084,9 @@ async function buildProjectPayload(title) {
     id: currentProjectId,   // null on first save → backend mints one; reused after → updates the same project
     title,
     buses: buses.map(b => ({ id:b.id, name:b.name, stereo:b.stereo!==false, color:b.color })),
-    master: { mGain: parseFloat($("mGain").value), mLim: parseFloat($("mLim").value) },
+    master: { mGain: parseFloat($("mGain").value), mLim: parseFloat($("mLim").value),
+      present: !!masterTrack.present,
+      inserts: (masterTrack.inserts || []).map(ins => ({ name:ins.name, params:{ ...ins.params }, bypassed:!!ins.bypassed })) },
     verb: {
       vSize: parseFloat($("vSize").value), vTone: parseFloat($("vTone").value),
       vPre: parseFloat($("vPre").value), vRet: parseFloat($("vRet").value),
@@ -4125,7 +4143,9 @@ async function loadProject(id) {
     if (proj.master) {
       if (proj.master.mGain != null) $("mGain").value = proj.master.mGain;
       if (proj.master.mLim  != null) $("mLim").value  = proj.master.mLim;
-    }
+      masterTrack.present = proj.master.present !== undefined ? !!proj.master.present : ((proj.master.inserts||[]).length>0);
+      masterTrack.inserts = (proj.master.inserts || []).map(ins => ({ name:ins.name, params:{ ...(ins.params||{}) }, bypassed:!!ins.bypassed }));
+    } else { masterTrack.present = false; masterTrack.inserts = []; }
     if (proj.verb) {
       if (proj.verb.vSize != null) $("vSize").value = proj.verb.vSize;
       if (proj.verb.vTone != null) $("vTone").value = proj.verb.vTone;
@@ -4203,6 +4223,7 @@ async function loadProject(id) {
     }
     migrateLegacySends();               // normalize legacy {toAux}/aux-id routing → slotted {bus} sends now that all auxes exist
     refreshSendMenus();                 // now that all buses exist, render every stem's sends
+    ensureMasterLane();                 // show the Master Fader lane iff this session has one (removes a stale one otherwise)
     $("drop").style.display = tracks.length ? "none" : "block";
     studioStatus("Loaded “" + (proj.title || id) + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
