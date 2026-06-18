@@ -33,8 +33,13 @@ when something's wrong, say so plainly and fix it.
 - `data/` is gitignored secrets — never commit it.
 
 ## HOW TO VERIFY (every slice)
+> 2026-06-18: the **Claude_Preview MCP** is the smoothest path now — `.claude/launch.json` has an
+> `arkitect-studio` config on **port 7791** (a 2nd uvicorn of the same app, so it never fights B's own
+> 7777 server). `preview_start` it once, then `preview_eval` (build a synthetic track + `setView('mix')`),
+> `preview_console_logs`(level error), `preview_screenshot`. Reload past the guard with
+> `tracks.length=0; window.onbeforeunload=null; location.reload()`. Chrome MCP on 7777 still works too.
 1. **Syntax-check** the inline script: regex `<script>` blocks out of studio.html, `node --check` each
-   (the snippet I used writes each block to /tmp and checks). Must be 0 errors.
+   (a tiny extractor that writes each inline block to a temp .js + `node --check`s it). Must be 0 errors.
 2. **Chrome MCP** (`mcp__Claude_in_Chrome__*`) on the tab at `localhost:7777/static/studio.html`.
    - `beforeunload` guard fires when tracks exist; to reload, first `javascript_tool`:
      `tracks.length=0; window.onbeforeunload=null;` then `navigate`.
@@ -77,19 +82,24 @@ when something's wrong, say so plainly and fix it.
 - **Phase 2 — Finish a vocal: edit set DONE.** clip gain (drag the dB badge) · nudge (`,`/`.` by grid)
   · fades & crossfades (drag a clip's top corners; engine ramps the per-clip gain node). Comping/take-
   playlists + loop-record intentionally NOT built (owner rejected take-stacking).
-- **Phase 3 — Mix (NEXT options):** make EQ/comp + Auto-mix reachable in the MIX view strips; full
-  mastering insert rack + editable ceiling on the MIX master strip; per-insert bypass/remove on MIX
-  strips; dB-faithful MIX faders (use `gdbStr`) + the F-J send bank; **wire the renamable interface
-  input ("BRYANS MIC") to be the ACTUAL record source** + serialize IF_NAMES in the project (today
-  `t.input` is display-only; capture is the global `#inDev` device).
-- **Phase 4 — Deliver:** real **Bounce-to-Disk dialog** over the (already solid) offline render —
+- **Phase 3 — Mix: DONE 2026-06-18.** MIX strips now: read dB on the fader (`gdbStr`) + show the full
+  A–J send banks; per-insert bypass-dot + remove (✕); a built-in EQ/Dyn knob row (LO/MID/HI/CMP) + an
+  ✨ Auto-mix button (Auto-mix now also analyzes a clip-track's longest clip, not just `t.buffer`;
+  reasoning shows in a floating card in MIX view). Master strip got a real **Master FX rack** (mastering
+  plugins first, bypass/remove) + a draggable **CEIL** knob (limiter ceiling). And a track **Input can now
+  be a real hardware device** (`dev:<id>` in the I/O picker's "hardware in" group, renamable like
+  "BRYANS MIC"): arming that track records FROM that device (transportGo routes capture to it, falling
+  back to global `#inDev`); `IF_NAMES` now travels in the saved project. NOTE: `dev:` is excluded from
+  the bus-input path in `buildTrackGraph`/`wouldFeedback`, so a hardware-input track still plays its clips.
+- **Phase 4 — Deliver (NEXT):** real **Bounce-to-Disk dialog** over the (already solid) offline render —
   Source (MON L/R or a bus/output/track for stems), File Type (WAV + MP3), Bit Depth (16/24), Sample
   Rate, file name + directory, bounce the SEL range; wire Track-menu Bounce/Commit/Freeze/Make-Inactive
   (dead now); add Hide to the track right-click menu.
 - Deferred: rename desktop folder pink-room→arkitect (cwd/server lock); Sessions Dashboard "New
   Session" modal/templates (design in `studio-research/design/sessions-dashboard.md`).
 
-**Ask him which of Phase 3 / Phase 4 / more look-and-feel next — he'll usually just say "go".**
+**This session (2026-06-18): owner said "go down the list — do Phase 3, then Phase 4, then a
+look-and-feel pass." Phase 3 DONE + committed. Phase 4 (Bounce-to-Disk) next, then the L&F pass.**
 
 ## ENGINE MAP (grep for current line numbers — they shift)
 - `buildTrackGraph(c,t,when,offset,isOffline)`: per clip → **per-clip GainNode (cl.gain + fade ramps)**
