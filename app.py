@@ -2664,6 +2664,104 @@ async def editor_pick():
         return JSONResponse({"error": f"file dialog failed: {e}"}, status_code=500)
 
 
+@app.post("/api/studio/session/pick-folder")
+async def studio_pick_folder():
+    """Native OS folder picker on B's own machine — choose WHERE to save a session
+    folder. Runs Tk in a child process so it never touches the async loop."""
+    script = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
+        "d=filedialog.askdirectory(title='Choose where to save this ARKITECT session')\n"
+        "import sys;sys.stdout.write(d or '')\n"
+    )
+    try:
+        r = await asyncio.to_thread(
+            lambda: subprocess.run([_sys.executable, "-c", script],
+                                   capture_output=True, text=True, creationflags=_NOWIN, timeout=600))
+        return {"path": (r.stdout or "").strip()}
+    except Exception as e:
+        return JSONResponse({"error": f"folder dialog failed: {e}"}, status_code=500)
+
+
+@app.post("/api/studio/session/pick-file")
+async def studio_pick_file():
+    """Native OS open dialog filtered to ARKITECT session files (*.ark) so B can
+    open a session straight from a folder on their own disk."""
+    script = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
+        "f=filedialog.askopenfilename(title='Open an ARKITECT session',"
+        "filetypes=[('ARKITECT session','*.ark'),('All files','*.*')])\n"
+        "import sys;sys.stdout.write(f or '')\n"
+    )
+    try:
+        r = await asyncio.to_thread(
+            lambda: subprocess.run([_sys.executable, "-c", script],
+                                   capture_output=True, text=True, creationflags=_NOWIN, timeout=600))
+        return {"path": (r.stdout or "").strip()}
+    except Exception as e:
+        return JSONResponse({"error": f"file dialog failed: {e}"}, status_code=500)
+
+
+def _safe_session_name(name: str) -> str:
+    keep = "".join(ch for ch in (name or "").strip() if ch.isalnum() or ch in " -_()").strip()
+    return keep[:80] or "ARKITECT Session"
+
+
+@app.post("/api/studio/session/save-to-folder")
+async def studio_save_to_folder(req: Request):
+    """Write a real Pro-Tools-style session FOLDER on B's own disk:
+        <dir>/<name>/<name>.ark              the session (JSON; audio embedded)
+        <dir>/<name>/Audio Files/            (for future split-out audio)
+        <dir>/<name>/Bounced Files/          (bounces land here)
+        <dir>/<name>/Session File Backups/   (timestamped auto-backups)
+    `backup=True` writes a timestamped copy into Session File Backups/ instead."""
+    body = await req.json()
+    base_dir = body.get("dir") or ""
+    name = _safe_session_name(body.get("name") or "")
+    payload = body.get("payload")
+    backup = bool(body.get("backup"))
+    if not base_dir or not os.path.isdir(base_dir):
+        return JSONResponse({"error": "pick a folder first"}, status_code=400)
+    if payload is None:
+        return JSONResponse({"error": "no session data"}, status_code=400)
+    try:
+        sess_dir = os.path.join(base_dir, name)
+        for sub in ("", "Audio Files", "Bounced Files", "Session File Backups"):
+            os.makedirs(os.path.join(sess_dir, sub) if sub else sess_dir, exist_ok=True)
+        data = json.dumps(payload, ensure_ascii=False)
+        if backup:
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            out = os.path.join(sess_dir, "Session File Backups", f"{name} {stamp}.ark")
+        else:
+            out = os.path.join(sess_dir, f"{name}.ark")
+        tmp = out + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(data)
+        os.replace(tmp, out)   # atomic
+        return {"ok": True, "path": out, "dir": sess_dir, "name": name}
+    except Exception as e:
+        return JSONResponse({"error": f"save failed: {e}"}, status_code=500)
+
+
+@app.post("/api/studio/session/read-file")
+async def studio_read_file(req: Request):
+    """Read a .ark session file from B's disk and hand the JSON back to the UI."""
+    body = await req.json()
+    path = body.get("path") or ""
+    if not path or not os.path.isfile(path):
+        return JSONResponse({"error": "file not found"}, status_code=400)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        return {"ok": True, "payload": payload, "dir": os.path.dirname(path),
+                "name": os.path.splitext(os.path.basename(path))[0]}
+    except Exception as e:
+        return JSONResponse({"error": f"read failed: {e}"}, status_code=500)
+
+
 @app.post("/api/editor/import")
 async def editor_import(req: Request):
     """Register one or more source files: probe, assign a stable id, kick off
@@ -3285,6 +3383,7 @@ app.include_router(swarm_router)
 #    set any, else the local model), room-aware: he knows the room you're in and
 #    walks you through it. Separate from Tiff, who owns the main chat. ───────────
 from swarm_routes import _enabled_slots, _call_with_fallback  # noqa: E402
+import kit_kb as kb  # noqa: E402  — Kit's knowledge layer (RAG over data/kit_kb/*.md)
 
 KIT_SYSTEM = """You are Kit — the build-bot who lives inside ARKITECT, a private creative studio that runs on the user's own machine.
 
@@ -3352,6 +3451,13 @@ async def kit_help(req: Request):
     if not msg:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
     system = KIT_SYSTEM + ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    # Kit's brain: pull the few most relevant knowledge slices for THIS question
+    # (scoped to the room + the program-wide doc) and ground his answer in them.
+    # Best-effort — retrieval must never break a reply.
+    try:
+        system += kb.as_prompt_block(kb.retrieve(room, msg))
+    except Exception:
+        pass
     slots = _enabled_slots()
     try:
         if slots:
