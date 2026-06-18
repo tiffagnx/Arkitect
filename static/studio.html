@@ -600,6 +600,19 @@
   @keyframes kitFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-5px); } }
   .drop-h1 { transition:opacity .32s ease; }   /* rotating-quote crossfade */
   .drop-by { margin-top:9px; font:600 12px 'Space Mono'; letter-spacing:.05em; color:var(--teal); opacity:0; transition:opacity .32s ease; min-height:15px; }
+  /* Updates menu — amber pulse + dot when a newer release is on GitHub */
+  .mb-title.upd-avail { color:var(--amber); animation:updPulse 1.5s ease-in-out infinite; }
+  .mb-title.upd-avail::after { content:""; display:inline-block; width:6px; height:6px; margin-left:6px; border-radius:50%;
+    background:var(--amber); box-shadow:0 0 8px var(--amber); vertical-align:middle; }
+  @keyframes updPulse { 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
+  /* Updates dialog body */
+  .upd-new, .upd-ok { font:600 13px Inter; color:var(--text); margin-bottom:12px; }
+  .upd-new { color:var(--amber); }
+  .upd-vers { display:flex; align-items:center; gap:10px; font:700 18px Oxanium; color:var(--text); }
+  .upd-vers .upd-from { color:var(--dim); } .upd-vers .upd-arr, .upd-vers .upd-to { color:var(--teal); }
+  .upd-notes { margin-top:12px; max-height:180px; overflow:auto; white-space:pre-wrap; font:500 11.5px 'Space Mono'; line-height:1.5;
+    color:var(--dim); background:rgba(255,255,255,.03); border:1px solid var(--hairline); border-radius:8px; padding:10px 12px; }
+  .upd-hint { margin-top:14px; font:500 11px Inter; color:var(--dim); }
   .mb-panel { z-index:9999; min-width:240px; max-height:calc(100vh - 64px); overflow-y:auto; overflow-x:hidden;
     padding:5px; background:#1C1D24; border:1px solid rgba(255,255,255,.1); border-radius:10px;
     box-shadow:0 20px 54px rgba(0,0,0,.62); }
@@ -6036,10 +6049,13 @@ function laneUiTake(t, placeAt) {
   // ARKITECT branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
   window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace');
   const _helpMenu = window.PT_MENUS.find(m => m.id === 'help');
-  if (_helpMenu) _helpMenu.items = [
-    { label:"Check for Updates…", shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:true,  submenu:null },
-    { label:"About ARKITECT",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
-  ];
+  if (_helpMenu) {
+    _helpMenu.title = "Updates";   // owner: the Help menu IS the update center now
+    _helpMenu.items = [
+      { label:"Check for Updates…", shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:true,  submenu:null },
+      { label:"About ARKITECT",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
+    ];
+  }
 
   // current selected track (clip-context ops read selClip / SEL internally)
   const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
@@ -6109,8 +6125,8 @@ function laneUiTake(t, placeAt) {
     if (menuId === "track"       && /^Commit/.test(L))            return onTrack(t => commitTrack(t));
     if (menuId === "track"       && /^Bounce/.test(L))            return onTrack(t => bounceTrackStem(t));
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
-    if (menuId === "help"        && /Update/i.test(L))         return () => flash("ARKITECT is up to date ✓");
-    if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT — DeMartin Audio Labs · in-browser DAW");
+    if (menuId === "help"        && /Update/i.test(L))         return () => { if (window.__updateInfo) openUpdatesDialog(); else checkForUpdates(true); };
+    if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT v" + (window.APP_VERSION||"?") + " — DeMartin Audio Labs · in-browser DAW");
     if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
     return null;
   }
@@ -6188,8 +6204,10 @@ function laneUiTake(t, placeAt) {
     b.className = "mb-title"; b.textContent = m.title;
     b.addEventListener("click", (e) => { e.stopPropagation(); (openIdx === i) ? closeAll() : openAt(i); });
     b.addEventListener("mouseenter", () => { if (openIdx !== null && openIdx !== i) openAt(i); });
+    if (m.id === "help") b.id = "updatesTitle";   // updater blinks this when a newer release exists
     titles[i] = b; bar.appendChild(b);
   });
+  if (typeof paintUpdatesBadge === "function") paintUpdatesBadge();   // reflect any update found before the bar built
   const _kitMount = document.createElement("span"); _kitMount.className = "kit-mount"; bar.appendChild(_kitMount);   // Kit's slot, right after Help (kit-helper.js mounts here, matching Visual Labs)
   document.addEventListener("mousedown", (e) => { const t = e.target; if (t.closest && !t.closest("#menubar") && !t.closest(".mb-panel")) closeAll(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && openIdx !== null) closeAll(); });
@@ -6231,6 +6249,111 @@ function laneUiTake(t, placeAt) {
   });
 
   console.log("[menu bar] " + window.PT_MENUS.length + " menus rendered, " + Object.keys(SHORTCUTS).length + " shortcuts wired");
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTO-UPDATER (pass 1) — watches GitHub Releases for tiffagnx/Arkitect and
+   blinks the "Updates" menu when a newer build is published. The repo ships as
+   a ZIP (no git needed for users); the version check is a plain CORS-safe fetch.
+   Pass 2 will wire save → download → swap → restart through the backend.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function arkUpdater(){
+  const APP_VERSION = "1.0.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const REPO        = "tiffagnx/Arkitect";
+  const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
+  window.APP_VERSION  = APP_VERSION;
+  window.__updateInfo = null;             // {version, tag, url, notes, asset} once a newer release is found
+
+  const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  // semver-ish compare, tolerant of a "v" prefix and missing parts → -1 / 0 / 1
+  function cmpVer(a, b){
+    const part = s => String(s||"").replace(/^v/i,"").split(/[.\-+]/).map(n => parseInt(n,10) || 0);
+    const A = part(a), B = part(b), n = Math.max(A.length, B.length);
+    for (let i=0;i<n;i++){ const d = (A[i]||0) - (B[i]||0); if (d) return d<0?-1:1; }
+    return 0;
+  }
+  function paintUpdatesBadge(){
+    const el = document.getElementById("updatesTitle");
+    if (!el) return;
+    if (window.__updateInfo){ el.classList.add("upd-avail"); el.title = "Update available — v" + window.__updateInfo.version; }
+    else { el.classList.remove("upd-avail"); el.removeAttribute("title"); }
+  }
+  window.paintUpdatesBadge = paintUpdatesBadge;
+
+  async function checkForUpdates(manual){
+    if (!manual){                                       // background check: honor the throttle, badge already restored from cache
+      try { if (Date.now() - (+localStorage.getItem("ark_upd_last") || 0) < CHECK_EVERY) return; } catch(e){}
+    }
+    try {
+      const r = await fetch("https://api.github.com/repos/" + REPO + "/releases/latest",
+                            { headers:{ "Accept":"application/vnd.github+json" }, cache:"no-store" });
+      try { localStorage.setItem("ark_upd_last", String(Date.now())); } catch(e){}
+      if (r.status === 404){                             // repo has no published release yet → nothing to nag about
+        window.__updateInfo = null; try { localStorage.removeItem("ark_upd_info"); } catch(e){}
+        paintUpdatesBadge(); if (manual) flash("ARKITECT v" + APP_VERSION + " — up to date ✓"); return;
+      }
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const rel = await r.json();
+      const tag = rel.tag_name || rel.name || "";
+      if (tag && cmpVer(tag, APP_VERSION) > 0){
+        const zip = (rel.assets || []).find(a => /\.zip$/i.test(a.name || ""));
+        window.__updateInfo = { version: String(tag).replace(/^v/i,""), tag,
+          url:   rel.html_url || ("https://github.com/" + REPO + "/releases/latest"),
+          notes: rel.body || "", asset: (zip && zip.browser_download_url) || rel.zipball_url || "" };
+        try { localStorage.setItem("ark_upd_info", JSON.stringify(window.__updateInfo)); } catch(e){}
+        paintUpdatesBadge();
+        if (manual) openUpdatesDialog();
+      } else {                                           // already current
+        window.__updateInfo = null; try { localStorage.removeItem("ark_upd_info"); } catch(e){}
+        paintUpdatesBadge(); if (manual) flash("ARKITECT v" + APP_VERSION + " — up to date ✓");
+      }
+    } catch(e){
+      if (manual) flash("Couldn't reach the update server — try again later");
+      // background failures stay silent so we never nag on a flaky connection
+    }
+  }
+  window.checkForUpdates = checkForUpdates;
+
+  function openUpdatesDialog(){
+    const info = window.__updateInfo;
+    const ex = document.getElementById("updDlg"); if (ex) ex.remove();
+    const body = info
+      ? '<div class="upd-new">A newer build of ARKITECT is ready.</div>' +
+        '<div class="upd-vers"><span class="upd-from">v' + esc(APP_VERSION) + '</span><span class="upd-arr">→</span><span class="upd-to">v' + esc(info.version) + '</span></div>' +
+        (info.notes ? '<div class="upd-notes">' + esc(info.notes).slice(0, 1400) + '</div>' : "") +
+        '<div class="upd-hint">One-tap update (save → install → restart) is coming next — for now this opens the download page.</div>'
+      : '<div class="upd-ok">You’re on the latest version.</div>' +
+        '<div class="upd-vers"><span class="upd-to">v' + esc(APP_VERSION) + '</span></div>';
+    const ov = document.createElement("div"); ov.className = "modal-ov"; ov.id = "updDlg";
+    ov.innerHTML =
+      '<div class="modal" role="dialog" aria-label="Updates">' +
+        '<div class="modal-h"><h3>UPDATES</h3><button class="modal-x" title="close">✕</button></div>' +
+        '<div class="modal-body">' + body + '</div>' +
+        '<div class="modal-foot">' +
+          '<button class="modal-btn" id="updClose">Close</button>' +
+          (info ? '<button class="modal-btn go" id="updGet">Download v' + esc(info.version) + '</button>'
+                : '<button class="modal-btn" id="updRecheck">Check again</button>') +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector(".modal-x").onclick = close;
+    ov.querySelector("#updClose").onclick = close;
+    ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+    const get = ov.querySelector("#updGet"); if (get) get.onclick = () => { window.open(info.url, "_blank", "noopener"); close(); };
+    const re  = ov.querySelector("#updRecheck"); if (re) re.onclick = () => { close(); checkForUpdates(true); };
+  }
+  window.openUpdatesDialog = openUpdatesDialog;
+
+  // restore a previously-found update from cache (so a reload keeps the badge without re-hitting GitHub)
+  try {
+    const cached = JSON.parse(localStorage.getItem("ark_upd_info") || "null");
+    if (cached && cached.version && cmpVer(cached.version, APP_VERSION) > 0) window.__updateInfo = cached;
+    else localStorage.removeItem("ark_upd_info");        // stale (we already updated past it)
+  } catch(e){}
+  paintUpdatesBadge();
+  setTimeout(() => checkForUpdates(false), 4000);        // first background check shortly after load
+  setInterval(() => checkForUpdates(false), CHECK_EVERY);
 })();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
