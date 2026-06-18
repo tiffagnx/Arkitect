@@ -111,6 +111,22 @@ Open follow-ups: aux lane still uses `auxLaneUi` (unify → `laneUi`); the fader
 is dB, which was the ask — a dB-tapered throw is more PT-exact); Sessions Dashboard; rename folder
 pink-room→arkitect.**
 
+**Post-handoff fixes (same session, from owner screenshots):**
+- **Fades are DRAG-ONLY** (commit 2d86d4c): drag a clip's top-corner square handle inward — left = fade-in,
+  right = fade-out (visible white handles on the selected clip + a `col-resize` cursor cue). Removed the
+  destructive right-click "Fade in/Fade out" items (`clipFx_fade` now unused) and the #chan cf-fi/cf-fo
+  buttons; added PT-style **"Delete fades."**
+- **The fade now tapers the actual WAVEFORM** (commit 0586eb1): `drawWaveBand`/`drawClipWave` take fi/fo/dur
+  and scale each column by the linear fade gain, so the wave shrinks to zero across the fade like PT — was
+  only an overlay line over a full-height wave. The dark fade fill was lightened so the taper shows.
+- **LIVE record waveform** (commit 231adca): `beginCapture` tags the armed track; `onaudioprocess` feeds
+  `REC.livePeaks`; `drawLiveTake` (called from `drawLane`) draws a growing RED wave + record-head on the
+  armed lane every frame while capturing — was blank until Stop. Drawing verified in-browser via simulated
+  capture state; the real-mic path is wired but only the owner can confirm live (headless has no mic).
+- **Verify method note:** the Claude_Preview screenshot pipeline can wedge after a 30s timeout — if
+  screenshots hang while `preview_eval` still responds, `preview_stop`+`preview_start` the `arkitect-studio`
+  config (port 7791) for a fresh renderer.
+
 ## ENGINE MAP (grep for current line numbers — they shift)
 - `buildTrackGraph(c,t,when,offset,isOffline)`: per clip → **per-clip GainNode (cl.gain + fade ramps)**
   → `inG` → eq(lo/mid/hi) → inserts → comp → pan → fader → meter → dest; sends tap comp(pre)/fader(post)
