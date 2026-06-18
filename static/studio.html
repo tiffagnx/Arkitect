@@ -646,6 +646,82 @@ function duplicateClip(){
   if(playing) restartPlayback(); flash("Duplicated clip");
   if(selTrackId===t.id) renderChannel(t);
 }
+/* ── Edit cluster (Phase 2): clipboard / insert silence / heal / trim-to-sel / consolidate ──
+   All operate on the Select-tool range SEL = {trackId,a,b}. */
+let CLIPBOARD = null;                                   // {buffer} — last copied/cut range (flattened)
+function _selRange(t){ if(!SEL||SEL.trackId!==t.id||Math.abs(SEL.a-SEL.b)<0.01) return null; return [Math.min(SEL.a,SEL.b),Math.max(SEL.a,SEL.b)]; }
+// split clip c at an absolute timeline second WITHOUT pushing undo (caller owns the snapshot)
+function _splitAt(t, c, atTime){
+  const local = atTime - c.start;
+  if(local<=0.001 || local>=c.buffer.duration-0.001) return false;
+  const f = local/c.buffer.duration, i = t.clips.indexOf(c);
+  t.clips.splice(i,1,{id:rid(),buffer:bufSlice(c.buffer,0,f),start:c.start},
+                     {id:rid(),buffer:bufSlice(c.buffer,f,1),start:c.start+local});
+  return true;
+}
+function concatBuffers(a,b){ const c=ensureCtx(), ch=Math.max(a.numberOfChannels,b.numberOfChannels);
+  const o=c.createBuffer(ch, a.length+b.length, a.sampleRate);
+  for(let k=0;k<ch;k++){ const d=o.getChannelData(k);
+    const sa=a.getChannelData(Math.min(k,a.numberOfChannels-1)); for(let i=0;i<a.length;i++) d[i]=sa[i];
+    const sb=b.getChannelData(Math.min(k,b.numberOfChannels-1)); for(let i=0;i<b.length;i++) d[a.length+i]=sb[i]; }
+  return o; }
+// flatten everything under [a,b] into ONE buffer (gaps -> silence)
+function _renderRange(t, a, b){
+  const c=ensureCtx(), sr=c.sampleRate;
+  const over = clipsOf(t).filter(cl=> cl.start < b-0.0001 && (cl.start+cl.buffer.duration) > a+0.0001);
+  const ch = over.length ? Math.max(...over.map(cl=>cl.buffer.numberOfChannels)) : 1;
+  const N = Math.max(1, Math.round((b-a)*sr)), out = c.createBuffer(ch, N, sr);
+  over.forEach(cl=>{ const off=Math.round((cl.start-a)*sr);
+    for(let k=0;k<ch;k++){ const s=cl.buffer.getChannelData(Math.min(k,cl.buffer.numberOfChannels-1)), d=out.getChannelData(k);
+      for(let i=Math.max(0,-off);i<s.length;i++){ const dd=off+i; if(dd>=N) break; d[dd]=s[i]; } } });
+  return out;
+}
+function copySelection(t){ const r=_selRange(t); if(!r){ flash("Make a selection first (⌶ Select tool)"); return false; }
+  CLIPBOARD = { buffer:_renderRange(t, r[0], r[1]) }; return true; }
+function copyCmd(t){ if(copySelection(t)) flash("Copied selection"); }
+function cutCmd(t){ if(copySelection(t)) deleteSelection(t); }   // deleteSelection flashes + owns its undo
+function pasteCmd(t){ if(!CLIPBOARD){ flash("Nothing to paste"); return; }
+  pushUndoClips(t,"Paste");
+  const at = (SEL && SEL.trackId===t.id) ? Math.min(SEL.a,SEL.b) : pos();
+  clipsOf(t).push({id:rid(), buffer:CLIPBOARD.buffer, start:Math.max(0,at)}); t.clips.sort((x,y)=>x.start-y.start);
+  syncPrimary(t); drawLane(t); if(playing) restartPlayback(); flash("Pasted");
+  if(selTrackId===t.id) renderChannel(t); }
+function insertSilence(t){ const r=_selRange(t); if(!r){ flash("Select the gap length first (⌶ Select tool)"); return; }
+  const [a,b]=r, gap=b-a; pushUndoClips(t,"Insert silence");
+  const straddle = clipsOf(t).find(c=> c.start < a-0.001 && (c.start+c.buffer.duration) > a+0.001); if(straddle) _splitAt(t,straddle,a);
+  clipsOf(t).forEach(c=>{ if(c.start >= a-0.0001) c.start += gap; });
+  syncPrimary(t); SEL=null; drawLane(t); if(playing) restartPlayback(); flash("Inserted "+gap.toFixed(2)+"s silence");
+  if(selTrackId===t.id) renderChannel(t); }
+function healSeparation(t){ const r=_selRange(t); if(!r){ flash("Select across a separation (⌶ Select tool)"); return; }
+  const [a,b]=r, cs=clipsOf(t).slice().sort((x,y)=>x.start-y.start);
+  for(let i=0;i<cs.length-1;i++){ const L=cs[i], R=cs[i+1], bd=L.start+L.buffer.duration;
+    if(Math.abs(R.start-bd)<0.012 && bd>=a-0.012 && bd<=b+0.012){
+      pushUndoClips(t,"Heal separation");
+      t.clips.splice(t.clips.indexOf(R),1);
+      t.clips.splice(t.clips.indexOf(L),1,{id:rid(),buffer:concatBuffers(L.buffer,R.buffer),start:L.start});
+      syncPrimary(t); SEL=null; drawLane(t); if(playing) restartPlayback(); flash("Healed separation");
+      if(selTrackId===t.id) renderChannel(t); return; } }
+  flash("No adjacent split found in the selection"); }
+function trimToSelection(t){ const r=_selRange(t); if(!r){ flash("Make a selection first (⌶ Select tool)"); return; }
+  const [a,b]=r, cl=clipAt(t,(a+b)/2); if(!cl){ flash("Selection isn't over a clip"); return; }
+  pushUndoClips(t,"Trim to selection");
+  const dur=cl.buffer.duration, f1=Math.max(0,(a-cl.start)/dur), f2=Math.min(1,(b-cl.start)/dur), i=t.clips.indexOf(cl);
+  const nc={id:rid(), buffer:bufSlice(cl.buffer,f1,f2), start:Math.max(cl.start,a)};
+  t.clips.splice(i,1,nc); syncPrimary(t); selClip={trackId:t.id,clipId:nc.id}; SEL=null; drawLane(t);
+  if(playing) restartPlayback(); flash("Trimmed to selection"); if(selTrackId===t.id) renderChannel(t); }
+function consolidateSelection(t){ const r=_selRange(t); if(!r){ flash("Make a selection first (⌶ Select tool)"); return; }
+  const [a,b]=r;
+  const overlap = clipsOf(t).filter(c=> c.start < b-0.0001 && (c.start+c.buffer.duration) > a+0.0001);
+  if(!overlap.length){ flash("No audio in the selection"); return; }
+  pushUndoClips(t,"Consolidate");
+  const sA = clipsOf(t).find(c=> c.start < a-0.001 && (c.start+c.buffer.duration) > a+0.001); if(sA) _splitAt(t,sA,a);
+  const sB = clipsOf(t).find(c=> c.start < b-0.001 && (c.start+c.buffer.duration) > b+0.001); if(sB) _splitAt(t,sB,b);
+  const inside = clipsOf(t).filter(c=> c.start >= a-0.001 && (c.start+c.buffer.duration) <= b+0.001 && c.start < b-0.0001);
+  const buffer = _renderRange(t, a, b);
+  t.clips = clipsOf(t).filter(c=> !inside.includes(c));
+  const nc={id:rid(), buffer, start:a}; t.clips.push(nc); t.clips.sort((x,y)=>x.start-y.start);
+  syncPrimary(t); selClip={trackId:t.id,clipId:nc.id}; SEL=null; drawLane(t);
+  if(playing) restartPlayback(); flash("Consolidated selection"); if(selTrackId===t.id) renderChannel(t); }
 // keep [f1,f2] of a buffer (fractions). sample-accurate splice for Separate.
 function bufSlice(buf, f1, f2){
   const sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
@@ -4449,6 +4525,8 @@ function laneUiTake(t, placeAt) {
   // current selected track (clip-context ops read selClip / SEL internally)
   const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
   const onTrack  = (fn) => () => { const t = curTrack(); if (!t) return flash("Select a track first"); fn(t); };
+  const selTrk   = () => (SEL ? tracks.find(t => t.id === SEL.trackId) : null);   // track holding the current Select-range
+  const onSel    = (fn) => () => { const t = selTrk(); if (!t) return flash("Make a selection first (⌶ Select tool)"); fn(t); };
 
   // the "exists" mapsTo values wired in Phase 1 (anything not here stays greyed)
   const BY_MAPSTO = {
@@ -4478,6 +4556,7 @@ function laneUiTake(t, placeAt) {
   const DISABLE = {
     "edit|Undo": () => !UNDO.length,
     "edit|Redo": () => !REDO.length,
+    "edit|Paste": () => !CLIPBOARD,
   };
   // dynamic labels — e.g. "Undo Duplicate" / "Redo Duplicate"
   const LABELFN = {
@@ -4492,6 +4571,13 @@ function laneUiTake(t, placeAt) {
     // Phase 2 — Edit cluster (built on the clip/undo engine)
     if (menuId === "edit" && L === "Redo") return () => redoLast();
     if ((menuId === "edit" || menuId === "clip") && L === "Duplicate") return () => duplicateClip();
+    if (menuId === "edit" && L === "Cut")   return onSel(t => cutCmd(t));
+    if (menuId === "edit" && L === "Copy")  return onSel(t => copyCmd(t));
+    if (menuId === "edit" && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
+    if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
+    if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
+    if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
+    if ((menuId === "edit" || menuId === "clip") && L === "To Selection") return onSel(t => trimToSelection(t));
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => addAux();          // re-home the FX-bus capability
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
@@ -4607,7 +4693,10 @@ function laneUiTake(t, placeAt) {
   window.PT_MENUS.forEach((m, i) => { m._i = i; collect(m, m.items, null); });
   document.addEventListener("keydown", (e) => {
     if (/^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable) return;
-    const act = SHORTCUTS[comboFromEvent(e)];
+    const combo = comboFromEvent(e);
+    // let native copy/cut/paste through when the user has page text selected
+    if (/^Ctrl\+[CXV]$/.test(combo) && window.getSelection && String(window.getSelection())) return;
+    const act = SHORTCUTS[combo];
     if (act) { e.preventDefault(); act(); }
   });
 
