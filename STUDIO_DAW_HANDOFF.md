@@ -103,8 +103,13 @@ when something's wrong, say so plainly and fix it.
 - Deferred: rename desktop folder pink-room→arkitect (cwd/server lock); Sessions Dashboard "New
   Session" modal/templates (design in `studio-research/design/sessions-dashboard.md`).
 
-**This session (2026-06-18): owner said "go down the list — Phase 3, then Phase 4, then a look-and-feel
-pass." Phases 3 & 4 DONE + committed/verified. NEXT in-session = the look-and-feel polish pass.**
+**This session (2026-06-18): owner said "go down the list — Phase 3, Phase 4, then a look-and-feel
+pass." ALL THREE DONE + committed/verified (commits 20dd6d1 … a5d70a8). The look-and-feel pass tightened
+the MIX view: capped the sends region so the FADER is always in view, + PT section dividers on the strips.
+The big reskin ("PT vibe without being PT") is still the owner's to drive — show him screenshots and ask.
+Open follow-ups: aux lane still uses `auxLaneUi` (unify → `laneUi`); the fader THROW is linear (the readout
+is dB, which was the ask — a dB-tapered throw is more PT-exact); Sessions Dashboard; rename folder
+pink-room→arkitect.**
 
 ## ENGINE MAP (grep for current line numbers — they shift)
 - `buildTrackGraph(c,t,when,offset,isOffline)`: per clip → **per-clip GainNode (cl.gain + fade ramps)**
