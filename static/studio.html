@@ -2868,6 +2868,18 @@ function laneUi(t) {
     const vd = viewDur(), r = wv.getBoundingClientRect();
     const atTime = scrollT + (e.clientX - r.left) / r.width * vd;
     const cl = clipAt(t, atTime);
+    // CLIP GAIN — grab the bottom-left "dB" badge and drag up/down to ride this clip's level
+    if (cl) {
+      const ry = e.clientY - r.top, rx = e.clientX - r.left, bx0 = Math.max(0, ((cl.start - scrollT)/vd)*r.width);
+      if (ry > r.height - 16 && rx >= bx0 && rx <= bx0 + 64) {
+        selectTrack(t); selClip = { trackId:t.id, clipId:cl.id }; drawLane(t); renderChannel(t);
+        const startG = (cl.gain==null?1:cl.gain), sy = e.clientY; let changed = false;
+        const mv = (ev) => { if (!changed && Math.abs(ev.clientY - sy) > 2) { changed = true; pushUndoClips(t, "Clip gain"); }
+          if (changed) { let db = 20*Math.log10(startG||0.0001) + (sy - ev.clientY)/4; db = Math.max(-24, Math.min(12, db)); cl.gain = Math.pow(10, db/20); drawLane(t); } };
+        const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (changed) { if (playing) restartPlayback(); flash("Clip gain " + gdbStr(cl.gain) + " dB"); } };
+        document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); return;
+      }
+    }
     // SELECT: drag to highlight a time range (or Smart tool in the bottom strip of a clip)
     if (tool==='select' || (tool==='smart' && cl && (e.clientY-r.top) > r.height*0.62)) {
       SEL = { trackId:t.id, a:atTime, b:atTime }; drawLane(t);
@@ -4044,7 +4056,8 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
     const transportZeroCtx = when - offset;                          // ctx time of transport pos 0
     for (const cl of clipsOf(t)) {                                   // one source PER clip, each at its own start
       if (cl.muted) continue;                                        // muted clip → no source, plays silent
-      const src = c.createBufferSource(); src.buffer = cl.buffer; src.connect(inG);
+      const src = c.createBufferSource(); src.buffer = cl.buffer;
+      const cg = c.createGain(); cg.gain.value = (cl.gain==null?1:cl.gain); src.connect(cg); cg.connect(inG);   // per-clip gain — ride a loud word down
       const clipStartCtx = transportZeroCtx + cl.start;
       if (clipStartCtx >= when) src.start(clipStartCtx, 0);          // clip starts in the future → from its head
       else { const into = when - clipStartCtx; if (into < cl.buffer.duration - 0.01) src.start(when, Math.max(0, Math.min(into, cl.buffer.duration - 0.01))); }  // transport already inside → start partway in
