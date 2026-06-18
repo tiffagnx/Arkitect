@@ -706,7 +706,9 @@
   <div class="zoombar" id="zoombar">
     <span class="zb-lbl">H</span>
     <button class="zb zb-mini" id="zFit" title="Fit session — whole timeline (start → end)">⤢</button>
-    <input type="range" id="hzoomSlider" class="zoom-slider" min="0" max="100" step="0.1" value="0" title="Horizontal zoom — left = fit whole session, right = max" />
+    <button class="zb zb-mini" id="hzOut" title="zoom out (time)">−</button>
+    <input type="range" id="hzoomSlider" class="zoom-slider" min="0" max="100" step="0.1" value="0" title="Horizontal zoom — left = fit whole session, right = max. Or use − / + to drill to the millisecond." />
+    <button class="zb zb-mini" id="hzIn" title="zoom in (time) — keep pressing to go all the way to the milliseconds">+</button>
     <span class="zb-pct" id="hzoomPct">100%</span>
     <input type="range" id="hscroll" class="zoom-pan" min="0" max="1" step="0.001" value="0" style="display:none" title="scroll the timeline" />
     <span class="zb-lbl vsep">V</span>
@@ -912,17 +914,28 @@ function t2x(time, W){ return ((time-scrollT)/viewDur())*W; }
 function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.textContent=Math.round(zoom*100)+"%";
   const hs=document.getElementById("hscroll"); if(hs){ const room=Math.max(0, maxDur()-viewDur()); hs.max=room.toFixed(3); hs.value=Math.min(scrollT,room); hs.style.display=room>0.02?'block':'none'; }
   const hz=document.getElementById("hzoomSlider"); if(hz && document.activeElement!==hz) hz.value=zoomToSlider(zoom);   // keep slider thumb in lockstep with +/- buttons + Ctrl+wheel
-  const hp=document.getElementById("hzoomPct"); if(hp) hp.textContent=Math.round(zoom*100)+"%";
+  const hp=document.getElementById("hzoomPct"); if(hp){ const vd=viewDur(); hp.textContent = vd<1 ? (vd*1000).toFixed(vd<0.05?1:0)+"ms" : vd.toFixed(vd<10?2:1)+"s"; }   // show the visible span so you can see how deep you are
   const vz=document.getElementById("vzoomSlider"); if(vz && document.activeElement!==vz) vz.value=laneH; }
 function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); }
-function setZoom(z){ zoom=Math.max(0.1,Math.min(500,z)); relayoutAll(); }
+function setZoom(z){ zoom=Math.max(ZMIN,Math.min(zMax(),z)); relayoutAll(); }
+// zoom by a factor while keeping the playhead (or view centre) under the same spot —
+// so pressing + drills straight into where you're working, all the way to milliseconds
+function zoomAround(factor){
+  const vd=viewDur(); const ph=(typeof pos==='function')?pos():0;
+  const anchor=(ph>=scrollT && ph<=scrollT+vd) ? ph : scrollT+vd/2;
+  const frac=vd>0 ? (anchor-scrollT)/vd : 0.5;
+  zoom=Math.max(ZMIN,Math.min(zMax(),zoom*factor));
+  scrollT=Math.max(0, anchor-frac*viewDur());
+  relayoutAll();
+}
 function setLaneH(h){ laneH=h; tracks.forEach(t=>{ const cv=document.querySelector('#lane-'+t.id+' .wave'); if(cv){ cv.height=h; cv.style.height=h+'px'; drawLane(t); } }); updateZoomUi(); }
 
 // ── WHOLE-VIEW ZOOM (task #1) — the bottom zoom bar drives the existing centralized engine ──
-const ZMIN=0.1, ZMAX=500;                         // zoom range: 0.1 = whole song shrinks to a sliver … 500 = deep sample-level detail (matches setZoom clamp)
+const ZMIN=0.1, MIN_VIEW=0.002;                    // ZMIN=0.1 → whole song shrinks to a sliver; MIN_VIEW=2ms → deepest zoom shows ~2 ms across the canvas (sample-level)
+function zMax(){ return Math.max(50, maxDur()/MIN_VIEW); }   // DYNAMIC ceiling: + keeps zooming to ms-level no matter how long the song is (no fixed 500× wall)
 let laneHMin=44, laneHMax=260;                     // vertical-zoom (global lane-height) bounds
-function sliderToZoom(s){ s=Math.max(0,Math.min(100,s)); return ZMIN*Math.pow(ZMAX/ZMIN, s/100); }   // 0=fit, 100=max (log feel)
-function zoomToSlider(z){ z=Math.max(ZMIN,Math.min(ZMAX,z)); return 100*Math.log(z/ZMIN)/Math.log(ZMAX/ZMIN); }
+function sliderToZoom(s){ s=Math.max(0,Math.min(100,s)); const zx=zMax(); return ZMIN*Math.pow(zx/ZMIN, s/100); }   // 0=fit, 100=deepest (log feel)
+function zoomToSlider(z){ const zx=zMax(); z=Math.max(ZMIN,Math.min(zx,z)); return 100*Math.log(z/ZMIN)/Math.log(zx/ZMIN); }
 function fitZoom(){ return 1; }                    // Fit = viewDur()==maxDur() ⟺ whole session fills the canvas (zoom 1; ZMIN goes further out to a sliver)
 function fitSession(){ scrollT=0; setZoom(fitZoom()); }
 function setVZoom(h){ setLaneH(Math.max(laneHMin, Math.min(laneHMax, h))); }   // every lane height up/down together
@@ -930,7 +943,7 @@ function zoomToSelection(){
   if(!SEL){ flash('Make a selection first (⌶ Select tool)'); return; }
   const a=Math.min(SEL.a,SEL.b), b=Math.max(SEL.a,SEL.b), dur=b-a;
   if(dur<0.01){ flash('Selection is too small to zoom'); return; }
-  const z=Math.max(ZMIN, Math.min(ZMAX, maxDur()/(dur*1.1)));   // frame the range with a 10% margin
+  const z=Math.max(ZMIN, Math.min(zMax(), maxDur()/(dur*1.1)));   // frame the range with a 10% margin
   scrollT=Math.max(0, a-dur*0.05); setZoom(z);                  // setZoom→relayoutAll→clampScroll+redraw+UI
 }
 
@@ -4110,8 +4123,10 @@ document.addEventListener("keydown", (e) => {
 $("vEdit").onclick = () => setView('edit');
 $("vMix").onclick  = () => setView('mix');
 // zoom / lane-height / snap / horizontal scroll
-$("zoomIn").onclick  = () => setZoom(zoom*1.5);
-$("zoomOut").onclick = () => setZoom(zoom/1.5);
+$("zoomIn").onclick  = () => zoomAround(1.5);
+$("zoomOut").onclick = () => zoomAround(1/1.5);
+$("hzIn").onclick    = () => zoomAround(1.5);     // bottom-bar + : keep pressing to drill to the millisecond
+$("hzOut").onclick   = () => zoomAround(1/1.5);
 const _LANE_H = [104,160,230]; let _lhi = 0;
 $("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE_H[_lhi]); };
 $("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/"+gridNote+")" : "Snap: OFF"); };
@@ -4148,7 +4163,7 @@ document.addEventListener("mousedown", (e) => { if (!e.target.closest("#fileBtn,
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
 $("tracks").addEventListener("wheel", (e) => {
   if (viewMode === 'mix') return;
-  if (e.ctrlKey || e.metaKey) { setZoom(zoom * (e.deltaY < 0 ? 1.15 : 1/1.15)); e.preventDefault(); return; }   // Ctrl+wheel = zoom
+  if (e.ctrlKey || e.metaKey) { zoomAround(e.deltaY < 0 ? 1.15 : 1/1.15); e.preventDefault(); return; }   // Ctrl+wheel = zoom toward the playhead
   if (zoom > 1) { scrollT += (e.deltaY || e.deltaX) * viewDur() / 700; clampScroll(); updateZoomUi(); tracks.forEach(t=>drawLane(t)); e.preventDefault(); }  // wheel = pan when zoomed
 }, { passive:false });
 
