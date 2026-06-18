@@ -68,7 +68,22 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — Sessions / Dashboard (#2). Bussing #13 is COMPLETE.
+## 3. THE NEXT TASK — finish the Usability pass, then Sessions / Dashboard (#2).
+> **USABILITY PASS (owner wants to RECORD TONIGHT + "feels done") — in progress.** A fresh-eyes audit
+> ranked the blockers in `studio-research/USABILITY_AUDIT.md`. SHIPPED + verified live: stop kills the
+> beat (`8577b56`), **Spacebar** play/stop, transport guarded mid-record, **audible monitor** default;
+> save/load keeps clip mute/name + solo, **Delete** key, beforeunload guard (`ff20a4a`,`ee41916`);
+> **first-run HERO** empty state — quick-start buttons, no black void (`89fa6cb`); **Kit ROOM_HELP**
+> de-staled (`7c489be`, app.py — needs a uvicorn restart to go live); **record-ARM** (R button,
+> single-arm, take lands on the armed track as a clip) + fixed the `laneUiTake` `.lhead` crash (`9c3e97e`).
+> REMAINING audit items: **#5 per-frame `drawLane` jank** (offscreen lane bitmaps + overlay playhead,
+> skip when `!playing` — the riskiest, do it carefully/fresh), **#10 empty buffer-less tracks vanish on
+> Save→Load**, and the full 5-min auto-backup (ships with Sessions). See USABILITY_AUDIT.md for the ranked list.
+>
+> **THEN: Sessions / Dashboard (#2)** — design hardened in `studio-research/design/sessions-dashboard.md`
+> (verified: disk writes go through the FastAPI **backend**; reuse the existing native folder picker at
+> `/api/editor/pick`). Build smallest slice first (Dashboard modal + blank Create + Open on today's store).
+>
 > **BUSSING #13 (owner's #1) is DONE & shipped + verified live:** slice 2 (`cc8bdaa`, audio routing),
 > 3a (`2bb444b`, routing popup + A-E/F-J matrix UI), 3b (`31119ae`, I/O click-selectors + Mix-strip
 > sends column), 3c (`f6a85ad`, save/load persistence + legacy migration), 3d (`3b828ad`, Master Fader
