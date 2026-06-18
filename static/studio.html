@@ -3397,12 +3397,74 @@ function drawLane(t){
 }
 
 /* ── live graph per track ── */
+/* ═══ BUS AUDIO GRAPH (Bussing slice 2) — make sends + bus routing actually audible ═══
+   A BUS is a named internal path. setupBusNodes builds one GainNode per bus (the bus sum)
+   BEFORE any track graph, so sends/outputs can land on a real node and Aux inputs can read
+   from one. The SAME helper runs in playAll, export and the record-locked transport, so the
+   offline WAV can never diverge from live playback. A bus with no listener goes nowhere
+   (silent) — exactly Pro Tools (nothing hears a bus until an Aux takes it as input). ═══ */
+function setupBusNodes(c){
+  const busNodes = {};
+  buses.forEach(b => { busNodes[b.id] = c.createGain(); });
+  c._busNodes = busNodes;
+  // every Aux Input track LISTENS to its input bus → its collector node IS that bus node
+  tracks.forEach(t => { if (t.type === 'aux') t._in = busNodes[t.inputBus] || (t._in = c.createGain()); });
+  return busNodes;
+}
+// the bus a send ultimately feeds — new {bus} model first, legacy {toAux} second (for the guard)
+function sendTargetBus(s){
+  if (s.bus) return s.bus;
+  if (s.toAux){ const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux'); return aux ? aux.inputBus : null; }
+  return null;
+}
+// resolve a send's destination collector node (handles both send shapes + missing-bus fallback)
+function sendDestNode(c, s){
+  if (s.bus){ const bn = c._busNodes && c._busNodes[s.bus]; if (bn) return bn; }
+  if (s.toAux){ const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux');
+    if (aux){ const bn = aux.inputBus && c._busNodes && c._busNodes[aux.inputBus]; return bn || aux._in || null; } }
+  return null;
+}
+/* Web Audio law: a routing CYCLE with no DelayNode is SILENTLY muted — so a send/output that
+   loops back into its own input chain would kill audio on the whole cycle (and is musically a
+   bug). PT forbids it outright. We detect + deny over the DATA MODEL: BFS the listeners of busId
+   and where they send/output; if any path reaches a bus that feeds t, it's a cycle. Called at
+   build time (skip the tap) AND at assign time (refuse + flash). The #1 correctness gate. */
+function wouldFeedback(t, busId){
+  if (!busId) return false;
+  const targetInputs = new Set();                       // bus ids that feed back into t
+  if (t.type === 'aux' && t.inputBus) targetInputs.add(t.inputBus);
+  if (t.input && t.input.indexOf('if:') !== 0 && t.input !== 'none') targetInputs.add(t.input);
+  if (targetInputs.has(busId)) return true;             // direct self-feed
+  const seen = new Set(), q = [busId];
+  while (q.length){
+    const b = q.shift(); if (seen.has(b)) continue; seen.add(b);
+    for (const lt of tracks){
+      const listens = (lt.type === 'aux' && lt.inputBus === b) || (lt.type !== 'aux' && lt.input === b);
+      if (!listens) continue;
+      if (targetInputs.has(lt.output)) return true;
+      if (lt.output && lt.output !== 'master' && !seen.has(lt.output)) q.push(lt.output);
+      for (const s2 of (lt.sends || [])){
+        if (s2.on === false) continue;
+        const tb = sendTargetBus(s2); if (!tb) continue;
+        if (targetInputs.has(tb)) return true;
+        if (!seen.has(tb)) q.push(tb);
+      }
+    }
+  }
+  return false;
+}
 function buildTrackGraph(c, t, when, offset, isOffline) {
   const isAux = t.type === 'aux';
   const srcs = [];
   const inG = c.createGain();
-  if (isAux) { (t._in || (t._in = c.createGain())).connect(inG); }   // FX bus: input is the send-collecting gain
-  else {
+  // INPUT — an Aux (or any track whose Input names a bus) reads from that bus's collector node
+  // instead of its own clips; every other track plays its clip sources. (Guard against double-feed.)
+  const inputBusId = isAux ? t.inputBus
+    : (t.input && t.input !== 'none' && t.input.indexOf('if:') !== 0 ? t.input : null);
+  if (isAux || inputBusId) {
+    const _ib = isAux ? t.inputBus : inputBusId;
+    ((c._busNodes && c._busNodes[_ib]) || (t._in || (t._in = c.createGain()))).connect(inG);
+  } else {
     const transportZeroCtx = when - offset;                          // ctx time of transport pos 0
     for (const cl of clipsOf(t)) {                                   // one source PER clip, each at its own start
       if (cl.muted) continue;                                        // muted clip → no source, plays silent
@@ -3436,19 +3498,31 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   }
   tail.connect(comp); comp.connect(pan); pan.connect(fader);
   const meter = c.createAnalyser(); meter.fftSize = 256; fader.connect(meter);   // post-fader VU tap for the Mix window
+  // OUTPUT — Master by default; an Output that names a bus re-routes the WHOLE track into that
+  // bus collector (audio + aux alike → nested submixes). Legacy aux-id outputs still resolve.
   let dest = isOffline ? c._masterSum : master.sum;       // default output = Master sum bus
-  if (!isAux && t.output && t.output !== 'master') {       // routed to an FX bus instead
-    const ao = tracks.find(x => x.id === t.output && x.type === 'aux');
-    if (ao && ao._in) dest = ao._in;
+  if (t.output && t.output !== 'master') {
+    let bn = c._busNodes && c._busNodes[t.output];
+    if (bn && wouldFeedback(t, t.output)) bn = null;       // never wire a cycle (would mute) → fall back to Master
+    if (!bn) { const ao = tracks.find(x => x.id === t.output && x.type === 'aux'); if (ao && ao._in) bn = ao._in; }  // legacy aux-id output
+    if (bn) dest = bn;
   }
   const vdest = isOffline ? c._verbPre : verb.predelay;
   fader.connect(dest);
-  fader.connect(send); send.connect(vdest);
-  // aux SENDS — post-fader taps from a stem into FX-bus (aux) inputs; level rides per send
+  fader.connect(send); send.connect(vdest);               // global VERB send — separate from the A–J matrix
+  // A–J SENDS — tap the signal into a bus. PRE = post-insert / pre-fader (tap comp); POST = post-fader
+  // (tap fader). Each send gets its own level gain + pan, then → the target bus collector node.
   const sendGains = [];
-  if (!isAux) for (const s of (t.sends || [])) {
-    const aux = tracks.find(x => x.id === s.toAux && x.type === 'aux');
-    if (aux && aux._in) { const sg = c.createGain(); sg.gain.value = (s.level != null ? s.level : 0.5); fader.connect(sg); sg.connect(aux._in); sendGains.push(sg); s._sg = sg; }
+  for (const s of (t.sends || [])) {
+    if (s.on === false) continue;                          // an off send builds no node
+    const tb = sendTargetBus(s);
+    if (tb && wouldFeedback(t, tb)) continue;              // feedback guard — never wire a cycle-forming tap
+    const dn = sendDestNode(c, s);
+    if (!dn) continue;                                     // empty slot / deleted bus
+    const sg = c.createGain(); sg.gain.value = (s.level != null ? s.level : (s.bus ? 0 : 0.5));   // new sends default -INF
+    const sp = c.createStereoPanner(); sp.pan.value = s.fmp ? t.pan : (s.pan || 0);
+    (s.prefader ? comp : fader).connect(sg); sg.connect(sp); sp.connect(dn);
+    sendGains.push(sg); s._sg = sg; s._pan = sp;
   }
   const live = { srcs, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains, meter };
   applyTrackTo(t, live);
@@ -3463,6 +3537,11 @@ function applyTrackTo(t, n) {
   n.comp.threshold.value = -8 - t.comp * 28; n.comp.ratio.value = 1 + t.comp * 9;
   n.comp.knee.value = 12; n.comp.attack.value = 0.004; n.comp.release.value = 0.18;
   n.send.gain.value = t.send;
+  // live A–J send level/pan (mini-fader drags + FMP/pan follow) — no graph rebuild
+  (t.sends || []).forEach(s => {
+    if (s._sg)  s._sg.gain.value = (s.on === false ? 0 : (s.level != null ? s.level : (s.bus ? 0 : 0.5)));
+    if (s._pan) s._pan.pan.value = s.fmp ? t.pan : (s.pan || 0);
+  });
 }
 function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
 function applyMix() { tracks.forEach(applyTrack); }
@@ -3563,7 +3642,7 @@ async function playAll() {
   // otherwise sources start beyond their audio and play silence
   if (startOffset >= maxDur() - 0.02) startOffset = 0;
   startCtxTime = c.currentTime + 0.05;
-  tracks.forEach(t => { if (t.type === 'aux') t._in = c.createGain(); });   // FX-bus inputs first, so stem sends can land on them
+  setupBusNodes(c);                                                         // bus collectors (+ aux inputs) before any track graph
   tracks.forEach(t => { t.live = buildTrackGraph(c, t, startCtxTime, startOffset, false); });
   buildMasterChain(c, false);                                               // mastering chain on the full mix
   playing = true;
@@ -3737,7 +3816,7 @@ $("exportBtn").onclick = async () => {
     oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
     const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
     oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterSum);
-    tracks.forEach(t => { if (t.type === 'aux') t._in = oc.createGain(); });
+    setupBusNodes(oc);                                               // identical bus setup offline → export matches playback
     tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
     buildMasterChain(oc, true);                                       // master mastering chain on the export
     const rendered = await oc.startRendering();
@@ -4520,7 +4599,7 @@ function scheduleTransportAt(atCtxTime, offset) {
   stopSources();
   if (offset >= maxDur() - 0.02) offset = 0;
   startCtxTime = atCtxTime; startOffset = offset;
-  tracks.forEach(t => { if (t.type === 'aux') t._in = c.createGain(); });
+  setupBusNodes(c);
   tracks.forEach(t => { t.live = buildTrackGraph(c, t, atCtxTime, offset, false); });
   playing = true; $("play").textContent = "❚❚ Pause";
 }
