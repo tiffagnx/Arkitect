@@ -5222,6 +5222,13 @@ function laneUiTake(t, placeAt) {
   const bar = $("menubar");
   if (!bar) return;
   if (!window.PT_MENUS) { console.warn("[menu bar] PT_MENUS not loaded — /static/pt-menus.js missing?"); return; }
+  // ARKITECT branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
+  window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace');
+  const _helpMenu = window.PT_MENUS.find(m => m.id === 'help');
+  if (_helpMenu) _helpMenu.items = [
+    { label:"Check for Updates…", shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:true,  submenu:null },
+    { label:"About ARKITECT",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
+  ];
 
   // current selected track (clip-context ops read selClip / SEL internally)
   const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
@@ -5284,7 +5291,8 @@ function laneUiTake(t, placeAt) {
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => openNewTracksDialog();   // real PT New Tracks dialog
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
-    if (menuId === "marketplace" && /plug-?in/i.test(L))       return () => $("plugfile").click();
+    if (menuId === "help"        && /Update/i.test(L))         return () => flash("ARKITECT is up to date ✓");
+    if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT — DeMartin Audio Labs · in-browser DAW");
     if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
     return null;
   }
