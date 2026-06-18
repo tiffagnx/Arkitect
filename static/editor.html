@@ -351,6 +351,10 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .gridmenu button{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;font:500 12px var(--ui);color:var(--txt);text-align:left;white-space:nowrap}
 .gridmenu button:hover{background:var(--cy-soft)}
 .gridmenu .gm-chk{width:13px;flex:none;color:var(--cy);font-size:11px;text-align:center}
+.ease-menu{position:fixed;z-index:9999;background:#1C1D24;border:1px solid var(--line);border-radius:8px;padding:4px;
+  display:flex;flex-direction:column;gap:1px;box-shadow:0 12px 36px rgba(0,0,0,.6);min-width:142px}
+.ease-menu button{display:block;text-align:left;padding:5px 10px;border-radius:5px;font:500 12px var(--ui);color:var(--txt)}
+.ease-menu button:hover{background:var(--cy-soft)}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surf2);
   border:1px solid var(--line);border-radius:10px;padding:11px 18px;font-weight:600;font-size:12.5px;z-index:300;
@@ -689,7 +693,7 @@ function buildLaneProps(track,c){
     for(const r of g.rows){
       const pl=document.createElement('div');pl.className='tl-plane';
       if(r.fields){const times=new Set();for(const f of r.fields)if(c[f]&&c[f].k)for(const kf of c[f].k)times.add(kf.t);
-        for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';attachKeyDrag(d,c,tt);pl.appendChild(d);}}
+        for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';attachKeyDrag(d,c,tt);attachKeyEase(d,c,tt,r.fields);pl.appendChild(d);}}
       wrap.appendChild(pl);
     }
   }
@@ -764,8 +768,28 @@ function clipHasKeys(c){return KEYABLE.some(f=>c[f]&&c[f].k&&c[f].k.length);}
 function keyLane(track,c){const lane=document.createElement('div');lane.className='keylane';
   const times=new Set();for(const f of KEYABLE)if(c[f]&&c[f].k)for(const kf of c[f].k)times.add(kf.t);
   for(const t of times){const d=document.createElement('div');d.className='kdia';d.style.left=(t*ppf)+'px';
-    attachKeyDrag(d,c,t);lane.appendChild(d);}
+    attachKeyDrag(d,c,t);attachKeyEase(d,c,t,KEYABLE);lane.appendChild(d);}
   return lane;}
+// right-click a keyframe diamond → set its easing (Linear/Easy Ease/In/Out/Hold)
+function attachKeyEase(d,c,t0,fields){
+  d.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();openEaseMenu(e.clientX,e.clientY,c,t0,fields);});
+}
+function closeEaseMenu(){const m=document.getElementById('easeMenu');if(m)m.remove();}
+function openEaseMenu(x,y,c,t,fields){
+  closeEaseMenu();
+  const m=document.createElement('div');m.className='ease-menu';m.id='easeMenu';
+  [['Linear','linear'],['Easy Ease','ease'],['Easy Ease In','in'],['Easy Ease Out','out'],['Hold','hold']].forEach(([label,e])=>{
+    const b=document.createElement('button');b.textContent=label;
+    b.addEventListener('mousedown',ev=>{ev.preventDefault();ev.stopPropagation();
+      let n=0;for(const f of fields){const p=c[f];if(p&&p.k)for(const kf of p.k)if(kf.t===t){kf.e=e;n++;}}
+      closeEaseMenu();if(n){renderTimeline();drawFrame();save(true);toast(label+' · '+n+' keyframe'+(n>1?'s':''));}else toast('No keyframe here',1);});
+    m.appendChild(b);});
+  document.body.appendChild(m);
+  const r=m.getBoundingClientRect();let L=x,T=y;
+  if(L+r.width>innerWidth)L=Math.max(4,innerWidth-r.width-6);if(T+r.height>innerHeight)T=Math.max(4,innerHeight-r.height-6);
+  m.style.left=L+'px';m.style.top=T+'px';
+}
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#easeMenu'))closeEaseMenu();});
 function attachKeyDrag(d,c,t0){
   d.addEventListener('pointerdown',e=>{e.stopPropagation();d.setPointerCapture(e.pointerId);
     const sx=e.clientX;let cur=t0;
