@@ -1793,11 +1793,12 @@ window.addEventListener('resize',fitScreen);
     if(menuId==='edit'&&LABEL_COLORS.hasOwnProperty(L))return ()=>setLabel(L);
     if(menuId==='view'&&/^(Full|Half|Third|Quarter)$/.test(L))return ()=>setResolution(L);
     if(menuId==='view'&&/^Custom/.test(L))return ()=>setResolution('Custom');
-    if(menuId==='effect'){
+    if(menuId==='effect'||menuId==='layer'||menuId==='context-layer'){
       if(/Gaussian Blur/i.test(L))return ()=>applyEffect('fxBlur',12,'Gaussian Blur');
-      if(/Brightness\s*&?\s*Contrast/i.test(L))return ()=>applyEffect('fxBright',1.12,'Brightness & Contrast');
-      if(/Hue\/?\s*Saturation/i.test(L))return ()=>applyEffect('fxSat',1.4,'Hue/Saturation');
+      if(/^Brightness\s*&?\s*Contrast$/i.test(L))return ()=>applyEffect('fxBright',1.12,'Brightness & Contrast');
+      if(/^Hue\/?\s*Saturation$/i.test(L))return ()=>applyEffect('fxSat',1.4,'Hue/Saturation');
       if(/^Effect Controls/i.test(L))return ()=>{document.querySelector('.col.insp').scrollIntoView();toast('Adjust effects in Properties →');};
+      if(/^Remove All$/i.test(L))return clearEffects;
     }
     if(menuId==='comp'&&/^(Play|Preview)/i.test(L)&&!it.submenu)return ()=>togglePlay();
     if(menuId==='window'){
@@ -1908,12 +1909,24 @@ window.addEventListener('resize',fitScreen);
       {label:'Camera…',feasibility:'skip',separator_after:false}]},
     {label:'New Composition…',feasibility:'buildable-now',separator_after:false},
     {label:'Composition Settings…',feasibility:'buildable-now',separator_after:false}]};}
+  function layerContextMenu(){
+    const layer=window.AE_MENUS.find(m=>m.id==='layer');
+    const effect=window.AE_MENUS.find(m=>m.id==='effect');
+    const items=layer?layer.items.slice():[];
+    if(effect){
+      // insert Effect ▸ (full category tree) after Layer Styles, else append
+      const at=items.findIndex(it=>/^Layer Styles/i.test(it.label));
+      const node={label:'Effect',feasibility:'buildable-now',separator_after:true,submenu:effect.items};
+      if(at>=0)items.splice(at+1,0,node);else items.push(node);
+    }
+    return {id:'layer',title:'',items};
+  }
   const stageEl=document.querySelector('.stage');
   if(stageEl)stageEl.addEventListener('contextmenu',e=>{e.preventDefault();openContext(e.clientX,e.clientY,compContextMenu());});
   const tlCtx=document.getElementById('lanesWrap')||document.getElementById('lanes');
   if(tlCtx)tlCtx.addEventListener('contextmenu',e=>{e.preventDefault();
     const ce=e.target.closest('.clip');
-    if(ce){select(ce.dataset.tid,ce.dataset.cid);const lm=window.AE_MENUS.find(m=>m.id==='layer');openContext(e.clientX,e.clientY,lm||compContextMenu());}
+    if(ce){select(ce.dataset.tid,ce.dataset.cid);openContext(e.clientX,e.clientY,layerContextMenu());}
     else openContext(e.clientX,e.clientY,compContextMenu());});
 
   if(window.AE_MENUS){buildMenuBar();buildTools();buildWorkspaces();
