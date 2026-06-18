@@ -1190,8 +1190,7 @@ function showWaveMenu(t, wv, e){
     add("🌀  Print TIFF VERB", ()=>clipFx_verb(t,cl));
     add("⟿  BPM delay", ()=>clipFx_bpmDelay(t,cl));
     add("⋮⋮  Chop (1/16)", ()=>clipFx_chop(t,cl));
-    add("◢  Fade in", ()=>clipFx_fade(t,cl,'in'));
-    add("◣  Fade out", ()=>clipFx_fade(t,cl,'out'));
+    add("⌫  Delete fades", ()=>{ if(!cl.fadeIn && !cl.fadeOut){ flash("No fades on this clip — drag a top corner to make one"); return; } pushUndoClips(t,"Delete fades"); cl.fadeIn=0; cl.fadeOut=0; drawLane(t); if(playing) restartPlayback(); flash("Fades cleared"); });
     sep();
     add("⚙  AudioSuite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
   } else { const cx=e.clientX, cy=e.clientY; add("✨  Generate a sound here…", ()=>openSfxPrompt(t, atTime, cx, cy)); }
@@ -2932,20 +2931,28 @@ function laneUi(t) {
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); return;
       }
     }
-    // FADES — grab a TOP corner of a clip and drag inward: left corner = fade-in, right corner = fade-out
-    if (cl) {
+    // FADES — grab a clip's TOP-corner square handle and drag inward: left = fade-in, right = fade-out.
+    // (Pro Tools way — there is NO fade menu item. Iterate every clip so the corner hit-test is reliable
+    //  even at fade=0, and target the handle's drawn position so an existing fade is grabbable too.)
+    {
       const ry = e.clientY - r.top, rx = e.clientX - r.left;
-      const clx = ((cl.start - scrollT)/vd)*r.width, clxR = ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
-      const startFade = (side) => {
-        selectTrack(t); selClip = { trackId:t.id, clipId:cl.id };
-        const sx = e.clientX, f0 = (side==='in' ? cl.fadeIn : cl.fadeOut) || 0; let ch = false;
+      const startFade = (c2, side) => {
+        selectTrack(t); selClip = { trackId:t.id, clipId:c2.id }; drawLane(t);
+        const sx = e.clientX, f0 = (side==='in' ? c2.fadeIn : c2.fadeOut) || 0; let ch = false;
         const mv = (ev) => { if (!ch && Math.abs(ev.clientX - sx) > 2) { ch = true; pushUndoClips(t, side==='in'?"Fade in":"Fade out"); }
-          if (ch) { const dt = (ev.clientX - sx)/r.width*vd; let f = side==='in' ? f0 + dt : f0 - dt; f = Math.max(0, Math.min(cl.buffer.duration*0.95, f)); if(side==='in') cl.fadeIn=f; else cl.fadeOut=f; drawLane(t); } };
-        const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (ch) { if (playing) restartPlayback(); flash((side==='in'?"Fade in ":"Fade out ") + Math.round(((side==='in'?cl.fadeIn:cl.fadeOut)||0)*1000) + "ms"); } };
+          if (ch) { const dt = (ev.clientX - sx)/r.width*vd; let f = side==='in' ? f0 + dt : f0 - dt; f = Math.max(0, Math.min(c2.buffer.duration*0.95, f)); if(side==='in') c2.fadeIn=f; else c2.fadeOut=f; drawLane(t); } };
+        const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (ch) { if (playing) restartPlayback(); flash((side==='in'?"Fade in ":"Fade out ") + Math.round(((side==='in'?c2.fadeIn:c2.fadeOut)||0)*1000) + "ms"); } };
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
       };
-      if (ry < 14 && Math.abs(rx - clx) <= 18)  { startFade('in');  return; }
-      if (ry < 14 && Math.abs(rx - clxR) <= 18) { startFade('out'); return; }
+      if (ry < 20) {
+        for (const c2 of clipsOf(t)) {
+          const cx = ((c2.start - scrollT)/vd)*r.width, cxR = ((c2.start + c2.buffer.duration - scrollT)/vd)*r.width;
+          if (rx < cx - 6 || rx > cxR + 6) continue;
+          const inX = cx + (c2.fadeIn||0)/vd*r.width, outX = cxR - (c2.fadeOut||0)/vd*r.width;
+          if (Math.abs(rx - inX)  <= 12) { startFade(c2,'in');  return; }
+          if (Math.abs(rx - outX) <= 12) { startFade(c2,'out'); return; }
+        }
+      }
     }
     // SELECT: drag to highlight a time range (or Smart tool in the bottom strip of a clip)
     if (tool==='select' || (tool==='smart' && cl && (e.clientY-r.top) > r.height*0.62)) {
@@ -2983,6 +2990,11 @@ function laneUi(t) {
   };
   wv.onmousemove = (e) => {   // cursor reflects the active tool
     if (e.buttons) return; const vd=viewDur(), r=wv.getBoundingClientRect(), cl=clipAt(t, scrollT+(e.clientX-r.left)/r.width*vd);
+    if (cl) {   // a clip's top-corner fade handle takes cursor priority (the drag-to-fade cue) in any tool
+      const ry=e.clientY-r.top, rx=e.clientX-r.left, cx=((cl.start-scrollT)/vd)*r.width, cxR=((cl.start+cl.buffer.duration-scrollT)/vd)*r.width;
+      const inX=cx+(cl.fadeIn||0)/vd*r.width, outX=cxR-(cl.fadeOut||0)/vd*r.width;
+      if (ry<20 && (Math.abs(rx-inX)<=12 || Math.abs(rx-outX)<=12)) { wv.style.cursor='col-resize'; return; }
+    }
     let cur='crosshair';
     if (tool==='select') cur='text';
     else if (tool==='trim') cur = cl ? 'ew-resize' : 'crosshair';
@@ -3394,7 +3406,7 @@ function renderChannel(t){
   html+=`<div class="chan-section">Sends</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
   html+=`<div class="chan-section">Clip${cl?' · selected':''}</div>`;
   if(cl){
-    html+=`<div class="clip-fx">`+[['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("")+`</div>`;
+    html+=`<div class="clip-fx">`+[['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-del','🗑 Delete clip']].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("")+`</div>`;
     html+=`<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
     html+=`<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 Tune — see the notes (Melodyne)</button>`;
   } else {
@@ -3412,8 +3424,6 @@ function renderChannel(t){
     document.getElementById("cf-verb").onclick=live(clipFx_verb);
     document.getElementById("cf-dly").onclick=live(clipFx_bpmDelay);
     document.getElementById("cf-chop").onclick=live(clipFx_chop);
-    document.getElementById("cf-fi").onclick=()=>clipFx_fade(t,cl,'in');
-    document.getElementById("cf-fo").onclick=()=>clipFx_fade(t,cl,'out');
     document.getElementById("cf-del").onclick=()=>deleteClip(t,cl);
     document.getElementById("cf-as").onclick=()=>openAudioSuite(t);
     document.getElementById("cf-tune").onclick=()=>openTune(t);
@@ -4046,6 +4056,11 @@ function drawLane(t){
       g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(x,H-1); g.lineTo(x+fiPx,1); g.stroke(); }
     if(foPx>1){ const xr=x+w; g.fillStyle="rgba(8,9,13,0.34)"; g.beginPath(); g.moveTo(xr,0); g.lineTo(xr-foPx,0); g.lineTo(xr,H); g.closePath(); g.fill();
       g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(xr-foPx,1); g.lineTo(xr,H-1); g.stroke(); }
+    if(seld){                                                                // PT-style fade HANDLES: a little square at each top corner of the SELECTED clip — drag it to pull a fade
+      const hs=7, inHX=x+fiPx, outHX=(x+w)-foPx;
+      const dh=(hx)=>{ if(hx < x-3 || hx > x+w+3) return; g.fillStyle="rgba(255,255,255,0.95)"; g.fillRect(hx-hs/2,1,hs,hs); g.strokeStyle="rgba(8,9,13,0.85)"; g.lineWidth=1; g.strokeRect(hx-hs/2+0.5,1.5,hs-1,hs-1); };
+      dh(inHX); dh(outHX);
+    }
     if(cl.muted){ g.fillStyle="rgba(10,11,14,0.5)"; g.fillRect(fx,nbH,fw,H-nbH); }   // muted clip → dim the audio area
     // ── clip-gain badge, bottom-left (Pro Tools "0 dB") ──
     if(fw>30 && H>26){
