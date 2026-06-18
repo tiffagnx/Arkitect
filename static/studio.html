@@ -2987,6 +2987,14 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault(); undoLast();
   }
 });
+// Delete / Backspace — remove the Select-range, else the selected clip (was dead unless a time-range existed)
+document.addEventListener("keydown", (e) => {
+  if(e.key!=='Delete' && e.key!=='Backspace') return;
+  if(/^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable) return;
+  if(SEL){ const t=tracks.find(x=>x.id===SEL.trackId); if(t){ e.preventDefault(); deleteSelection(t); return; } }
+  if(selClip){ const t=tracks.find(x=>x.id===selClip.trackId); const cl=t&&clipsOf(t).find(c=>c.id===selClip.clipId);
+    if(t&&cl){ e.preventDefault(); deleteClip(t,cl); } }
+});
 /* =========================================================================
    TRUTHFUL AUTO-MIX LAYER  (vanilla JS, Web Audio)
    measure() -> detectType() -> autoMix(track) -> applyMoves(track)
@@ -4088,7 +4096,7 @@ async function buildProjectPayload(title) {
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
-      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
+      for (const cl of clipsOf(t)) td.clips.push({ start: cl.start, muted: !!cl.muted, name: cl.name || null, wav: await blobToDataUrl(bufferToWavBlob(cl.buffer)) });
     }
     trackData.push(td);
   }
@@ -4193,7 +4201,7 @@ async function loadProject(id) {
       }
       let clips = [];
       try {
-        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0 }); } }
+        if (td.clips && td.clips.length) { for (const cd of td.clips) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(cd.wav)); clips.push({ id: rid(), buffer: b, start: cd.start || 0, muted: !!cd.muted, name: cd.name || undefined }); } }
         else if (td.wav) { const b = await c.decodeAudioData(dataUrlToArrayBuffer(td.wav)); clips.push({ id: rid(), buffer: b, start: td.offset || 0 }); }   // old single-buffer save
       } catch (e) { studioStatus("Skipped a track (decode failed)", true); continue; }
       if (!clips.length) { studioStatus("Skipped an empty track", true); continue; }
@@ -4236,6 +4244,7 @@ async function loadProject(id) {
     migrateLegacySends();               // normalize legacy {toAux}/aux-id routing → slotted {bus} sends now that all auxes exist
     refreshSendMenus();                 // now that all buses exist, render every stem's sends
     ensureMasterLane();                 // show the Master Fader lane iff this session has one (removes a stale one otherwise)
+    applyMix();                         // re-apply mute/solo across ALL tracks once loaded (solo is global — per-track applyTrack during the loop saw partial state)
     $("drop").style.display = tracks.length ? "none" : "block";
     studioStatus("Loaded “" + (proj.title || id) + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
