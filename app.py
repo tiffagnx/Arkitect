@@ -1910,6 +1910,25 @@ def build_text2img(mode: str, prompt: str, w: int, h: int, seed: int,
     wf["7"] = _ksampler(model_node, pos, latent_in, seed, steps, denoise=denoise, scheduler=scheduler)
     # dev-family text2img gets the ESRGAN upscale tail IF the model is present
     if guidance is not None and not ref_name and _upscaler_present():
+        # ── DETAIL PASS ── a 2nd short low-denoise sampler that paints REAL texture
+        # (pores/hair/fabric weave) that ESRGAN can only interpolate. Re-encode the
+        # BASE ~1MP decode (node 8 — NOT the ESRGAN 2x image) and re-diffuse at the
+        # SAME ~1MP footprint as node 7, so peak VRAM is unchanged (the proven first-
+        # pass ceiling, run again sequentially) and a 1x latent at denoise 0.32 can't
+        # trigger FLUX double-image/limb-doubling. photo (Krea) only; not picker-
+        # override unets; gated <=~1.06MP so any larger future base falls back to the
+        # plain ESRGAN tail instead of risking OOM. Reuses the SAME model_node (incl.
+        # realism LoRA), FluxGuidance positive, negative, and seed → composition held.
+        do_refine = (mode == "photo" and not unet and (w * h) <= 1_115_000)
+        if do_refine:
+            wf["8"]  = {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}}
+            wf["17"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["8", 0], "vae": ["3", 0]}}
+            wf["18"] = {"class_type": "KSampler", "inputs": {
+                          "model": model_node, "positive": pos, "negative": ["5", 0],
+                          "latent_image": ["17", 0], "seed": seed, "steps": 8, "cfg": 1.0,
+                          "sampler_name": "euler", "scheduler": "beta", "denoise": 0.32}}
+            wf["19"] = {"class_type": "VAEDecode", "inputs": {"samples": ["18", 0], "vae": ["3", 0]}}
+            return _tail_upscaled(wf, refined_in=["19", 0])
         return _tail_upscaled(wf)
     return _tail(wf)
 
@@ -1939,13 +1958,18 @@ def _upscaler_present() -> bool:
         return False
 
 
-def _tail_upscaled(wf: dict) -> dict:
+def _tail_upscaled(wf: dict, refined_in=None) -> dict:
     """photo tail: decode → ESRGAN 4x → downscale to ~2x → SaveImage at '9'.
     Sequential under --lowvram (FLUX offloads before the upscaler loads), so peak
-    VRAM stays low. SaveImage MUST stay node '9' (the poller reads outputs['9'])."""
+    VRAM stays low. SaveImage MUST stay node '9' (the poller reads outputs['9']).
+
+    refined_in: when the DETAIL PASS ran, ESRGAN reads the refined decode (node
+    '19') instead of the base decode (node '8'). Default None → byte-identical to
+    the pre-refine tail (ESRGAN reads ['8',0])."""
     wf["8"]  = {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}}
+    src = refined_in if refined_in is not None else ["8", 0]
     wf["14"] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": UPSCALE_MODEL}}
-    wf["15"] = {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["14", 0], "image": ["8", 0]}}
+    wf["15"] = {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["14", 0], "image": src}}
     wf["16"] = {"class_type": "ImageScaleBy", "inputs": {"image": ["15", 0], "upscale_method": "lanczos", "scale_by": 0.5}}
     wf["9"]  = {"class_type": "SaveImage", "inputs": {"images": ["16", 0], "filename_prefix": "arkitect"}}
     return wf
@@ -3281,7 +3305,9 @@ ROOM_HELP = {
   "studio": """DeMartin Audio Labs — a full mixing studio (a DAW) right in the browser.
 - Drop MP3/WAV stems onto the board; each file becomes its own track (lane).
 - Each track's strip (left side) has VOL, PAN, and insert slots — click "+ insert" to add plugins (EQ-6, Compressor, De-Ess, Saturator, Cleanup, Gate, Tape Delay, TIFF VERB and more). Click a plugin's name to open its window and drag the knobs.
-- The MASTER lane at the bottom is where the whole mix sums — drop a mastering chain there (EQ -> comp -> maximizer, keep the maximizer LAST).
+- Routing: each track has INPUT + OUTPUT selectors plus two send banks (A-E / F-J). Make an Aux/bus (the + FX Bus button), send tracks to it, and stack FX on the aux — that's the bus matrix. A bus is routing (not a track); an Aux Input listens to a bus.
+- The Master Fader is a CREATED track (Track > New > Master Fader) that sums the whole mix at the bottom — drop a mastering chain on it (EQ -> comp -> maximizer, keep the maximizer LAST). The mix still plays even without one.
+- Empty session shows a hero with quick-start buttons (Add stems / New track / Record a take / Open a session). Spacebar = play/stop; Delete removes a selected clip; the bottom zoom bar (Fit + horizontal slider) shows the whole song, the vertical slider grows every lane.
 - Click a clip in a lane to edit it: reverse, fades, chop to 1/16, BPM delay, print VERB, or "Tune" (the pitch editor / Melodyne).
 - Top toolbar: Play / Stop / Loop / Record, an EDIT-vs-MIX view toggle, edit tools (grab / trim / select / smart), zoom, grid snap, Setup (audio device), and "Export WAV" on the right to bounce the mix down.""",
   "build": """Blueprint Builds — you vibe-code single-file web apps and tools here just by describing them.
