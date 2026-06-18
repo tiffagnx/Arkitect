@@ -2762,6 +2762,47 @@ async def studio_read_file(req: Request):
         return JSONResponse({"error": f"read failed: {e}"}, status_code=500)
 
 
+@app.post("/api/studio/session/bounce")
+async def studio_bounce(req: Request):
+    """Write a bounced mix/stem to disk. The UI renders the audio offline and hands
+    over WAV bytes (base64); we drop them into the chosen folder — and, for MP3,
+    transcode with ffmpeg (320 kbps). `session` (a session name) routes the file into
+    that session's `Bounced Files/` subfolder; otherwise `dir` is written to directly."""
+    body = await req.json()
+    base_dir = body.get("dir") or ""
+    session = body.get("session")
+    fmt = (body.get("format") or "wav").lower()
+    name = "".join(ch for ch in (body.get("filename") or "") if ch.isalnum() or ch in " -_()").strip()[:80] or "mix"
+    wav_b64 = body.get("wav") or ""
+    if not base_dir or not os.path.isdir(base_dir):
+        return JSONResponse({"error": "destination folder not found"}, status_code=400)
+    try:
+        raw = base64.b64decode(wav_b64.split(",", 1)[-1])
+    except Exception:
+        return JSONResponse({"error": "bad audio data"}, status_code=400)
+    try:
+        target = os.path.normpath(os.path.join(base_dir, _safe_session_name(session), "Bounced Files") if session else base_dir)
+        os.makedirs(target, exist_ok=True)
+        wav_path = os.path.join(target, name + ".wav")
+        with open(wav_path, "wb") as f:
+            f.write(raw)
+        if fmt == "mp3":
+            if _ffmpeg_missing():
+                return JSONResponse({"error": "ffmpeg not found — kept the WAV", "path": wav_path}, status_code=200)
+            mp3_path = os.path.join(target, name + ".mp3")
+            r = await asyncio.to_thread(lambda: subprocess.run(
+                [FFMPEG, "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-b:a", "320k", mp3_path],
+                capture_output=True, creationflags=_NOWIN, timeout=300))
+            if r.returncode != 0:
+                return JSONResponse({"error": "mp3 encode failed: " + ((r.stderr or b"").decode("utf-8", "ignore")[:200] or "?")}, status_code=500)
+            try: os.remove(wav_path)        # keep only the MP3 the user asked for
+            except Exception: pass
+            return {"ok": True, "path": mp3_path}
+        return {"ok": True, "path": wav_path}
+    except Exception as e:
+        return JSONResponse({"error": f"bounce write failed: {e}"}, status_code=500)
+
+
 @app.post("/api/editor/import")
 async def editor_import(req: Request):
     """Register one or more source files: probe, assign a stable id, kick off

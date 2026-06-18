@@ -4636,36 +4636,57 @@ function openBounceDialog() {
   ensureCtx();
   document.getElementById('bounceDlg')?.remove();
   const hasSel = !!(SEL && Math.abs(SEL.a - SEL.b) > 0.05);
+  const hasFolder = !!currentFolderDir;
   const ov = document.createElement('div'); ov.id = 'bounceDlg'; ov.className = 'bdlg-ov';
   ov.innerHTML = `
     <div class="bdlg">
       <div class="bdlg-h">Bounce to Disk</div>
       <label class="bdlg-row"><span>Source</span><select id="bSrc">${bounceSourceOptions().map(o=>`<option value="${o.v}">${o.label}</option>`).join("")}</select></label>
-      <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option></select></label>
+      <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option><option value="mp3">MP3 · 320 kbps</option></select></label>
       <label class="bdlg-row"><span>Bit depth</span><select id="bBits"><option value="24">24-bit</option><option value="16">16-bit</option></select></label>
       <label class="bdlg-row"><span>Sample rate</span><select id="bRate"><option value="">Project · ${Math.round(ctx.sampleRate)} Hz</option><option value="48000">48 000 Hz</option><option value="44100">44 100 Hz</option></select></label>
       <label class="bdlg-row"><span>Range</span><select id="bRange"><option value="all">Whole session</option>${hasSel?`<option value="sel">Selection</option>`:``}</select></label>
+      <label class="bdlg-row"><span>Destination</span><select id="bDest"><option value="download">Download</option>${hasFolder?`<option value="session">Session folder · Bounced</option>`:``}<option value="choose">Choose folder…</option></select></label>
       <label class="bdlg-row"><span>File name</span><input id="bName" type="text" value="${(((_lastTitle||'mix')+'').replace(/[^\w\- ]/g,'').trim())||'mix'}"></label>
       <div class="bdlg-note" id="bNote">Bounce reflects the current mutes / solos & plug-in settings.</div>
       <div class="bdlg-btns"><button class="tbtn" id="bCancel">Cancel</button><button class="tbtn teal" id="bGo">Bounce</button></div>
     </div>`;
   document.body.appendChild(ov);
+  const bType=ov.querySelector('#bType'), bBits=ov.querySelector('#bBits'), bDest=ov.querySelector('#bDest'), note=ov.querySelector('#bNote');
+  const syncType=()=>{ const mp3 = bType.value==='mp3'; bBits.disabled = mp3;     // MP3 is lossy 320k — bit depth N/A; it's encoded on disk by ffmpeg
+    if (mp3 && bDest.value==='download') bDest.value = hasFolder ? 'session' : 'choose';
+    note.textContent = mp3 ? 'MP3 is encoded on disk by the app (ffmpeg) — pick a folder.' : 'Bounce reflects the current mutes / solos & plug-in settings.'; };
+  bType.onchange = syncType;
+  bDest.onchange = () => { if (bType.value==='mp3' && bDest.value==='download') { bDest.value = hasFolder?'session':'choose'; note.textContent='MP3 must be written to a folder.'; } };
   ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
   ov.querySelector('#bCancel').onclick = () => ov.remove();
   ov.querySelector('#bGo').onclick = async () => {
-    const go = ov.querySelector('#bGo'), note = ov.querySelector('#bNote');
+    const go = ov.querySelector('#bGo');
     go.disabled = true; go.textContent = 'rendering…';
     try {
-      const source = ov.querySelector('#bSrc').value;
-      const bits = parseInt(ov.querySelector('#bBits').value, 10) || 24;
+      const source = ov.querySelector('#bSrc').value, fmt = bType.value, dest = bDest.value;
+      const bits = parseInt(bBits.value, 10) || 24;
       const rate = parseInt(ov.querySelector('#bRate').value, 10) || null;
       let startT = 0, endT = contentDur();
       if (ov.querySelector('#bRange').value === 'sel' && hasSel) { startT = Math.min(SEL.a, SEL.b); endT = Math.max(SEL.a, SEL.b); }
-      const buf = await renderBounce({ source, startT, endT, sampleRate: rate });
       const name = ((ov.querySelector('#bName').value || 'mix').trim().replace(/[^\w\- ]/g,'')) || 'mix';
-      const a = document.createElement('a'); a.href = URL.createObjectURL(bufferToWavBlob(buf, bits)); a.download = name + '.wav'; a.click();
-      flash('Bounced ' + name + '.wav (' + bits + '-bit)');
-      ov.remove();
+      const buf = await renderBounce({ source, startT, endT, sampleRate: rate });
+      const wav = bufferToWavBlob(buf, bits);
+      if (fmt === 'wav' && dest === 'download') {                                  // pure client path — no backend
+        const a = document.createElement('a'); a.href = URL.createObjectURL(wav); a.download = name + '.wav'; a.click();
+        flash('Bounced ' + name + '.wav (' + bits + '-bit)'); ov.remove(); return;
+      }
+      go.textContent = 'writing…';                                                // disk write and/or MP3 encode → backend
+      let dir = null, session = null;
+      if (dest === 'session') { dir = currentFolderDir; session = currentFolderName; }
+      else { const r = await fetch('/api/studio/session/pick-folder', { method:'POST' }); dir = (await r.json()).path;
+        if (!dir) { go.disabled=false; go.textContent='Bounce'; note.textContent='Cancelled — no folder chosen.'; return; } }
+      const wavB64 = await blobToDataUrl(wav);
+      const res = await fetch('/api/studio/session/bounce', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ dir, session, filename: name, format: fmt, wav: wavB64 }) });
+      const j = await res.json().catch(()=>({}));
+      if (j && j.ok) { flash('Bounced → ' + j.path); ov.remove(); }
+      else { go.disabled=false; go.textContent='Bounce'; note.textContent = 'Bounce failed: ' + ((j&&j.error)||('HTTP '+res.status)); note.classList.add('bad'); }
     } catch (e) { go.disabled = false; go.textContent = 'Bounce'; note.textContent = 'Bounce failed: ' + e.message; note.classList.add('bad'); }
   };
 }
