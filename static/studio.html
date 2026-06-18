@@ -3994,8 +3994,9 @@ function drawGrid(g, W, H){
 // one CHANNEL drawn as a filled peak waveform inside the vertical band [yT, yB] (Pro Tools look).
 // mid = the channel's zero-crossing line; cap keeps peaks inside the band. Reads real min/max
 // peaks per pixel, so at deep zoom (i1<=i0) it still plots the single sample under the pixel.
-function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb){
+function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur){
   const N=data.length, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*vZoom;
+  fi=fi||0; fo=fo||0; dur=dur||0;
   g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();         // zero line (subtle)
   g.moveTo(x0+pa, mid); g.lineTo(x0+pb, mid); g.strokeStyle="rgba(255,255,255,0.06)"; g.stroke();
   g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();
@@ -4003,23 +4004,28 @@ function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb){
     let i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); if(i1<=i0) i1=i0+1;
     let mn=1,mx=-1; for(let j=i0;j<i1 && j<N;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
     if(mx<mn){ mn=0; mx=0; }
-    const top=Math.max(-cap,Math.min(cap, mx*amp)), bot=Math.max(-cap,Math.min(cap, mn*amp));
+    let env=1;                                                          // FADE envelope → the WAVEFORM itself tapers across the fade (matches the audio ramp + Pro Tools)
+    if(dur>0){ const tt=(px/w)*dur;
+      if(fi>0 && tt<fi) env=tt/fi;
+      if(fo>0 && tt>dur-fo) env=Math.min(env,(dur-tt)/fo);
+      env = env<0?0 : env>1?1 : env; }
+    const top=Math.max(-cap,Math.min(cap, mx*amp*env)), bot=Math.max(-cap,Math.min(cap, mn*amp*env));
     g.moveTo(x0+px, mid-top); g.lineTo(x0+px, mid-bot+0.6);             // +0.6 so flat (silent) lines still show
   }
   g.stroke();
 }
 // one clip's waveform inside its box [x0, x0+w], on-screen part only. Stereo buffers render a
 // DUAL waveform (channel 0 on top, channel 1 on the bottom); mono renders one centered band.
-function drawClipWave(g, buf, x0, w, yT, yB, color){
-  const W=g.canvas.width, pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0));
+function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo){
+  const W=g.canvas.width, pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0)), dur=buf.duration;
   if(buf.numberOfChannels>1){
     const split=(yT+yB)/2;
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb);
-    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb, fi, fo, dur);
+    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb, fi, fo, dur);
     g.strokeStyle="rgba(255,255,255,0.05)"; g.lineWidth=1; g.beginPath();   // channel divider
     g.moveTo(x0+pa, split); g.lineTo(x0+pb, split); g.stroke();
   } else {
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur);
   }
 }
 // draw a whole lane: clips on the [scrollT, scrollT+viewDur] timeline window
@@ -4037,7 +4043,7 @@ function drawLane(t){
     const fx=Math.max(0,x), fw=Math.min(W,x+w)-fx;
     const showBar = fw>34, nbH = showBar?NB:0;                              // hide name bar on slivers
     g.fillStyle=hexA(t.color, seld?0.20:0.10); g.fillRect(fx,0,fw,H);       // clip body tint
-    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color);                  // waveform sits below the name bar
+    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, cl.fadeIn||0, cl.fadeOut||0);   // waveform sits below the name bar + visually tapers across its fades
     // ── clip name bar across the top (Pro Tools) ──
     if(showBar){
       g.fillStyle=hexA(t.color, seld?0.78:0.6); g.fillRect(fx,0,fw,nbH);
@@ -4052,9 +4058,9 @@ function drawLane(t){
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
     // ── fades: diagonal taper + shaded region (overlap two clips & fade each = a crossfade, no click) ──
     const fiPx=(cl.fadeIn||0)/vd*W, foPx=(cl.fadeOut||0)/vd*W;
-    if(fiPx>1){ g.fillStyle="rgba(8,9,13,0.34)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x+fiPx,0); g.lineTo(x,H); g.closePath(); g.fill();
+    if(fiPx>1){ g.fillStyle="rgba(8,9,13,0.14)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x+fiPx,0); g.lineTo(x,H); g.closePath(); g.fill();
       g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(x,H-1); g.lineTo(x+fiPx,1); g.stroke(); }
-    if(foPx>1){ const xr=x+w; g.fillStyle="rgba(8,9,13,0.34)"; g.beginPath(); g.moveTo(xr,0); g.lineTo(xr-foPx,0); g.lineTo(xr,H); g.closePath(); g.fill();
+    if(foPx>1){ const xr=x+w; g.fillStyle="rgba(8,9,13,0.14)"; g.beginPath(); g.moveTo(xr,0); g.lineTo(xr-foPx,0); g.lineTo(xr,H); g.closePath(); g.fill();
       g.strokeStyle="rgba(255,255,255,0.6)"; g.lineWidth=1.4; g.beginPath(); g.moveTo(xr-foPx,1); g.lineTo(xr,H-1); g.stroke(); }
     if(seld){                                                                // PT-style fade HANDLES: a little square at each top corner of the SELECTED clip — drag it to pull a fade
       const hs=7, inHX=x+fiPx, outHX=(x+w)-foPx;
