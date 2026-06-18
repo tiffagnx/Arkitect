@@ -2799,22 +2799,26 @@ function addAux(){
   return t;
 }
 function auxLaneUi(t){
-  if (!t.color) t.color = nextStemColor();
-  const d = document.createElement("div"); d.className = "lane aux"; d.id = "lane-" + t.id;
-  if (t.muted) d.classList.add("muted");
-  d.innerHTML = `
-    <div class="lhead">
-      <span class="cdot" style="background:${t.color}"></span>
-      <span class="auxbadge">AUX</span><span class="name">${t.name}</span>
-      <span style="font:600 9px 'Space Mono';color:var(--dim);margin-left:8px">aux input · set Input to a bus →</span>
-      <button class="chip x" title="remove aux track" style="margin-left:auto">✕</button>
-    </div>`;
-  $("tracks").appendChild(d);
-  d.onclick = (e) => { if (!e.target.closest(".chip")) selectTrack(t); };
-  d.querySelector(".chip.x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
+  // Aux Input renders as a NORMAL track row (owner: "the aux needs to be a stem"), just typed aux:
+  // same strip — M/S, VOL/PAN, inserts — no record-arm, no clips; its INPUT is a bus (set in the channel panel).
+  laneUi(t);
+  const d = $("lane-" + t.id); if (!d) return;
+  d.classList.add("aux");
+  const top = d.querySelector(".ts-top");
+  if (top && !top.querySelector(".auxbadge")) {
+    const badge = document.createElement("span"); badge.className = "auxbadge"; badge.textContent = "AUX";
+    top.insertBefore(badge, top.querySelector(".ts-name"));
+  }
+  const rb = d.querySelector(".ts-btn.r"); if (rb) rb.remove();        // you don't record onto an aux
+  const xb = d.querySelector(".ts-x");                                  // remove-aux also drops its paired bus + scrubs routing
+  if (xb) xb.onclick = (e) => { e.stopPropagation(); stopAll();
+    const bus = t.inputBus;
+    tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
-    tracks.forEach(x => { if (x.output === t.id) x.output = 'master'; });   // stems routed here fall back to Master
-    refreshSendMenus(); };
+    if (bus && typeof removeBus === 'function') removeBus(bus);
+    refreshSendMenus();
+    $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "flex";
+  };
   selectTrack(t); ensureMasterLane();
 }
 function renderSends(t){
