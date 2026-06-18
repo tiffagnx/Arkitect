@@ -31,6 +31,10 @@ Base before this work: `9c4de5e`. Commits added, newest last — all **verified 
 | `bf2172d` | **New Tracks dialog** (Track→New): count · Mono/Stereo · type · timebase; creates real empty audio tracks + Aux Input tracks; Master/MIDI/etc. stubbed. **Killed the bogus "FX Bus" track concept.** |
 | `d135f5d` | **Bussing slice 1** — bus registry (`buses[]`, `addBus`/`removeBus`/`busById`), `addAux` now creates a PAIRED bus + sets `inputBus`/`input`/`output` + empty A–J `sends`, per-track `input`/`output` fields, helpers (`BANK_AE/FJ`, `sendInSlot`, `IF_INPUTS/OUTPUTS`, `dbOf`, `ioLabel`, `refreshAllRouting`). **Dormant — no audio-graph change yet, no regression.** |
 | `cc8bdaa` | **Bussing slice 2 — audio-graph routing (sends + buses now AUDIBLE).** `setupBusNodes(c)` builds one GainNode per bus before any track graph, shared by all 3 build sites (`playAll`/export/`scheduleTransportAt`) so WAV == playback. `buildTrackGraph`: Aux/bus-input track reads `inG` from its bus collector; Output generalized to route any track into `busNodes[output]` (audio + aux nested submixes; legacy aux-id fallback); the **A–J send taps** (PRE=tap `comp`, POST=tap `fader`) each with own level gain + `StereoPanner` → target bus node. `applyTrackTo` live-updates send level/pan/FMP (no rebuild). **`wouldFeedback(t,busId)`** denies cycles at build time. Resolution handles BOTH new `{slot,bus,…}` and legacy `{toAux,level}` sends → no regression. **Verified live** (stem→bus→aux return = audible; bus w/ no return = exact silence; send −INF→full raises RMS; feedback guard catches self + nested cycles). |
+| `2bb444b` | **Bussing slice 3a — routing popup + send matrix UI.** `openRoutePopup` (send/input/output), extracted popup helpers (`placePopup`/`closeRoutePopups`/`armPopupClickaway`), `assignRoute`, `renderSends` rewritten to fixed A-E/F-J banks (`sendsBankHtml`/`bindSendBank`). Popup lists No-Send/interface/buses/＋New Bus, greys feedback targets, has PRE/FMP/ON + level mini-fader. PT defaults (−INF/post/on). |
+| `4c78ec4` | **Whole-view zoom** — bottom zoom bar: log H-zoom slider + Fit (`fitSession`) + relocated pan, V lane-height slider (`setVZoom` 44–260, all lanes together). `updateZoomUi` syncs thumbs w/ +/- buttons + Ctrl+wheel. `zoomToSelection` helper ready (no Zoomer tool yet). Engine was already centralized. |
+| `31119ae` | **Bussing slice 3b — I/O click-selectors + Mix-strip sends column.** `renderChannel` (stem+aux) + `buildStrip` use `.io-sel`/`.ms-iosel` buttons → `openRoutePopup` (INPUT+OUTPUT) instead of the old `<select>`; aux gains I/O + a sends rack; Mix strips get a compact A-E sends bank. Matches the PT mix-strip column flow. |
+| `f6a85ad` | **Bussing slice 3c — save/load persistence + legacy migration.** `buildProjectPayload` saves `buses[]` + per-track `input`/`inputBus` + rich `sends`. `loadProject` restores buses FIRST, mints a bus for old auxes, restores all routing. `migrateLegacySends()` converts legacy aux-id outputs + `{toAux}` sends → slotted `{bus}` sends. Verified via real backend round-trips (new + legacy). |
 
 **What works for a user right now:** open any of the 12 menus; Undo/Redo with labels; Duplicate;
 Cut/Copy/Paste; Insert Silence/Heal/Trim-to-Selection/Consolidate; Mute & Rename clips; Window
@@ -63,7 +67,18 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — Bussing slice 3 (the routing UI) + save/load migration. Do this first.
+## 3. THE NEXT TASK — Bussing slice 3d (Master Fader as a created track), then Sessions.
+> **DONE & shipped + verified live:** slice 2 (`cc8bdaa`, audio routing), slice 3a (`2bb444b`, routing
+> popup + A-E/F-J matrix UI), slice 3b (`31119ae`, I/O click-selectors + Mix-strip sends column),
+> slice 3c (`f6a85ad`, save/load persistence + legacy migration). Whole-view zoom also shipped
+> (`4c78ec4`). **REMAINING bussing → slice 3d = Master Fader as a created track** (remove the
+> hardcoded MASTER lane; owner model §4 here + `design/sends-bussing-io.md` §4.4 — most invasive, do
+> carefully). **After bussing → the big Sessions/Dashboard feature** (`design/sessions-dashboard.md`:
+> New Session modal + custom templates + save session as a FOLDER on the user's disk + 5-min
+> auto-backup; the doc recommends BACKEND filesystem writes via app.py's `_atomic_write`). Owner also
+> wants the PT Edit-window per-track COLUMN layout (COMMENTS·MIC PRE·INSERTS A-E/F-J·SENDS A-E/F-J·I/O).
+>
+> _(Original slice-3 plan kept below for the 3d details + the sub-slice breakdown.)_
 > **Slice 2 (audio-graph routing) is DONE & shipped (`cc8bdaa`) and verified live.** The engine
 > now routes sends + buses correctly for BOTH the new `{slot,bus,…}` model and legacy `{toAux}`
 > sends. What's missing is the **UI to drive the new model** and **persistence**. Build, from
