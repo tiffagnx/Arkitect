@@ -91,15 +91,20 @@ when something's wrong, say so plainly and fix it.
   "BRYANS MIC"): arming that track records FROM that device (transportGo routes capture to it, falling
   back to global `#inDev`); `IF_NAMES` now travels in the saved project. NOTE: `dev:` is excluded from
   the bus-input path in `buildTrackGraph`/`wouldFeedback`, so a hardware-input track still plays its clips.
-- **Phase 4 — Deliver (NEXT):** real **Bounce-to-Disk dialog** over the (already solid) offline render —
-  Source (MON L/R or a bus/output/track for stems), File Type (WAV + MP3), Bit Depth (16/24), Sample
-  Rate, file name + directory, bounce the SEL range; wire Track-menu Bounce/Commit/Freeze/Make-Inactive
-  (dead now); add Hide to the track right-click menu.
+- **Phase 4 — Deliver: DONE 2026-06-18.** **Bounce to Disk dialog** over the offline render (repurposed
+  `#exportBtn`; File ▸ Bounce to ▸ Disk maps here): Source (Main Mix / per-track stem / per-bus), File
+  Type WAV+MP3, Bit Depth 16/24 (`bufferToWavBlob` does 24-bit now), Sample Rate (project/48k/44.1k),
+  Range (whole / SEL), file name, Destination (Download / session Bounced Files/ / Choose folder…).
+  `renderBounce({source,startT,endT,sampleRate,tap})` reuses setupBusNodes+buildTrackGraph+buildMasterChain
+  so a bounce == playback. Backend `/api/studio/session/bounce` writes the WAV + ffmpeg→MP3 320k. Track ops
+  wired (top Track menu via `actionFor` + right-click): **Bounce** (stem), **Commit** (print inserts/EQ/comp
+  to a clip, tap:'pre'), **Freeze** (reversible Commit, stash in `t._frozen`), **Make Inactive** (silent+grey
+  via the applyTrackTo gate), **Hide** (+ Show all tracks). All verified in the browser.
 - Deferred: rename desktop folder pink-room→arkitect (cwd/server lock); Sessions Dashboard "New
   Session" modal/templates (design in `studio-research/design/sessions-dashboard.md`).
 
-**This session (2026-06-18): owner said "go down the list — do Phase 3, then Phase 4, then a
-look-and-feel pass." Phase 3 DONE + committed. Phase 4 (Bounce-to-Disk) next, then the L&F pass.**
+**This session (2026-06-18): owner said "go down the list — Phase 3, then Phase 4, then a look-and-feel
+pass." Phases 3 & 4 DONE + committed/verified. NEXT in-session = the look-and-feel polish pass.**
 
 ## ENGINE MAP (grep for current line numbers — they shift)
 - `buildTrackGraph(c,t,when,offset,isOffline)`: per clip → **per-clip GainNode (cl.gain + fade ramps)**
