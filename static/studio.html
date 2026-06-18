@@ -1039,6 +1039,27 @@ function zoomToSelection(){
 }
 
 // ── SEPARATE: split one clip at an absolute timeline second; both halves stay put ──
+// OVERWRITE on overlap — when a clip is dropped over others on the same lane, the covered audio of
+// the lower clips goes away (Pro Tools-style). Fully-covered clips vanish; partially-covered ones get
+// trimmed; a clip straddled in the middle splits into the surviving head + tail. Undo restores it all.
+function resolveOverlaps(t, moved){
+  if(!moved || !moved.buffer) return;
+  const mS=moved.start, mE=moved.start+moved.buffer.duration, eps=1e-4;
+  const out=[];
+  for(const o of clipsOf(t)){
+    if(o===moved){ out.push(o); continue; }
+    const oS=o.start, ob=o.buffer, oD=ob.duration, oE=oS+oD;
+    if(oE<=mS+eps || oS>=mE-eps){ out.push(o); continue; }              // no overlap → keep as-is
+    const headCov = mS<=oS+eps, tailCov = mE>=oE-eps;
+    if(headCov && tailCov) continue;                                    // o fully covered → it's gone
+    if(tailCov){ const f=(mS-oS)/oD; if(f>0.01) out.push({...o, buffer:bufSlice(ob,0,f), start:oS}); continue; }   // covered on its right → keep [oS, mS]
+    if(headCov){ const f=(mE-oS)/oD; if(f<0.99) out.push({...o, buffer:bufSlice(ob,f,1), start:mE}); continue; }   // covered on its left → keep [mE, oE]
+    const lF=(mS-oS)/oD, rF=(mE-oS)/oD;                                 // moved sits inside o → split, drop the middle
+    if(lF>0.01) out.push({...o, buffer:bufSlice(ob,0,lF), start:oS});
+    if(rF<0.99) out.push({...o, id:rid(), buffer:bufSlice(ob,rF,1), start:mE});
+  }
+  t.clips = out;
+}
 function separateClip(t, cl, atTime){
   const local = atTime - cl.start;
   if(local<=0.01 || local>=cl.buffer.duration-0.01){ flash("Pick a spot inside the clip to separate"); return; }
@@ -2985,7 +3006,7 @@ function laneUi(t) {
     const mv = (ev) => { if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
       if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(Math.max(0, startStart + dx)); drawLane(t); } };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
-      if (!moved) seek(atTime); else { syncPrimary(t); if (wasPlaying) restartPlayback(); flash("Moved clip"); } };
+      if (!moved) seek(atTime); else { resolveOverlaps(t, cl); syncPrimary(t); drawLane(t); if (wasPlaying) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   wv.onmousemove = (e) => {   // cursor reflects the active tool
