@@ -1300,7 +1300,7 @@ function refreshInspector(){
     </div>
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
       ${numRowK('Opacity','opacity',clip)}${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}
-      ${numRowK('Scale','scale',clip)}${numRowK('Rotate','rotation',clip)}</div>
+      ${numRowK('Scale','scale',clip)}${numRow('Scale X','cScaleX',clip.scaleX==null?1:clip.scaleX)}${numRow('Scale Y','cScaleY',clip.scaleY==null?1:clip.scaleY)}${numRowK('Rotate','rotation',clip)}</div>
     <div class="grp director-only"><div class="gt">Effects</div>
       ${numRowK('Blur','fxBlur',clip)}${numRowK('Bright','fxBright',clip)}${numRowK('Contrast','fxContrast',clip)}
       ${numRowK('Saturate','fxSat',clip)}${numRowK('Hue','fxHue',clip)}
@@ -1318,6 +1318,8 @@ function refreshInspector(){
   if(isSolid){const cc=$('#cSolColor');if(cc)cc.oninput=e=>{clip.color=e.target.value;renderTimeline();drawFrame();save(true);};}
   if(!isAud){
     for(const fld of ['opacity','posX','posY','scale','rotation','fxBlur','fxBright','fxContrast','fxSat','fxHue'])bindKRow(fld,clip);
+    bindNum('cScaleX',v=>{clip.scaleX=v;drawFrame();save(true);});
+    bindNum('cScaleY',v=>{clip.scaleY=v;drawFrame();save(true);});
     $('#cBlend').onchange=e=>{clip.blend=e.target.value;drawFrame();save(true);};
     if(!opaKeyed){
       bindNum('tIn',v=>{clip.transIn=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
