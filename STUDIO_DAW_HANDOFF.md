@@ -138,6 +138,37 @@ pink-room→arkitect.**
   linear fallback in try/catch), the waveform taper (`drawWaveBand`), AND the drawn fade line — all matched. Right-click
   ▸ "Fade shape" cycles Standard→Equal-Power→S-Curve; serialized as `fadeInShape`/`fadeOutShape`.
 
+**Blank-slate + Updater (2026-06-18, owner napping — built & verified, committed):**
+- **Blank slate reworked** (676a5d6 + 611bbd0): killed "what's up — let's make something" → **rotating real quotes**
+  (`QUOTES` array, attributed — hip-hop/rock/punk artists + top producers/engineers + DeMartin house lines; `rollQuote`/
+  `startQuotes`, 9 s crossfade). The ◆ diamond is now **Kit** the mascot — `static/kit-hero.png` is the WHOLE transparent
+  "little guy" (NOT the launcher icon/tile; owner corrected this twice — ships in `static/` so every download gets it),
+  floating via `@keyframes kitFloat`. The oversized top-bar "Yo, Kit" button was shrunk to match the Visual Lab
+  (`.menubar .kit-fab.in-bar canvas{19px}`).
+- **AUTO-UPDATER — both passes DONE.** Owner spec: rename Help → **Updates**, blink when a new build is out, click →
+  save → download → restart; ships as a ZIP via **GitHub Releases** (`tiffagnx/Arkitect`), users need no git.
+  - *Pass 1* (548a049, `static/studio.html` `arkUpdater` IIFE): `APP_VERSION="1.0.0"` (bump per release tag), CORS-safe
+    fetch of `releases/latest`, semver `cmpVer`, **404/no-release = silently up-to-date** (no nag), background check every
+    6 h (localStorage-throttled + cached so a reload keeps the badge). A newer tag → the **Updates** menu pulses amber with
+    a dot (`.upd-avail`); clicking opens the **Updates dialog** (vX → vY + release notes + Download). All paths verified in
+    the preview (real 404 path + simulated-update blink/dialog).
+  - *Pass 2* (9a4ed10, `app.py` + `setup-and-run.ps1` + `.gitignore`): **stage-then-apply-on-relaunch** so the running
+    process never overwrites itself. Backend `POST /api/studio/update/stage {url,version}` downloads the ZIP (httpx,
+    follows GitHub redirects) → `_stage_update_from_zip` extracts to `_update/staged/` with a **zip-slip guard** + an
+    **"is this ARKITECT?" sanity check** (needs app.py + static/) + writes `_update/pending.json`. `GET …/status`,
+    `POST …/restart` (detached PS waits for port 7777 to free, runs START HERE.bat, then `os._exit`). The **launcher**
+    applies the staged update at startup: zips a **rollback backup** (excludes venv/data/_update/.git), `robocopy /E /XD`
+    merges new files over the install (**never touches data/ or venv/**), clears the marker, then `pip install -r
+    requirements.txt` if a release changed deps. Front-end `stageUpdate()` does autosave → stage → "Restart now / Later".
+    `_update/` is gitignored. **Verified:** staging helper unit-tested (nested zipball + flat ZIP + zip-slip + bad-payload
+    all correct); launcher apply invariants proven on a temp install (code merges in place, data + venv survive, no
+    clobber, backup made, cleanup). NOT exercised live (no published release yet; `/restart` would kill the running
+    server) — but apply-on-relaunch is safe-by-design and "close & reopen ARKITECT" is always the fallback.
+  - **To cut a release:** tag `vX.Y.Z` on GitHub + upload the distributable ZIP as the release asset, and bump
+    `APP_VERSION` in `static/studio.html` to match. *Pass-2 follow-up to do WITH the owner present:* one real end-to-end
+    update against a live test release on his machine (confirm the detached restart lands cleanly; tidy the leftover
+    old console window).
+
 **Big discoveries (so we don't rebuild):** **Auto-Tune ALREADY EXISTS** — `openTune` (5533) is a real Melodyne-style
 pitch editor (detectPitchTrack→segmentNotes→piano-roll→snap-to-key→`fxPitchBuf` retune→print). **Auto-mix** already
 FFT-analyzes + applies bounded EQ/comp/de-ess (the seed for "Vocal Doctor"). `clipFx_chop` (1/16 stutter) + `clipFx_bpmDelay`
