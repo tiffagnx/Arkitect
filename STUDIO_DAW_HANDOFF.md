@@ -68,7 +68,32 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — finish the Usability pass, then Sessions / Dashboard (#2).
+## 3. THE NEXT TASK — match Pro Tools (owner gave a full live walkthrough 2026-06-18), then the EDITING beast.
+> **READ THE MEMORY `studio-aux-and-pt-track-reference.md` FIRST** — the owner walked the entire PT
+> session lifecycle (record → tracks → bussing → inserts → master → bounce) click-by-click; it's all
+> captured there with the exact targets. **DONE so far:** aux now renders as a normal track row (`7e6471e`),
+> the whole record-tonight usability batch, Master Fader as a created track.
+>
+> **READY-TO-BUILD PT-MATCH QUEUE (no research needed — straight from the owner's demo):**
+> 1. **Numbered bus pool** — replace "＋ New Bus" with picking **Bus 1-2, 3-4 … (Stereo)** from a standing
+>    fixed list in every input/output/send picker (owner's explicit correction; routing = same bus number
+>    on a send/output and on an aux's input). Touch `openRoutePopup` + `addBus`.
+> 2. **Drag-reorder tracks** — press-drag the track-name to reorder lanes; Master Fader free-placed (not pinned bottom).
+> 3. **Track right-click menu** — New · Rename · Duplicate · Delete (+ later Freeze/Commit/Bounce). Quick wins.
+> 4. **New Track: Mono/Stereo** channel-format dropdown (already has the type dropdown).
+> 5. **Renamable interface inputs** (owner's "BRYANS MIC") — make IF_INPUTS user-editable + persisted.
+> 6. **Inline edit-window I/O columns** (INPUT top / OUTPUT bottom per row) — bigger visual pass.
+> 7. **Grow "Export WAV" → a real Bounce dialog** (Source / Format mono-summed·multi-mono·interleaved /
+>    Bit Depth / Sample Rate / Offline / Directory) + the File-menu depth (Create New→Dashboard, Save As Template…).
+>
+> **THE NEXT BEAST = EDITING, "the way the owner edits"** (he'll steer the specifics like he did recording).
+> A research workflow was launched to map the full PT editing model → `studio-research/design/EDITING_MASTER_PLAN.md`
+> (building on the finalized `design/edit-modes.md`, `smart-tool.md`, `track-view.md`). Owner will demo his
+> exact edit workflow before we build it.
+>
+> _(Earlier priorities below — Sessions/Dashboard design is hardened + ready when we circle back.)_
+
+## (earlier) Usability pass, then Sessions / Dashboard (#2).
 > **USABILITY PASS (owner wants to RECORD TONIGHT + "feels done") — in progress.** A fresh-eyes audit
 > ranked the blockers in `studio-research/USABILITY_AUDIT.md`. SHIPPED + verified live: stop kills the
 > beat (`8577b56`), **Spacebar** play/stop, transport guarded mid-record, **audible monitor** default;
