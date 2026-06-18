@@ -77,9 +77,14 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 > **PT-MATCH QUEUE — SHIPPED 2026-06-18:** ✅1 numbered bus pool (`28aba2a`) · ✅2 drag-reorder tracks (`3be955e`)
 > · ✅3 track right-click New/Rename/Duplicate/Delete (`2d10817`) · ✅4 Mono/Stereo (already existed) · ✅5
 > renamable interface inputs / "BRYANS MIC" (`116841a`). Also this run: aux = normal track row (`7e6471e`).
-> **STILL TO BUILD: #6 inline edit-window I/O columns (the big per-row COMMENTS·INSERTS A-E/F-J·SENDS
-> A-E/F-J·I/O layout — owner showed it repeatedly; biggest refactor) and #7 a real Bounce dialog +
-> File-menu depth.** Original spec for reference:
+> ✅6 **inline edit-window I/O COLUMNS** (`9f8b11f`) — each lane now has the per-row INSERTS A-E/F-J ·
+> SENDS A-E/F-J · I/O columns + a width-aligned sticky header (renderInsertCol/renderSendCol/
+> renderLaneCols/ensureColHeader; additive — uses lane-local ids, renderChannel/engine untouched).
+> Also: menus de-branded (`acafebe`) — Marketplace killed, Help slimmed to Check-for-Updates + About
+> ARKITECT (no Avid/Pro Tools). **STILL TO BUILD: #7 a real Bounce dialog + File-menu depth (Save As
+> Template, etc.).** Known follow-ups: the right-side channel panel still duplicates I/O+sends (now
+> redundant since the lane columns exist — trim it); pt-menus.js "behavior" metadata still mentions
+> Avid/PT internally (not user-visible). Original spec for reference:
 >
 > **READY-TO-BUILD PT-MATCH QUEUE (no research needed — straight from the owner's demo):**
 > 1. **Numbered bus pool** — replace "＋ New Bus" with picking **Bus 1-2, 3-4 … (Stereo)** from a standing
