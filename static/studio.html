@@ -1490,6 +1490,29 @@ TIFF_PLUGINS.list.push(
         },
         dispose() { voices.forEach(vc=>{ try { vc.lfo.stop(); } catch {} }); } };
     } },
+  /* ── Slap — short fixed vocal slap-delay (parallel mix), the classic vocal throw ── */
+  { name: "Slap", params: [
+      { id:"time", label:"Time ms", min:40, max:180, value:110 },
+      { id:"fb",   label:"Feedback", min:0, max:0.6, value:0.15 },
+      { id:"tone", label:"Tone Hz", min:1000, max:9000, value:4500 },
+      { id:"mix",  label:"Mix", min:0, max:1, value:0.2 },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dly = c.createDelay(0.5); dly.delayTime.value = 0.11;
+      const fb = c.createGain(); fb.gain.value = 0.15;
+      const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 300;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4500;
+      const wet = c.createGain(), dry = c.createGain(); wet.gain.value = 0.2; dry.gain.value = 1;
+      i.connect(dry); dry.connect(o);
+      i.connect(hp); hp.connect(dly); dly.connect(lp); lp.connect(wet); wet.connect(o);
+      dly.connect(fb); fb.connect(dly);                    // feedback tap (kept low for a slap, not a wash)
+      const ramp = (prm,v) => prm.setTargetAtTime(v, c.currentTime, 0.01);
+      return { input: i, output: o, set(id,v) { ({
+        time:()=>ramp(dly.delayTime, v/1000), fb:()=>ramp(fb.gain, v),
+        tone:()=>ramp(lp.frequency, v), mix:()=>ramp(wet.gain, v),
+      })[id]?.(); } };
+    } },
 );
 
 /* ── Compressor — worklet dynamics processor (peak/RMS detector, soft knee,
@@ -3157,6 +3180,7 @@ const PLUG_COLOR = {
   "EQ-6":      "#4D8FB0",        // blue (control)
   "Saturator": "#C8924A",        // amber (drive/warmth)
   "De-Ess":    "#46B0A0",        // teal
+  "Slap":      "#7C8AA5",        // violet (time/throw)
   "Tape Delay":"#5E9ED0",        // sky
   "Ensemble":  "#7C8AA5",        // slate
   "Telephone": "#8C8F98",        // gray (lo-fi)
@@ -4437,7 +4461,7 @@ function showFloatingSummary(text){
    leaves the user's own inserts alone (the __doc tag rides in params, so it even
    survives save/load without changing serialization).
    ═══════════════════════════════════════════════════════════════════════════ */
-const VDOC_CHAIN = ['EQ-6','De-Ess','Compressor','Saturator'];   // corrective-first order
+const VDOC_CHAIN = ['EQ-6','De-Ess','Compressor','Saturator','Slap'];   // corrective-first, slap last (parallel)
 const VDOC_MACROS = [
   { id:'bright', label:'Bright', hint:'air + presence', targets:[
       { ins:'EQ-6', param:'air', delta:2.2 }, { ins:'EQ-6', param:'pG', delta:1.5 } ] },
@@ -4448,6 +4472,7 @@ const VDOC_MACROS = [
   { id:'deess',  label:'De-Ess', hint:'tame sibilance — right = more', targets:[
       { ins:'De-Ess', param:'thr', delta:-6 }, { ins:'De-Ess', param:'ratio', delta:1.5 } ] },
   { id:'space',  label:'Space',  hint:'reverb send', targets:[ { send:true, delta:0.14 } ] },
+  { id:'throw',  label:'Throw',  hint:'slap-delay amount', targets:[ { ins:'Slap', param:'mix', delta:0.15 } ] },
 ];
 function vdIsDoc(ins){ return !!(ins && (ins._doc || (ins.params && ins.params.__doc))); }
 function vdInsByName(t, name){ return (t.inserts||[]).find(ins => vdIsDoc(ins) && ins.name===name) || null; }
@@ -4479,6 +4504,7 @@ function vdPlan(f){
     'De-Ess':     { x:dx, thr:dthr, ratio:dratio, rel:70 },
     'Compressor': { threshold:cthr, ratio:cratio, knee:6, attack:12, release:180, makeup:cmk, mix:0.85, detector:1 },
     'Saturator':  { mode:1, drive:4, bias:0.18, emph:3000, mix:0.22 },
+    'Slap':       { time:110, fb:0.15, tone:4500, mix:0.18 },
     space: 0.18,
   };
 }
@@ -4493,7 +4519,7 @@ function vdSummary(f, det, plan){
   return [
     `Heard a ${det.type.toUpperCase()} (confidence ${det.confidence}).`,
     `Measured — RMS ${f.rmsDb.toFixed(1)} dB, crest ${f.crestDb.toFixed(1)} dB, sibilance ${(f.sibRatio*100|0)}% of presence+air, tilt ${f.tilt.toFixed(1)} dB/oct.`,
-    `Built: HPF ${eq.hpf} Hz${eq.mG<=-0.7?`, ${eq.mG} dB mud @ ${eq.mF}`:''}, +${eq.pG} dB presence, +${eq.air} dB air → De-Ess @ ${de.x} Hz (${de.ratio}:1) → Comp ${cp.ratio}:1 @ ${cp.threshold} dB (mix ${Math.round(cp.mix*100)}%) → light tube → reverb send ${gdbStr(plan.space)} dB.`,
+    `Built: HPF ${eq.hpf} Hz${eq.mG<=-0.7?`, ${eq.mG} dB mud @ ${eq.mF}`:''}, +${eq.pG} dB presence, +${eq.air} dB air → De-Ess @ ${de.x} Hz (${de.ratio}:1) → Comp ${cp.ratio}:1 @ ${cp.threshold} dB (mix ${Math.round(cp.mix*100)}%) → light tube → ${plan['Slap'].time}ms slap + reverb send ${gdbStr(plan.space)} dB.`,
     `HONESTY: ${det.disclaimer} The "Your Edge" sliders only move within a safe band around these settings — slide to taste, you can't wreck it. Trust your ears over the meter.`,
   ].join(' ');
 }
