@@ -105,17 +105,29 @@
     backdrop-filter:blur(18px); overflow:hidden; margin-bottom:8px; animation:rise .25s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
   .lane.muted { opacity:.45; }
-  /* per-track control strip (Pro Tools edit-window: controls LEFT of the waveform, sized to the lane) */
-  .tstrip { width:212px; flex:none; border-right:1px solid var(--hairline); padding:8px 9px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }
-  .ts-top { display:flex; align-items:center; gap:7px; }
-  .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }
-  .ts-name { font:600 12px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text; }
-  .ts-x { background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E58A8E; width:20px; height:20px; border-radius:6px; cursor:pointer; font-size:11px; flex:none; }
-  .ts-row { display:flex; align-items:stretch; gap:5px; }
-  .ts-btn { width:24px; flex:none; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; border-radius:6px; cursor:pointer; }
+  /* per-track control strip (Pro Tools edit-window: Track-Color strip + controls LEFT of the waveform) */
+  .tcolor { width:4px; flex:none; align-self:stretch; }                                    /* PT Track-Color view: color strip, left-most */
+  .tstrip { width:192px; flex:none; border-right:1px solid var(--hairline); padding:7px 8px; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.015); overflow:hidden; }
+  .ts-top { display:flex; align-items:center; gap:6px; }
+  .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }    /* master lane keeps its color dot */
+  .ts-name { font:600 11.5px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text;
+    background:rgba(255,255,255,.05); border:1px solid var(--hairline); border-radius:5px; padding:3px 8px; }   /* PT highlights the track name */
+  .ts-name:hover { border-color:rgba(62,156,184,.45); color:#EAF4F8; }
+  .ts-x { background:transparent; border:none; color:var(--dim); width:18px; height:18px; border-radius:5px; cursor:pointer; font-size:11px; flex:none; opacity:0; transition:opacity .12s; }
+  .lane:hover .ts-x { opacity:.55; }
+  .ts-x:hover { opacity:1; color:#E58A8E; background:rgba(229,86,91,.16); }
+  .ts-mid { display:flex; align-items:stretch; gap:7px; flex:1; min-height:0; }       /* fill the strip → tall PT-style meter */
+  .ts-ctrls { display:flex; flex-direction:column; gap:5px; flex:1; min-width:0; }
+  .ts-row { display:flex; align-items:center; gap:5px; }
+  .ts-btn { width:23px; height:19px; flex:none; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 9.5px 'Space Mono'; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  .ts-btn:hover { border-color:rgba(255,255,255,.22); color:var(--text); }
+  .ts-btn.r { width:19px; height:19px; border-radius:50%; font-size:9px; color:#E58A8E; }
   .ts-btn.m.on { background:rgba(229,86,91,.2); color:#E58A8E; border-color:rgba(229,86,91,.55); }
   .ts-btn.s.on { background:rgba(217,164,65,.2); color:#E6B878; border-color:rgba(217,164,65,.55); }
   .ts-btn.r.on { background:rgba(229,86,91,.28); color:#FF6B72; border-color:rgba(229,86,91,.7); box-shadow:0 0 8px rgba(229,86,91,.4); }
+  .lm-meter { width:9px; flex:none; align-self:stretch; min-height:40px; background:rgba(0,0,0,.5); border:1px solid var(--hairline); border-radius:3px; position:relative; overflow:hidden; }
+  .lm-meter i { position:absolute; left:0; right:0; bottom:0; height:0%; background:linear-gradient(0deg,#3E9CB8,#F5A623 72%,#FF5A6E); transition:height .05s linear; }
+  /* shared mix-control widget (also used by the right channel panel + master strip — keep) */
   .ts-ctl { flex:1; position:relative; border:1px solid var(--hairline); border-radius:6px; background:rgba(0,0,0,.3); padding:5px 8px; cursor:ns-resize; overflow:hidden; min-width:0; min-height:40px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
   .ts-ctl.drag { border-color:rgba(62,156,184,.7); box-shadow:0 0 10px rgba(62,156,184,.25); }
   .ts-pop { position:absolute; right:5px; top:6px; bottom:6px; width:7px; background:rgba(0,0,0,.6); border:1px solid rgba(62,156,184,.45); border-radius:4px; z-index:3; }
@@ -134,28 +146,24 @@
   .ts-sn:hover { color:#9FCFDD; }
   .ts-sx { color:#E58A8E; cursor:pointer; }
   /* PT edit-window per-track COLUMNS — inserts A-E/F-J, sends A-E/F-J, I/O (left of the waveform, on every lane) */
-  .lc { flex:none; border-right:1px solid var(--hairline); padding:5px 4px; display:flex; flex-direction:column; gap:3px; overflow:hidden; background:rgba(255,255,255,.012); }
-  .lc-insAE, .lc-insFJ { width:64px; }
-  .lc-sndAE, .lc-sndFJ { width:66px; }
-  .lc-io { width:96px; gap:4px; }
-  .lc-cell { display:flex; align-items:center; gap:4px; min-height:17px; border-radius:4px; padding:1px 4px; font:600 9px Inter; background:rgba(255,255,255,.03); border:1px solid var(--hairline); color:var(--dim); }
-  .lc-cell.filled { background:rgba(124,138,165,.16); border-color:rgba(124,138,165,.4); color:#C9D2E0; cursor:pointer; }
-  .lc-cell.filled.byp { opacity:.45; }
-  .lc-cell.add { border-style:dashed; cursor:pointer; }
-  .lc-cell.add:hover { border-color:rgba(62,156,184,.5); color:#9FCFDD; }
-  .lc-cell.blank { opacity:.32; }
-  .lc-let { font:700 8px 'Space Mono'; color:var(--dim); width:7px; flex:none; text-transform:lowercase; }
+  .lc { flex:none; border-right:1px solid var(--hairline); padding:5px 5px; display:flex; flex-direction:column; gap:3px; overflow:hidden; background:rgba(255,255,255,.012); }
+  .lc-insAE, .lc-insFJ { width:72px; }
+  .lc-sndAE, .lc-sndFJ { width:74px; }
+  .lc-io { width:104px; gap:4px; }
+  .lc-cell { display:flex; align-items:center; gap:5px; min-height:18px; border-radius:4px; padding:2px 5px; font:600 9px Inter; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.05); color:var(--dim); }
+  .lc-cell.empty { background:rgba(0,0,0,.16); cursor:pointer; }                            /* clean recessed empty slot (PT) — no junk text */
+  .lc-cell.empty:hover { border-color:rgba(62,156,184,.4); }
+  .lc-cell.empty .lc-nm { opacity:0; }
+  .lc-cell.empty:hover .lc-nm { opacity:.75; color:#9FCFDD; }
+  .lc-cell.filled { background:rgba(124,138,165,.18); border-color:rgba(124,138,165,.42); color:#D2DAE6; cursor:pointer; }
+  .lc-cell.filled:hover { border-color:rgba(62,156,184,.55); }
+  .lc-cell.filled.byp { opacity:.42; }
+  .lc-let { font:700 7.5px 'Space Mono'; color:rgba(160,168,182,.5); width:7px; flex:none; text-transform:lowercase; text-align:center; }
   .lc-nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .lc-io .io-sel { width:100%; padding:3px 5px; font:600 9.5px Inter; border-radius:5px; }
-  .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:17px; margin-bottom:4px; }
-  .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:16px; flex:none; }
-  /* PT controls block: record = small ● circle, S/M squares, + a live level meter; vol/pan live in the I/O column */
-  .ts-row { align-items:flex-start; }
-  .ts-btn { height:18px; }
-  .ts-btn.r { width:16px; height:16px; min-height:0; border-radius:50%; padding:0; font:700 8px 'Space Mono'; line-height:1; align-self:center; color:#E58A8E; }
-  .lm-meter { width:8px; height:42px; margin-left:auto; flex:none; background:rgba(0,0,0,.45); border:1px solid var(--hairline); border-radius:3px; position:relative; overflow:hidden; }
-  .lm-meter i { position:absolute; left:0; right:0; bottom:0; height:0%; background:linear-gradient(0deg,#3E9CB8,#F5A623 70%,#FF5A6E); transition:height .05s linear; }
-  .lc-io .ts-ctl { min-height:0; padding:2px 6px; }
+  .lc-io .io-sel { width:100%; padding:3px 6px; font:600 9.5px Inter; border-radius:5px; }
+  .lc-io .ts-ctl { min-height:0; padding:3px 7px; }
+  .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
+  .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:17px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
@@ -713,6 +721,8 @@ const $ = (id) => document.getElementById(id);
 let ctx = null;                 // AudioContext (created on first interaction)
 const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
 let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
+// linear fader gain → Pro-Tools-style dB readout ("0.0" = unity, "−∞" = silence)
+function gdbStr(g){ if(g==null||g<=0.0001) return "−∞"; const d=20*Math.log10(g); return (Math.abs(d)<0.05?"0.0":(d>0?"+":"")+d.toFixed(1)); }
 let verb = null;                // {convolver, predelay, ret}
 // per-stem color: ONE color per track/stem (stereo = same color both channels), distinct per stem
 const STEM_COLORS = ["#3E9CB8","#00D1C4","#7C8AA5","#F5A623","#34D399","#60A5FA",
@@ -2349,7 +2359,7 @@ async function addFiles(files) {
     catch { alert(`Couldn't read ${f.name}`); continue; }
     const t = {
       id: Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ""),
-      buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
+      buffer: buf, gain: 1.0, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
       send: 0, inserts: [], muted: false, solo: false, src: null, live: null,
       input: 'none', output: 'master',
     };
@@ -2363,7 +2373,7 @@ async function addFiles(files) {
 /* ── NEW TRACKS — Pro Tools "New Tracks" dialog (Track > New). Creates real empty
    audio tracks + aux/FX buses; other types (master/MIDI/instrument/video) are stubbed. ── */
 function makeAudioTrack(name, stereo){
-  const t = { id: rid(), name, buffer:null, clips:[], gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0,
+  const t = { id: rid(), name, buffer:null, clips:[], gain:1.0, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0,
     send:0, inserts:[], muted:false, solo:false, src:null, live:null, stereo:!!stereo, input:'none', output:'master' };
   tracks.push(t); laneUi(t); return t;
 }
@@ -2625,21 +2635,22 @@ function renderInsertCol(t, host, startIdx){
   for(let k=0;k<5;k++){
     const i=startIdx+k, ins=t.inserts[i]; const cell=document.createElement("div");
     if(ins){ cell.className="lc-cell filled"+(ins.bypassed?" byp":"");
-      cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span><span class="lc-nm" title="${ins.name}">${ins.name}</span>`;
+      cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span><span class="lc-nm" title="${ins.name} — click to open, right-click to remove">${ins.name}</span>`;
       cell.onclick=(e)=>{ e.stopPropagation(); openPluginWindow(t,i); };
       cell.oncontextmenu=(e)=>{ e.preventDefault(); e.stopPropagation(); if(typeof closeTrackWindows==='function') closeTrackWindows(t); t.inserts.splice(i,1); renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(playing) restartPlayback(); };
-    } else if(i===t.inserts.length){ cell.className="lc-cell add";
+    } else { cell.className="lc-cell empty";                                                  // clean recessed slot; click → assign next insert
       cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span><span class="lc-nm">+ insert</span>`;
-      cell.onclick=(e)=>{ e.stopPropagation(); openPluginMenu(cell, t.type==='master', (name)=>{ t.inserts[i]={name,params:{},bypassed:false}; renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(playing) restartPlayback(); openPluginWindow(t,i); }, ()=>openTune(t)); };
-    } else { cell.className="lc-cell blank"; cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span>`; }
+      const addIdx=t.inserts.length;
+      cell.onclick=(e)=>{ e.stopPropagation(); openPluginMenu(cell, t.type==='master', (name)=>{ t.inserts[addIdx]={name,params:{},bypassed:false}; renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(playing) restartPlayback(); openPluginWindow(t,addIdx); }, ()=>openTune(t)); };
+    }
     host.appendChild(cell);
   }
 }
 function renderSendCol(t, host, letters){
   if(!host) return; host.innerHTML="";
   letters.forEach(Lt=>{ const s=sendInSlot(t,Lt), b=(s&&s.bus)?busById(s.bus):null;
-    const cell=document.createElement("div"); cell.className="lc-cell"+(b?" filled":" add")+(s&&s.on===false?" byp":"");
-    cell.innerHTML=`<span class="lc-let">${Lt.toLowerCase()}</span><span class="lc-nm" title="${b?b.name:'send '+Lt}">${b?b.name:'—'}</span>`;
+    const cell=document.createElement("div"); cell.className="lc-cell "+(b?"filled":"empty")+(s&&s.on===false?" byp":"");
+    cell.innerHTML=`<span class="lc-let">${Lt.toLowerCase()}</span><span class="lc-nm" title="${b?b.name:'assign send '+Lt}">${b?b.name:'+ send'}</span>`;
     cell.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(cell,'send',t,Lt,()=>{ renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); }); };
     host.appendChild(cell);
   });
@@ -2657,7 +2668,7 @@ function ensureColHeader(){
   const tr=$("tracks"); if(!tr) return;
   let h=document.getElementById('colHeader');
   if(!h){ h=document.createElement('div'); h.id='colHeader'; h.className='col-header';
-    h.innerHTML=`<div class="chh" style="width:212px;border-right:none"></div><div class="chh" style="width:64px">INSERTS A-E</div><div class="chh" style="width:64px">INSERTS F-J</div><div class="chh" style="width:66px">SENDS A-E</div><div class="chh" style="width:66px">SENDS F-J</div><div class="chh" style="width:96px;border-right:none">I/O</div>`;
+    h.innerHTML=`<div class="chh" style="width:196px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
     tr.insertBefore(h, tr.firstChild);
   }
   h.style.display = tracks.length ? 'flex' : 'none';
@@ -2669,10 +2680,15 @@ function laneUi(t) {
   d.className = "lane"; d.id = "lane-" + t.id;
   if (t.muted) d.classList.add("muted");
   d.innerHTML = `
+    <div class="tcolor" style="background:${t.color}"></div>
     <div class="tstrip">
-      <div class="ts-top"><span class="cdot" style="background:${t.color}"></span><span class="ts-name" title="double-click to rename">${t.name}</span><button class="ts-x" title="remove track">✕</button></div>
-      <div class="ts-row">
-        <button class="ts-btn r" title="record-enable (arm) — your next take records onto this track">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button>
+      <div class="ts-top"><span class="ts-name" title="double-click to rename">${t.name}</span><button class="ts-x" title="remove track">✕</button></div>
+      <div class="ts-mid">
+        <div class="ts-ctrls">
+          <div class="ts-row">
+            <button class="ts-btn r" title="record-enable (arm) — your next take records onto this track">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button>
+          </div>
+        </div>
         <div class="lm-meter" title="track level"><i></i></div>
       </div>
     </div>
@@ -2696,7 +2712,7 @@ function laneUi(t) {
   mb.onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; mb.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
   sb.onclick = (e) => { e.stopPropagation(); t.solo = !t.solo; sb.classList.toggle("on", t.solo); applyMix(); };
   rb.onclick = (e) => { e.stopPropagation(); setArm(t, !t.armed); };
-  bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, v => v.toFixed(2), true);
+  bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, gdbStr, true);
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
   renderLaneCols(t);
   const _li=d.querySelector('.lio-in'); if(_li) _li.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(_li,'input',t,null,()=>renderLaneCols(t)); };
@@ -2947,7 +2963,7 @@ function addAux(){
   const bus = nextFreePoolBus();                          // grab the next open numbered bus (Bus 1-2, then 3-4, …)
   const t = { id: rid(), name: "Aux " + (tracks.filter(x=>x.type==='aux').length+1), type:'aux',
     inputBus: bus.id, input: bus.id, output: 'master', sends: [],
-    gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: bus.color };
+    gain:1.0, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: bus.color };
   tracks.push(t); auxLaneUi(t); refreshSendMenus();      // bus keeps its numbered name (e.g. Bus 3-4); the aux is "Aux 1"
   if (playing) restartPlayback();
   flash("Aux + bus “" + bus.name + "” created — send tracks to it, then stack FX on the aux");
@@ -3038,7 +3054,7 @@ function ensureMasterLane(){
         <div class="ts-slots" id="mslots"></div>
       </div>
       <div class="masterinfo">the whole mix — everything sums here<br><span class="mi-sub">drop a mastering chain · EQ → comp → maximizer (keep it last)</span></div>`;
-    bindMasterStripCtl(d.querySelector(".ts-ctl.mvol"), 0, 1.4, 0.9, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), true);
+    bindMasterStripCtl(d.querySelector(".ts-ctl.mvol"), 0, 1.4, 0.9, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, gdbStr, true);
     bindMasterStripCtl(d.querySelector(".ts-ctl.mceil"), -12, 0, -1, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1), false);
     renderMasterSlots(d.querySelector("#mslots"));
     d.onclick=(e)=>{ if(!e.target.closest(".ts-ctl,.ts-slot,.ts-slots,.ts-x")) selectTrack(masterTrack); };
@@ -3082,7 +3098,7 @@ function renderMasterChannel(panel){
   html+=`<div class="ins-rack"><div class="ins-bar"><span class="ins-title">master inserts</span><button class="ins-add" type="button">+ add mastering plugin…</button></div><div class="ins-list" id="inslist-__master__"></div></div>`;
   html+=`<div class="chan-hint">This is the final stage — everything sums here. Aim for the loudest point around −1 dB on the ceiling. Keep the Maximizer last.</div>`;
   panel.innerHTML=html;
-  bindMasterKnob("ckn-m-vol","cko-m-vol", 0, 1.4, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, v=>v.toFixed(2), 0.9);
+  bindMasterKnob("ckn-m-vol","cko-m-vol", 0, 1.4, ()=>parseFloat($("mGain").value)||0.9, v=>{ $("mGain").value=v.toFixed(2); masterTrack.gain=v; if(master) master.gain.gain.value=v; }, gdbStr, 0.9);
   bindMasterKnob("ckn-m-ceil","cko-m-ceil", -12, 0, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1)+'dB', -1);
   renderInserts(masterTrack);
   panel.querySelector(".ins-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, true, (name)=>addInsert(masterTrack, name)); };
@@ -3098,6 +3114,7 @@ function trackVal(t,k){ return k==='gain'?t.gain : k==='pan'?t.pan : k==='comp'?
 function setTrackVal(t,k,v){ if(k==='gain')t.gain=v; else if(k==='pan')t.pan=v; else if(k==='comp')t.comp=v; else if(k==='send')t.send=v; else t.eq[k]=v; }
 function fmtK(k,v){
   if(k==='pan') return Math.abs(v)<0.005?'C':(v<0?'L'+Math.round(-v*100):'R'+Math.round(v*100));
+  if(k==='gain') return gdbStr(v);
   if(k==='lo'||k==='mid'||k==='hi') return (v>0?'+':'')+v.toFixed(1);
   if(k==='comp') return Math.round(v*100)+'%';
   return v.toFixed(2);
@@ -3734,19 +3751,36 @@ function drawGrid(g, W, H){
     g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
   }
 }
-// one clip's waveform drawn inside its box [x0, x0+w], only the on-screen part (vZoom = vertical/audio zoom)
-function drawClipWave(g, buf, x0, w, H, color){
-  const data=buf.getChannelData(0), N=data.length, mid=H/2, W=g.canvas.width, cap=H*0.48;
-  const pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0));
-  g.strokeStyle=hexA(color,0.9); g.lineWidth=1; g.beginPath();
+// one CHANNEL drawn as a filled peak waveform inside the vertical band [yT, yB] (Pro Tools look).
+// mid = the channel's zero-crossing line; cap keeps peaks inside the band. Reads real min/max
+// peaks per pixel, so at deep zoom (i1<=i0) it still plots the single sample under the pixel.
+function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb){
+  const N=data.length, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*vZoom;
+  g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();         // zero line (subtle)
+  g.moveTo(x0+pa, mid); g.lineTo(x0+pb, mid); g.strokeStyle="rgba(255,255,255,0.06)"; g.stroke();
+  g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();
   for(let px=pa; px<pb; px++){
-    const i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); let mn=1,mx=-1;
-    for(let j=i0;j<i1;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
+    let i0=Math.floor(px/w*N), i1=Math.floor((px+1)/w*N); if(i1<=i0) i1=i0+1;
+    let mn=1,mx=-1; for(let j=i0;j<i1 && j<N;j++){ const v=data[j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
     if(mx<mn){ mn=0; mx=0; }
-    const top=Math.max(-cap,Math.min(cap, mx*H*0.46*vZoom)), bot=Math.max(-cap,Math.min(cap, mn*H*0.46*vZoom));
-    g.moveTo(x0+px, mid-top); g.lineTo(x0+px, mid-bot);
+    const top=Math.max(-cap,Math.min(cap, mx*amp)), bot=Math.max(-cap,Math.min(cap, mn*amp));
+    g.moveTo(x0+px, mid-top); g.lineTo(x0+px, mid-bot+0.6);             // +0.6 so flat (silent) lines still show
   }
   g.stroke();
+}
+// one clip's waveform inside its box [x0, x0+w], on-screen part only. Stereo buffers render a
+// DUAL waveform (channel 0 on top, channel 1 on the bottom); mono renders one centered band.
+function drawClipWave(g, buf, x0, w, yT, yB, color){
+  const W=g.canvas.width, pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0));
+  if(buf.numberOfChannels>1){
+    const split=(yT+yB)/2;
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb);
+    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb);
+    g.strokeStyle="rgba(255,255,255,0.05)"; g.lineWidth=1; g.beginPath();   // channel divider
+    g.moveTo(x0+pa, split); g.lineTo(x0+pb, split); g.stroke();
+  } else {
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb);
+  }
 }
 // draw a whole lane: clips on the [scrollT, scrollT+viewDur] timeline window
 function drawLane(t){
@@ -3754,19 +3788,39 @@ function drawLane(t){
   const g=cv.getContext("2d"), W=cv.width, H=cv.height, vd=viewDur();
   g.clearRect(0,0,W,H);
   drawGrid(g,W,H);
+  const NB=Math.max(11,Math.min(15,Math.round(H*0.2)));                     // clip name-bar height (scales with lane)
   for(const cl of clipsOf(t)){
     const x=t2x(cl.start,W), w=Math.max(2,(cl.buffer.duration/vd)*W);
     if(x+w<0 || x>W) continue;                                              // off-screen clip
     const seld = selClip && selClip.trackId===t.id && selClip.clipId===cl.id;
     const fx=Math.max(0,x), fw=Math.min(W,x+w)-fx;
-    g.fillStyle=hexA(t.color, seld?0.22:0.11); g.fillRect(fx,0,fw,H);       // clip body tint
-    drawClipWave(g, cl.buffer, x, w, H, t.color);
+    const showBar = fw>34, nbH = showBar?NB:0;                              // hide name bar on slivers
+    g.fillStyle=hexA(t.color, seld?0.20:0.10); g.fillRect(fx,0,fw,H);       // clip body tint
+    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color);                  // waveform sits below the name bar
+    // ── clip name bar across the top (Pro Tools) ──
+    if(showBar){
+      g.fillStyle=hexA(t.color, seld?0.78:0.6); g.fillRect(fx,0,fw,nbH);
+      g.fillStyle="rgba(0,0,0,0.18)"; g.fillRect(fx,nbH-1,fw,1);
+      g.save(); g.beginPath(); g.rect(fx+1,0,fw-2,nbH); g.clip();          // clip text to the bar
+      g.textBaseline="middle"; g.font="700 9px 'Space Mono'";
+      g.fillStyle = seld ? "#0c0d11" : "rgba(8,9,13,0.92)";
+      g.fillText((cl.name||t.name||"Audio").toUpperCase(), fx+5, nbH/2+0.5);  // pinned to visible left → stays readable while scrolling
+      g.restore();
+    }
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
-    if(cl.muted){ g.fillStyle="rgba(10,11,14,0.55)"; g.fillRect(fx,0,fw,H); }   // muted clip → dim
-    g.textBaseline="top"; g.font="700 9px 'Space Mono'";
-    if(cl.name){ g.fillStyle = cl.muted ? "rgba(233,234,237,0.6)" : hexA(t.color,0.95); g.fillText(cl.name, fx+5, 4); }
-    if(cl.muted){ g.fillStyle="rgba(233,234,237,0.78)"; g.fillText("MUTED", fx+5, cl.name?16:4); }
+    if(cl.muted){ g.fillStyle="rgba(10,11,14,0.5)"; g.fillRect(fx,nbH,fw,H-nbH); }   // muted clip → dim the audio area
+    // ── clip-gain badge, bottom-left (Pro Tools "0 dB") ──
+    if(fw>30 && H>26){
+      const gv=(cl.gain==null?1:cl.gain), gdb=gv<=0?-Infinity:20*Math.log10(gv);
+      const gtxt=(gdb===-Infinity)?"−∞":(Math.abs(gdb)<0.05?"0":(gdb>0?"+":"")+gdb.toFixed(1).replace(/\.0$/,""))+" dB";
+      g.font="600 8px 'Space Mono'"; const tw=g.measureText(gtxt).width;
+      const bx=fx+3, by=H-13;
+      g.fillStyle="rgba(10,11,14,0.62)"; g.fillRect(bx,by,tw+8,11);
+      g.strokeStyle=hexA(t.color,0.5); g.lineWidth=1; g.strokeRect(bx+0.5,by+0.5,tw+7,10);
+      g.fillStyle="rgba(233,238,242,0.9)"; g.textBaseline="middle"; g.fillText(gtxt, bx+4, by+6);
+    }
+    if(cl.muted){ g.fillStyle="rgba(233,234,237,0.8)"; g.font="700 9px 'Space Mono'"; g.textBaseline="top"; g.fillText("MUTED", fx+5, nbH+3); }
   }
   if(SEL && SEL.trackId===t.id){                                            // selection highlight (Select tool)
     const x1=t2x(Math.min(SEL.a,SEL.b),W), x2=t2x(Math.max(SEL.a,SEL.b),W);
