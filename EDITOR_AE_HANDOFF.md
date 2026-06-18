@@ -21,17 +21,21 @@ Same pipeline the Studio used: **research → spec markdown → JSON config → 
 
 Wired menu actions: File New/Open/Save/Save As/Increment & Save/Revert/Export · Edit Undo/Redo/Cut/Copy/Paste/Duplicate/Clear/Split Layer/Keyboard Shortcuts · Composition New/Settings/Add to Render Queue · Layer New>Text/Reset/Blending Mode (+Next/Prev) · Effect Gaussian Blur·Brightness & Contrast·Hue/Saturation·Remove All · Animation Add Keyframe·Toggle Hold·Easy Ease (In/Out) · View Zoom In/Out·Go to Time · Window panel toggles.
 
-## Next up (priority order, from `00-critique.md`)
-**High-leverage, mostly wiring or one small feature each:**
-1. Apply the critique's tag corrections in the config (then re-run `gen_ae_menus.py`).
-2. Wire **Open Recent** (we already `GET /api/editor/projects`), **Select All**, and a live "Undo X / Redo Y" label.
-3. **Guides / Grid / Rulers / safe-margins** overlay on the monitor — unlocks ~12 View-menu items at once.
-4. **Label colors** (`clip.label` + tint) — unlocks the whole Edit>Label block.
-5. **Solid / Adjustment / Null** layer type (`solid` clip kind drawn as a color fill) — unlocks Layer>New + much of Effect usefulness.
-6. **Real Render Queue** (turn the single export job into a list reusing the export backend).
-7. **Convert Audio to Keyframes** — peaks are already cached (`m.cache.peaks`); near-free, demos great.
+## Shipped in session 2 (overnight, all verified)
+- **Solid layers** (Layer/right-click New > Solid; color picker in Inspector); **right-click context menus** (New on empty comp/timeline; full Layer menu on a clip) with the **full Effect category tree** (Gaussian Blur / Brightness & Contrast / Hue-Saturation / Remove All live, rest greyed).
+- **Viewer manipulation**: select box + 8 handles + anchor crosshair; drag-to-move; corner = uniform scale, **edges = non-uniform X/Y scale**; mouse-wheel **view zoom** (separate from layer scale) + %, double-click reset; drop media on the viewer = add layer. Works for video, solid, AND text (text box measured + pivoted at its real center).
+- **Timeline twirl-down properties**: ▸ on every clip → Transform (Position/Scale/Rotation/Opacity) + Audio (Audio Levels/Waveform) rows with stopwatches + keyframe dot-lanes; heads & lanes grow together (dynamic `trackHeight`).
+- **Per-keyframe easing**: right-click a keyframe diamond → Linear / Easy Ease / In / Out / Hold.
+- **Layer actions**: Center In View, Flip Horizontal/Vertical (negative X/Y scale), Time-Reverse Layer (↺) + Freeze Frame (❄) (centralized `clipSrcFrame`, export byte-identical for default clips), Rename (`c.name`), Duplicate, Arrange (move across video tracks = z-order).
+- **Keyframable audio levels** (`volume` in KEYABLE; preview honors `pval(volume)`; default unchanged) + **Convert Audio to Keyframes** (Animation>Keyframe Assistant — beat-reactive scale from cached peaks; needs audio on the timeline to exercise).
+- **Overlays reworked**: AE's 5 separate toggles (Title/Action Safe, Proportional Grid, Grid, Guides, Rulers), ALL OFF by default, via the monitor ▦ dropdown. Plus earlier session-1 items (undo/redo, Composition Settings, label colors, Open Recent, Resolution, menu bar/tools/workspaces).
+- **Bug fix**: submenu-overlap in the menu renderer (`clearFly(level)` not `level+1`).
 
-**Honest gaps to keep greyed** (touch deep subsystems): masks/pen/shapes/paint/roto/puppet, real effect stack, precompose/nesting, 3D, Start Timecode / non-square pixels / drop-frame, ProRes/alpha export. Show them for fidelity; don't fake them.
+## Still open (next session)
+1. **Draggable anchor point** + non-uniform edge scale on rotated layers — needs the `drawClip` pivot-matrix rewrite + position compensation (interaction-model.md §1.10). Crosshair is a read-only indicator today.
+2. **Export AUDIO volume automation** — preview honors keyed `volume`; the server muxer (`app.py`, the OTHER track's file) reads scalar volume. Coordinate with that owner.
+3. **Optional polish**: swap the precise researched `context-comp`/`context-layer` ordering in (configs in `ae-config/`); inspector Scale X / Scale Y fields; live "Undo X / Redo Y" labels.
+4. **Bigger build-outs** (still greyed, honest): real Effect *stack* (vs the 5 fixed filters), Solid/Adjustment/Null beyond Solid, masks/pen/shapes/paint/roto/puppet, precompose/nesting, real Render Queue, 3D. Show them for fidelity; don't fake them.
 
 ## Gotchas
 - editor functions are top-level in the inline script; the `aeChrome()` IIFE runs after them and after `ae-menus.js` loads (script tag is placed before the inline script).
