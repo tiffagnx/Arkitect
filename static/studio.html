@@ -107,13 +107,13 @@
   .lane.muted { opacity:.45; }
   /* per-track control strip (Pro Tools edit-window: Track-Color strip + controls LEFT of the waveform) */
   .tcolor { width:4px; flex:none; align-self:stretch; }                                    /* PT Track-Color view: color strip, left-most */
-  .tstrip { width:192px; flex:none; border-right:1px solid var(--hairline); padding:7px 8px; display:flex; flex-direction:column; gap:7px; background:rgba(255,255,255,.015); overflow:hidden; }
-  .ts-top { display:flex; align-items:center; gap:6px; }
+  .tstrip { width:150px; flex:none; border-right:1px solid var(--hairline); padding:6px 7px; display:flex; flex-direction:column; gap:6px; background:rgba(255,255,255,.015); overflow:hidden; }
+  .ts-top { display:flex; align-items:center; gap:6px; position:relative; }
   .ts-top .cdot { width:10px; height:10px; border-radius:3px; flex:none; }    /* master lane keeps its color dot */
   .ts-name { font:600 11.5px Inter; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:text;
     background:rgba(255,255,255,.05); border:1px solid var(--hairline); border-radius:5px; padding:3px 8px; }   /* PT highlights the track name */
   .ts-name:hover { border-color:rgba(62,156,184,.45); color:#EAF4F8; }
-  .ts-x { background:transparent; border:none; color:var(--dim); width:18px; height:18px; border-radius:5px; cursor:pointer; font-size:11px; flex:none; opacity:0; transition:opacity .12s; }
+  .ts-x { position:absolute; right:1px; top:50%; transform:translateY(-50%); background:rgba(20,22,28,.85); border:none; color:var(--dim); width:17px; height:17px; border-radius:5px; cursor:pointer; font-size:11px; opacity:0; transition:opacity .12s; z-index:2; }
   .lane:hover .ts-x { opacity:.55; }
   .ts-x:hover { opacity:1; color:#E58A8E; background:rgba(229,86,91,.16); }
   .ts-mid { display:flex; align-items:stretch; gap:7px; flex:1; min-height:0; }       /* fill the strip → tall PT-style meter */
@@ -699,7 +699,8 @@
   </div>
   </div>
 
-  <div class="chan" id="chan"><div class="empty">Click a track to mix it.<br>Its volume, pan, EQ, comp, inserts and sends show here — off the lane, so you can edit the wave.</div></div>
+  <!-- selected-track mix panel: kept in the DOM (renderChannel writes to it) but HIDDEN — Pro Tools has no right panel in the Edit window; mixing happens in the MIX view -->
+  <div class="chan" id="chan" style="display:none"><div class="empty">Click a track to mix it.</div></div>
   <div class="mixwin" id="mixwin" style="display:none"></div>
   <!-- whole-view zoom bar (task #1): horizontal zoom slider + Fit + pan, and a vertical (lane-height) zoom -->
   <div class="zoombar" id="zoombar">
@@ -1126,6 +1127,8 @@ function showTrackMenu(t, e){
   add("✛  New track…", ()=>openNewTracksDialog());
   add("✎  Rename…", ()=>{ const nm=document.querySelector('#lane-'+t.id+' .ts-name'); renameTrack(t, nm); });
   add("⧉  Duplicate", ()=>duplicateTrack(t));
+  sep();
+  add("✨  Auto-mix", ()=>runAutoMix(t, null), !!t.buffer);   // Auto-mix lived in the (removed) right panel — keep it reachable here
   sep();
   add("🗑  Delete", ()=>{ const x=document.querySelector('#lane-'+t.id+' .ts-x'); if(x) x.click(); });
   m.style.left = Math.min(e.clientX, window.innerWidth-220)+"px";
@@ -2668,7 +2671,7 @@ function ensureColHeader(){
   const tr=$("tracks"); if(!tr) return;
   let h=document.getElementById('colHeader');
   if(!h){ h=document.createElement('div'); h.id='colHeader'; h.className='col-header';
-    h.innerHTML=`<div class="chh" style="width:196px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
+    h.innerHTML=`<div class="chh" style="width:154px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
     tr.insertBefore(h, tr.firstChild);
   }
   h.style.display = tracks.length ? 'flex' : 'none';
@@ -3785,6 +3788,7 @@ function drawClipWave(g, buf, x0, w, yT, yB, color){
 // draw a whole lane: clips on the [scrollT, scrollT+viewDur] timeline window
 function drawLane(t){
   const cv=document.querySelector(`#lane-${t.id} .wave`); if(!cv) return;
+  if(cv.clientWidth && cv.width!==cv.clientWidth) cv.width=cv.clientWidth;   // match drawing buffer to rendered width → crisp + fills the full edit area
   const g=cv.getContext("2d"), W=cv.width, H=cv.height, vd=viewDur();
   g.clearRect(0,0,W,H);
   drawGrid(g,W,H);
@@ -3988,10 +3992,12 @@ function setView(mode){
   document.getElementById("vEdit").classList.toggle("on", !mix);
   document.getElementById("vMix").classList.toggle("on", mix);
   $("tracks").style.display = mix ? 'none' : '';
-  $("chan").style.display   = mix ? 'none' : '';
+  $("chan").style.display   = 'none';                  // Pro Tools has NO right panel in the Edit window — mixing lives in the MIX view
   $("mixwin").style.display = mix ? 'flex' : 'none';
-  if (mix) renderMixWindow();
+  if (mix) renderMixWindow(); else relayoutAll();      // edit view reclaimed the panel's width → redraw lanes full-width
 }
+// keep lanes crisp + full-width when the window resizes
+window.addEventListener('resize', () => { if (viewMode !== 'mix') relayoutAll(); });
 function renderMixWindow(){
   const win = $("mixwin"); win.innerHTML = "";
   if (!tracks.length){ win.innerHTML = `<div class="empty" style="margin:auto">No tracks yet — drop stems in the Edit view.</div>`; if(masterTrack.present) win.appendChild(buildMasterStrip()); return; }
