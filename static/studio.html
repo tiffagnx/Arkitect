@@ -54,6 +54,7 @@
   .tp.play { color:#6FE0A0; } .tp.play.on { background:rgba(52,211,153,.22); color:#34D399; border-color:rgba(52,211,153,.55); }
   .tp.loop.on { background:rgba(62,156,184,.22); color:#6FC0D8; border-color:rgba(62,156,184,.55); }
   .tp.rec { color:#E58A8E; }
+  .tp.metro { font-size:13px; } .tp.metro.on { background:rgba(62,156,184,.22); color:#6FC0D8; border-color:rgba(62,156,184,.55); }
   .tp.rec.tarm { color:#FF6B72; border-color:rgba(229,86,91,.85); box-shadow:0 0 0 1px rgba(229,86,91,.55),0 0 9px rgba(229,86,91,.5); animation:recpulse 1.1s ease-in-out infinite; }
   .tp.rec.live { background:linear-gradient(120deg,#E5565B,#3E9CB8); color:#1A0410; border-color:transparent; }
   .rec-warn { font:500 10px Inter; color:#FFC46B; line-height:1.45; margin-top:6px; }
@@ -612,6 +613,9 @@
       <button class="tp loop" id="loop" title="Loop" style="display:none">↻</button>
     </span>
   </div>
+  <div class="tgroup"><span class="tg-l">CLICK</span>
+    <button class="tp metro" id="metroBtn" title="Count-in metronome click — on / off">♪</button>
+  </div>
   <span class="countin" id="countin"></span>
   <div class="tgroup"><span class="tg-l">VIEW</span>
     <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
@@ -769,6 +773,7 @@ const $ = (id) => document.getElementById(id);
 let ctx = null;                 // AudioContext (created on first interaction)
 const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
 let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
+let metroOn = false;   // count-in metronome click — OFF by default (never forced); toggle with the ♪ Click button
 // linear fader gain → Pro-Tools-style dB readout ("0.0" = unity, "−∞" = silence)
 function gdbStr(g){ if(g==null||g<=0.0001) return "−∞"; const d=20*Math.log10(g); return (Math.abs(d)<0.05?"0.0":(d>0?"+":"")+d.toFixed(1)); }
 let verb = null;                // {convolver, predelay, ret}
@@ -4249,6 +4254,7 @@ $("rtz").onclick   = () => { seek(0); scrollT = 0; relayoutAll(); };
 $("toend").onclick = () => { seek(contentDur()); };
 $("rew").onclick   = () => { const b = barDur(); seek(Math.max(0, (Math.round(pos() / b) - 1) * b)); };
 $("ffwd").onclick  = () => { const b = barDur(); seek(Math.min(maxDur(), (Math.round(pos() / b) + 1) * b)); };
+$("metroBtn").onclick = () => { metroOn = !metroOn; $("metroBtn").classList.toggle("on", metroOn); flash(metroOn ? "Count-in click ON" : "Count-in click OFF — records straight from the cursor"); };
 $("loop").onclick = (e) => { loop = !loop; e.target.classList.toggle("on", loop); };
 // Spacebar = play / stop — the #1 DAW key. Stops a take if recording. Ignored while typing.
 document.addEventListener("keydown", (e) => {
@@ -5349,7 +5355,7 @@ async function armAndRecord() {
   if (c.state === "suspended") await c.resume();
   $("rec").classList.add("armed");
 
-  const bars = +$("countBars").value;
+  const bars = metroOn ? (+$("countBars").value || 0) : 0;   // no count-in (and no click) unless the ♪ Click toggle is on
   const beat = beatDur(), barLen = barDur();          // time-signature aware count-in
   const countDur = bars * barLen;
 
@@ -5359,8 +5365,7 @@ async function armAndRecord() {
 
   // schedule count-in clicks, then start the beat in sync with the downbeat
   const t0 = c.currentTime + 0.12;             // small safety lead
-  for (let b = 0; b < bars * tsNum; b++) click(c, t0 + b * beat, b % tsNum === 0);
-  showCountin(bars * tsNum, t0, beat);
+  if (bars > 0) { for (let b = 0; b < bars * tsNum; b++) click(c, t0 + b * beat, b % tsNum === 0); showCountin(bars * tsNum, t0, beat); }   // click + count only when enabled
 
   // transport (the beat) begins AT the downbeat after the count
   const beatStartCtxTime = t0 + countDur;
