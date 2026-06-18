@@ -74,6 +74,13 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 > captured there with the exact targets. **DONE so far:** aux now renders as a normal track row (`7e6471e`),
 > the whole record-tonight usability batch, Master Fader as a created track.
 >
+> **PT-MATCH QUEUE — SHIPPED 2026-06-18:** ✅1 numbered bus pool (`28aba2a`) · ✅2 drag-reorder tracks (`3be955e`)
+> · ✅3 track right-click New/Rename/Duplicate/Delete (`2d10817`) · ✅4 Mono/Stereo (already existed) · ✅5
+> renamable interface inputs / "BRYANS MIC" (`116841a`). Also this run: aux = normal track row (`7e6471e`).
+> **STILL TO BUILD: #6 inline edit-window I/O columns (the big per-row COMMENTS·INSERTS A-E/F-J·SENDS
+> A-E/F-J·I/O layout — owner showed it repeatedly; biggest refactor) and #7 a real Bounce dialog +
+> File-menu depth.** Original spec for reference:
+>
 > **READY-TO-BUILD PT-MATCH QUEUE (no research needed — straight from the owner's demo):**
 > 1. **Numbered bus pool** — replace "＋ New Bus" with picking **Bus 1-2, 3-4 … (Stereo)** from a standing
 >    fixed list in every input/output/send picker (owner's explicit correction; routing = same bus number
