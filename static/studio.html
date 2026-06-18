@@ -149,6 +149,13 @@
   .lc-io .io-sel { width:100%; padding:3px 5px; font:600 9.5px Inter; border-radius:5px; }
   .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:17px; margin-bottom:4px; }
   .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:16px; flex:none; }
+  /* PT controls block: record = small ● circle, S/M squares, + a live level meter; vol/pan live in the I/O column */
+  .ts-row { align-items:flex-start; }
+  .ts-btn { height:18px; }
+  .ts-btn.r { width:16px; height:16px; min-height:0; border-radius:50%; padding:0; font:700 8px 'Space Mono'; line-height:1; align-self:center; color:#E58A8E; }
+  .lm-meter { width:8px; height:42px; margin-left:auto; flex:none; background:rgba(0,0,0,.45); border:1px solid var(--hairline); border-radius:3px; position:relative; overflow:hidden; }
+  .lm-meter i { position:absolute; left:0; right:0; bottom:0; height:0%; background:linear-gradient(0deg,#3E9CB8,#F5A623 70%,#FF5A6E); transition:height .05s linear; }
+  .lc-io .ts-ctl { min-height:0; padding:2px 6px; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
@@ -2665,16 +2672,15 @@ function laneUi(t) {
     <div class="tstrip">
       <div class="ts-top"><span class="cdot" style="background:${t.color}"></span><span class="ts-name" title="double-click to rename">${t.name}</span><button class="ts-x" title="remove track">✕</button></div>
       <div class="ts-row">
-        <button class="ts-btn r" title="record-enable (arm) — your next take records onto this track">R</button><button class="ts-btn m" title="mute">M</button><button class="ts-btn s" title="solo">S</button>
-        <div class="ts-ctl vol" title="drag up / down — volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div>
-        <div class="ts-ctl pan" title="drag up / down — pan"><span class="ts-k">PAN</span><b class="ts-v"></b></div>
+        <button class="ts-btn r" title="record-enable (arm) — your next take records onto this track">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button>
+        <div class="lm-meter" title="track level"><i></i></div>
       </div>
     </div>
     <div class="lc lc-insAE"></div>
     <div class="lc lc-insFJ"></div>
     <div class="lc lc-sndAE"></div>
     <div class="lc lc-sndFJ"></div>
-    <div class="lc lc-io"><button class="io-sel lio-in" title="track input"></button><button class="io-sel lio-out" title="track output"></button></div>
+    <div class="lc lc-io"><button class="io-sel lio-in" title="track input"></button><button class="io-sel lio-out" title="track output"></button><div class="ts-ctl vol" title="drag — volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div><div class="ts-ctl pan" title="drag — pan"><span class="ts-k">PAN</span><b class="ts-v"></b></div></div>
     <canvas class="wave" width="1200" height="${laneH}" style="height:${laneH}px"></canvas>`;
   $("tracks").appendChild(d);
   drawLane(t); updateZoomUi();
@@ -4114,6 +4120,9 @@ function tickUi() {
     tracks.forEach(t => { const m = win.querySelector(`.mstrip[data-id="${t.id}"] .ms-meter i`);
       if (m) m.style.height = ((t.live && t.live.meter ? lvlOf(t.live.meter) : 0) * 100) + "%"; });
     const mm = win.querySelector('.mstrip.master .ms-meter i'); if (mm && master) mm.style.height = (lvlOf(master.aL) * 100) + "%";
+  } else {                                                // Edit-window per-lane level meters
+    tracks.forEach(t => { const lm = document.querySelector('#lane-'+t.id+' .lm-meter i');
+      if (lm) lm.style.height = ((t.live && t.live.meter ? lvlOf(t.live.meter) : 0) * 100) + "%"; });
   }
   // input meter + runaway-feedback watch
   if (REC.inAnalyser) { const il = lvlOf(REC.inAnalyser); $("inMeter").style.width = (il * 100) + "%"; feedbackWatch(il); }
