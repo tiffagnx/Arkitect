@@ -378,6 +378,28 @@
     color:var(--dim); border-radius:7px; font:700 9px 'Space Mono'; padding:2px 7px; cursor:pointer; }
   .ai-summary-x:hover { color:#9FCFDD; border-color:rgba(62,156,184,.5); }
   .ai-summary-body { font:400 11px Inter; line-height:1.55; color:var(--text); white-space:pre-wrap; }
+  /* Vocal Doctor — the "Your Edge" panel (a plugwin shell + safe-bounded macro sliders) */
+  .vdoc { min-width:332px; max-width:384px; }
+  .vdoc .pw-bar { background:linear-gradient(120deg,rgba(70,176,160,.26),rgba(124,138,165,.14)); }
+  .vdoc .pw-title { background:linear-gradient(100deg,#7FE0D2,#46B0A0); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .vdoc-honesty { margin:0 0 14px; border-color:rgba(70,176,160,.32);
+    background:linear-gradient(120deg,rgba(70,176,160,.07),rgba(124,138,165,.06)); }
+  .vdoc-edge-h { font:700 9px 'Space Mono'; letter-spacing:.16em; text-transform:uppercase; color:#8FE0D2; margin:2px 0 12px; }
+  .vdoc-rows { display:flex; flex-direction:column; gap:11px; }
+  .vdoc-row label { width:60px; color:#CFE0DC; }
+  .vdoc-row input[type=range] { accent-color:#46B0A0; border-radius:3px;
+    background:linear-gradient(90deg,transparent calc(50% - 1px),rgba(70,176,160,.5) calc(50% - 1px),rgba(70,176,160,.5) calc(50% + 1px),transparent calc(50% + 1px)); }
+  .vdoc-row output { color:#7FE0D2; width:54px; }
+  .vdoc-foot { display:flex; gap:8px; margin-top:16px; }
+  .vdoc-btn { flex:1; padding:8px; border-radius:8px; border:1px solid rgba(70,176,160,.4); background:rgba(70,176,160,.10);
+    color:#9FE6DA; font:600 11px Inter; cursor:pointer; }
+  .vdoc-btn:hover { background:rgba(70,176,160,.2); }
+  /* the 🩺 Vocal Doctor button on a MIX strip — sits under ✨ Auto-mix */
+  .ms-doc { width:100%; margin:5px 0 0; padding:6px 4px; border-radius:7px; cursor:pointer;
+    border:1px solid rgba(70,176,160,.42); background:rgba(70,176,160,.12); color:#9FE6DA;
+    font:700 9.5px 'Space Mono'; letter-spacing:.04em; }
+  .ms-doc:hover { background:rgba(70,176,160,.22); }
+  .ms-doc:disabled { opacity:.6; cursor:default; }
   .wave { flex:1; min-width:0; height:auto; background:rgba(0,0,0,.4); cursor:crosshair; display:block; }
   .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
   .knob { display:flex; align-items:center; gap:6px; }
@@ -4403,6 +4425,174 @@ function showFloatingSummary(text){
   p.querySelector('.ai-summary-body').textContent=text;
   p.querySelector('.ai-summary-x').onclick=()=>p.remove();
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VOCAL DOCTOR — one button: analyze the vocal → build a full READY chain
+   (HPF/EQ → De-Ess → Compressor → light tube Saturation) + a tasteful reverb
+   send, then a "Your Edge" panel whose sliders are CLAMPED to a safe band around
+   the Doctor's settings, so you can shape it without wrecking the quality.
+   Reuses the existing measure()/detectType() analysis + the real EQ-6 / De-Ess /
+   Compressor / Saturator plugins + the global verb send (t.send). Idempotent:
+   Doctor inserts are tagged (params.__doc) so re-running replaces only them and
+   leaves the user's own inserts alone (the __doc tag rides in params, so it even
+   survives save/load without changing serialization).
+   ═══════════════════════════════════════════════════════════════════════════ */
+const VDOC_CHAIN = ['EQ-6','De-Ess','Compressor','Saturator'];   // corrective-first order
+const VDOC_MACROS = [
+  { id:'bright', label:'Bright', hint:'air + presence', targets:[
+      { ins:'EQ-6', param:'air', delta:2.2 }, { ins:'EQ-6', param:'pG', delta:1.5 } ] },
+  { id:'warm',   label:'Warm',   hint:'low body + tube warmth', targets:[
+      { ins:'EQ-6', param:'loG', delta:2.0 }, { ins:'Saturator', param:'mix', delta:0.15 } ] },
+  { id:'smooth', label:'Smooth', hint:'compression — right = more glue', targets:[
+      { ins:'Compressor', param:'ratio', delta:1.2 }, { ins:'Compressor', param:'threshold', delta:-4 }, { ins:'Compressor', param:'makeup', delta:1.5 } ] },
+  { id:'deess',  label:'De-Ess', hint:'tame sibilance — right = more', targets:[
+      { ins:'De-Ess', param:'thr', delta:-6 }, { ins:'De-Ess', param:'ratio', delta:1.5 } ] },
+  { id:'space',  label:'Space',  hint:'reverb send', targets:[ { send:true, delta:0.14 } ] },
+];
+function vdIsDoc(ins){ return !!(ins && (ins._doc || (ins.params && ins.params.__doc))); }
+function vdInsByName(t, name){ return (t.inserts||[]).find(ins => vdIsDoc(ins) && ins.name===name) || null; }
+function vdPdef(name, param){ const d = TIFF_PLUGINS.list.find(p=>p.name===name); return d ? (d.params.find(p=>p.id===param)||null) : null; }
+function vdSourceBuffer(t){
+  let src = (t && t.buffer) ? t.buffer : null;
+  if (t && !t.buffer && typeof clipsOf === 'function'){
+    const cs = clipsOf(t) || [];
+    if (cs.length){ const big = cs.slice().sort((a,b)=>((b.buffer&&b.buffer.duration)||0)-((a.buffer&&a.buffer.duration)||0))[0]; if (big && big.buffer) src = big.buffer; }
+  }
+  return src;
+}
+// measured features → a full vocal-ready baseline (each value clamped to the plugin's range)
+function vdPlan(f){
+  const hpf = Math.round(_clamp(f.bandPct.sub > 0.10 ? 100 : (f.bandPct.sub < 0.04 ? 80 : 90), 70, 120));
+  const mudVsBody = f.bandPct.mud / (f.bandPct.body + 1e-9);
+  const mG  = +_clamp(mudVsBody > 0.6 ? -(mudVsBody - 0.6) * 7 : 0, -4, 0).toFixed(2);
+  const pG  = +_clamp(f.bandPct.presence < 0.12 ? 2.2 : 1.2, 0, 3).toFixed(2);
+  const air = +_clamp(f.tilt < -2 ? 2.5 : 1.5, 0, 3).toFixed(2);
+  const dx     = Math.round(_clamp(f.sibPeakHz || 6500, 5000, 9000));
+  const dthr   = +_clamp(f.rmsDb + 6, -30, -8).toFixed(1);
+  const dratio = +_clamp(2 + Math.max(0, f.sibRatio - 0.18) * 12, 2, 4).toFixed(1);
+  const cthr   = +_clamp(f.rmsDb + 3, -28, -12).toFixed(1);
+  const cratio = +_clamp(1.6 + Math.max(0, f.crestDb - 10) * 0.22, 2, 4).toFixed(1);
+  const grAtRms = Math.max(0, f.rmsDb - cthr) * (1 - 1 / cratio);
+  const cmk = +_clamp(grAtRms * 0.5, 0, 4).toFixed(1);
+  return {
+    'EQ-6':       { hpf, loG:0, mF:320, mG, mQ:1.1, pF:3500, pG, pQ:1.0, air, lpf:20000 },
+    'De-Ess':     { x:dx, thr:dthr, ratio:dratio, rel:70 },
+    'Compressor': { threshold:cthr, ratio:cratio, knee:6, attack:12, release:180, makeup:cmk, mix:0.85, detector:1 },
+    'Saturator':  { mode:1, drive:4, bias:0.18, emph:3000, mix:0.22 },
+    space: 0.18,
+  };
+}
+function vdBuildChain(t, plan){
+  t.inserts = (t.inserts || []).filter(ins => !vdIsDoc(ins));    // drop the previous Doctor chain, keep the user's inserts
+  const doc = VDOC_CHAIN.map(name => ({ name, params: Object.assign({ __doc:1 }, plan[name]), _doc:true }));
+  t.inserts = doc.concat(t.inserts);                             // corrective chain first (PT order)
+  t.send = plan.space;                                           // global reverb send
+}
+function vdSummary(f, det, plan){
+  const eq = plan['EQ-6'], de = plan['De-Ess'], cp = plan['Compressor'];
+  return [
+    `Heard a ${det.type.toUpperCase()} (confidence ${det.confidence}).`,
+    `Measured — RMS ${f.rmsDb.toFixed(1)} dB, crest ${f.crestDb.toFixed(1)} dB, sibilance ${(f.sibRatio*100|0)}% of presence+air, tilt ${f.tilt.toFixed(1)} dB/oct.`,
+    `Built: HPF ${eq.hpf} Hz${eq.mG<=-0.7?`, ${eq.mG} dB mud @ ${eq.mF}`:''}, +${eq.pG} dB presence, +${eq.air} dB air → De-Ess @ ${de.x} Hz (${de.ratio}:1) → Comp ${cp.ratio}:1 @ ${cp.threshold} dB (mix ${Math.round(cp.mix*100)}%) → light tube → reverb send ${gdbStr(plan.space)} dB.`,
+    `HONESTY: ${det.disclaimer} The "Your Edge" sliders only move within a safe band around these settings — slide to taste, you can't wreck it. Trust your ears over the meter.`,
+  ].join(' ');
+}
+function vdMacroValue(t, mac, u){
+  const tg = mac.targets[0];
+  if (tg.send){ const sv=_clamp(t._doctor.base.space + (u-0.5)*2*tg.delta, 0, 0.6); return { v:sv, readout:gdbStr(sv)+' dB' }; }
+  const base = t._doctor.base[tg.ins+'.'+tg.param], pdef = vdPdef(tg.ins, tg.param) || { min:-99, max:99 };
+  const v = _clamp(base + (u-0.5)*2*tg.delta, pdef.min, pdef.max);
+  const dbP = (tg.param==='air'||tg.param==='loG'||tg.param==='pG'||tg.param==='thr'||tg.param==='threshold');
+  const r = Math.round(v*10)/10;
+  const readout = tg.param==='ratio' ? (r+':1') : (dbP ? ((r>0?'+':'')+r+' dB') : String(r));
+  return { v, readout };
+}
+function vdApplyMacro(t, mac, u){
+  if (!t._doctor) return;
+  t._doctor.macroU[mac.id] = u;
+  mac.targets.forEach(tg => {
+    if (tg.send){
+      const v = +_clamp(t._doctor.base.space + (u-0.5)*2*tg.delta, 0, 0.6).toFixed(3);
+      t.send = v; applyTrack(t); return;
+    }
+    const ins = vdInsByName(t, tg.ins); if (!ins) return;
+    const pdef = vdPdef(tg.ins, tg.param); if (!pdef) return;
+    const base = t._doctor.base[tg.ins+'.'+tg.param];
+    let v = _clamp(base + (u-0.5)*2*tg.delta, pdef.min, pdef.max);
+    v = +v.toFixed((tg.param==='mix'||tg.param==='ratio') ? 2 : 1);
+    if (!ins.params) ins.params = {};
+    ins.params[tg.param] = v;
+    const idx = t.inserts.indexOf(ins);
+    if (t.live && t.live.insertNodes && t.live.insertNodes[idx] && t.live.insertNodes[idx].set) {
+      try { t.live.insertNodes[idx].set(tg.param, v); } catch(e){}
+    }
+  });
+}
+async function runVocalDoctor(t, btn){
+  if (!t || t.type==='aux' || t.type==='master'){ flash('Vocal Doctor works on an audio track'); return; }
+  const buf = vdSourceBuffer(t);
+  if (!buf){ flash('Add a vocal to this track first'); return; }
+  if (btn){ btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = '🩺 listening…'; }
+  try {
+    try { if (typeof ensureCtx === 'function') ensureCtx(); } catch(e){}
+    const m = await measure(buf);
+    if (!m.ok){ flash('Could not analyze this track'); return; }
+    const f = m.features, det = detectType(f), plan = vdPlan(f);
+    vdBuildChain(t, plan);
+    const base = { space: plan.space };
+    VDOC_MACROS.forEach(mac => mac.targets.forEach(tg => { if (!tg.send) base[tg.ins+'.'+tg.param] = (plan[tg.ins]||{})[tg.param]; }));
+    t._doctor = { features:f, det, base, macroU:{}, summary: vdSummary(f, det, plan) };
+    if (typeof renderMixWindow === 'function') renderMixWindow();
+    if (selTrackId===t.id && typeof renderChannel==='function') renderChannel(t);
+    if (playing) restartPlayback();
+    vdOpenPanel(t);
+    flash(det.type==='vocal' ? 'Vocal Doctor — ready chain built ✓' : "Doctor built a vocal chain (heads-up: this didn't measure like a solo vocal)");
+  } finally {
+    if (btn){ btn.disabled = false; btn.textContent = btn.dataset._t || '🩺 Vocal Doctor'; }
+  }
+}
+function vdOpenPanel(t){
+  if (!t._doctor) return;
+  const id = 'vdoc-' + t.id;
+  const old = document.getElementById(id); if (old) old.remove();
+  const w = document.createElement('div'); w.className = 'plugwin vdoc'; w.id = id;
+  w.innerHTML =
+    `<div class="pw-bar"><span class="pw-title">🩺 Vocal Doctor</span><span class="pw-track"></span><button class="pw-x" title="close">✕</button></div>`+
+    `<div class="pw-body">`+
+      `<div class="ai-summary vdoc-honesty"><div class="ai-summary-h">🩺 what I heard &amp; built</div><div class="ai-summary-body"></div></div>`+
+      `<div class="vdoc-edge-h">Your Edge — shape it, safely</div>`+
+      `<div class="vdoc-rows"></div>`+
+      `<div class="vdoc-foot"><button class="vdoc-btn" data-a="reset">Reset to Doctor</button><button class="vdoc-btn" data-a="redo">Re-analyze</button></div>`+
+    `</div>`;
+  document.body.appendChild(w);
+  w.style.left = '180px'; w.style.top = '108px';
+  w.querySelector('.pw-track').textContent = t.name;
+  w.querySelector('.vdoc-honesty .ai-summary-body').textContent = t._doctor.summary;
+  const rows = w.querySelector('.vdoc-rows');
+  VDOC_MACROS.forEach(mac => {
+    const u0 = (t._doctor.macroU[mac.id] != null) ? t._doctor.macroU[mac.id] : 0.5;
+    const row = document.createElement('div'); row.className = 'pw-row vdoc-row';
+    row.innerHTML = `<label></label><input type="range" min="0" max="1" step="0.01"><output></output>`;
+    row.querySelector('label').textContent = mac.label;
+    row.querySelector('label').title = mac.hint;
+    const rng = row.querySelector('input'), out = row.querySelector('output');
+    rng.value = String(u0);
+    const draw = (uu) => { out.textContent = vdMacroValue(t, mac, uu).readout; };
+    rng.oninput = () => { const uu = parseFloat(rng.value); vdApplyMacro(t, mac, uu); draw(uu); };
+    vdApplyMacro(t, mac, u0); draw(u0);   // assert the baseline (center = the Doctor's setting)
+    rows.appendChild(row);
+  });
+  w.querySelector('.pw-x').onclick = () => w.remove();
+  w.querySelector('[data-a="reset"]').onclick = () => {
+    VDOC_MACROS.forEach(mac => vdApplyMacro(t, mac, 0.5));
+    if (typeof renderMixWindow === 'function') renderMixWindow();
+    if (playing) restartPlayback();
+    vdOpenPanel(t);
+  };
+  w.querySelector('[data-a="redo"]').onclick = () => runVocalDoctor(t, null);
+  makeDraggable(w, w.querySelector('.pw-bar'));
+  bringFront(w);
+}
 function buildStrip(t, auxes){
   const isAux = t.type==='aux';
   const el=document.createElement("div"); el.className="mstrip"+(isAux?" aux":"")+(t.muted?" muted":"")+(t.inactive?" inactive":""); el.dataset.id=t.id;
@@ -4410,6 +4600,7 @@ function buildStrip(t, auxes){
     <div class="ms-top"><span class="cdot" style="background:${t.color}"></span><span class="ms-nm" title="double-click to rename">${t.name}</span></div>
     ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
     ${isAux?``:`<button class="ms-auto" type="button" title="Analyze &amp; propose bounded EQ/comp moves — real FFT">✨ Auto-mix</button>
+    <button class="ms-doc" type="button" title="Vocal Doctor — analyze the vocal &amp; build a full ready chain you can shape safely">🩺 Vocal Doctor</button>
     <div class="ms-lbl">EQ / Dyn</div>
     <div class="ms-eq">
       <div class="ms-eqk"><output></output><div class="cknob xs" data-k="lo"><span class="cknob-ind"></span></div><label>LO</label></div>
@@ -4442,6 +4633,7 @@ function buildStrip(t, auxes){
   el.querySelectorAll('.ms-eq .ms-eqk').forEach(w=>{ const kn=w.querySelector('.cknob'), o=w.querySelector('output'), k=kn.dataset.k; const [min,max]=KRANGE[k];
     bindStripKnob(kn,o,min,max,KSTEP[k],()=>trackVal(t,k),v=>{ setTrackVal(t,k,v); applyTrack(t); },v=>fmtK(k,v),0); });
   const _au=el.querySelector('.ms-auto'); if(_au) _au.onclick=async(e)=>{ e.stopPropagation(); await runAutoMix(t,e.currentTarget); renderMixWindow(); const _ln=$("lane-"+t.id), _b=_ln&&_ln.querySelector('.ai-summary-body'); if(_b) showFloatingSummary(_b.textContent); };
+  const _vd=el.querySelector('.ms-doc'); if(_vd) _vd.onclick=(e)=>{ e.stopPropagation(); runVocalDoctor(t, e.currentTarget); };
   el.onclick=(e)=>{ if(!e.target.closest("button,select,.cknob,.ms-slot,.ms-in")) { selectTrack(t); } };
   return el;
 }
