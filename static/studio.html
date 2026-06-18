@@ -4388,7 +4388,14 @@ async function buildProjectPayload(title) {
 
 async function saveProject() {
   if (!tracks.length) { studioStatus("Nothing to save — add a track first.", true); return; }
-  const title = (prompt("Save project as:", "mix") || "").trim();
+  if (currentFolderDir) {                       // a disk session is open → Save writes back to the folder, no prompt
+    studioStatus("Saving…");
+    const payload = await buildProjectPayload(currentFolderName);
+    const ok = await writeDiskSession(payload, false);
+    studioStatus(ok ? ("Saved “" + currentFolderName + "” to disk ✓") : "Disk save failed", !ok);
+    return;
+  }
+  const title = (prompt("Save project as:", _lastTitle || "mix") || "").trim();
   if (!title) return;
   ensureCtx();
   studioStatus("Saving “" + title + "”…");
@@ -4424,6 +4431,7 @@ async function autosave(reason){
     const j = await res.json();
     if (j && j.ok) {
       if (!currentProjectId) currentProjectId = j.id;
+      if (currentFolderDir) writeDiskSession(payload, true);   // also drop a timestamped backup in the disk folder
       const t = new Date(); const hh = String(t.getHours()).padStart(2,'0'), mm = String(t.getMinutes()).padStart(2,'0');
       studioStatus("Auto-backed up ✓ " + hh + ":" + mm);
     }
@@ -4431,6 +4439,54 @@ async function autosave(reason){
   _autosaveBusy = false;
 }
 setInterval(() => autosave("timer"), 5 * 60 * 1000);          // every 5 minutes (owner's ask)
+
+/* ── SAVE TO A FOLDER ON YOUR OWN DISK — a real Pro-Tools-style session folder
+   (<chosen>/<Name>/<Name>.ark + Audio Files/ Bounced Files/ Session File Backups/).
+   Pick the destination once; after that, Save (Ctrl+S) and auto-backup write there too.
+   The app runs locally, so the backend writing the folder == writing to B's computer. ── */
+let currentFolderDir = null, currentFolderName = null;     // the disk session folder, once chosen
+async function writeDiskSession(payload, backup){
+  if(!currentFolderDir) return false;
+  try{
+    const r = await fetch("/api/studio/session/save-to-folder", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ dir: currentFolderDir, name: currentFolderName, payload, backup: !!backup }) });
+    const j = await r.json(); return !!(j && j.ok);
+  }catch(e){ return false; }
+}
+async function saveSessionToFolder(){
+  if(!tracks.length){ studioStatus("Nothing to save — add a track first.", true); return; }
+  const name = (prompt("Session name (a folder with this name is created on your computer):", _lastTitle || "My Song") || "").trim();
+  if(!name) return;
+  studioStatus("Choose where to save…");
+  let dir;
+  try{ dir = (await (await fetch("/api/studio/session/pick-folder", { method:"POST" })).json()).path; }
+  catch(e){ studioStatus("Folder picker failed: " + e.message, true); return; }
+  if(!dir){ studioStatus("Save cancelled"); return; }
+  currentFolderDir = dir; currentFolderName = name; _lastTitle = name;
+  studioStatus("Saving session folder…");
+  const payload = await buildProjectPayload(name);
+  const j = await (await fetch("/api/studio/session/save-to-folder", { method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ dir, name, payload }) })).json();
+  if(j && j.ok) studioStatus("Saved to " + j.path + " ✓");
+  else { studioStatus("Save failed: " + (j && j.error || "?"), true); currentFolderDir = null; }
+}
+async function openSessionFromFolder(){
+  studioStatus("Choose a session (.ark)…");
+  let path;
+  try{ path = (await (await fetch("/api/studio/session/pick-file", { method:"POST" })).json()).path; }
+  catch(e){ studioStatus("File picker failed: " + e.message, true); return; }
+  if(!path){ studioStatus("Open cancelled"); return; }
+  try{
+    const j = await (await fetch("/api/studio/session/read-file", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ path }) })).json();
+    if(!j || !j.ok) throw new Error(j && j.error || "read failed");
+    currentProjectId = null;                                       // disk session — a server Save would fork a new project
+    currentFolderDir = (j.dir || "").replace(/[\\/][^\\/]+$/, ""); // parent of the session folder → re-save writes back here
+    currentFolderName = j.name; _lastTitle = j.name;
+    await applyProjectPayload(j.payload);
+    studioStatus("Opened “" + j.name + "” from disk ✓");
+  }catch(e){ studioStatus("Open failed: " + e.message, true); }
+}
 
 /* LOAD — fetch a project, restore master/verb, then rebuild every track THROUGH
    the existing track-creation path (laneUi/renderInserts/applyTrack). */
@@ -4442,6 +4498,12 @@ async function loadProject(id) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const proj = await res.json();
     currentProjectId = id;   // re-saving a loaded project updates it, not duplicates it
+    await applyProjectPayload(proj);
+  } catch (e) { studioStatus("Load failed: " + e.message, true); }
+}
+// restore a full session from a payload object — shared by server-load AND disk-folder (.ark) open
+async function applyProjectPayload(proj) {
+  try {
     const c = ensureCtx();
 
     // wipe the current board first — don't leave the old mix mixed in
@@ -4549,7 +4611,7 @@ async function loadProject(id) {
     ensureMasterLane();                 // show the Master Fader lane iff this session has one (removes a stale one otherwise)
     applyMix();                         // re-apply mute/solo across ALL tracks once loaded (solo is global — per-track applyTrack during the loop saw partial state)
     $("drop").style.display = tracks.length ? "none" : "flex";
-    studioStatus("Loaded “" + (proj.title || id) + "” ✓");
+    studioStatus("Loaded “" + (proj.title || "session") + "” ✓");
   } catch (e) { studioStatus("Load failed: " + e.message, true); }
 }
 
@@ -5397,6 +5459,9 @@ function laneUiTake(t, placeAt) {
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
     if ((menuId === "edit" || menuId === "clip") && L === "To Selection") return onSel(t => trimToSelection(t));
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
+    if (menuId === "file"        && /^Open Project/.test(L))   return () => openSessionFromFolder();   // open a .ark from a disk folder
+    if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
+    if (menuId === "file"        && (/^Save As/.test(L) || /^Save Copy/.test(L))) return () => saveSessionToFolder();   // save a real session FOLDER on your disk
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => openNewTracksDialog();   // real PT New Tracks dialog
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
     if (menuId === "help"        && /Update/i.test(L))         return () => flash("ARKITECT is up to date ✓");
