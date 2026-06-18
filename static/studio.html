@@ -595,9 +595,11 @@
   .menubar .kit-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
   .menubar .kit-fab.in-bar canvas { width:19px; height:19px; }   /* match the Visual Lab — keep Kit's face small + aligned in the bar (studio was missing this → Kit too big) */
   /* blank-slate hero: Kit's face instead of the abstract diamond (frame 0 of the 9-frame sprite sheet, gently floating) */
-  .drop-spark.kit { width:74px; height:74px; margin:0 auto 10px; background:url(/static/kit-sprites.png) no-repeat 0 50%; background-size:900% auto;
+  .drop-spark.kit { width:88px; height:88px; margin:0 auto 12px; background:url(/static/kit.png) center/contain no-repeat;   /* the WHOLE Kit (256² standalone, not the cropped sprite sheet) */
     filter:drop-shadow(0 6px 18px rgba(62,156,184,.5)); animation:kitFloat 3.6s ease-in-out infinite; }
   @keyframes kitFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-5px); } }
+  .drop-h1 { transition:opacity .32s ease; }   /* rotating-quote crossfade */
+  .drop-by { margin-top:9px; font:600 12px 'Space Mono'; letter-spacing:.05em; color:var(--teal); opacity:0; transition:opacity .32s ease; min-height:15px; }
   .mb-panel { z-index:9999; min-width:240px; max-height:calc(100vh - 64px); overflow-y:auto; overflow-x:hidden;
     padding:5px; background:#1C1D24; border:1px solid rgba(255,255,255,.1); border-radius:10px;
     box-shadow:0 20px 54px rgba(0,0,0,.62); }
@@ -790,7 +792,8 @@
     <div class="drop" id="drop">
     <div class="drop-hero">
       <div class="drop-spark kit" title="Yo — it's Kit"></div>
-      <div class="drop-h1">What's up — let's make something.</div>
+      <div class="drop-h1" id="dropQuote">Let's make something.</div>
+      <div class="drop-by" id="dropQuoteBy"></div>
       <div class="drop-h2">Drop your stems anywhere here — vocals, beat, anything (MP3 / WAV). Each file becomes a lane.</div>
       <div class="drop-actions">
         <button class="drop-btn" id="qsAdd">＋ Add stems</button>
@@ -4668,6 +4671,41 @@ $("qsAdd").onclick   = (e) => { e.stopPropagation(); $("addfiles").click(); };
 $("qsTrack").onclick = (e) => { e.stopPropagation(); openNewTracksDialog(); };
 $("qsRec").onclick   = (e) => { e.stopPropagation(); $("rec").click(); };
 $("qsOpen").onclick  = (e) => { e.stopPropagation(); openLoadMenu($("qsOpen")); };
+// ── blank-slate ROTATING QUOTES — real lines from the greats + producers/engineers (verbatim, verified),
+//    rolled on each empty-board show + every ~9s while it's up. House "DeMartin" lines at the bottom — edit freely. ──
+const QUOTES = [
+  { text:"I'm not a businessman, I'm a business, man.", by:"Jay-Z" },
+  { text:"I will spark the brain that will change the world.", by:"Tupac" },
+  { text:"Be the truest form of yourself.", by:"Missy Elliott" },
+  { text:"My vice is probably creating. I'm addicted to creating.", by:"André 3000" },
+  { text:"Everything I'm not made me everything I am.", by:"Kanye West" },
+  { text:"I want my voice and my words to marry the beat.", by:"Nas" },
+  { text:"Always go a little further into the water than you feel you're capable of being in.", by:"David Bowie" },
+  { text:"Everyone has a creative impulse, and has the right to create, and should.", by:"Patti Smith" },
+  { text:"Without people, you're nothing.", by:"Joe Strummer" },
+  { text:"Punk rock should mean freedom — playing whatever you want, as sloppy as you want.", by:"Kurt Cobain" },
+  { text:"Get in your garage and just suck.", by:"Dave Grohl" },
+  { text:"Inspiration and work ethic — they ride right next to each other.", by:"Jack White" },
+  { text:"Inspiration comes first. You come next. The audience comes last.", by:"Rick Rubin" },
+  { text:"I have no technical ability, and I know nothing about music.", by:"Rick Rubin" },
+  { text:"Honour thy error as a hidden intention.", by:"Brian Eno" },
+  { text:"If it sounds good, if it sounds fun, and if it rocks, then it's right.", by:"Sylvia Massy" },
+  { text:"I don't want it to be perfect, because humans aren't perfect, so the music shouldn't be.", by:"Dr. Dre" },
+  { text:"EQing before you've heard the source is like salting your food before you've tasted it.", by:"Bruce Swedien" },
+  { text:"I always try to make their next record, not their last record.", by:"Nile Rodgers" },
+  { text:"The take you almost didn't keep is usually the one.", by:"DeMartin" },
+  { text:"Mix it 'til it feels like you — not 'til it sounds like them.", by:"DeMartin" },
+];
+let _qIdx = -1, _qTimer = null;
+function rollQuote(){
+  const el = $("dropQuote"), by = $("dropQuoteBy"); if(!el) return;
+  let n; do { n = Math.floor(Math.random()*QUOTES.length); } while(QUOTES.length>1 && n===_qIdx); _qIdx = n;
+  const q = QUOTES[n];
+  el.style.opacity = 0; if(by) by.style.opacity = 0;
+  setTimeout(()=>{ el.textContent = "“"+q.text+"”"; if(by) by.textContent = "— "+q.by; el.style.opacity = 1; if(by) by.style.opacity = 0.85; }, 200);
+}
+function startQuotes(){ rollQuote(); clearInterval(_qTimer); _qTimer = setInterval(()=>{ const d=$("drop"); if(d && d.style.display!=='none') rollQuote(); }, 9000); }
+startQuotes();
 document.body.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
 document.body.addEventListener("dragleave", () => $("drop").classList.remove("over"));
 document.body.addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("over");
