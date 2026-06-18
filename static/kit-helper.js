@@ -1,4 +1,4 @@
-/* KIT — the in-room build-bot helper. A draggable "Ask Kit" window with his
+/* KIT — the in-room build-bot helper. A draggable "Yo, Kit" window with his
    animated sprite + a text box, wired to /api/kit (room-aware brain). Loads in
    every ROOM and self-skips the main chat (that's Tiff's house) + non-rooms.
    Self-contained; injected by pinkroom-nav.js, same pattern as the exit pill. */
@@ -95,7 +95,7 @@
   win.innerHTML =
     `<div class="kit-bar"><span class="kit-spr"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-body"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask Kit about this room…"></textarea><button class="kit-go" title="ask">➤</button></div>`;
+     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-go" title="ask">➤</button></div>`;
   document.body.appendChild(win);
   win.querySelector(".kit-spr").appendChild(winSpr.cv);
   const body = win.querySelector(".kit-body"), input = win.querySelector(".kit-in"), go = win.querySelector(".kit-go");
@@ -108,11 +108,11 @@
   }
   addMsg("kit", `Hey — I'm Kit. I know my way around ${ROOMS[room]}. Stuck on anything? Ask me and I'll walk you through it.`);
 
-  // ── floating "Ask Kit" button ──
+  // ── floating "Yo, Kit" button ──
   const fabSpr = makeSprite(28, 3);
-  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Ask Kit about this room";
-  fab.appendChild(fabSpr.cv); const lbl = document.createElement("span"); lbl.textContent = "Ask Kit"; fab.appendChild(lbl);
-  const _bar = document.querySelector(".top");
+  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Yo, Kit — your in-room helper";
+  fab.appendChild(fabSpr.cv); const lbl = document.createElement("span"); lbl.textContent = "Yo, Kit"; fab.appendChild(lbl);
+  const _bar = document.querySelector(".kit-mount, .top");
   if (_bar) { fab.classList.add("in-bar"); win.classList.add("from-bar"); _bar.appendChild(fab); } else { document.body.appendChild(fab); }
   fab.onclick = () => { win.classList.toggle("open"); if (win.classList.contains("open")) input.focus(); };
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
