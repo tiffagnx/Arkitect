@@ -133,6 +133,22 @@
   .ts-sn { flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ts-sn:hover { color:#9FCFDD; }
   .ts-sx { color:#E58A8E; cursor:pointer; }
+  /* PT edit-window per-track COLUMNS — inserts A-E/F-J, sends A-E/F-J, I/O (left of the waveform, on every lane) */
+  .lc { flex:none; border-right:1px solid var(--hairline); padding:5px 4px; display:flex; flex-direction:column; gap:3px; overflow:hidden; background:rgba(255,255,255,.012); }
+  .lc-insAE, .lc-insFJ { width:64px; }
+  .lc-sndAE, .lc-sndFJ { width:66px; }
+  .lc-io { width:96px; gap:4px; }
+  .lc-cell { display:flex; align-items:center; gap:4px; min-height:17px; border-radius:4px; padding:1px 4px; font:600 9px Inter; background:rgba(255,255,255,.03); border:1px solid var(--hairline); color:var(--dim); }
+  .lc-cell.filled { background:rgba(124,138,165,.16); border-color:rgba(124,138,165,.4); color:#C9D2E0; cursor:pointer; }
+  .lc-cell.filled.byp { opacity:.45; }
+  .lc-cell.add { border-style:dashed; cursor:pointer; }
+  .lc-cell.add:hover { border-color:rgba(62,156,184,.5); color:#9FCFDD; }
+  .lc-cell.blank { opacity:.32; }
+  .lc-let { font:700 8px 'Space Mono'; color:var(--dim); width:7px; flex:none; text-transform:lowercase; }
+  .lc-nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lc-io .io-sel { width:100%; padding:3px 5px; font:600 9.5px Inter; border-radius:5px; }
+  .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:17px; margin-bottom:4px; }
+  .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:16px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
   .lane.masterlane.sel { border-color:rgba(200,146,74,.75); box-shadow:0 0 0 1px rgba(200,146,74,.4), 0 0 22px rgba(200,146,74,.12); }
@@ -2595,6 +2611,50 @@ function bindLaneDrag(d, t){
     document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
   });
 }
+// ── PT edit-window per-track COLUMNS — render the inserts A-E/F-J + sends A-E/F-J + I/O on each lane ──
+const _INS_LET = "abcdefghij";
+function renderInsertCol(t, host, startIdx){
+  if(!host) return; host.innerHTML=""; t.inserts = t.inserts||[];
+  for(let k=0;k<5;k++){
+    const i=startIdx+k, ins=t.inserts[i]; const cell=document.createElement("div");
+    if(ins){ cell.className="lc-cell filled"+(ins.bypassed?" byp":"");
+      cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span><span class="lc-nm" title="${ins.name}">${ins.name}</span>`;
+      cell.onclick=(e)=>{ e.stopPropagation(); openPluginWindow(t,i); };
+      cell.oncontextmenu=(e)=>{ e.preventDefault(); e.stopPropagation(); if(typeof closeTrackWindows==='function') closeTrackWindows(t); t.inserts.splice(i,1); renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(playing) restartPlayback(); };
+    } else if(i===t.inserts.length){ cell.className="lc-cell add";
+      cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span><span class="lc-nm">+ insert</span>`;
+      cell.onclick=(e)=>{ e.stopPropagation(); openPluginMenu(cell, t.type==='master', (name)=>{ t.inserts[i]={name,params:{},bypassed:false}; renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); if(playing) restartPlayback(); openPluginWindow(t,i); }, ()=>openTune(t)); };
+    } else { cell.className="lc-cell blank"; cell.innerHTML=`<span class="lc-let">${_INS_LET[i]}</span>`; }
+    host.appendChild(cell);
+  }
+}
+function renderSendCol(t, host, letters){
+  if(!host) return; host.innerHTML="";
+  letters.forEach(Lt=>{ const s=sendInSlot(t,Lt), b=(s&&s.bus)?busById(s.bus):null;
+    const cell=document.createElement("div"); cell.className="lc-cell"+(b?" filled":" add")+(s&&s.on===false?" byp":"");
+    cell.innerHTML=`<span class="lc-let">${Lt.toLowerCase()}</span><span class="lc-nm" title="${b?b.name:'send '+Lt}">${b?b.name:'—'}</span>`;
+    cell.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(cell,'send',t,Lt,()=>{ renderLaneCols(t); if(selTrackId===t.id) renderChannel(t); }); };
+    host.appendChild(cell);
+  });
+}
+function renderLaneCols(t){
+  const d=document.getElementById('lane-'+t.id); if(!d) return;
+  renderInsertCol(t, d.querySelector('.lc-insAE'), 0);
+  renderInsertCol(t, d.querySelector('.lc-insFJ'), 5);
+  renderSendCol(t, d.querySelector('.lc-sndAE'), BANK_AE);
+  renderSendCol(t, d.querySelector('.lc-sndFJ'), BANK_FJ);
+  const li=d.querySelector('.lio-in'), lo=d.querySelector('.lio-out');
+  if(li) li.textContent=ioLabel(t,'input'); if(lo) lo.textContent=ioLabel(t,'output');
+}
+function ensureColHeader(){
+  const tr=$("tracks"); if(!tr) return;
+  let h=document.getElementById('colHeader');
+  if(!h){ h=document.createElement('div'); h.id='colHeader'; h.className='col-header';
+    h.innerHTML=`<div class="chh" style="width:212px;border-right:none"></div><div class="chh" style="width:64px">INSERTS A-E</div><div class="chh" style="width:64px">INSERTS F-J</div><div class="chh" style="width:66px">SENDS A-E</div><div class="chh" style="width:66px">SENDS F-J</div><div class="chh" style="width:96px;border-right:none">I/O</div>`;
+    tr.insertBefore(h, tr.firstChild);
+  }
+  h.style.display = tracks.length ? 'flex' : 'none';
+}
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
   clipsOf(t);                                            // make sure the clip model exists
@@ -2609,18 +2669,22 @@ function laneUi(t) {
         <div class="ts-ctl vol" title="drag up / down — volume"><span class="ts-k">VOL</span><b class="ts-v"></b><span class="ts-fill"></span></div>
         <div class="ts-ctl pan" title="drag up / down — pan"><span class="ts-k">PAN</span><b class="ts-v"></b></div>
       </div>
-      <div class="ts-slots"></div>
     </div>
+    <div class="lc lc-insAE"></div>
+    <div class="lc lc-insFJ"></div>
+    <div class="lc lc-sndAE"></div>
+    <div class="lc lc-sndFJ"></div>
+    <div class="lc lc-io"><button class="io-sel lio-in" title="track input"></button><button class="io-sel lio-out" title="track output"></button></div>
     <canvas class="wave" width="1200" height="${laneH}" style="height:${laneH}px"></canvas>`;
   $("tracks").appendChild(d);
   drawLane(t); updateZoomUi();
-  d.onclick = (e) => { if (!e.target.closest(".ts-x,.ts-btn,.ts-ctl,.ts-slots,.ts-name,.wave")) selectTrack(t); };
+  d.onclick = (e) => { if (!e.target.closest(".ts-x,.ts-btn,.ts-ctl,.lc,.ts-name,.wave")) selectTrack(t); };
   const _strip = d.querySelector(".tstrip"); if(_strip) _strip.oncontextmenu = (e) => showTrackMenu(t, e);
   bindLaneDrag(d, t);
   const nm = d.querySelector(".ts-name"); nm.ondblclick = (e) => { e.stopPropagation(); renameTrack(t, nm); };
   d.querySelector(".ts-x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
-    $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "flex"; };
+    $("drop").style.display = tracks.filter(x=>x.buffer).length ? "none" : "flex"; ensureColHeader(); };
   const mb = d.querySelector(".ts-btn.m"), sb = d.querySelector(".ts-btn.s"), rb = d.querySelector(".ts-btn.r");
   mb.classList.toggle("on", t.muted); sb.classList.toggle("on", t.solo); rb.classList.toggle("on", !!t.armed);
   mb.onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; mb.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
@@ -2628,7 +2692,10 @@ function laneUi(t) {
   rb.onclick = (e) => { e.stopPropagation(); setArm(t, !t.armed); };
   bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, v => v.toFixed(2), true);
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
-  renderStripSlots(t, d.querySelector(".ts-slots"));
+  renderLaneCols(t);
+  const _li=d.querySelector('.lio-in'); if(_li) _li.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(_li,'input',t,null,()=>renderLaneCols(t)); };
+  const _lo=d.querySelector('.lio-out'); if(_lo) _lo.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(_lo,'output',t,null,()=>renderLaneCols(t)); };
+  ensureColHeader();
   const wv = d.querySelector(".wave");
   // TOOL-AWARE: Grab(move anywhere) · Trim(resize edge) · Select(highlight) · Smart(auto)
   wv.onmousedown = (e) => {
