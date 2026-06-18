@@ -4020,6 +4020,27 @@ function dataUrlToArrayBuffer(dataUrl) {
 }
 
 let currentProjectId = null;   // set after first save / after a load → re-saves UPDATE in place instead of duplicating
+// after a load, normalize routing to the new model: legacy aux-id outputs → that aux's bus, legacy
+// {toAux} sends → that aux's bus + a free slot, fill defaults, drop sends whose bus no longer exists.
+function migrateLegacySends(){
+  const slots=[...BANK_AE, ...BANK_FJ];
+  tracks.forEach(t=>{
+    if(t.output && t.output!=='master' && !busById(t.output)){            // legacy aux-id output → its bus
+      const ao=tracks.find(x=>x.id===t.output && x.type==='aux');
+      t.output = (ao && ao.inputBus) ? ao.inputBus : 'master';
+    }
+    if(!t.sends || !t.sends.length) return;
+    const used=new Set(t.sends.filter(s=>s.slot).map(s=>s.slot));
+    t.sends.forEach(s=>{
+      if(!s.bus && s.toAux){ const aux=tracks.find(x=>x.id===s.toAux && x.type==='aux'); if(aux && aux.inputBus) s.bus=aux.inputBus; }
+      if('toAux' in s) delete s.toAux;
+      if(!s.slot){ const L=slots.find(x=>!used.has(x)); if(L){ s.slot=L; used.add(L); } }
+      if(s.level==null) s.level=0;
+      if(s.on===undefined) s.on=true;
+    });
+    t.sends = t.sends.filter(s=> s.bus && busById(s.bus) && s.slot);
+  });
+}
 async function buildProjectPayload(title) {
   const trackData = [];
   for (const t of tracks) {
@@ -4032,8 +4053,10 @@ async function buildProjectPayload(title) {
       inserts: (t.inserts || []).map(ins => ({ name: ins.name, params: { ...ins.params }, bypassed: !!ins.bypassed })),
       muted: !!t.muted, solo: !!t.solo,
       offset: t.offset || 0,
+      input: t.input || 'none',
       output: t.output || 'master',
-      sends: (t.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
+      inputBus: t.inputBus || null,
+      sends: (t.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
@@ -4044,6 +4067,7 @@ async function buildProjectPayload(title) {
   return {
     id: currentProjectId,   // null on first save → backend mints one; reused after → updates the same project
     title,
+    buses: buses.map(b => ({ id:b.id, name:b.name, stereo:b.stereo!==false, color:b.color })),
     master: { mGain: parseFloat($("mGain").value), mLim: parseFloat($("mLim").value) },
     verb: {
       vSize: parseFloat($("vSize").value), vTone: parseFloat($("vTone").value),
@@ -4093,6 +4117,9 @@ async function loadProject(id) {
       const t = tracks.pop();
       const lane = $("lane-" + t.id); if (lane) lane.remove();
     }
+    // restore the BUS registry FIRST so tracks resolve their input/output/sends to real buses
+    buses = Array.isArray(proj.buses) ? proj.buses.map(b => ({ id:b.id, name:b.name, stereo:b.stereo!==false, color:b.color||nextStemColor() })) : [];
+    busSeq = buses.length;
 
     // restore master + verb sliders, then fire change events so the live bus updates
     if (proj.master) {
@@ -4113,12 +4140,17 @@ async function loadProject(id) {
 
     // rebuild each saved track through the real track path
     for (const td of (proj.tracks || [])) {
-      if (td.type === 'aux') {                 // FX bus — no audio, just plugins
-        const t = { id: td.id || Math.random().toString(36).slice(2), name: td.name || "FX Bus", type:'aux',
+      if (td.type === 'aux') {                 // Aux Input track — listens to a bus, holds FX
+        let inputBus = td.inputBus || null;
+        if (!inputBus) { const b = addBus(td.name || null, true); inputBus = b.id; }                 // old save: mint a bus for this aux
+        else if (!busById(inputBus)) buses.push({ id:inputBus, name:td.name||"Bus", stereo:true, color:td.color||nextStemColor() });  // dangling-ref safety
+        const t = { id: td.id || rid(), name: td.name || "Aux", type:'aux',
+          inputBus, input: td.input || inputBus, output: td.output || 'master',
+          sends: (td.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
           gain: td.gain != null ? td.gain : 0.9, pan: td.pan != null ? td.pan : 0,
           eq: { lo: td.eq?.lo||0, mid: td.eq?.mid||0, hi: td.eq?.hi||0 }, comp: td.comp || 0, send: td.send || 0,
           inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params||{}) }, bypassed: !!ins.bypassed })),
-          muted: !!td.muted, solo: !!td.solo, src:null, live:null };
+          muted: !!td.muted, solo: !!td.solo, color: td.color || nextStemColor(), src:null, live:null };
         tracks.push(t); auxLaneUi(t);
         const al = $("lane-"+t.id);
         al.querySelectorAll(".strip input[type=range]").forEach(inp => { if(inp.dataset.k==="gain") inp.value=t.gain; if(inp.dataset.k==="pan") inp.value=t.pan; });
@@ -4147,8 +4179,9 @@ async function loadProject(id) {
         inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params || {}) }, bypassed: !!ins.bypassed })),
         muted: !!td.muted, solo: !!td.solo,
         offset: td.offset || 0,
+        input: td.input || 'none',
         output: td.output || 'master',
-        sends: (td.sends || []).map(s => ({ toAux: s.toAux, level: s.level })),
+        sends: (td.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
         src: null, live: null,
       };
       tracks.push(t);
@@ -4168,6 +4201,7 @@ async function loadProject(id) {
       renderInserts(t);          // show the insert rack with its values
       applyTrack(t);
     }
+    migrateLegacySends();               // normalize legacy {toAux}/aux-id routing → slotted {bus} sends now that all auxes exist
     refreshSendMenus();                 // now that all buses exist, render every stem's sends
     $("drop").style.display = tracks.length ? "none" : "block";
     studioStatus("Loaded “" + (proj.title || id) + "” ✓");
