@@ -306,6 +306,7 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .ph-ruler{position:absolute;top:0;bottom:0;width:1.5px;background:var(--red);z-index:11;pointer-events:none}
 .tick{position:absolute;top:0;height:100%;border-left:1px solid var(--line);font:600 9px var(--mono);
   color:var(--dim2);padding:3px 0 0 4px}
+.subtick{position:absolute;bottom:0;height:7px;border-left:1px solid rgba(255,255,255,.16);pointer-events:none}
 
 .ghost{position:fixed;pointer-events:none;z-index:9999;background:var(--vclip);border:1px solid var(--vclip-b);
   border-radius:5px;padding:5px 9px;font:600 11px var(--ui);color:#eafafe;opacity:.9;box-shadow:0 6px 20px rgba(0,0,0,.5)}
@@ -450,7 +451,7 @@ body.mode-simple .director-only{display:none!important}
       <button class="tool" id="snapBtn" title="Snap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v8a6 6 0 0012 0V3"/><path d="M3 21h18"/></svg></button>
       <button class="tool" id="delBtn" title="Delete (Del)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
       <span class="lbl" id="modeHint" style="margin-left:10px"></span>
-      <div class="zoom"><span class="lbl">Zoom</span><input type="range" id="zoom" min="2" max="60" value="12"/></div>
+      <div class="zoom"><span class="lbl">Zoom</span><input type="range" id="zoom" min="1" max="120" step="0.5" value="12"/><span class="lbl" id="zoomLbl" style="min-width:54px">12 px/f</span></div>
     </div>
     <div class="tl-grid">
       <div class="tl-corner"></div>
@@ -811,12 +812,19 @@ async function drawClipWave(el,c){
     ctx.fillRect(x,(h-bh)/2,1,bh);}
 }
 function renderRuler(){
-  [...ruler.querySelectorAll('.tick')].forEach(e=>e.remove());
-  const fps=FPS();let stepF=fps;
-  const targets=[fps/6,fps/2,fps,fps*2,fps*5,fps*10,fps*30,fps*60];
-  for(const s of targets){if(s*ppf>=66){stepF=s;break;}stepF=targets[targets.length-1];}
-  const total=tlWidthFrames();
-  for(let f=0;f<=total;f+=stepF){const d=document.createElement('div');d.className='tick';
+  [...ruler.querySelectorAll('.tick,.subtick')].forEach(e=>e.remove());
+  const fps=FPS(),total=tlWidthFrames();
+  // MAJOR labeled ticks land on whole frames; pick the smallest "nice" frame step
+  // wide enough (~72px) that the timecode labels don't crowd.
+  const nice=[1,2,5,10,fps,fps*2,fps*5,fps*10,fps*30,fps*60].map(v=>Math.max(1,Math.round(v)));
+  let majF=nice[nice.length-1];
+  for(const s of nice){if(s*ppf>=72){majF=s;break;}}
+  // MINOR per-frame ticks — once a frame is wide enough to cut on (and the count is sane),
+  // mark EVERY frame so you can see/cut the 24 (or 60) frames inside each second.
+  if(ppf>=7&&total<=2600&&majF>1){
+    for(let f=0;f<=total;f++){if(f%majF===0)continue;const d=document.createElement('div');d.className='subtick';d.style.left=(f*ppf)+'px';ruler.appendChild(d);}
+  }
+  for(let f=0;f<=total;f+=majF){const d=document.createElement('div');d.className='tick';
     d.style.left=(f*ppf)+'px';d.textContent=tc(f);ruler.appendChild(d);}
 }
 
@@ -1434,8 +1442,26 @@ function insertTrack(tr,kind){
   else project.tracks.push(tr);
   renderTimeline();save(true);
 }
-$('#zoom').oninput=e=>{const f=playhead;ppf=+e.target.value;renderTimeline();
-  lanesWrap.scrollLeft=f*ppf-lanesWrap.clientWidth/2;};
+function applyPpf(centerFrame){
+  ppf=clamp(ppf,1,120);
+  const z=$('#zoom');if(z)z.value=ppf;
+  const zl=$('#zoomLbl');if(zl)zl.textContent=(Math.round(ppf*10)/10)+' px/f';
+  renderTimeline();
+  if(centerFrame!=null)lanesWrap.scrollLeft=Math.max(0,centerFrame*ppf-lanesWrap.clientWidth/2);
+}
+$('#zoom').oninput=e=>{ppf=+e.target.value;applyPpf(playhead);};
+// Ctrl/Alt/⌘ + wheel over the timeline = zoom centered on the cursor (frame under the cursor stays put)
+function tlWheelZoom(e){
+  if(!(e.ctrlKey||e.altKey||e.metaKey))return;        // plain wheel still scrolls
+  e.preventDefault();
+  const rect=lanesWrap.getBoundingClientRect(),localX=e.clientX-rect.left;
+  const frameAtCursor=(localX+lanesWrap.scrollLeft)/ppf;
+  ppf=clamp(ppf*(e.deltaY<0?1.25:1/1.25),1,120);
+  applyPpf(null);
+  lanesWrap.scrollLeft=Math.max(0,frameAtCursor*ppf-localX);
+}
+lanesWrap.addEventListener('wheel',tlWheelZoom,{passive:false});
+ruler.parentElement.addEventListener('wheel',tlWheelZoom,{passive:false});
 $('#mSimple').onclick=()=>setMode('simple');$('#mDirector').onclick=()=>setMode('director');
 function setMode(m){document.body.className='mode-'+m;
   $('#mSimple').classList.toggle('on',m==='simple');$('#mDirector').classList.toggle('on',m==='director');
@@ -1464,6 +1490,8 @@ window.addEventListener('keydown',e=>{
   else if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){e.preventDefault();openCompSettings();}
   else if(e.key==="'"&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleOv('grid');toast('Grid '+(OV.grid?'on':'off'));}
   else if(e.key===';'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleOv('guides');toast('Guides '+(OV.guides?'on':'off'));}
+  else if((e.key==='='||e.key==='+')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf*1.3,1,120);applyPpf(playhead);}
+  else if((e.key==='-'||e.key==='_')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf/1.3,1,120);applyPpf(playhead);}
 });
 
 // ── PROJECTS: SAVE / OPEN / NEW ────────────────────────────────────────
@@ -1806,7 +1834,7 @@ window.addEventListener('resize',fitScreen);
     refreshInspector();drawFrame();save();toast(label+' · '+n+' keyframe'+(n>1?'s':''));}
   function gotoTimePrompt(){const v=prompt('Go to time (seconds):','');if(v==null)return;
     const f=Math.round(parseFloat(v)*FPS());if(isFinite(f)){stop();setPlayhead(clamp(f,0,timelineFrames()),true);}}
-  function zoomTimeline(d){ppf=clamp(ppf*(d>0?1.3:1/1.3),2,80);const z=$('#zoom');if(z)z.value=ppf;renderTimeline();}
+  function zoomTimeline(d){ppf=clamp(ppf*(d>0?1.3:1/1.3),1,120);applyPpf(playhead);}
   function togglePanel(cls){document.body.classList.toggle(cls);fitScreen();renderTimeline();}
   function showShortcuts(){toast('V select · C razor · Space play · ←/→ frame · ⌫ delete · Ctrl+Z undo · Ctrl+K comp settings');}
 
