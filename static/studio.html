@@ -912,6 +912,7 @@ function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
 let zoom=1, scrollT=0, laneH=104, snapOn=true, gridNote=16, vZoom=1;
+let markers=[];   // memory locations: [{id,t,name}] — drawn on the ruler, recalled by click, saved with the session
 let tool='grab', SEL=null;   // edit tool: grab(move) | trim | select(highlight) | smart ; SEL = {trackId,a,b} time range
 function gridStep(){ return (60/curTempo()) * (4/gridNote); }   // seconds per grid line (1/gridNote note)
 function viewDur(){ return maxDur()/zoom; }
@@ -2714,10 +2715,20 @@ function ensureRuler(){
     r.innerHTML=`<div class="ruler-side"><span class="rs-l rs-bars">BARS|BEATS</span><span class="rs-l rs-secs">MIN:SECS</span></div><canvas class="ruler-cv" id="rulerCv" width="1200" height="34"></canvas>`;
     tr.insertBefore(r, tr.firstChild);                      // ruler sits ABOVE the column header
     const cv=r.querySelector('#rulerCv');
-    cv.addEventListener('mousedown', (e)=>{ const rc=cv.getBoundingClientRect(); seek(Math.max(0, scrollT+(e.clientX-rc.left)/rc.width*viewDur())); drawRuler(); });
+    cv.addEventListener('mousedown', (e)=>{ const rc=cv.getBoundingClientRect(); const x=e.clientX-rc.left; const t=Math.max(0, scrollT+x/rc.width*viewDur());
+      const hit=markers.find(m=>Math.abs(t2x(m.t,cv.width)-x)<=6); seek(hit?hit.t:t); drawRuler(); });   // click a marker flag → recall it; else move playhead
+    cv.addEventListener('dblclick', (e)=>{ const rc=cv.getBoundingClientRect(); const x=e.clientX-rc.left;
+      const i=markers.findIndex(m=>Math.abs(t2x(m.t,cv.width)-x)<=7); if(i>=0){ markers.splice(i,1); drawRuler(); flash("Marker removed"); } });
   }
   r.style.display = tracks.length ? 'flex' : 'none';
   drawRuler();
+}
+// drop a memory location at the playhead (Enter) — recall by clicking it on the ruler, remove by double-click
+function addMarker(t){
+  const at=(t==null)?pos():t;
+  markers.push({ id:rid(), t:at, name:"Marker "+(markers.length+1) });
+  markers.sort((a,b)=>a.t-b.t);
+  drawRuler(); flash("Marker dropped at "+_fmtRulerTime(at,0.1));
 }
 function drawRuler(){
   const cv=document.getElementById('rulerCv'); if(!cv || !tracks.length) return;
@@ -2743,6 +2754,13 @@ function drawRuler(){
     const labeled = bar%labelEvery===0;
     if(barPx>=9 || labeled){ g.strokeStyle=labeled?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,midY); g.stroke(); }
     if(labeled){ g.fillStyle="rgba(210,216,226,0.82)"; g.fillText(String(bar+1), x+3, 11); }
+  }
+  // markers (memory locations)
+  g.font="700 8px 'Space Mono'"; g.textBaseline="alphabetic";
+  for(const mk of markers){ const x=t2x(mk.t,W); if(x<-2||x>W) continue;
+    g.strokeStyle="rgba(230,180,80,0.65)"; g.lineWidth=1; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
+    g.fillStyle="rgba(230,180,80,0.92)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x+8,0); g.lineTo(x,7); g.closePath(); g.fill();
+    if(mk.name){ g.fillStyle="rgba(244,214,150,0.9)"; g.fillText(mk.name, x+10, 8); }
   }
   // playhead marker
   const ph=t2x(pos(),W);
@@ -4180,6 +4198,14 @@ document.addEventListener("keydown", (e) => {
   if (REC.capturing) { stopRecording(); return; }
   playing ? pauseAll() : playAll();
 });
+// transport / navigation keys (Pro Tools-ish): Home = return to zero, End = go to end, Enter = drop a marker
+document.addEventListener("keydown", (e) => {
+  const el=e.target; if(el && (/^(input|textarea|select)$/i.test(el.tagName) || el.isContentEditable)) return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key==="Home"){ e.preventDefault(); seek(0); scrollT=0; relayoutAll(); }
+  else if(e.key==="End"){ e.preventDefault(); seek(maxDur()); }
+  else if(e.key==="Enter"){ if(!tracks.length) return; e.preventDefault(); addMarker(); }
+});
 $("vEdit").onclick = () => setView('edit');
 $("vMix").onclick  = () => setView('mix');
 // zoom / lane-height / snap / horizontal scroll
@@ -4234,6 +4260,10 @@ function tickUi() {
   const _bl=60/curTempo(), _barL=_bl*4, _bar=Math.floor(p/_barL)+1, _beat=Math.floor((p%_barL)/_bl)+1;   // Bars|Beats main counter (4/4)
   $("clock").textContent = `${_bar}|${_beat}  ${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
   if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
+  if (playing && viewMode !== 'mix') {                  // keep the playhead on screen when zoomed in (page-flip)
+    const vd = viewDur();
+    if (vd < dur - 1e-6 && (p > scrollT + vd * 0.92 || p < scrollT)) { scrollT = Math.max(0, Math.min(dur - vd, p - vd * 0.1)); relayoutAll(); }
+  }
   // playheads — a take's wave spans only ITS buffer starting at t.offset, so
   // map the transport playhead into the clip's local time.
   if (viewMode !== 'mix') tracks.forEach(t => {
@@ -4458,6 +4488,7 @@ async function buildProjectPayload(title) {
     session: {                                              // the song's spine — must survive a reload
       bpm: parseFloat($("recBpm").value) || 120,
       grid: gridNote, snap: !!snapOn, loop: !!loop,
+      markers: markers.map(m => ({ t: m.t, name: m.name })),
     },
     tracks: trackData,
   };
@@ -4617,7 +4648,8 @@ async function applyProjectPayload(proj) {
       if (proj.session.grid != null) { gridNote = proj.session.grid; if ($("gridSel")) $("gridSel").value = String(proj.session.grid); }
       if (proj.session.snap != null) { snapOn = !!proj.session.snap; if ($("snapBtn")) $("snapBtn").classList.toggle("on", snapOn); }
       if (proj.session.loop != null) { loop = !!proj.session.loop; if ($("loop")) $("loop").classList.toggle("on", loop); }
-    }
+      markers = Array.isArray(proj.session.markers) ? proj.session.markers.map(m => ({ id: rid(), t: m.t, name: m.name })) : [];
+    } else { markers = []; }
     _lastTitle = proj.title || _lastTitle;
 
     // rebuild each saved track through the real track path
