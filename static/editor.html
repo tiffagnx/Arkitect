@@ -876,6 +876,7 @@ function clipFilter(c,f,kpx){
 }
 function isIdentity(c,f){
   if(c.blend&&c.blend!=='source-over')return false;
+  if((c.scaleX!=null&&c.scaleX!==1)||(c.scaleY!=null&&c.scaleY!==1))return false;
   const fr=f-c.start;
   return pval(c,'posX',fr,0)===0&&pval(c,'posY',fr,0)===0&&pval(c,'scale',fr,1)===1&&pval(c,'rotation',fr,0)===0
     &&pval(c,'fxBlur',fr,0)===0&&pval(c,'fxBright',fr,1)===1&&pval(c,'fxContrast',fr,1)===1
@@ -934,7 +935,7 @@ function drawClip(ctx,c,f,src,sw,sh,W,H){
   ctx.filter=clipFilter(c,f,k);
   ctx.translate(W/2+pval(c,'posX',fr,0)*k, H/2+pval(c,'posY',fr,0)*k);
   const rot=pval(c,'rotation',fr,0);if(rot)ctx.rotate(rot*Math.PI/180);
-  const sc=pval(c,'scale',fr,1);if(sc!==1)ctx.scale(sc,sc);
+  const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)ctx.scale(sx,sy);
   ctx.translate(-W/2,-H/2);
   stageFit(ctx,src,sw,sh,W,H);
   ctx.restore();
@@ -956,6 +957,7 @@ function drawTextClip(ctx,c,f,W,H){
   ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=0;ctx.shadowOffsetX=2*k;ctx.shadowOffsetY=2*k;
   ctx.translate(baseX+pval(c,'posX',fr,0)*k, baseY+pval(c,'posY',fr,0)*k);
   if(rot)ctx.rotate(rot*Math.PI/180);
+  const _sx=(c.scaleX==null?1:c.scaleX),_sy=(c.scaleY==null?1:c.scaleY);if(_sx!==1||_sy!==1)ctx.scale(_sx,_sy);
   ctx.fillText(c.text||'',0,0);
   ctx.restore();
 }
@@ -965,7 +967,7 @@ function drawSolidClip(ctx,c,f,W,H){
   ctx.save();ctx.globalAlpha=a;ctx.globalCompositeOperation=c.blend||'source-over';ctx.filter=clipFilter(c,f,k);
   ctx.translate(W/2+pval(c,'posX',fr,0)*k,H/2+pval(c,'posY',fr,0)*k);
   const rot=pval(c,'rotation',fr,0);if(rot)ctx.rotate(rot*Math.PI/180);
-  const sc=pval(c,'scale',fr,1);if(sc!==1)ctx.scale(sc,sc);
+  const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)ctx.scale(sx,sy);
   ctx.translate(-W/2,-H/2);
   ctx.fillStyle=c.color||'#6a6a6a';ctx.fillRect(ox,oy,fw,fh);
   ctx.restore();
@@ -1051,15 +1053,15 @@ function layerCenter(c,W,H){
 function clipQuad(c,W,H){
   const {k}=stageBox(W,H),fr=playhead-c.start,ctr=layerCenter(c,W,H);
   const rot=pval(c,'rotation',fr,0)*Math.PI/180,cos=Math.cos(rot),sin=Math.sin(rot);
-  let hw,hh;
+  let hw,hh;const ax=Math.abs(c.scaleX==null?1:c.scaleX),ay=Math.abs(c.scaleY==null?1:c.scaleY);
   if(isTextClip(c)){
     const sz=((c.size||72)*k)*pval(c,'scale',fr,1);
     sctx.save();sctx.font=`700 ${sz}px Inter, system-ui, sans-serif`;const tw=sctx.measureText(c.text||' ').width;sctx.restore();
-    hw=Math.max(8,tw/2);hh=Math.max(8,sz*0.62);
+    hw=Math.max(8,tw/2*ax);hh=Math.max(8,sz*0.62*ay);
   }else{
     const wh=mediaWH(c);if(!wh)return null;
     const stW=project.width*k,stH=project.height*k,s=Math.min(stW/wh.sw,stH/wh.sh),sc=pval(c,'scale',fr,1);
-    hw=wh.sw*s*sc/2;hh=wh.sh*s*sc/2;
+    hw=wh.sw*s*sc*ax/2;hh=wh.sh*s*sc*ay/2;
   }
   return [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([x,y])=>({x:ctr.x+x*cos-y*sin,y:ctr.y+x*sin+y*cos}));
 }
@@ -1111,7 +1113,9 @@ function startMove(e,sc,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc
   vdrag={mode:'move',c,p0,posX0:pval(c,'posX',fr,0),posY0:pval(c,'posY',fr,0),k};}
 function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start;
   const pivot=layerCenter(c,W,H);
-  vdrag={mode:'scale',c,handle,pivot,d0:Math.hypot(p0.x-pivot.x,p0.y-pivot.y)||1,scale0:pval(c,'scale',fr,1)};}
+  vdrag={mode:'scale',c,handle,pivot,p0,d0:Math.hypot(p0.x-pivot.x,p0.y-pivot.y)||1,scale0:pval(c,'scale',fr,1),
+    scaleX0:(c.scaleX==null?1:c.scaleX),scaleY0:(c.scaleY==null?1:c.scaleY),
+    dx0:Math.abs(p0.x-pivot.x)||1,dy0:Math.abs(p0.y-pivot.y)||1};}
 screen.addEventListener('pointermove',e=>{
   if(!vdrag){ // cursor affordance
     if(tool==='select'){const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),sc=selClip();
@@ -1122,7 +1126,10 @@ screen.addEventListener('pointermove',e=>{
   if(vdrag.mode==='move'){const k=vdrag.k;let nx=vdrag.posX0+(x-vdrag.p0.x)/k,ny=vdrag.posY0+(y-vdrag.p0.y)/k;
     if(e.shiftKey){if(Math.abs(x-vdrag.p0.x)>Math.abs(y-vdrag.p0.y))ny=vdrag.posY0;else nx=vdrag.posX0;}
     writeProp(c,'posX',Math.round(nx));writeProp(c,'posY',Math.round(ny));}
-  else{const d=Math.hypot(x-vdrag.pivot.x,y-vdrag.pivot.y);let s=Math.max(0.01,+(vdrag.scale0*(d/vdrag.d0)).toFixed(3));writeProp(c,'scale',s);}
+  else{const h=vdrag.handle;
+    if(h==='e'||h==='w'){const f=Math.abs(x-vdrag.pivot.x)/vdrag.dx0;writeProp(c,'scaleX',Math.max(0.01,+(vdrag.scaleX0*f).toFixed(3)));}
+    else if(h==='n'||h==='s'){const f=Math.abs(y-vdrag.pivot.y)/vdrag.dy0;writeProp(c,'scaleY',Math.max(0.01,+(vdrag.scaleY0*f).toFixed(3)));}
+    else{const d=Math.hypot(x-vdrag.pivot.x,y-vdrag.pivot.y);writeProp(c,'scale',Math.max(0.01,+(vdrag.scale0*(d/vdrag.d0)).toFixed(3)));}}
   drawFrame();
 });
 screen.addEventListener('pointerup',e=>{if(!vdrag)return;try{screen.releasePointerCapture(e.pointerId);}catch{}vdrag=null;refreshInspector();save(true);});
@@ -1766,6 +1773,8 @@ window.addEventListener('resize',fitScreen);
     if(s.clip.freeze!=null){s.clip.freeze=null;toast('Freeze off');}
     else{s.clip.freeze=clamp(playhead-s.clip.start,0,Math.max(0,s.clip.dur-1));toast('Frozen @ frame '+s.clip.freeze);}
     drawFrame();save();}
+  function flipH(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);s.clip.scaleX=-(s.clip.scaleX==null?1:s.clip.scaleX);refreshInspector();drawFrame();save();toast('Flip Horizontal');}
+  function flipV(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);s.clip.scaleY=-(s.clip.scaleY==null?1:s.clip.scaleY);refreshInspector();drawFrame();save();toast('Flip Vertical');}
   function addKeyframeSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
     toggleKeyHere(s.clip,'opacity');refreshInspector();drawFrame();save();toast('Opacity keyframe @ playhead');}
   function setEaseSel(ez,label){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
@@ -1876,6 +1885,8 @@ window.addEventListener('resize',fitScreen);
       if(/to Back$/i.test(L))return ()=>arrangeSel('back');
       if(/^Time-Reverse Layer$/i.test(L))return timeReverseSel;
       if(/^Freeze Frame$/i.test(L))return freezeFrameSel;
+      if(/^Flip Horizontal$/i.test(L))return flipH;
+      if(/^Flip Vertical$/i.test(L))return flipV;
     }
     if(menuId==='edit'&&LABEL_COLORS.hasOwnProperty(L))return ()=>setLabel(L);
     if(menuId==='view'&&/^(Full|Half|Third|Quarter)$/.test(L))return ()=>setResolution(L);
