@@ -162,7 +162,14 @@
   .lc-nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .lc-io .io-sel { width:100%; padding:3px 6px; font:600 9.5px Inter; border-radius:5px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lc-io .ts-ctl { min-height:0; padding:3px 7px; align-items:center; text-align:center; }   /* center VOL/PAN value in its box */
-  .col-header { position:sticky; top:0; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
+  /* TIME RULER — pinned above the lanes; left side = row labels, canvas = Bars|Beats (top) + Min:Secs (bottom) aligned to the waveform */
+  .ruler { position:sticky; top:0; z-index:7; display:flex; align-items:stretch; height:34px; background:var(--bg1); border-bottom:1px solid var(--hairline); }
+  .ruler-side { width:508px; flex:none; border-right:1px solid var(--hairline); display:flex; flex-direction:column; justify-content:center; padding:0 9px; gap:3px; background:rgba(255,255,255,.012); }
+  .ruler-side .rs-l { font:700 7.5px 'Space Mono'; letter-spacing:.14em; line-height:1; }
+  .ruler-side .rs-bars { color:rgba(160,168,182,.7); }
+  .ruler-side .rs-secs { color:rgba(160,168,182,.42); }
+  .ruler-cv { flex:1; min-width:0; height:34px; display:block; cursor:text; }
+  .col-header { position:sticky; top:34px; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
   .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:17px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
   .lane.masterlane:hover { border-color:rgba(200,146,74,.55); }
@@ -916,7 +923,7 @@ function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.
   const hz=document.getElementById("hzoomSlider"); if(hz && document.activeElement!==hz) hz.value=zoomToSlider(zoom);   // keep slider thumb in lockstep with +/- buttons + Ctrl+wheel
   const hp=document.getElementById("hzoomPct"); if(hp){ const vd=viewDur(); hp.textContent = vd<1 ? (vd*1000).toFixed(vd<0.05?1:0)+"ms" : vd.toFixed(vd<10?2:1)+"s"; }   // show the visible span so you can see how deep you are
   const vz=document.getElementById("vzoomSlider"); if(vz && document.activeElement!==vz) vz.value=laneH; }
-function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); }
+function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); drawRuler(); }
 function setZoom(z){ zoom=Math.max(ZMIN,Math.min(zMax(),z)); relayoutAll(); }
 // zoom by a factor while keeping the playhead (or view centre) under the same spot —
 // so pressing + drills straight into where you're working, all the way to milliseconds
@@ -2688,6 +2695,59 @@ function ensureColHeader(){
     tr.insertBefore(h, tr.firstChild);
   }
   h.style.display = tracks.length ? 'flex' : 'none';
+  ensureRuler();
+}
+/* ── TIME RULER — the primary navigation surface. Bars|Beats on top, Min:Secs on the
+   bottom, aligned to the waveform via the same scrollT/viewDur/t2x as the lanes, with
+   adaptive tick density and a playhead marker. Click it to move the playhead. ── */
+function _niceStep(raw, set){ for(const v of set){ if(v>=raw) return v; } return set[set.length-1]; }
+function _fmtRulerTime(t, step){
+  if(t<0) t=0; const m=Math.floor(t/60), s=t-m*60;
+  if(step>=1)   return m+":"+String(Math.round(s)).padStart(2,'0');
+  if(step>=0.1) return m+":"+s.toFixed(1).padStart(4,'0');
+  return s.toFixed(3)+"s";                                 // sub-100ms → seconds.millis
+}
+function ensureRuler(){
+  const tr=$("tracks"); if(!tr) return;
+  let r=document.getElementById('ruler');
+  if(!r){ r=document.createElement('div'); r.id='ruler'; r.className='ruler';
+    r.innerHTML=`<div class="ruler-side"><span class="rs-l rs-bars">BARS|BEATS</span><span class="rs-l rs-secs">MIN:SECS</span></div><canvas class="ruler-cv" id="rulerCv" width="1200" height="34"></canvas>`;
+    tr.insertBefore(r, tr.firstChild);                      // ruler sits ABOVE the column header
+    const cv=r.querySelector('#rulerCv');
+    cv.addEventListener('mousedown', (e)=>{ const rc=cv.getBoundingClientRect(); seek(Math.max(0, scrollT+(e.clientX-rc.left)/rc.width*viewDur())); drawRuler(); });
+  }
+  r.style.display = tracks.length ? 'flex' : 'none';
+  drawRuler();
+}
+function drawRuler(){
+  const cv=document.getElementById('rulerCv'); if(!cv || !tracks.length) return;
+  if(cv.clientWidth && cv.width!==cv.clientWidth) cv.width=cv.clientWidth;
+  const g=cv.getContext('2d'), W=cv.width, H=cv.height, midY=Math.round(H/2); g.clearRect(0,0,W,H);
+  const vd=viewDur(); if(vd<=0) return;
+  g.fillStyle="rgba(255,255,255,0.02)"; g.fillRect(0,0,W,midY);
+  // Min:Secs (bottom)
+  const SECS=[0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,15,30,60,120,300,600];
+  const sStep=_niceStep(vd/(W/90), SECS);
+  g.font="600 8.5px 'Space Mono'"; g.textBaseline="alphabetic";
+  for(let i=Math.ceil(scrollT/sStep); ; i++){ const t=i*sStep, x=t2x(t,W); if(x>W) break; if(x<-44) continue;
+    g.strokeStyle="rgba(160,168,182,0.32)"; g.beginPath(); g.moveTo(x,midY); g.lineTo(x,H); g.stroke();
+    g.fillStyle="rgba(200,206,216,0.62)"; g.fillText(_fmtRulerTime(t,sStep), x+3, H-4);
+  }
+  // Bars|Beats (top) — 4/4 for now
+  const bpm=curTempo(), beatLen=60/bpm, barLen=beatLen*4, barPx=barLen/vd*W;
+  if(beatLen/vd*W>=7){ for(let b=Math.ceil(scrollT/beatLen); ; b++){ const t=b*beatLen, x=t2x(t,W); if(x>W) break; if(x<0) continue;
+    if(b%4!==0){ g.strokeStyle="rgba(255,255,255,0.06)"; g.beginPath(); g.moveTo(x,midY-7); g.lineTo(x,midY); g.stroke(); } } }
+  const labelEvery=Math.max(1, Math.ceil(46/Math.max(1,barPx)));
+  g.font="700 9px 'Space Mono'";
+  for(let bar=Math.floor(scrollT/barLen); ; bar++){ const t=bar*barLen, x=t2x(t,W); if(x>W) break; if(x<-44) continue;
+    const labeled = bar%labelEvery===0;
+    if(barPx>=9 || labeled){ g.strokeStyle=labeled?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.1)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,midY); g.stroke(); }
+    if(labeled){ g.fillStyle="rgba(210,216,226,0.82)"; g.fillText(String(bar+1), x+3, 11); }
+  }
+  // playhead marker
+  const ph=t2x(pos(),W);
+  if(ph>=0 && ph<=W){ g.fillStyle="#E6557A"; g.beginPath(); g.moveTo(ph-4,0); g.lineTo(ph+4,0); g.lineTo(ph,6); g.closePath(); g.fill();
+    g.strokeStyle="rgba(230,85,122,0.5)"; g.lineWidth=1; g.beginPath(); g.moveTo(ph,0); g.lineTo(ph,H); g.stroke(); }
 }
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
@@ -4171,7 +4231,8 @@ $("tracks").addEventListener("wheel", (e) => {
 function tickUi() {
   requestAnimationFrame(tickUi);
   const p = pos(), dur = maxDur();
-  $("clock").textContent = `${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
+  const _bl=60/curTempo(), _barL=_bl*4, _bar=Math.floor(p/_barL)+1, _beat=Math.floor((p%_barL)/_bl)+1;   // Bars|Beats main counter (4/4)
+  $("clock").textContent = `${_bar}|${_beat}  ${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
   if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
   // playheads — a take's wave spans only ITS buffer starting at t.offset, so
   // map the transport playhead into the clip's local time.
@@ -4183,6 +4244,7 @@ function tickUi() {
     g.strokeStyle = "rgba(255,255,255,0.92)"; g.lineWidth = 2;
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
+  if (viewMode !== 'mix') drawRuler();                  // ruler ticks + moving playhead marker
   // meters
   const lvlOf = (a) => { const d = new Uint8Array(a.fftSize); a.getByteTimeDomainData(d);
     let mx = 0; for (const v of d) mx = Math.max(mx, Math.abs(v - 128) / 128); return mx; };
