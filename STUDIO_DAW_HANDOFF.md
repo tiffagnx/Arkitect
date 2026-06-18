@@ -68,7 +68,24 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — match Pro Tools (owner gave a full live walkthrough 2026-06-18), then the EDITING beast.
+## 3. THE NEXT TASK — AUTONOMOUS (owner asleep 2026-06-18, said "don't stop, finish the full job, don't wait for me").
+> **WORK CONTINUOUSLY, commit per verified slice, keep this handoff + memory current so a context reset resumes cleanly.**
+> Immediate build order (no research — owner said just build):
+> 1. **ZOOM RANGE** — owner: "yours goes to 100, mine goes to zero." Widen the zoom WAY out (below fit → the
+>    whole song becomes a tiny sliver) AND WAY in (intricate sample-level detail). In studio.html: `setZoom`
+>    clamps `Math.max(1,Math.min(24,z))` — change to ~`Math.max(0.1, Math.min(500, z))`; set `ZMIN=0.1, ZMAX=500`
+>    (the slider log-maps ZMIN..ZMAX; Fit = zoom 1). clampScroll already handles viewDur>maxDur (sliver, room=0).
+>    Make drawClipWave render real peak detail when zoomed deep.
+> 2. **CLIP LOOK** (see memory studio-aux-and-pt-track-reference "CLIP/WAVEFORM display targets"): stereo DUAL
+>    waveform (top+bottom channel), per-clip color, a clip NAME bar across the top, a "0 dB" CLIP-GAIN badge
+>    bottom-left. In drawLane/drawClipWave (studio.html). Ties into clip-gain.md.
+> 3. Trim the now-redundant right-side channel panel (I/O+sends live on the lane columns now).
+> 4. The real **Bounce dialog** (#7) + File-menu depth (Save As Template).
+> Then continue the PT-match polish + the EDITING beast (design/EDITING_MASTER_PLAN.md).
+>
+> _(Below: the PT-match queue status + the original walkthrough capture.)_
+
+## (PT-match) — owner gave a full live walkthrough 2026-06-18, then the EDITING beast.
 > **READ THE MEMORY `studio-aux-and-pt-track-reference.md` FIRST** — the owner walked the entire PT
 > session lifecycle (record → tracks → bussing → inserts → master → bounce) click-by-click; it's all
 > captured there with the exact targets. **DONE so far:** aux now renders as a normal track row (`7e6471e`),

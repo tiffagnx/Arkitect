@@ -904,15 +904,15 @@ function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.
   const hp=document.getElementById("hzoomPct"); if(hp) hp.textContent=Math.round(zoom*100)+"%";
   const vz=document.getElementById("vzoomSlider"); if(vz && document.activeElement!==vz) vz.value=laneH; }
 function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); }
-function setZoom(z){ zoom=Math.max(1,Math.min(24,z)); relayoutAll(); }
+function setZoom(z){ zoom=Math.max(0.1,Math.min(500,z)); relayoutAll(); }
 function setLaneH(h){ laneH=h; tracks.forEach(t=>{ const cv=document.querySelector('#lane-'+t.id+' .wave'); if(cv){ cv.height=h; cv.style.height=h+'px'; drawLane(t); } }); updateZoomUi(); }
 
 // ── WHOLE-VIEW ZOOM (task #1) — the bottom zoom bar drives the existing centralized engine ──
-const ZMIN=1, ZMAX=24;                            // horizontal zoom clamp (matches setZoom)
+const ZMIN=0.1, ZMAX=500;                         // zoom range: 0.1 = whole song shrinks to a sliver … 500 = deep sample-level detail (matches setZoom clamp)
 let laneHMin=44, laneHMax=260;                     // vertical-zoom (global lane-height) bounds
 function sliderToZoom(s){ s=Math.max(0,Math.min(100,s)); return ZMIN*Math.pow(ZMAX/ZMIN, s/100); }   // 0=fit, 100=max (log feel)
 function zoomToSlider(z){ z=Math.max(ZMIN,Math.min(ZMAX,z)); return 100*Math.log(z/ZMIN)/Math.log(ZMAX/ZMIN); }
-function fitZoom(){ return ZMIN; }                 // viewDur()==maxDur() ⟺ whole session visible
+function fitZoom(){ return 1; }                    // Fit = viewDur()==maxDur() ⟺ whole session fills the canvas (zoom 1; ZMIN goes further out to a sliver)
 function fitSession(){ scrollT=0; setZoom(fitZoom()); }
 function setVZoom(h){ setLaneH(Math.max(laneHMin, Math.min(laneHMax, h))); }   // every lane height up/down together
 function zoomToSelection(){
