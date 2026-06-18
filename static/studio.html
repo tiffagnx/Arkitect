@@ -652,6 +652,12 @@
           <button class="tk-btn" id="autoBpmBtn" title="auto-detect tempo from the selected clip">AUTO</button>
         </div>
         <div class="tk-row">
+          <span class="tk-lbl">TIME SIG</span>
+          <input type="number" id="tsNum" min="1" max="16" step="1" value="4" class="tk-num" style="width:40px" title="beats per bar" />
+          <span class="tk-unit">/</span>
+          <select id="tsDen" class="tk-num" style="width:48px" title="beat unit"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select>
+        </div>
+        <div class="tk-row">
           <span class="tk-lbl">KEY</span>
           <span class="tk-key" id="keyVal">—</span>
           <button class="tk-btn" id="autoKeyBtn" title="detect the musical key of the selected clip">DETECT</button>
@@ -913,8 +919,11 @@ function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
 let zoom=1, scrollT=0, laneH=104, snapOn=true, gridNote=16, vZoom=1;
 let markers=[];   // memory locations: [{id,t,name}] — drawn on the ruler, recalled by click, saved with the session
+let tsNum=4, tsDen=4;   // time signature (beats per bar / beat unit) — drives the ruler, count-in, grid &amp; bars|beats counter
 let tool='grab', SEL=null;   // edit tool: grab(move) | trim | select(highlight) | smart ; SEL = {trackId,a,b} time range
 function gridStep(){ return (60/curTempo()) * (4/gridNote); }   // seconds per grid line (1/gridNote note)
+function beatDur(){ return (240/curTempo())/tsDen; }            // seconds per time-signature beat (4/4 → quarter = 60/bpm; 6/8 → eighth)
+function barDur(){ return beatDur()*tsNum; }                    // seconds per bar (tsNum beats)
 function viewDur(){ return maxDur()/zoom; }
 function clampScroll(){ const room=Math.max(0, maxDur()-viewDur()); scrollT=Math.max(0, Math.min(scrollT, room)); }
 function snapTime(x){ x=Math.max(0,x); if(!snapOn) return x; const step=gridStep(); return Math.round(x/step)*step; }   // snap to the selected grid (1/4…1/64)
@@ -2744,10 +2753,10 @@ function drawRuler(){
     g.strokeStyle="rgba(160,168,182,0.32)"; g.beginPath(); g.moveTo(x,midY); g.lineTo(x,H); g.stroke();
     g.fillStyle="rgba(200,206,216,0.62)"; g.fillText(_fmtRulerTime(t,sStep), x+3, H-4);
   }
-  // Bars|Beats (top) — 4/4 for now
-  const bpm=curTempo(), beatLen=60/bpm, barLen=beatLen*4, barPx=barLen/vd*W;
+  // Bars|Beats (top) — time-signature aware
+  const beatLen=beatDur(), barLen=barDur(), barPx=barLen/vd*W;
   if(beatLen/vd*W>=7){ for(let b=Math.ceil(scrollT/beatLen); ; b++){ const t=b*beatLen, x=t2x(t,W); if(x>W) break; if(x<0) continue;
-    if(b%4!==0){ g.strokeStyle="rgba(255,255,255,0.06)"; g.beginPath(); g.moveTo(x,midY-7); g.lineTo(x,midY); g.stroke(); } } }
+    if(b%tsNum!==0){ g.strokeStyle="rgba(255,255,255,0.06)"; g.beginPath(); g.moveTo(x,midY-7); g.lineTo(x,midY); g.stroke(); } } }
   const labelEvery=Math.max(1, Math.ceil(46/Math.max(1,barPx)));
   g.font="700 9px 'Space Mono'";
   for(let bar=Math.floor(scrollT/barLen); ; bar++){ const t=bar*barLen, x=t2x(t,W); if(x>W) break; if(x<-44) continue;
@@ -3837,7 +3846,7 @@ function showAiSummary(lane, t, text) {
 // faint beat grid across the VISIBLE window — so clip moves read against the tempo
 function drawGrid(g, W, H){
   const step=gridStep(); if(step<=0) return; const vd=viewDur(); if(vd/step>420) return;
-  const spb=Math.max(1, Math.round(gridNote/4)), spbar=Math.max(1, gridNote);   // grid lines per beat / per bar
+  const spb=Math.max(1, Math.round(beatDur()/step)), spbar=Math.max(1, Math.round(barDur()/step));   // grid lines per beat / per bar (time-sig aware)
   g.lineWidth = 1;
   for(let i=Math.floor(scrollT/step); ; i++){
     const x=t2x(i*step, W); if(x>W) break; if(x<0) continue;
@@ -4257,7 +4266,7 @@ $("tracks").addEventListener("wheel", (e) => {
 function tickUi() {
   requestAnimationFrame(tickUi);
   const p = pos(), dur = maxDur();
-  const _bl=60/curTempo(), _barL=_bl*4, _bar=Math.floor(p/_barL)+1, _beat=Math.floor((p%_barL)/_bl)+1;   // Bars|Beats main counter (4/4)
+  const _bl=beatDur(), _barL=barDur(), _bar=Math.floor(p/_barL)+1, _beat=Math.floor((p%_barL)/_bl)+1;   // Bars|Beats main counter (time-sig aware)
   $("clock").textContent = `${_bar}|${_beat}  ${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
   if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
   if (playing && viewMode !== 'mix') {                  // keep the playhead on screen when zoomed in (page-flip)
@@ -4488,6 +4497,7 @@ async function buildProjectPayload(title) {
     session: {                                              // the song's spine — must survive a reload
       bpm: parseFloat($("recBpm").value) || 120,
       grid: gridNote, snap: !!snapOn, loop: !!loop,
+      tsNum, tsDen,
       markers: markers.map(m => ({ t: m.t, name: m.name })),
     },
     tracks: trackData,
@@ -4648,6 +4658,8 @@ async function applyProjectPayload(proj) {
       if (proj.session.grid != null) { gridNote = proj.session.grid; if ($("gridSel")) $("gridSel").value = String(proj.session.grid); }
       if (proj.session.snap != null) { snapOn = !!proj.session.snap; if ($("snapBtn")) $("snapBtn").classList.toggle("on", snapOn); }
       if (proj.session.loop != null) { loop = !!proj.session.loop; if ($("loop")) $("loop").classList.toggle("on", loop); }
+      if (proj.session.tsNum) { tsNum = proj.session.tsNum; if ($("tsNum")) $("tsNum").value = tsNum; }
+      if (proj.session.tsDen) { tsDen = proj.session.tsDen; if ($("tsDen")) $("tsDen").value = String(tsDen); }
       markers = Array.isArray(proj.session.markers) ? proj.session.markers.map(m => ({ id: rid(), t: m.t, name: m.name })) : [];
     } else { markers = []; }
     _lastTitle = proj.title || _lastTitle;
@@ -4959,6 +4971,8 @@ function feedbackWatch(level) {
 
 /* ── count-in / tempo ── */
 // ── TEMPO / KEY / COUNT-IN — typed BPM + TAP + AUTO, key detect, segmented count-in ──
+$("tsNum").oninput = $("tsNum").onchange = () => { tsNum = Math.max(1, Math.min(16, Math.round(+$("tsNum").value || 4))); $("tsNum").value = tsNum; relayoutAll(); };
+$("tsDen").onchange = () => { tsDen = +$("tsDen").value || 4; relayoutAll(); };
 $("recBpm").oninput  = () => relayoutAll();   // curTempo() reads recBpm live; redraw the grid
 $("recBpm").onchange = () => { const v = Math.max(40, Math.min(240, Math.round(+$("recBpm").value || 120))); $("recBpm").value = v; relayoutAll(); };
 $("countSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -5277,8 +5291,8 @@ async function armAndRecord() {
   if (c.state === "suspended") await c.resume();
   $("rec").classList.add("armed");
 
-  const bpm = +$("recBpm").value, bars = +$("countBars").value;
-  const beat = 60 / bpm, barLen = beat * 4;
+  const bars = +$("countBars").value;
+  const beat = beatDur(), barLen = barDur();          // time-signature aware count-in
   const countDur = bars * barLen;
 
   // PUNCH-IN: keep the current playhead; otherwise drop to the top so the take
@@ -5289,8 +5303,8 @@ async function armAndRecord() {
 
   // schedule count-in clicks, then start the beat in sync with the downbeat
   const t0 = c.currentTime + 0.12;             // small safety lead
-  for (let b = 0; b < bars * 4; b++) click(c, t0 + b * beat, b % 4 === 0);
-  showCountin(bars * 4, t0, beat);
+  for (let b = 0; b < bars * tsNum; b++) click(c, t0 + b * beat, b % tsNum === 0);
+  showCountin(bars * tsNum, t0, beat);
 
   // transport (the beat) begins AT the downbeat after the count
   const beatStartCtxTime = t0 + countDur;
