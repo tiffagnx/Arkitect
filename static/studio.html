@@ -340,6 +340,8 @@
   .ins-mini:hover { color:#DCE7EC; } .ins-mini.rm:hover { color:#FF7A93; }
   /* aux / FX bus lane + sends */
   .lane.aux { border-color:rgba(124,138,165,.32); }
+  .lane.dragging { opacity:.65; outline:2px dashed var(--pink); outline-offset:-2px; }
+  .lane .ts-top { cursor:grab; }
   .auxbadge { font:700 8px 'Space Mono'; letter-spacing:.14em; color:#CFE0EA; background:rgba(124,138,165,.16);
     border:1px solid rgba(124,138,165,.4); border-radius:6px; padding:2px 7px; margin-right:7px; }
   .sends-rack .send-list { display:flex; flex-direction:column; gap:5px; }
@@ -2564,6 +2566,32 @@ function setArm(t, on){
   tracks.forEach(x=>{ const b=document.querySelector('#lane-'+x.id+' .ts-btn.r'); if(b) b.classList.toggle('on', !!x.armed); });
   if(on) flash('Armed “'+t.name+'” — your next take records onto this track');
 }
+// DRAG-REORDER tracks — press-drag the track header (the name row) up/down to reorder lanes (Pro Tools-style).
+function bindLaneDrag(d, t){
+  const head = d.querySelector('.ts-top'); if(!head) return;
+  head.addEventListener('mousedown', (e) => {
+    if(e.button!==0 || (e.target.closest && e.target.closest('.ts-x'))) return;   // ignore the remove button
+    const startY = e.clientY; let dragging=false; const tracksEl = $("tracks");
+    const onMove = (ev) => {
+      if(!dragging){ if(Math.abs(ev.clientY-startY) < 6) return; dragging=true; d.classList.add('dragging'); document.body.style.cursor='grabbing'; }
+      ev.preventDefault();
+      const lanes = [...tracksEl.querySelectorAll('.lane')].filter(x=>x!==d && x.id!=='lane-__master__');
+      let placed=false;
+      for(const x of lanes){ const r=x.getBoundingClientRect(); if(ev.clientY < r.top + r.height/2){ if(x.previousElementSibling!==d) tracksEl.insertBefore(d, x); placed=true; break; } }
+      if(!placed){ tracksEl.insertBefore(d, document.getElementById('lane-__master__')); }   // drop at the end (above the Master lane)
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+      if(!dragging) return;
+      d.classList.remove('dragging'); document.body.style.cursor='';
+      const order = [...tracksEl.querySelectorAll('.lane')].map(x=>x.id.replace('lane-','')).filter(id=>id!=='__master__');
+      tracks.sort((a,b)=> order.indexOf(a.id) - order.indexOf(b.id));   // tracks[] follows the new DOM order
+      if(viewMode==='mix' && typeof renderMixWindow==='function') renderMixWindow();
+      flash('Reordered tracks');
+    };
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
+  });
+}
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
   clipsOf(t);                                            // make sure the clip model exists
@@ -2585,6 +2613,7 @@ function laneUi(t) {
   drawLane(t); updateZoomUi();
   d.onclick = (e) => { if (!e.target.closest(".ts-x,.ts-btn,.ts-ctl,.ts-slots,.ts-name,.wave")) selectTrack(t); };
   const _strip = d.querySelector(".tstrip"); if(_strip) _strip.oncontextmenu = (e) => showTrackMenu(t, e);
+  bindLaneDrag(d, t);
   const nm = d.querySelector(".ts-name"); nm.ondblclick = (e) => { e.stopPropagation(); renameTrack(t, nm); };
   d.querySelector(".ts-x").onclick = (e) => { e.stopPropagation(); stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
     if (selTrackId === t.id) { selTrackId = null; $("chan").innerHTML = `<div class="empty">Click a track to mix it.</div>`; }
