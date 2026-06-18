@@ -35,6 +35,7 @@ Base before this work: `9c4de5e`. Commits added, newest last — all **verified 
 | `4c78ec4` | **Whole-view zoom** — bottom zoom bar: log H-zoom slider + Fit (`fitSession`) + relocated pan, V lane-height slider (`setVZoom` 44–260, all lanes together). `updateZoomUi` syncs thumbs w/ +/- buttons + Ctrl+wheel. `zoomToSelection` helper ready (no Zoomer tool yet). Engine was already centralized. |
 | `31119ae` | **Bussing slice 3b — I/O click-selectors + Mix-strip sends column.** `renderChannel` (stem+aux) + `buildStrip` use `.io-sel`/`.ms-iosel` buttons → `openRoutePopup` (INPUT+OUTPUT) instead of the old `<select>`; aux gains I/O + a sends rack; Mix strips get a compact A-E sends bank. Matches the PT mix-strip column flow. |
 | `f6a85ad` | **Bussing slice 3c — save/load persistence + legacy migration.** `buildProjectPayload` saves `buses[]` + per-track `input`/`inputBus` + rich `sends`. `loadProject` restores buses FIRST, mints a bus for old auxes, restores all routing. `migrateLegacySends()` converts legacy aux-id outputs + `{toAux}` sends → slotted `{bus}` sends. Verified via real backend round-trips (new + legacy). |
+| `3b828ad` | **Bussing slice 3d — Master Fader is a CREATED track.** `masterTrack.present` flag (default false); output bus (`buildBus`) always runs so audio flows w/ or w/o a Master Fader. `createTracks('master')` makes one (one per session); lane has a ✕ → `removeMasterFader()`. `ensureMasterLane` gated on present; init auto-call removed. `buildMasterChain` gates master inserts on present; `renderMixWindow` shows the strip only when present. Save/load persists `master.present`+`inserts`. **Completes Bussing #13.** |
 
 **What works for a user right now:** open any of the 12 menus; Undo/Redo with labels; Duplicate;
 Cut/Copy/Paste; Insert Silence/Heal/Trim-to-Selection/Consolidate; Mute & Rename clips; Window
@@ -67,16 +68,19 @@ All in `studio-research/` (**gitignored = local scratch on this machine; present
 
 ---
 
-## 3. THE NEXT TASK — Bussing slice 3d (Master Fader as a created track), then Sessions.
-> **DONE & shipped + verified live:** slice 2 (`cc8bdaa`, audio routing), slice 3a (`2bb444b`, routing
-> popup + A-E/F-J matrix UI), slice 3b (`31119ae`, I/O click-selectors + Mix-strip sends column),
-> slice 3c (`f6a85ad`, save/load persistence + legacy migration). Whole-view zoom also shipped
-> (`4c78ec4`). **REMAINING bussing → slice 3d = Master Fader as a created track** (remove the
-> hardcoded MASTER lane; owner model §4 here + `design/sends-bussing-io.md` §4.4 — most invasive, do
-> carefully). **After bussing → the big Sessions/Dashboard feature** (`design/sessions-dashboard.md`:
-> New Session modal + custom templates + save session as a FOLDER on the user's disk + 5-min
-> auto-backup; the doc recommends BACKEND filesystem writes via app.py's `_atomic_write`). Owner also
-> wants the PT Edit-window per-track COLUMN layout (COMMENTS·MIC PRE·INSERTS A-E/F-J·SENDS A-E/F-J·I/O).
+## 3. THE NEXT TASK — Sessions / Dashboard (#2). Bussing #13 is COMPLETE.
+> **BUSSING #13 (owner's #1) is DONE & shipped + verified live:** slice 2 (`cc8bdaa`, audio routing),
+> 3a (`2bb444b`, routing popup + A-E/F-J matrix UI), 3b (`31119ae`, I/O click-selectors + Mix-strip
+> sends column), 3c (`f6a85ad`, save/load persistence + legacy migration), 3d (`3b828ad`, Master Fader
+> is now a created/removable track — output bus always runs). Whole-view zoom also shipped (`4c78ec4`).
+>
+> **NEXT: the big Sessions/Dashboard feature (#2)** — build from `design/sessions-dashboard.md`
+> (build-ready, 5 numbered slices, recommends BACKEND filesystem writes via app.py's `_atomic_write`):
+> New Session modal (Create/Recent/Projects) + custom user templates + save a session as a FOLDER on
+> the user's chosen disk location + 5-min auto-backup. Start with the smallest slice (Dashboard modal +
+> blank Create + Open on today's JSON store), then real disk-folder save, then templates, then backup.
+> Owner also wants the PT Edit-window per-track COLUMN layout (COMMENTS·MIC PRE·INSERTS A-E/F-J·SENDS
+> A-E/F-J·I/O) — a later visual pass. (Folder rename pink-room→arkitect still deferred: cwd/server lock.)
 >
 > _(Original slice-3 plan kept below for the 3d details + the sub-slice breakdown.)_
 > **Slice 2 (audio-graph routing) is DONE & shipped (`cc8bdaa`) and verified live.** The engine
