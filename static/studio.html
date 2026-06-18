@@ -356,6 +356,10 @@
   .io-sel:hover { border-color:rgba(62,156,184,.5); }
   .ms-iosel { width:100%; padding:5px 7px; border-radius:7px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); color:#E8D6E8; font:600 10px Inter; cursor:pointer; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ms-iosel:hover { border-color:rgba(62,156,184,.5); }
+  .ms-sends { margin-top:3px; }
+  .mstrip .send-slot { padding:2px 5px; gap:4px; }
+  .mstrip .ss-name { min-width:0; font-size:9px; }
+  .mstrip .ss-lvl { width:36px; }
   /* floating plugin window */
   .plugwin { position:fixed; z-index:300; min-width:268px; max-width:360px;
     background:
@@ -2907,12 +2911,17 @@ function renderChannel(t){
     const params=[['gain','VOL'],['pan','PAN']];
     let html=`<div class="chan-head"><span class="cdot" style="background:${t.color}"></span><span class="auxbadge">FX BUS</span><span class="name">${t.name}</span></div>`;
     html+=`<div class="chan-actions"><button class="cbtn m${t.muted?' on':''}" id="ca-m">Mute</button><button class="cbtn s${t.solo?' on':''}" id="ca-s">Solo</button></div>`;
+    html+=`<div class="chan-io"><span class="io-lbl">INPUT</span><button class="io-sel" id="ioin-${t.id}">${ioLabel(t,'input')}</button><span class="io-lbl">OUTPUT</span><button class="io-sel" id="ioout-${t.id}">${ioLabel(t,'output')}</button></div>`;
     html+=`<div class="chan-section" style="border-top:none;padding-top:2px">Bus · double-click a knob to reset</div><div class="chan-knobs">`;
     params.forEach(([k,lbl])=>html+=`<div class="cknob-wrap"><output id="cko-${t.id}-${k}"></output><div class="cknob" id="ckn-${t.id}-${k}"><span class="cknob-ind"></span></div><label>${lbl}</label></div>`);
     html+=`</div><div class="chan-section">Inserts</div><div class="ins-rack"><div class="ins-bar"><span class="ins-title">stack plugins here</span><button class="ins-add" type="button">+ add effect…</button></div><div class="ins-list" id="inslist-${t.id}"></div></div>`;
+    html+=`<div class="chan-section">Sends</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
     panel.innerHTML=html;
     params.forEach(([k])=>makeChanKnob(t,k));
     renderInserts(t);
+    renderSends(t);
+    const axin=document.getElementById("ioin-"+t.id); if(axin) axin.onclick=(e)=>openRoutePopup(e.currentTarget,'input',t,null,()=>renderChannel(t));
+    const axout=document.getElementById("ioout-"+t.id); if(axout) axout.onclick=(e)=>openRoutePopup(e.currentTarget,'output',t,null,()=>renderChannel(t));
     panel.querySelector(".ins-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>addInsert(t,name), ()=>openTune(t)); };
     const mb=document.getElementById("ca-m"); if(mb) mb.onclick=(e)=>{ t.muted=!t.muted; e.target.classList.toggle("on",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted); applyMix(); };
     const sb=document.getElementById("ca-s"); if(sb) sb.onclick=(e)=>{ t.solo=!t.solo; e.target.classList.toggle("on",t.solo); applyMix(); };
@@ -2923,8 +2932,8 @@ function renderChannel(t){
   const cl = (selClip && selClip.trackId===t.id) ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
   const auxes=tracks.filter(x=>x.type==='aux');
   let html=`<div class="chan-head"><span class="cdot" style="background:${t.color}"></span><span class="name">${t.name}</span><button class="cbtn ai" id="ca-ai" style="margin-left:auto;padding:5px 9px" title="Analyze & propose bounded EQ/comp moves — real FFT">✨ Auto-mix</button></div>`;
-  html+=`<div class="chan-io"><span class="io-lbl">OUTPUT →</span><select class="io-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select></div>`;
-  html+=`<div class="chan-section">Sends → FX bus</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
+  html+=`<div class="chan-io"><span class="io-lbl">INPUT</span><button class="io-sel" id="ioin-${t.id}">${ioLabel(t,'input')}</button><span class="io-lbl">OUTPUT</span><button class="io-sel" id="ioout-${t.id}">${ioLabel(t,'output')}</button></div>`;
+  html+=`<div class="chan-section">Sends</div><div class="ins-rack sends-rack" id="sends-${t.id}"></div>`;
   html+=`<div class="chan-section">Clip${cl?' · selected':''}</div>`;
   if(cl){
     html+=`<div class="clip-fx">`+[['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-fi','◢ Fade in'],['cf-fo','◣ Fade out'],['cf-del','🗑 Delete clip']].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("")+`</div>`;
@@ -2936,7 +2945,8 @@ function renderChannel(t){
   panel.innerHTML=html;
   renderSends(t);
   const ai=document.getElementById("ca-ai"); if(ai) ai.onclick=(e)=>runAutoMix(t,e.currentTarget);
-  const io=panel.querySelector(".io-out"); if(io) io.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); flash("Output → "+e.target.selectedOptions[0].textContent); };
+  const ioin=document.getElementById("ioin-"+t.id); if(ioin) ioin.onclick=(e)=>openRoutePopup(e.currentTarget,'input',t,null,()=>renderChannel(t));
+  const ioout=document.getElementById("ioout-"+t.id); if(ioout) ioout.onclick=(e)=>openRoutePopup(e.currentTarget,'output',t,null,()=>renderChannel(t));
   if(cl){
     const live=(fn)=>()=>{ const c2=clipsOf(t).find(c=>c.id===(selClip&&selClip.clipId))||cl; fn(t,c2); };
     document.getElementById("cf-rev").onclick=live(clipFx_reverse);
@@ -3741,7 +3751,8 @@ function buildStrip(t, auxes){
     ${isAux?`<div class="ms-badge">FX BUS</div>`:``}
     <div class="ms-lbl">Inserts</div><div class="ms-inlist"></div>
     <button class="ms-add" type="button">+ fx</button>
-    ${isAux?``:`<div class="ms-lbl">Output</div><select class="ms-out"><option value="master"${(!t.output||t.output==='master')?' selected':''}>Master</option>${auxes.map(a=>`<option value="${a.id}"${t.output===a.id?' selected':''}>${a.name}</option>`).join("")}</select>`}
+    <div class="ms-lbl">I/O</div><button class="ms-iosel" data-io="input" title="track input">${ioLabel(t,'input')}</button><button class="ms-iosel" data-io="output" title="track output">${ioLabel(t,'output')}</button>
+    <div class="ms-lbl">Sends</div><div class="ms-sends" id="mssends-${t.id}"></div>
     <div class="ms-knobrow"><div class="ms-pan"><div class="cknob sm" id="msp-${t.id}"><span class="cknob-ind"></span></div><label>PAN</label></div>
       <div class="ms-mscol"><button class="msbtn m${t.muted?' on':''}" data-a="m">M</button><button class="msbtn s${t.solo?' on':''}" data-a="s">S</button></div></div>
     <div class="ms-fader"><div class="ms-meter"><i></i></div><div class="ms-slot" id="msf-${t.id}"><div class="ms-cap"></div></div></div>
@@ -3749,7 +3760,8 @@ function buildStrip(t, auxes){
   const inlist=el.querySelector(".ms-inlist");
   (t.inserts||[]).forEach((ins,i)=>{ const r=document.createElement("div"); r.className="ms-in"+(ins.bypassed?" byp":""); r.textContent=ins.name; r.title="open "+ins.name; r.onclick=()=>openPluginWindow(t,i); inlist.appendChild(r); });
   el.querySelector(".ms-add").onclick=(e)=>{ e.stopPropagation(); openPluginMenu(e.currentTarget, false, (name)=>{ addInsert(t,name); renderMixWindow(); }, ()=>openTune(t)); };
-  const outSel=el.querySelector(".ms-out"); if(outSel) outSel.onchange=(e)=>{ t.output=e.target.value; if(playing) restartPlayback(); };
+  el.querySelectorAll(".ms-iosel").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openRoutePopup(e.currentTarget, b.dataset.io, t, null, ()=>renderMixWindow()); });
+  const mss=el.querySelector("#mssends-"+t.id); if(mss){ mss.innerHTML=sendsBankHtml(t,BANK_AE); bindSendBank(mss,t); }
   bindMiniPan(t, el.querySelector(`#msp-${t.id}`));
   el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });
   const nm=el.querySelector(".ms-nm"); nm.ondblclick=()=>renameTrack(t,nm);
