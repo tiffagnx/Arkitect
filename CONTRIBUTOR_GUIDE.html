@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Build ARKITECT With Us — Crew Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg0:#0C0D10; --bg1:#15161A; --panel:#1A1B22; --line:rgba(255,255,255,.08);
+    --steel:#3E9CB8; --steel-lite:#7FD0E4; --slate:#7C8AA5; --amber:#D9A441;
+    --text:#E9EAED; --dim:rgba(198,201,208,.62);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:
+      radial-gradient(120% 80% at 50% -10%, rgba(62,156,184,.10), transparent 60%),
+      linear-gradient(180deg,#0C0D10,#0a0b0e);
+    color:var(--text);font:400 16px/1.65 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:820px;margin:0 auto;padding:48px 22px 90px;}
+  header{text-align:center;margin-bottom:14px;}
+  .brand{font:800 40px Oxanium;letter-spacing:.16em;
+    background:linear-gradient(100deg,#cfd6dc,#9fb0bc 40%,#5b6b76);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 14px rgba(62,156,184,.25));}
+  .sub{font:600 12px 'Space Mono';letter-spacing:.32em;text-transform:uppercase;color:var(--dim);margin-top:8px;}
+  .lede{font:500 18px Inter;color:#cdd3da;max-width:640px;margin:26px auto 0;text-align:center;line-height:1.6;}
+  h2{font:700 23px Oxanium;letter-spacing:.04em;margin:46px 0 4px;color:#eaf2f5;
+    display:flex;align-items:center;gap:11px;}
+  h2 .n{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;flex:none;
+    font:800 14px Oxanium;color:#08171c;background:linear-gradient(180deg,var(--steel-lite),var(--steel));}
+  .hint{color:var(--dim);font-size:14px;margin:2px 0 16px 41px;}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0)),var(--panel);
+    border:1px solid var(--line);border-radius:15px;padding:20px 22px;margin:14px 0;}
+  .card h3{font:700 16px Oxanium;letter-spacing:.05em;margin:0 0 6px;color:#dcebf0;}
+  .card p{margin:0 0 0;color:#c7cdd5;font-size:15px;}
+  .step{display:flex;gap:15px;padding:15px 0;border-bottom:1px solid var(--line);}
+  .step:last-child{border-bottom:none;}
+  .step .dot{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font:800 15px Oxanium;color:#08171c;background:linear-gradient(180deg,var(--steel-lite),var(--steel));margin-top:2px;}
+  .step b{color:#eaf2f5;font:700 16px Oxanium;letter-spacing:.03em;}
+  .step .d{color:#c5ccd4;font-size:15px;margin-top:3px;}
+  .step .d em{color:var(--steel-lite);font-style:normal;font-weight:600;}
+  .callout{border:1px solid rgba(62,156,184,.4);background:rgba(62,156,184,.09);border-radius:13px;padding:16px 18px;margin:18px 0;}
+  .callout b{color:var(--steel-lite);font:700 14px Oxanium;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:5px;}
+  .callout.amber{border-color:rgba(217,164,65,.4);background:rgba(217,164,65,.08);}
+  .callout.amber b{color:var(--amber);}
+  .rule{display:flex;gap:11px;align-items:flex-start;margin:11px 0;font-size:15px;color:#c7cdd5;}
+  .rule .x{color:var(--steel-lite);font-weight:800;flex:none;margin-top:1px;}
+  code{font:600 13px 'Space Mono';background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:#bfe3ee;}
+  .goals{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:8px;}
+  .goal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px 18px;}
+  .goal .t{font:700 15px Oxanium;color:#eaf2f5;letter-spacing:.04em;}
+  .goal .v{color:var(--steel-lite);font-weight:600;font-size:14px;margin:3px 0 7px;}
+  .goal p{font-size:14px;color:#c0c7cf;margin:0;}
+  .foot{text-align:center;margin-top:54px;color:var(--dim);font-size:14px;line-height:1.7;}
+  .foot .big{font:700 18px Oxanium;color:#dcebf0;letter-spacing:.05em;display:block;margin-bottom:6px;}
+  @media(max-width:560px){.goals{grid-template-columns:1fr;}.brand{font-size:32px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">AЯKITECT</div>
+    <div class="sub">Crew Guide · how we build this thing</div>
+    <p class="lede">Welcome in. This is the studio we're building <b>together</b> — and own. It runs 100% on your own machine, free, no subscription. You're not just using it; you've got a real piece of it. Here's exactly how to help build it without anybody stepping on toes.</p>
+  </header>
+
+  <h2><span class="n">1</span> What we're actually building</h2>
+  <p class="hint">The north star, so we're all aiming at the same thing.</p>
+  <div class="goals">
+    <div class="goal"><div class="t">🎚️ The Audio Studio</div><div class="v">Build it like Pro Tools.</div><p>DeMartin Audio Labs. Real menu bar, real workflow, real depth. Aim it at Pro Tools — that's the bar.</p></div>
+    <div class="goal"><div class="t">🎬 The Video Studio</div><div class="v">Build it like After Effects.</div><p>LePrince Visual Labs. Motion, effects, compositing. After Effects is the target.</p></div>
+    <div class="goal"><div class="t">🎛️ The Plugins</div><div class="v">Recreate the ones you love.</div><p>Find plugins/effects you love in Pro Tools, After Effects, anywhere — and let's rebuild them in here, ours, free.</p></div>
+    <div class="goal"><div class="t">🤖 The Whole Thing</div><div class="v">Yours. Owned. No rent.</div><p>Image gen, app builder, chat — all of it local and free. We stop renting our own tools.</p></div>
+  </div>
+
+  <h2><span class="n">2</span> What you need (no coding required)</h2>
+  <p class="hint">Seriously — you don't have to be a coder. You have to know what you want.</p>
+  <div class="card"><h3>An AI coding assistant that can actually work</h3><p><b>Claude (Claude Code)</b> is what we use — it does the heavy lifting; you steer it. You can use what you prefer, but it's gotta be a tool that can really build, not a toy.</p></div>
+  <div class="card"><h3>The project on your machine</h3><p>You get added to the GitHub repo, you pull it down, and you run it locally. Then you build by <b>talking to the AI in plain English.</b></p></div>
+  <div class="card"><h3>The two docs that catch you up</h3><p>Before you touch anything, have your AI read <code>HANDOFF.md</code> and <code>DEMARTIN_DAW_PLAN.md</code> in the project. They explain how it's built + the plan. Don't skip this — it's how you avoid reinventing what's already there.</p></div>
+
+  <h2><span class="n">3</span> The Method — how we build (this is the important part)</h2>
+  <p class="hint">This is exactly how the whole thing got built. Do it this way and you can't go wrong.</p>
+
+  <div class="step"><div class="dot">1</div><div><b>Pick ONE thing you want.</b><div class="d">A plugin, an effect, a feature — something you love in Pro Tools / After Effects / wherever. <em>One thing.</em> Not ten.</div></div></div>
+  <div class="step"><div class="dot">2</div><div><b>Screenshot EVERYTHING about it.</b><div class="d">This is the secret. Take snapshots of exactly what you want — the layout, the knobs, the menus, what it looks like, how it behaves. <em>Pictures beat words.</em> Hand the AI the visuals.</div></div></div>
+  <div class="step"><div class="dot">3</div><div><b>Describe it in obsessive detail.</b><div class="d">Don't be vague. Say exactly what it does, how it should look, how it should feel. <em>The more of what's in your head you get out, the closer it builds to what you actually want.</em></div></div></div>
+  <div class="step"><div class="dot">4</div><div><b>Research FIRST, build second.</b><div class="d">For anything real, tell the AI: <em>"research how this works first, then build it."</em> It'll send a swarm of agents out, get the real facts, and build on truth instead of guessing. Don't let it wing the big stuff.</div></div></div>
+  <div class="step"><div class="dot">5</div><div><b>Look at it. React. Refine.</b><div class="d">Build it, open it in the browser, look hard. Love it? Keep it. Off? Tell it exactly what's wrong and run it back. <em>That's the whole loop.</em></div></div></div>
+
+  <div class="callout"><b>⚡ When to flip on ULTRACODE</b>For big jobs — a whole new feature, a complex plugin, the menu system, anything that needs deep research — turn on <b>ultracode</b> in Claude Code. It makes the AI go <em>exhaustive</em> and use the research swarms automatically. For tiny tweaks, normal mode is fine. Big = ultracode. Small = normal.</div>
+
+  <h2><span class="n">4</span> The Rules — so it's order, not chaos</h2>
+  <p class="hint">A few simple rules keep us from breaking each other's work.</p>
+  <div class="rule"><span class="x">→</span><div><b>One thing at a time, and say what you're on.</b> Tell the crew what you're building so two people don't build the same thing.</div></div>
+  <div class="rule"><span class="x">→</span><div><b>Don't break what works.</b> Run it in the browser and make sure it works <em>before</em> you push. If it's broken, don't ship it.</div></div>
+  <div class="rule"><span class="x">→</span><div><b>Big changes go on a branch, not straight to main.</b> Make your own branch, build there, then open a Pull Request so it can get a look before it lands. Small fixes are fine direct.</div></div>
+  <div class="rule"><span class="x">→</span><div><b>Read the plan docs first.</b> <code>HANDOFF.md</code> + <code>DEMARTIN_DAW_PLAN.md</code>. Build <em>on</em> what's there, don't reinvent it.</div></div>
+  <div class="rule"><span class="x">→</span><div><b>Commit with a clear message.</b> Say what you changed in one line, so everyone can follow the history.</div></div>
+
+  <div class="callout amber"><b>🎛️ Real talk on audio plugins</b>The basic browser audio blocks sound like garbage — that's a known ceiling, not your fault. To make plugins that actually sound <b>pro</b>, we use real DSP compiled to <b>WebAssembly</b>, and the best tool for that is <b>Faust</b> (there are already <code>.dsp</code> files in the <code>vst/</code> folder — that's the road). Want to build a great-sounding plugin? Have your AI research the Faust → WebAssembly path first. The AI can write the Faust code — it just needs the right pipeline.</div>
+
+  <h2><span class="n">5</span> Getting started (the quick version)</h2>
+  <p class="hint">From zero to building, for dummies.</p>
+  <div class="step"><div class="dot">1</div><div><b>Get added.</b><div class="d">DM your GitHub username so you get collaborator access to the repo.</div></div></div>
+  <div class="step"><div class="dot">2</div><div><b>Pull it down.</b><div class="d">Clone the repo to your machine (your AI assistant can do this for you — just ask it).</div></div></div>
+  <div class="step"><div class="dot">3</div><div><b>Run it.</b><div class="d">Double-click <code>START HERE.bat</code> — it sets itself up and opens ARKITECT in your browser.</div></div></div>
+  <div class="step"><div class="dot">4</div><div><b>Build.</b><div class="d">Open the project in Claude, point it at what you want (screenshots + detail), and go. Verify in the browser.</div></div></div>
+  <div class="step"><div class="dot">5</div><div><b>Ship it.</b><div class="d">Commit + push your branch, open a Pull Request. Done — you just built a piece of the studio.</div></div></div>
+
+  <div class="foot">
+    <span class="big">That's it. Now go build something.</span>
+    Find a thing you love, screenshot it, describe it, research it, build it. One piece at a time, we make the studio we all wish existed — and we own it.
+    <br><br>🎚️🎬🤖 &nbsp; Welcome to the crew.
+  </div>
+
+</div>
+</body>
+</html>
