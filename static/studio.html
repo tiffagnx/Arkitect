@@ -47,7 +47,8 @@
   .tgroup { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:5px; padding:3px 9px 5px; border:1px solid var(--hairline); border-radius:10px; background:rgba(255,255,255,.022); flex:none; }
   .tgroup .tg-l { font:700 7px 'Space Mono'; letter-spacing:.16em; color:rgba(160,168,182,.42); line-height:1; }
   .tgroup .vtoggle, .tgroup .toolsel, .tgroup .zoomctl { margin:0; }
-  .transport { display:inline-grid; grid-template-columns:repeat(4,1fr); gap:3px; }
+  .transport { display:inline-flex; flex-direction:column; gap:3px; }
+  .tp-row { display:flex; gap:3px; justify-content:center; }
   .tp { width:31px; height:20px; display:flex; align-items:center; justify-content:center; border:1px solid var(--hairline); background:rgba(255,255,255,.05); color:var(--dim); border-radius:5px; cursor:pointer; font:600 12px Oxanium,sans-serif; padding:0; line-height:1; transition:background .12s,color .12s,box-shadow .12s; }
   .tp:hover { color:var(--text); border-color:rgba(255,255,255,.28); }
   .tp.play { color:#6FE0A0; } .tp.play.on { background:rgba(52,211,153,.22); color:#34D399; border-color:rgba(52,211,153,.55); }
@@ -597,14 +598,18 @@
   <div class="tgroup counter"><span class="tg-l">COUNTER</span><span class="clock" id="clock">1|1  0:00.0</span></div>
   <div class="tgroup"><span class="tg-l">TRANSPORT</span>
     <span class="transport" id="transport">
-      <button class="tp play" id="play" title="Play / Pause (Space)">▶</button>
-      <button class="tp" id="stop" title="Stop">■</button>
-      <button class="tp loop" id="loop" title="Loop">↻</button>
-      <button class="tp rec" id="rec" title="Record-arm (then Play to roll)">●</button>
-      <button class="tp nav" id="rtz" title="Return to Zero (Home)">⏮</button>
-      <button class="tp nav" id="rew" title="Rewind a bar">⏪</button>
-      <button class="tp nav" id="ffwd" title="Fast-forward a bar">⏩</button>
-      <button class="tp nav" id="toend" title="Go to End (End)">⏭</button>
+      <span class="tp-row">
+        <button class="tp" id="stop" title="Stop">■</button>
+        <button class="tp play" id="play" title="Play / Pause (Space)">▶</button>
+        <button class="tp rec" id="rec" title="Record-arm (then Play to roll)">●</button>
+      </span>
+      <span class="tp-row">
+        <button class="tp nav" id="rtz" title="Return to Zero (Home)">⏮</button>
+        <button class="tp nav" id="rew" title="Rewind a bar">⏪</button>
+        <button class="tp nav" id="ffwd" title="Fast-forward a bar">⏩</button>
+        <button class="tp nav" id="toend" title="Go to End (End)">⏭</button>
+      </span>
+      <button class="tp loop" id="loop" title="Loop" style="display:none">↻</button>
     </span>
   </div>
   <span class="countin" id="countin"></span>
