@@ -2190,6 +2190,7 @@ async function addFiles(files) {
       id: Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ""),
       buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
       send: 0, inserts: [], muted: false, solo: false, src: null, live: null,
+      input: 'none', output: 'master',
     };
     tracks.push(t);
     laneUi(t);
@@ -2202,7 +2203,7 @@ async function addFiles(files) {
    audio tracks + aux/FX buses; other types (master/MIDI/instrument/video) are stubbed. ── */
 function makeAudioTrack(name, stereo){
   const t = { id: rid(), name, buffer:null, clips:[], gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0,
-    send:0, inserts:[], muted:false, solo:false, src:null, live:null, stereo:!!stereo };
+    send:0, inserts:[], muted:false, solo:false, src:null, live:null, stereo:!!stereo, input:'none', output:'master' };
   tracks.push(t); laneUi(t); return t;
 }
 function createTracks(count, format, type){
@@ -2531,13 +2532,68 @@ function openPluginWindow(t, i){
   makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
 }
 // ── AUX / FX BUSES + SENDS — stack plugins on a bus, send stems to it (Pro Tools style) ──
+/* ═══════════════ BUSSING — Pro Tools routing fabric (task #13, owner #1) ═══════════════
+   A BUS is a named internal signal path (NOT a track). Sends tap INTO a bus, track Outputs
+   route INTO a bus, and Aux Input tracks take a bus as their INPUT. A bus is decoupled from
+   aux tracks (0..n listeners) and persisted in the project. SLICE 1 = registry + helpers +
+   addAux migration + per-track I/O fields. These are DORMANT until the buildTrackGraph
+   routing slice wires them — no audio behavior changes yet (no regression). ═══════════ */
+let buses = [];                 // [{id, name, stereo, color}]
+let busSeq = 0;
+function busById(id){ return buses.find(b => b.id === id) || null; }
+function nextBusName(stereo){ const n = busSeq + 1; return stereo!==false ? ("Bus "+(2*n-1)+"-"+(2*n)) : ("Bus "+n); }
+function addBus(name, stereo){
+  busSeq += 1;
+  const b = { id: "bus_" + Math.random().toString(36).slice(2),
+              name: name || nextBusName(stereo), stereo: stereo !== false, color: nextStemColor() };
+  buses.push(b); return b;
+}
+function removeBus(id){
+  buses = buses.filter(b => b.id !== id);
+  tracks.forEach(t => {                                  // scrub every dead-bus reference
+    if (t.output === id) t.output = 'master';
+    if (t.input  === id) t.input  = 'none';
+    if (t.inputBus === id) t.inputBus = null;
+    (t.sends || []).forEach(s => { if (s.bus === id){ s.bus = null; s.on = false; } });
+  });
+  refreshAllRouting();
+}
+const BANK_AE = ["A","B","C","D","E"], BANK_FJ = ["F","G","H","I","J"];   // 10 send slots
+function sendInSlot(t, slot){ return (t.sends || []).find(s => s.slot === slot) || null; }
+// interface I/O — honest named stubs (Studio is one stereo AudioContext; labels match PT)
+const IF_INPUTS = [
+  {id:'mic1',label:'Mic/Line 1'},{id:'mic2',label:'Mic/Line 2'},{id:'hiz',label:'Hi-Z'},
+  {id:'monlr',label:'Mon L-R'},{id:'virt12',label:'Virtual 1-2'},{id:'virt34',label:'Virtual 3-4'},
+  {id:'spdif',label:'S/PDIF L-R'},{id:'adat12',label:'ADAT 1-2'},{id:'adat34',label:'ADAT 3-4'},
+  {id:'adat56',label:'ADAT 5-6'},{id:'adat78',label:'ADAT 7-8'},{id:'aux1',label:'AUX 1'},{id:'aux2',label:'AUX 2'},
+];
+const IF_OUTPUTS = [{id:'an12',label:'Analog 1-2'},{id:'an34',label:'Analog 3-4'}];
+function dbOf(v){ return v<=0 ? "-∞" : (20*Math.log10(v)).toFixed(1)+" dB"; }
+// resolve a track I/O field to a display label
+function ioLabel(t, which){
+  const v = which==='input' ? (t.type==='aux' ? t.inputBus : t.input) : t.output;
+  if(!v || v==='none') return which==='output' ? 'Master' : 'No Input';
+  if(v==='master') return 'Master';
+  if(typeof v==='string' && v.indexOf('if:')===0){ const p=[...IF_INPUTS,...IF_OUTPUTS].find(x=>'if:'+x.id===v); return p?p.label:'—'; }
+  const b = busById(v); return b ? b.name : '—';
+}
+// re-render routing surfaces + restart audio if a topology field changed
+function refreshAllRouting(){
+  if(typeof refreshSendMenus==='function') refreshSendMenus();
+  if(selTrackId){ const t=tracks.find(x=>x.id===selTrackId); if(t) renderChannel(t); }
+  if(playing) restartPlayback();
+}
+
 function addAux(){
-  // An Aux Input track (NOT a "bus" — a bus is a routing path you set as this aux's input).
-  const t = { id: Math.random().toString(36).slice(2), name: "Aux " + (tracks.filter(x=>x.type==='aux').length+1), type:'aux',
-    input:null, output:'master', gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: nextStemColor() };
+  // An Aux Input track. It LISTENS to a bus (its input). A bus is routing, not a track.
+  const bus = addBus(null, true);
+  const t = { id: rid(), name: "Aux " + (tracks.filter(x=>x.type==='aux').length+1), type:'aux',
+    inputBus: bus.id, input: bus.id, output: 'master', sends: [],
+    gain:0.9, pan:0, eq:{lo:0,mid:0,hi:0}, comp:0, send:0, inserts:[], muted:false, solo:false, color: bus.color };
+  bus.name = t.name;                                     // keep the bus name in lockstep on create
   tracks.push(t); auxLaneUi(t); refreshSendMenus();
   if (playing) restartPlayback();
-  flash("Aux Input added — set its Input to a bus, stack plugins, route its Output");
+  flash("Aux + bus “" + bus.name + "” created — send tracks to it, then stack FX on the aux");
   return t;
 }
 function auxLaneUi(t){
