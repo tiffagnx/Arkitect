@@ -6356,6 +6356,10 @@ function laneUiTake(t, placeAt) {
     if (menuId === "edit" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));   // top-level only — the Automation submenu has its own Cut/Copy/Paste leaves that must NOT wire to clip cut
     if (menuId === "edit" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
     if (menuId === "edit" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
+    // Clip-menu clipboard — same selection-based engine (grab a word/phrase, drop it elsewhere)
+    if (menuId === "clip" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));
+    if (menuId === "clip" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
+    if (menuId === "clip" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
     if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
@@ -6365,6 +6369,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
     if (menuId === "file"        && (/^Save As/.test(L) || /^Save Copy/.test(L))) return () => saveSessionToFolder();   // save a real session FOLDER on your disk
     if (menuId === "track"       && !parentLabel && /^New/.test(L)) return () => openNewTracksDialog();   // real PT New Tracks dialog
+    if (menuId === "track"       && !parentLabel && /^Duplicate/.test(L)) return onTrack(t => duplicateTrack(t));   // copy a track (chain + clips), reuses duplicateTrack()
     if (menuId === "track"       && /^Make (Inactive|Active)/.test(L)) return onTrack(t => setTrackInactive(t));
     if (menuId === "track"       && /^Freeze/.test(L))            return onTrack(t => freezeTrack(t));
     if (menuId === "track"       && /^Commit/.test(L))            return onTrack(t => commitTrack(t));
