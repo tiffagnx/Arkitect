@@ -1253,6 +1253,44 @@ function fadeToStart(){ const s=_selFadeClip(); if(!s){ flash("Select a clip fir
 function fadeToEnd(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; const end=cl.start+cl.buffer.duration; const f=Math.max(0,Math.min(cl.buffer.duration*0.95, end-pos())); if(f<=0.0005){ flash("Put the cursor inside the clip, before its end"); return; } pushUndoClips(t,"Fade to end"); cl.fadeOut=f; drawLane(t); if(playing) restartPlayback(); flash("Fade out ← "+Math.round(f*1000)+" ms"); }
 function deleteFadesCmd(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; if(!cl.fadeIn&&!cl.fadeOut){ flash("No fades on this clip"); return; } pushUndoClips(t,"Delete fades"); cl.fadeIn=0; cl.fadeOut=0; drawLane(t); if(playing) restartPlayback(); flash("Fades cleared"); }
 function setFadeShape(shape){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; pushUndoClips(t,"Fade shape"); cl.fadeInShape=shape; cl.fadeOutShape=shape; if(!cl.fadeIn&&!cl.fadeOut){ const d=Math.min(0.02,cl.buffer.duration*0.45); cl.fadeIn=d; cl.fadeOut=d; } drawLane(t); if(playing) restartPlayback(); const NM={lin:'Standard / Equal-Gain',pow:'Equal-Power',scv:'S-Curve'}; flash("Fade shape: "+(NM[shape]||shape)); }
+
+/* ── Strip Silence — gate the quiet gaps (breaths / room tone) out of the selected clip.
+   Adaptive threshold (noise floor + peak), keeps audible phrases as separate clips at their
+   ORIGINAL timeline spots, de-click fades on each. One tap, fully undoable. ── */
+function _sliceBuffer(buf, a, b){
+  const len=Math.max(1,b-a), out=ctx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+  for(let c=0;c<buf.numberOfChannels;c++){ const src=buf.getChannelData(c), dst=out.getChannelData(c); for(let i=0;i<len;i++) dst[i]=src[a+i]||0; }
+  return out;
+}
+function stripSilence(opts){
+  const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; }
+  const {t,cl}=s; const buf=cl.buffer, sr=buf.sampleRate, N=buf.length;
+  const o=opts||{}; const minSil=o.minSilence!=null?o.minSilence:0.18, minReg=o.minRegion!=null?o.minRegion:0.06, pad=o.pad!=null?o.pad:0.02;
+  const win=Math.max(1,Math.floor(sr*0.01)), nWin=Math.ceil(N/win);
+  const ch0=buf.getChannelData(0), ch1=buf.numberOfChannels>1?buf.getChannelData(1):null;
+  const rms=new Float32Array(nWin); let peak=0;
+  for(let w=0;w<nWin;w++){ let acc=0,n=0; const st=w*win, en=Math.min(N,st+win); for(let i=st;i<en;i++){ let v=ch0[i]; if(ch1)v=(v+ch1[i])*0.5; acc+=v*v; n++; const a=Math.abs(v); if(a>peak)peak=a; } rms[w]=Math.sqrt(acc/(n||1)); }
+  const sorted=[...rms].sort((a,b)=>a-b); const floor=sorted[Math.floor(nWin*0.2)]||0;
+  const thr=(o.threshLin!=null)?o.threshLin:Math.max(floor*4, peak*0.05, 0.0008);
+  const aud=Array.from(rms,v=>v>=thr);
+  const minSilW=Math.max(1,Math.ceil(minSil*sr/win)), minRegW=Math.max(1,Math.ceil(minReg*sr/win)), padS=Math.floor(pad*sr);
+  // 1) bridge silence gaps shorter than minSil (don't chop mid-word pauses)
+  let run=0; for(let w=0;w<nWin;w++){ if(!aud[w]){ run++; } else { if(run>0 && run<minSilW){ for(let k=w-run;k<w;k++) aud[k]=true; } run=0; } }
+  // 2) collect audible regions (window ranges), drop ones shorter than minReg
+  const regs=[]; let a=-1; for(let w=0;w<nWin;w++){ if(aud[w]){ if(a<0)a=w; } else if(a>=0){ if(w-a>=minRegW) regs.push([a,w]); a=-1; } } if(a>=0 && nWin-a>=minRegW) regs.push([a,nWin]);
+  if(!regs.length){ flash("This clip reads as silent — nothing to keep"); return; }
+  if(regs.length===1 && regs[0][0]<=1 && regs[0][1]>=nWin-1){ flash("No clear silence to strip on this clip"); return; }
+  pushUndoClips(t,"Strip silence");
+  const newClips=regs.map(([w0,w1])=>{
+    const a0=Math.max(0,(w0*win)-padS), b0=Math.min(N,(w1*win)+padS);
+    const sub=_sliceBuffer(buf,a0,b0); const dur=sub.duration;
+    return { id:rid(), buffer:sub, start:cl.start + a0/sr, name:cl.name, gain:(cl.gain!=null?cl.gain:1), muted:false,
+      fadeIn:Math.min(0.005,dur*0.3), fadeOut:Math.min(0.005,dur*0.3), fadeInShape:cl.fadeInShape||'lin', fadeOutShape:cl.fadeOutShape||'lin' };
+  });
+  const idx=t.clips.indexOf(cl); t.clips.splice(idx,1,...newClips);
+  syncPrimary(t); selClip={trackId:t.id,clipId:newClips[0].id}; drawLane(t); if(playing) restartPlayback();
+  flash("Stripped silence — kept "+newClips.length+" region"+(newClips.length>1?"s":"")+" (Ctrl+Z to undo)");
+}
 function showWaveMenu(t, wv, e){
   e.preventDefault();
   const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
@@ -6377,6 +6415,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "clip" && parentLabel === "Fades" && /^Equal Gain/.test(L))  return () => setFadeShape('lin');
     if (menuId === "clip" && parentLabel === "Fades" && /^Equal Power/.test(L)) return () => setFadeShape('pow');
     if (menuId === "clip" && parentLabel === "Fades" && /^S-Curve/.test(L))     return () => setFadeShape('scv');
+    if ((menuId === "edit" || menuId === "clip") && /^Strip Silence/.test(L))   return () => stripSilence();   // gate breaths/room tone out of the selected clip
     if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
