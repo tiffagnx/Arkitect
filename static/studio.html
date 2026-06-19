@@ -4903,7 +4903,7 @@ $("qsTrack").onclick = (e) => { e.stopPropagation(); openNewTracksDialog(); };
 $("qsRec").onclick   = (e) => { e.stopPropagation(); $("rec").click(); };
 $("qsOpen").onclick  = (e) => { e.stopPropagation(); openLoadMenu($("qsOpen")); };
 // ── blank-slate ROTATING QUOTES — real lines from the greats + producers/engineers (verbatim, verified),
-//    rolled on each empty-board show + every ~9s while it's up. House "DeMartin" lines at the bottom — edit freely. ──
+//    rolled on each empty-board show + every ~9s while it's up. House "DeMartin Audio Labs" lines at the bottom (named for Édouard-Léon Scott de Martinville, who recorded the first human voice in 1860) — edit freely. ──
 const QUOTES = [
   { text:"I'm not a businessman, I'm a business, man.", by:"Jay-Z" },
   { text:"I will spark the brain that will change the world.", by:"Tupac" },
@@ -4924,8 +4924,9 @@ const QUOTES = [
   { text:"I don't want it to be perfect, because humans aren't perfect, so the music shouldn't be.", by:"Dr. Dre" },
   { text:"EQing before you've heard the source is like salting your food before you've tasted it.", by:"Bruce Swedien" },
   { text:"I always try to make their next record, not their last record.", by:"Nile Rodgers" },
-  { text:"The take you almost didn't keep is usually the one.", by:"DeMartin" },
-  { text:"Mix it 'til it feels like you — not 'til it sounds like them.", by:"DeMartin" },
+  { text:"The take you almost didn't keep is usually the one.", by:"DeMartin Audio Labs" },
+  { text:"Mix it 'til it feels like you — not 'til it sounds like them.", by:"DeMartin Audio Labs" },
+  { text:"The first recorded voice waited 148 years to be heard. Don't make yours wait.", by:"DeMartin Audio Labs" },
 ];
 let _qIdx = -1, _qTimer = null;
 function rollQuote(){
