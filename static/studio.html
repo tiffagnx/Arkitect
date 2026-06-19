@@ -1245,6 +1245,14 @@ function renderAudioSuite(t){
 function ctxMenuEl(){ let m=document.getElementById("ctxmenu"); if(!m){ m=document.createElement("div"); m.id="ctxmenu"; m.className="ctxmenu"; document.body.appendChild(m); } return m; }
 function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classList.remove("on"); }
 function clipAt(t, atTime){ return clipsOf(t).find(c => atTime>=c.start && atTime<=c.start+c.buffer.duration) || null; }
+/* ── Fade commands (Edit/Clip ▸ Fades menu) — operate on the selected clip, reuse the per-clip fade engine.
+   Create = a quick top & tail; Fade to Start/End use the cursor; shapes set lin/pow/scv. All undoable. ── */
+function _selFadeClip(){ if(!selClip) return null; const t=tracks.find(x=>x.id===selClip.trackId); const cl=t&&clipsOf(t).find(c=>c.id===selClip.clipId); return (cl&&cl.buffer)?{t,cl}:null; }
+function createFades(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; pushUndoClips(t,"Create fades"); const d=Math.min(0.02, cl.buffer.duration*0.45); cl.fadeIn=d; cl.fadeOut=d; drawLane(t); if(playing) restartPlayback(); flash("Top & tail fades (20 ms) — drag a corner to taste"); }
+function fadeToStart(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; const f=Math.max(0,Math.min(cl.buffer.duration*0.95, pos()-cl.start)); if(f<=0.0005){ flash("Put the cursor inside the clip, past its start"); return; } pushUndoClips(t,"Fade to start"); cl.fadeIn=f; drawLane(t); if(playing) restartPlayback(); flash("Fade in → "+Math.round(f*1000)+" ms"); }
+function fadeToEnd(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; const end=cl.start+cl.buffer.duration; const f=Math.max(0,Math.min(cl.buffer.duration*0.95, end-pos())); if(f<=0.0005){ flash("Put the cursor inside the clip, before its end"); return; } pushUndoClips(t,"Fade to end"); cl.fadeOut=f; drawLane(t); if(playing) restartPlayback(); flash("Fade out ← "+Math.round(f*1000)+" ms"); }
+function deleteFadesCmd(){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; if(!cl.fadeIn&&!cl.fadeOut){ flash("No fades on this clip"); return; } pushUndoClips(t,"Delete fades"); cl.fadeIn=0; cl.fadeOut=0; drawLane(t); if(playing) restartPlayback(); flash("Fades cleared"); }
+function setFadeShape(shape){ const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; } const {t,cl}=s; pushUndoClips(t,"Fade shape"); cl.fadeInShape=shape; cl.fadeOutShape=shape; if(!cl.fadeIn&&!cl.fadeOut){ const d=Math.min(0.02,cl.buffer.duration*0.45); cl.fadeIn=d; cl.fadeOut=d; } drawLane(t); if(playing) restartPlayback(); const NM={lin:'Standard / Equal-Gain',pow:'Equal-Power',scv:'S-Curve'}; flash("Fade shape: "+(NM[shape]||shape)); }
 function showWaveMenu(t, wv, e){
   e.preventDefault();
   const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
@@ -6360,6 +6368,15 @@ function laneUiTake(t, placeAt) {
     if (menuId === "clip" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));
     if (menuId === "clip" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
     if (menuId === "clip" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
+    // Fades submenu (Edit + Clip) — reuse the per-clip fade engine on the selected clip
+    if ((menuId === "edit" || menuId === "clip") && parentLabel === "Fades" && /^Create/.test(L)) return () => createFades();
+    if ((menuId === "edit" || menuId === "clip") && /^Fade to Start/.test(L)) return () => fadeToStart();
+    if ((menuId === "edit" || menuId === "clip") && /^Fade to End/.test(L))   return () => fadeToEnd();
+    if ((menuId === "edit" || menuId === "clip") && /^Delete Fades/.test(L))   return () => deleteFadesCmd();
+    if (menuId === "clip" && parentLabel === "Fades" && /^Standard/.test(L))    return () => setFadeShape('lin');
+    if (menuId === "clip" && parentLabel === "Fades" && /^Equal Gain/.test(L))  return () => setFadeShape('lin');
+    if (menuId === "clip" && parentLabel === "Fades" && /^Equal Power/.test(L)) return () => setFadeShape('pow');
+    if (menuId === "clip" && parentLabel === "Fades" && /^S-Curve/.test(L))     return () => setFadeShape('scv');
     if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
