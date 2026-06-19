@@ -1291,6 +1291,28 @@ function stripSilence(opts){
   syncPrimary(t); selClip={trackId:t.id,clipId:newClips[0].id}; drawLane(t); if(playing) restartPlayback();
   flash("Stripped silence — kept "+newClips.length+" region"+(newClips.length>1?"s":"")+" (Ctrl+Z to undo)");
 }
+/* ── Select All — set the Select range over the current track's whole content (Ctrl+A) ── */
+function selectAllCmd(){
+  const t = tracks.find(x=>x.id===selTrackId) || (selClip && tracks.find(x=>x.id===selClip.trackId)) || tracks.find(x=>x.type!=='aux'&&x.type!=='master');
+  if(!t){ flash("No track to select"); return; }
+  const cls=clipsOf(t); if(!cls.length){ flash("Track is empty"); return; }
+  let a=Infinity,b=0; cls.forEach(c=>{ a=Math.min(a,c.start); b=Math.max(b,c.start+c.buffer.duration); });
+  SEL={trackId:t.id,a,b}; selClip=null; selectTrack(t); drawLane(t);
+  flash("Selected all of “"+(t.name||'track')+"”");
+}
+/* ── Bypass Inserts (Track ▸ Bypass Inserts ▸ All/EQ/Dynamics) — A/B the chain ── */
+function bypassInserts(kind){
+  const t = tracks.find(x=>x.id===selTrackId); if(!t){ flash("Select a track first"); return; }
+  const ins=(t.inserts||[]); if(!ins.length){ flash("No inserts on this track"); return; }
+  const match=(i)=> kind==='all' ? true : kind==='eq' ? /EQ/i.test(i.name) : kind==='dyn' ? /(Compress|De-?Ess|Dynamic|Limit)/i.test(i.name) : false;
+  const targets=ins.filter(match);
+  if(!targets.length){ flash("No "+(kind==='eq'?'EQ':kind==='dyn'?'dynamics':'')+" inserts here"); return; }
+  const anyActive=targets.some(i=>!i.bypassed); targets.forEach(i=>i.bypassed=anyActive);   // any on → bypass all; else re-enable all
+  if(typeof renderMixWindow==='function') renderMixWindow();
+  if(selTrackId===t.id && typeof renderChannel==='function') renderChannel(t);
+  if(playing) restartPlayback();
+  flash((anyActive?"Bypassed ":"Enabled ")+targets.length+" insert"+(targets.length>1?"s":"")+(kind!=='all'?" ("+(kind==='eq'?'EQ':'dynamics')+")":""));
+}
 function showWaveMenu(t, wv, e){
   e.preventDefault();
   const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
@@ -6416,6 +6438,10 @@ function laneUiTake(t, placeAt) {
     if (menuId === "clip" && parentLabel === "Fades" && /^Equal Power/.test(L)) return () => setFadeShape('pow');
     if (menuId === "clip" && parentLabel === "Fades" && /^S-Curve/.test(L))     return () => setFadeShape('scv');
     if ((menuId === "edit" || menuId === "clip") && /^Strip Silence/.test(L))   return () => stripSilence();   // gate breaths/room tone out of the selected clip
+    if (menuId === "edit" && /^Select All/.test(L)) return () => selectAllCmd();
+    if (menuId === "track" && parentLabel === "Bypass Inserts" && /^All/.test(L))      return () => bypassInserts('all');
+    if (menuId === "track" && parentLabel === "Bypass Inserts" && /^EQ/.test(L))       return () => bypassInserts('eq');
+    if (menuId === "track" && parentLabel === "Bypass Inserts" && /^Dynamics/.test(L)) return () => bypassInserts('dyn');
     if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
