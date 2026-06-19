@@ -400,6 +400,16 @@
     font:700 9.5px 'Space Mono'; letter-spacing:.04em; }
   .ms-doc:hover { background:rgba(70,176,160,.22); }
   .ms-doc:disabled { opacity:.6; cursor:default; }
+  /* I/O Setup dialog (Setup ▸ I/O…) */
+  .io-sec { margin-bottom:14px; }
+  .io-h { font:700 9px 'Space Mono'; letter-spacing:.16em; text-transform:uppercase; color:var(--teal); margin-bottom:8px; }
+  .io-row { display:flex; align-items:center; gap:10px; padding:7px 10px; border:1px solid var(--hairline); border-radius:8px; margin-bottom:6px; background:rgba(255,255,255,.02); }
+  .io-nm { flex:1; font:600 12px Inter; color:var(--text); }
+  .io-to { font:500 11px 'Space Mono'; color:var(--dim); }
+  .io-rename { padding:4px 12px; border-radius:7px; border:1px solid rgba(62,156,184,.4); background:rgba(62,156,184,.1); color:#9FCFDD; font:600 10px Inter; cursor:pointer; }
+  .io-rename:hover { background:rgba(62,156,184,.2); }
+  .io-empty, .io-note { font:500 11px Inter; color:var(--dim); line-height:1.5; }
+  .io-note { margin-top:10px; }
   .wave { flex:1; min-width:0; height:auto; background:rgba(0,0,0,.4); cursor:crosshair; display:block; }
   .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
   .knob { display:flex; align-items:center; gap:6px; }
@@ -1342,6 +1352,37 @@ function trimEndToCursor(){
   pushUndoClips(t,"Trim end"); const b=Math.floor(off*cl.buffer.sampleRate);
   cl.buffer=_sliceBuffer(cl.buffer, 0, b); cl.fadeOut=0;
   syncPrimary(t); selClip={trackId:t.id,clipId:cl.id}; drawLane(t); if(playing) restartPlayback(); flash("Trimmed tail to cursor");
+}
+/* ── I/O Setup (Setup ▸ I/O…) — see + rename your hardware inputs (like Pro Tools' I/O Setup) ── */
+function openIODialog(){
+  const ex=document.getElementById('ioDlg'); if(ex) ex.remove();
+  const ov=document.createElement('div'); ov.className='modal-ov'; ov.id='ioDlg';
+  ov.innerHTML=`<div class="modal" role="dialog" aria-label="I/O Setup">
+    <div class="modal-h"><h3>I/O SETUP</h3><button class="modal-x" title="close">✕</button></div>
+    <div class="modal-body">
+      <div class="io-sec"><div class="io-h">Inputs</div><div id="ioInputs"></div></div>
+      <div class="io-sec"><div class="io-h">Output</div><div class="io-row"><span class="io-nm">Main Out</span><span class="io-to">→ Master</span></div></div>
+      <div class="io-note">Rename an input to whatever you call it ("BRYANS MIC") — the name sticks and travels with your sessions.</div>
+    </div>
+    <div class="modal-foot"><button class="modal-btn" id="ioDetect">Detect devices</button><button class="modal-btn go" id="ioClose">Done</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  function paint(){
+    const host=ov.querySelector('#ioInputs'); if(!host) return; host.innerHTML='';
+    if(!INPUT_DEVICES.length){ host.innerHTML='<div class="io-empty">No inputs detected yet — hit “Detect devices” (grants mic access so Windows reveals their names).</div>'; return; }
+    INPUT_DEVICES.forEach(d=>{ const did='dev:'+d.deviceId; const row=document.createElement('div'); row.className='io-row';
+      const nm=document.createElement('span'); nm.className='io-nm'; nm.textContent=ifLabel(did, d.label);
+      const btn=document.createElement('button'); btn.className='io-rename'; btn.textContent='Rename';
+      btn.onclick=()=>renameInterface(did, d.label, ()=>{ paint(); if(typeof renderMixWindow==='function') renderMixWindow(); });
+      row.appendChild(nm); row.appendChild(btn); host.appendChild(row); });
+  }
+  paint();
+  ov.querySelector('.modal-x').onclick=close; ov.querySelector('#ioClose').onclick=close;
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
+  ov.querySelector('#ioDetect').onclick=async()=>{ const b=ov.querySelector('#ioDetect'); b.disabled=true; b.textContent='detecting…';
+    try{ if(typeof unlockDeviceLabels==='function') await unlockDeviceLabels(); if(typeof populateDevices==='function') await populateDevices(); }catch(e){}
+    b.disabled=false; b.textContent='Detect devices'; paint(); };
 }
 function showWaveMenu(t, wv, e){
   e.preventDefault();
@@ -6485,6 +6526,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
     if ((menuId === "edit" || menuId === "clip") && /start to insertion/i.test(L)) return () => trimStartToCursor();
     if ((menuId === "edit" || menuId === "clip") && /end to insertion/i.test(L))   return () => trimEndToCursor();
+    if (menuId === "setup" && /^I\/O/.test(L)) return () => openIODialog();
     if (menuId === "file"        && /^Open Project/.test(L))   return () => openSessionFromFolder();   // open a .ark from a disk folder
     if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
     if (menuId === "file"        && (/^Save As/.test(L) || /^Save Copy/.test(L))) return () => saveSessionToFolder();   // save a real session FOLDER on your disk
