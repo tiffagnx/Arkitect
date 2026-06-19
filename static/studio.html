@@ -6266,7 +6266,33 @@ function laneUiTake(t, placeAt) {
   if (!bar) return;
   if (!window.PT_MENUS) { console.warn("[menu bar] PT_MENUS not loaded — /static/pt-menus.js missing?"); return; }
   // ARKITECT branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
-  window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace');
+  window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace' && m.id !== 'event');   // drop Marketplace + Event (Event is 100% MIDI / quantize / tempo-curve — dead weight for a vocal studio; audit 2026-06-18)
+  // ── Declutter for a VOCAL studio: hide dead-weight menu items (MIDI, scoring, surround, film
+  //    timecode, Avid cloud, quantize/elastic, punch/loop-record, window-layout, DSP accounting).
+  //    A hidden item is just not rendered — the underlying feature/rendering is untouched, and a
+  //    WIRED item is NEVER hidden (safety net in isHiddenItem). Derived from the menu-bar audit.
+  const MENU_HIDE_GLOBAL = [
+    /MIDI/i, /\bSibelius\b/i, /\bScore\b/i, /Notation/i,
+    /Surround/i, /Sound ?Field/i, /AutoPan/i, /Down ?Mix/i,
+    /Timecode/i, /Feet ?\+? ?Frames/i, /\bVideo\b/i, /QuickTime/i,
+    /DigiDelivery/i, /SoundCloud/i, /DigiBase/i, /Workspace/i, /Soundbase/i, /Artist Chat/i, /Metadata Inspector/i, /Universe/i, /^Sign In/i,
+    /ReWire/i, /Click II/i, /\bVCA\b/i, /Coalesce/i,
+    /Destructive/i, /QuickPunch/i, /TrackPunch/i, /DestructivePunch/i, /Prepare DPE/i, /Loop Record/i,
+    /Beat Detective/i, /Identify Beat/i, /Quantize/i, /Elastic/i, /Conform to Tempo/i, /Tempo Operations/i, /Time Operations/i, /Renumber Bars/i, /\bWarp\b/i,
+    /Task Manager/i, /Disk Usage/i, /System Usage/i, /Configuration/i, /^Arrange/i, /^Tile/i, /Cascade/i,
+    /AAF/i, /OMF/i, /Media Composer/i, /\bHEAT\b/i, /Low Latency/i, /Chord/i, /Transcription/i,
+  ];
+  const MENU_HIDE_BY = {
+    file:       [/^Send To/i, /^Export/i, /Get Info/i],
+    edit:       [/Special/i, /^Automation$/i, /^TCE /i, /At Transients/i],
+    clip:       [/Matching Alternates/i, /Elastic Properties/i, /Conform/i, /Remove Pitch Shift/i, /^Spot/i, /Auto-Spot/i, /^Group$/i, /^Ungroup/i, /^Regroup/i, /^Loop\b/i, /^Unloop/i, /^Capture/i, /Rating/i, /Sync Point/i, /^Insert$/i, /Lock\/Unlock/i, /Lock the/i],
+    options:    [/Dynamic Transport/i, /Transport Online/i, /Auto-Spot/i, /Mirrored/i, /^MIDI Thru/i, /Keyboard Lock/i],
+    setup:      [/^Hardware/i, /Disk Allocation/i, /Peripherals/i, /Video Sync/i, /External Timecode/i, /Current Feet/i, /Current Timecode/i, /^MIDI$/i],
+    track:      [/Split into Mono/i, /Clear Trim Automation/i, /Coalesce/i, /Create Click Track/i, /Set Record Tracks/i],
+    window:     [/^Close Window/i, /Hide All Floating/i, /New Workspace/i],
+    view:       [/Narrow Mix/i, /Real-Time Properties/i, /Scene and Take/i, /Processing State/i, /Trim Playlist/i, /Composite Playlist/i, /^Samples$/i],
+    audiosuite: [/^Pitch Shift/i, /^Reverb/i, /^Delay/i, /^Modulation/i, /^Harmonic/i, /^Instrument/i, /^Effect/i],
+  };
   const _helpMenu = window.PT_MENUS.find(m => m.id === 'help');
   if (_helpMenu) {
     _helpMenu.title = "Updates";   // owner: the Help menu IS the update center now
@@ -6327,9 +6353,9 @@ function laneUiTake(t, placeAt) {
     if ((menuId === "edit" || menuId === "clip") && L === "Duplicate") return () => duplicateClip();
     if ((menuId === "edit" || menuId === "clip") && /^Mute/.test(L)) return () => toggleClipMute();
     if (menuId === "clip" && /^Rename/.test(L)) return () => renameClip();
-    if (menuId === "edit" && L === "Cut")   return onSel(t => cutCmd(t));
-    if (menuId === "edit" && L === "Copy")  return onSel(t => copyCmd(t));
-    if (menuId === "edit" && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
+    if (menuId === "edit" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));   // top-level only — the Automation submenu has its own Cut/Copy/Paste leaves that must NOT wire to clip cut
+    if (menuId === "edit" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
+    if (menuId === "edit" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
     if (menuId === "edit" && L === "Insert Silence")  return onSel(t => insertSilence(t));
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
@@ -6354,10 +6380,23 @@ function laneUiTake(t, placeAt) {
   let flyouts = [];
   const clearFly = (from) => { while (flyouts.length > from) { const f = flyouts.pop(); if (f && f.parentNode) f.remove(); } };
 
+  // is this item (or any descendant) WIRED to a live action? wired items are never hidden.
+  function menuItemWired(menuId, it, parentLabel){
+    if (it.submenu && it.submenu.length) return it.submenu.some(s => menuItemWired(menuId, s, it.label));
+    return !!actionFor(menuId, it, parentLabel, null);
+  }
+  // dead weight for a vocal studio → don't render. Safety net: a wired item is always kept.
+  function isHiddenItem(menuId, it, parentLabel){
+    if (menuItemWired(menuId, it, parentLabel)) return false;
+    const L = it.label || "";
+    return MENU_HIDE_GLOBAL.some(r => r.test(L)) || (MENU_HIDE_BY[menuId] || []).some(r => r.test(L));
+  }
+
   function buildPanel(menu, items, parentLabel, level, titleEl){
     const panel = document.createElement("div");
     panel.className = "mb-panel " + (level === 0 ? "mb-drop" : "mb-fly");
-    items.forEach(it => {
+    const vis = items.filter(it => !isHiddenItem(menu.id, it, parentLabel));   // drop dead-weight items
+    vis.forEach((it, _vi) => {
       const row = document.createElement("div");
       row.className = "mb-item";
       const hasSub = !!(it.submenu && it.submenu.length);
@@ -6397,7 +6436,7 @@ function laneUiTake(t, placeAt) {
       if (act && !greyed) row.addEventListener("click", (e) => { e.stopPropagation(); closeAll(); act(); });
 
       panel.appendChild(row);
-      if (it.separator_after) { const sep = document.createElement("div"); sep.className = "mb-sep"; panel.appendChild(sep); }
+      if (it.separator_after && _vi < vis.length - 1) { const sep = document.createElement("div"); sep.className = "mb-sep"; panel.appendChild(sep); }
     });
     return panel;
   }
