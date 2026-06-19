@@ -1313,6 +1313,36 @@ function bypassInserts(kind){
   if(playing) restartPlayback();
   flash((anyActive?"Bypassed ":"Enabled ")+targets.length+" insert"+(targets.length>1?"s":"")+(kind!=='all'?" ("+(kind==='eq'?'EQ':'dynamics')+")":""));
 }
+/* ── New / Close session — wipe the board back to a blank slate (File ▸ Create New / Close Session) ── */
+function newSessionCmd(){
+  if(tracks.length && !confirm("Start a new session? Unsaved changes in the current one will be lost.")) return;
+  try{ stopAll(); }catch(e){}
+  while(tracks.length){ const t=tracks.pop(); const lane=$("lane-"+t.id); if(lane) lane.remove(); }
+  buses=[]; busSeq=0; masterTrack.present=false; masterTrack.inserts=[];
+  currentProjectId=null; currentFolderDir=null; currentFolderName=null;
+  selClip=null; SEL=null; selTrackId=null;
+  try{ seek(0); }catch(e){}
+  if(typeof renderMixWindow==='function') renderMixWindow();
+  const d=$("drop"); if(d) d.style.display="flex";
+  studioStatus("New session"); flash("New session — blank slate");
+}
+/* ── Trim head/tail to the cursor (Edit/Clip ▸ Trim Clip ▸ Start/End To Insertion) ── */
+function trimStartToCursor(){
+  const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; }
+  const {t,cl}=s; const off=pos()-cl.start;
+  if(off<=0.0005 || off>=cl.buffer.duration-0.0005){ flash("Put the cursor inside the clip, past its start"); return; }
+  pushUndoClips(t,"Trim start"); const a=Math.floor(off*cl.buffer.sampleRate);
+  cl.buffer=_sliceBuffer(cl.buffer, a, cl.buffer.length); cl.start=pos(); cl.fadeIn=0;
+  syncPrimary(t); selClip={trackId:t.id,clipId:cl.id}; drawLane(t); if(playing) restartPlayback(); flash("Trimmed head to cursor");
+}
+function trimEndToCursor(){
+  const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return; }
+  const {t,cl}=s; const off=pos()-cl.start;
+  if(off<=0.0005 || off>=cl.buffer.duration-0.0005){ flash("Put the cursor inside the clip, before its end"); return; }
+  pushUndoClips(t,"Trim end"); const b=Math.floor(off*cl.buffer.sampleRate);
+  cl.buffer=_sliceBuffer(cl.buffer, 0, b); cl.fadeOut=0;
+  syncPrimary(t); selClip={trackId:t.id,clipId:cl.id}; drawLane(t); if(playing) restartPlayback(); flash("Trimmed tail to cursor");
+}
 function showWaveMenu(t, wv, e){
   e.preventDefault();
   const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
@@ -6369,6 +6399,8 @@ function laneUiTake(t, placeAt) {
       { label:"About ARKITECT",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
     ];
   }
+  const _fileMenu = window.PT_MENUS.find(m => m.id === 'file');   // flatten "Open Recent" → a clickable item (opens the recent-projects list), since submenu parents get no click action
+  if (_fileMenu) { const _orc = _fileMenu.items.find(it => /^Open Recent/.test(it.label)); if (_orc) _orc.submenu = null; }
 
   // current selected track (clip-context ops read selClip / SEL internally)
   const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
@@ -6446,7 +6478,13 @@ function laneUiTake(t, placeAt) {
     if (menuId === "edit" && L === "Heal Separation") return onSel(t => healSeparation(t));
     if (menuId === "edit" && /^Consolidate/.test(L))  return onSel(t => consolidateSelection(t));
     if ((menuId === "edit" || menuId === "clip") && L === "To Selection") return onSel(t => trimToSelection(t));
+    if (menuId === "file"        && /^Create New/.test(L))     return () => newSessionCmd();
+    if (menuId === "file"        && /^Close Session/.test(L))  return () => newSessionCmd();
+    if (menuId === "file"        && /^Open Recent/.test(L))    return () => openLoadMenu(titleEl);   // recent-first saved-projects list
+    if (menuId === "file"        && /^Revert to Saved/.test(L)) return () => { if(currentProjectId) loadProject(currentProjectId); else flash("Nothing to revert to — this session was never saved"); };
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
+    if ((menuId === "edit" || menuId === "clip") && /start to insertion/i.test(L)) return () => trimStartToCursor();
+    if ((menuId === "edit" || menuId === "clip") && /end to insertion/i.test(L))   return () => trimEndToCursor();
     if (menuId === "file"        && /^Open Project/.test(L))   return () => openSessionFromFolder();   // open a .ark from a disk folder
     if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
     if (menuId === "file"        && (/^Save As/.test(L) || /^Save Copy/.test(L))) return () => saveSessionToFolder();   // save a real session FOLDER on your disk
