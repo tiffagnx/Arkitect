@@ -53,9 +53,12 @@ _KEYS_LOCK = asyncio.Lock()                 # serialize key writes so concurrent
 # native_web flags whether the MODELS themselves can browse (almost none can — the
 # swarm feeds them pages either way; this is just guidance shown in the UI).
 PRESETS = [
-    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "llama-3.3-70b-versatile, openai/gpt-oss-120b", "free": "~1K calls/day, fastest inference",            "native_web": "no", "key_url": "https://console.groq.com/keys"},
+    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "openai/gpt-oss-120b, llama-3.3-70b-versatile, meta-llama/llama-4-scout-17b-16e-instruct", "free": "free ~1K calls/day, fastest inference",       "native_web": "no", "key_url": "https://console.groq.com/keys"},
+    {"name": "Google Gemini","base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "models_hint": "gemini-2.5-flash, gemini-2.5-pro, gemini-2.5-flash-lite", "free": "big free token budget · vision + tools + reasoning", "native_web": "grounding (native API only)", "key_url": "https://aistudio.google.com/apikey"},
+    {"name": "Featherless", "base_url": "https://api.featherless.ai/v1",                   "models_hint": "moonshotai/Kimi-K2.6, deepseek-ai/DeepSeek-V4, zai-org/GLM-5.1, Qwen/Qwen3-235B-A22B", "free": "FLAT MONTHLY — unlimited tokens ($10 ≤15B / $25 all sizes)", "native_web": "no", "key_url": "https://featherless.ai/account/api-keys"},
+    {"name": "Z.ai GLM",    "base_url": "https://api.z.ai/api/coding/paas/v4",             "models_hint": "glm-5.2, glm-4.6, glm-4.5-air",              "free": "FLAT MONTHLY coding plan (quota, not per-token) · GLM-5.2 is Claude-class", "native_web": "no", "key_url": "https://z.ai/manage-apikey/apikey-list"},
+    {"name": "xAI Grok",    "base_url": "https://api.x.ai/v1",                             "models_hint": "grok-4, grok-4-fast, grok-2-vision-1212",    "free": "pay-per-use (vision + tools + reasoning)",   "native_web": "live X search (native)", "key_url": "https://console.x.ai"},
     {"name": "OpenRouter",  "base_url": "https://openrouter.ai/api/v1",                    "models_hint": "pick any model id ending in :free",          "free": "50/day free, 1000/day after one-time $10",   "native_web": "no", "key_url": "https://openrouter.ai/keys"},
-    {"name": "Google Gemini","base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "models_hint": "gemini-2.5-flash, gemini-2.5-flash-lite",     "free": "big free token budget (trains on prompts)",  "native_web": "grounding (native API only)", "key_url": "https://aistudio.google.com/apikey"},
     {"name": "Mistral",     "base_url": "https://api.mistral.ai/v1",                       "models_hint": "mistral-large-latest, mistral-small-latest", "free": "~1B tokens/MONTH, 1 req/sec",                "native_web": "no", "key_url": "https://console.mistral.ai/api-keys"},
     {"name": "Cerebras",    "base_url": "https://api.cerebras.ai/v1",                      "models_hint": "llama-3.3-70b, qwen-3-32b",                  "free": "2600 tok/s, but ~8K context cap",            "native_web": "no", "key_url": "https://cloud.cerebras.ai"},
     {"name": "Custom",      "base_url": "",                                                "models_hint": "any OpenAI-compatible /v1 endpoint",         "free": "—",                                          "native_web": "?",  "key_url": ""},
@@ -140,6 +143,41 @@ async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 70
         return (msg.get("content") or msg.get("reasoning_content") or "").strip()
     except (KeyError, IndexError, ValueError, TypeError):
         raise ProviderError(f"{slot['name']} returned an unreadable reply")
+
+
+async def provider_stream(slot: dict, payload: dict):
+    """STREAM chat deltas from any OpenAI-compatible provider as ARKITECT SSE lines —
+    the streaming sibling of provider_once. Emits the SAME shape as app.lm_stream
+    ({'type':'delta','text':...}) so the chat frontend needs zero changes. Points at the
+    slot's base_url + Bearer key instead of local LM Studio."""
+    base = (slot.get("base_url") or "").rstrip("/")
+    url = f"{base}/chat/completions"
+    headers = {"Authorization": f"Bearer {slot.get('api_key','')}", "Content-Type": "application/json",
+               "HTTP-Referer": "http://localhost", "X-Title": "Tiff ARKITECT"}
+    try:
+        async with httpx.AsyncClient(timeout=None) as cx:
+            async with cx.stream("POST", url, headers=headers, json=payload) as r:
+                if r.status_code != 200:
+                    body = (await r.aread()).decode(errors="replace")[:300]
+                    emsg = f"{slot.get('name','cloud')} error {r.status_code}: {body}"
+                    yield f"data: {json.dumps({'type':'error','text':emsg})}\n\n"
+                    return
+                async for line in r.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    chunk = line[6:]
+                    if chunk.strip() == "[DONE]":
+                        break
+                    try:
+                        d = json.loads(chunk)["choices"][0]["delta"]
+                        delta = d.get("content") or d.get("reasoning_content") or ""
+                    except Exception:
+                        continue
+                    if delta:
+                        yield f"data: {json.dumps({'type':'delta','text':delta})}\n\n"
+    except Exception as e:
+        emsg = f"{slot.get('name','cloud')} couldn't be reached: {e}"
+        yield f"data: {json.dumps({'type':'error','text':emsg})}\n\n"
 
 
 async def _call_with_fallback(slots: list[dict], system: str, user: str,

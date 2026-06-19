@@ -328,13 +328,22 @@ const TEXT_EXTS = /\.(txt|md|markdown|csv|tsv|json|log|html?|css|js|jsx|ts|tsx|p
 const FILE_CAP = 24000;       // chars of a text/doc file folded into the message she reads
 
 /* ── boot ── */
-(async () => {
+async function arkRebuildModels(){
+  const sel = $("model"); if (!sel) return {};
   const r = await fetch("/api/models").then(r => r.json()).catch(() => ({models:[]}));
-  const sel = $("model");
+  const prev = sel.value || localStorage.getItem("pinkroom-model");
+  sel.innerHTML = "";
   (r.models || []).forEach(m => { const o = document.createElement("option"); o.value = o.textContent = m; sel.appendChild(o); });
+  (r.cloud || []).forEach(c => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); });  // ☁ cloud models (your own keys)
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  return r;
+}
+window.arkRebuildModels = arkRebuildModels;
+window.addEventListener("ark:providers-changed", arkRebuildModels);   // Settings adds a cloud key → picker refreshes live
+(async () => {
+  const sel = $("model");
+  const r = await arkRebuildModels();
   if (r.error) setStatus(r.error, true);
-  const saved = localStorage.getItem("pinkroom-model");
-  if (saved && r.models?.includes(saved)) sel.value = saved;
   sel.onchange = () => localStorage.setItem("pinkroom-model", sel.value);
   const think = $("think");
   think.value = localStorage.getItem("pinkroom-think") || "low";

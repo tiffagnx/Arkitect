@@ -88,8 +88,8 @@
       <div class="as-head"><h2>SETTINGS</h2><button class="as-x" id="asClose">✕</button></div>
       <div class="as-body">
         <div class="as-sec">
-          <h3>Research providers — your API keys</h3>
-          <div class="as-sub">Research with <b>Swarm</b> uses outside LLMs through <b>your own free API keys</b> — they stay on this machine, nothing is shared.</div>
+          <h3>Cloud models &amp; API keys — make ARKITECT smarter</h3>
+          <div class="as-sub">Add a provider with <b>your own API key</b> and its model shows up in your <b>chat model picker</b> (☁) and powers <b>Swarm</b> research. Keys stay on this machine — nothing is shared. On a light PC, this is how you run a frontier brain — flat-monthly picks like <b>Featherless</b> &amp; <b>Z.ai GLM</b>, or free <b>Groq</b>.</div>
           <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Pick a provider in the <b>Provider</b> dropdown below — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> right under it — that opens their site. Make a free account and copy the key they give you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. Done — Swarm research now runs on your key.</li></ol></div>
           <div class="as-slots" id="asSlots"><div class="as-empty">loading…</div></div>
           <div class="as-formhead">＋ Add a provider</div>
@@ -100,7 +100,7 @@
             <div class="as-adv" id="asAdv">
               <div class="as-frow">
                 <div class="as-field"><label>Name</label><input id="asName" placeholder="Groq" /></div>
-                <div class="as-field"><label>Model</label><input id="asModel" placeholder="llama-3.3-70b-versatile" /></div>
+                <div class="as-field"><label>Model</label><input id="asModel" list="asModelList" placeholder="llama-3.3-70b-versatile" /><datalist id="asModelList"></datalist></div>
               </div>
               <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
             </div>
@@ -135,6 +135,8 @@
     const p = PRESETS[+$("asPreset").value]; if (!p) return;
     if (p.name !== "Custom") { $("asName").value = p.name; $("asBase").value = p.base_url; $("asModel").value = (p.models_hint || "").split(",")[0].trim(); }
     else { $("asName").value = ""; $("asBase").value = ""; }
+    // good-model dropdown for this provider (vision / tool-use / reasoning picks) — editable
+    const dl = $("asModelList"); if (dl) { dl.innerHTML = ""; (p.models_hint || "").split(",").map(s => s.trim()).filter(Boolean).forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }); }
     const hint = (p.free && p.free !== "—" ? `${p.free}. ` : "") + (p.models_hint ? `models: ${p.models_hint}.` : "");
     const el = $("asHint"); el.textContent = hint;
     if (p.key_url) { el.appendChild(document.createTextNode(" · ")); const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "get a free key ↗"; el.appendChild(a); }
@@ -154,13 +156,13 @@
            <button class="del" data-act="del">Delete</button>
          </div>`;
       d.querySelector('[data-act="toggle"]').onclick = () => saveProvider({ id: p.id, name: p.name, base_url: p.base_url, model: p.model, enabled: !p.enabled, grounded: p.grounded });
-      d.querySelector('[data-act="del"]').onclick = async () => { if (confirm(`Remove ${p.name}?`)) { await fetch(`/api/swarm/providers/${p.id}`, { method: "DELETE" }); loadProviders(); } };
+      d.querySelector('[data-act="del"]').onclick = async () => { if (confirm(`Remove ${p.name}?`)) { await fetch(`/api/swarm/providers/${p.id}`, { method: "DELETE" }); loadProviders(); window.dispatchEvent(new Event("ark:providers-changed")); } };
       el.appendChild(d);
     });
   }
   async function saveProvider(payload) {
     const r = await fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({ error: "failed" }));
-    await loadProviders(); return r;
+    await loadProviders(); window.dispatchEvent(new Event("ark:providers-changed")); return r;   // refresh the chat model picker live
   }
   async function load() { loadPresets(); loadProviders(); }
 

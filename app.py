@@ -356,16 +356,25 @@ async def models(req: Request):
     # the Builder passes ?include_hidden=1 — a coder model (qwen) is hidden from CHAT
     # because it's a flat conversationalist, but it's exactly what we want for builds.
     include_hidden = req.query_params.get("include_hidden") in ("1", "true", "yes")
+    # CLOUD models the user added with their own key (reuses the swarm provider store).
+    # Computed independently of LM Studio so a weak PC with LM Studio closed still sees them.
+    try:
+        from swarm_routes import _enabled_slots
+        cloud = [{"id": f"cloud:{s['id']}", "label": f"☁ {s['name']} · {s['model']}"} for s in _enabled_slots()]
+    except Exception:
+        cloud = []
     try:
         async with httpx.AsyncClient(timeout=8) as cx:
             r = await cx.get(f"{LM}/models")
             all_ids = [m["id"] for m in r.json().get("data", []) if "embed" not in m["id"].lower()]
             if include_hidden:
-                return {"models": all_ids}
+                return {"models": all_ids, "cloud": cloud}
             ids = [i for i in all_ids if not any(h in i.lower() for h in CHAT_HIDE)]
-            return {"models": ids or all_ids}   # never hand back an empty picker — fall back to all
+            return {"models": ids or all_ids, "cloud": cloud}   # never hand back an empty picker — fall back to all
     except Exception as e:
-        return JSONResponse({"models": [], "error": f"LM Studio isn't reachable — open it and hit Start Server. ({e})"})
+        # LM Studio down — still hand back any cloud models so a cloud-only user isn't stuck
+        return JSONResponse({"models": [], "cloud": cloud,
+                             "error": (None if cloud else f"LM Studio isn't reachable — open it and hit Start Server. ({e})")})
 
 
 # ── BRAIN AUTO-BOOT — open the site and go; no babysitting LM Studio ──────────
@@ -591,6 +600,34 @@ async def chat(req: Request):
     }
 
     async def gen():
+        # ── CLOUD model picked (cloud:<slot>) → stream from the user's own provider, skip the
+        #    local brain entirely (so a weak PC with LM Studio closed still works). Keys live
+        #    server-side in the swarm store; the picker only ever carries the opaque slot id. ──
+        if model.startswith("cloud:"):
+            from swarm_routes import _enabled_slots, provider_stream
+            slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
+            if not slot:
+                yield f"data: {json.dumps({'type':'error','text':'That cloud model isn’t set up anymore — pick another in the picker (Settings ⚙).'})}\n\n"
+                yield f"data: {json.dumps({'type':'done'})}\n\n"
+                return
+            cpay = dict(payload)
+            cpay["model"] = slot["model"]          # the provider's real model id, not "cloud:<slot>"
+            cpay.pop("reasoning_effort", None)      # LM-Studio-ism — many cloud providers 400 on unknown fields
+            reply_parts = []
+            async for ev in provider_stream(slot, cpay):
+                yield ev
+                if ev.startswith("data: "):
+                    try:
+                        d = json.loads(ev[6:])
+                        if d.get("type") == "delta":
+                            reply_parts.append(d.get("text", ""))
+                    except Exception:
+                        pass
+            yield f"data: {json.dumps({'type':'done'})}\n\n"
+            # auto-memory stays on the LOCAL brain — never burn the cloud key's quota on it
+            if mode != "write":
+                _fire(_auto_remember(DEFAULT_MODEL, messages, "".join(reply_parts)))
+            return
         if not await brain_up():
             yield f"data: {json.dumps({'type':'step','icon':'🧠','text':'waking her up — give it a few seconds…'})}\n\n"
             if not await ensure_brain():
