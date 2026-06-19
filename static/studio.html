@@ -410,6 +410,24 @@
   .io-rename:hover { background:rgba(62,156,184,.2); }
   .io-empty, .io-note { font:500 11px Inter; color:var(--dim); line-height:1.5; }
   .io-note { margin-top:10px; }
+  /* Batch Fades dialog (Edit ▸ Fades ▸ Create) */
+  .modal.bf-modal { min-width:720px; max-width:760px; }
+  .bf-presets { display:flex; gap:6px; align-items:center; margin-bottom:12px; }
+  .bf-plabel { font:700 9px 'Space Mono'; letter-spacing:.14em; color:var(--dim); margin-right:4px; }
+  .bf-preset { width:28px; height:25px; border-radius:6px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--text); font:600 11px 'Space Mono'; cursor:pointer; }
+  .bf-preset:hover { border-color:rgba(62,156,184,.55); color:#9FCFDD; }
+  .bf-cols { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .bf-col { border:1px solid var(--hairline); border-radius:10px; padding:11px; background:rgba(255,255,255,.02); }
+  .bf-col h4 { font:700 10px Oxanium; letter-spacing:.1em; color:var(--teal); margin-bottom:8px; text-transform:uppercase; }
+  .bf-canvas { width:100%; height:70px; background:rgba(0,0,0,.35); border:1px solid var(--hairline); border-radius:6px; display:block; margin-bottom:9px; }
+  .bf-shapes { display:flex; flex-direction:column; gap:4px; margin-bottom:9px; }
+  .bf-shapes label, .bf-place label { font:500 11px Inter; color:var(--text); display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .bf-len { display:flex; align-items:center; gap:6px; }
+  .bf-len input[type=range] { flex:1; accent-color:var(--teal); min-width:0; }
+  .bf-len input[type=number] { width:54px; background:rgba(0,0,0,.35); border:1px solid var(--hairline); color:var(--teal); border-radius:5px; font:600 10px 'Space Mono'; padding:3px 4px; }
+  .bf-ms { font:500 9px 'Space Mono'; color:var(--dim); }
+  .bf-place { display:flex; gap:10px; margin-top:8px; }
+  .bf-place label { font-size:10px; color:var(--dim); }
   .wave { flex:1; min-width:0; height:auto; background:rgba(0,0,0,.4); cursor:crosshair; display:block; }
   .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
   .knob { display:flex; align-items:center; gap:6px; }
@@ -1383,6 +1401,89 @@ function openIODialog(){
   ov.querySelector('#ioDetect').onclick=async()=>{ const b=ov.querySelector('#ioDetect'); b.disabled=true; b.textContent='detecting…';
     try{ if(typeof unlockDeviceLabels==='function') await unlockDeviceLabels(); if(typeof populateDevices==='function') await populateDevices(); }catch(e){}
     b.disabled=false; b.textContent='Detect devices'; paint(); };
+}
+
+/* ── Batch Fades dialog (Edit ▸ Fades ▸ Create) — PT-style: Fade In / Crossfade / Fade Out with
+   curve previews, shapes (Standard/Equal-Power/S-Curve), lengths in ms, placement, presets 1–5,
+   OK/Cancel. Applies fade in/out to the selected clip + a crossfade to an adjacent clip. ── */
+const BF_SHAPES=[['lin','Standard'],['pow','Equal-Power'],['scv','S-Curve']];
+let BF_PRESETS=[]; try{ BF_PRESETS=JSON.parse(localStorage.getItem('ark_bf_presets')||'null'); }catch(e){}
+if(!Array.isArray(BF_PRESETS)||BF_PRESETS.length!==5) BF_PRESETS=[
+  {inLen:5,inShape:'lin',outLen:5,outShape:'lin',xLen:0,xShape:'pow',place:'centered'},      // 1 fast de-click
+  {inLen:10,inShape:'lin',outLen:20,outShape:'lin',xLen:0,xShape:'pow',place:'centered'},    // 2 short top & tail
+  {inLen:0,inShape:'pow',outLen:0,outShape:'pow',xLen:20,xShape:'pow',place:'centered'},     // 3 quick crossfade
+  {inLen:30,inShape:'scv',outLen:200,outShape:'scv',xLen:0,xShape:'pow',place:'centered'},   // 4 musical tail
+  {inLen:0,inShape:'pow',outLen:0,outShape:'pow',xLen:100,xShape:'pow',place:'centered'},    // 5 long crossfade
+];
+let BF=Object.assign({},BF_PRESETS[1]);
+function _bfDrawCurve(cv, shape, dir){
+  const g=cv.getContext('2d'), W=cv.width, H=cv.height; g.clearRect(0,0,W,H);
+  const one=(d,stroke,fill)=>{ g.beginPath(); for(let px=0;px<=W;px++){ const gain=_fadeGain(shape,px/W,d); const y=H-1-gain*(H-3); px===0?g.moveTo(px,y):g.lineTo(px,y);} g.strokeStyle=stroke; g.lineWidth=2; g.stroke(); g.lineTo(W,H); g.lineTo(0,H); g.closePath(); g.fillStyle=fill; g.fill(); };
+  if(dir==='x'){ one('in','#5FB4CE','rgba(95,180,206,.16)'); one('out','#D9A441','rgba(217,164,65,.16)'); }
+  else if(dir==='out') one('out','#D9A441','rgba(217,164,65,.16)');
+  else one('in','#5FB4CE','rgba(95,180,206,.16)');
+}
+function _applyBatchFades(){
+  const s=_selFadeClip(); if(!s){ flash("Select a clip first (click it)"); return false; }
+  const {t,cl}=s; pushUndoClips(t,"Batch fades"); const did=[];
+  if(BF.inLen>0){ cl.fadeIn=Math.min(cl.buffer.duration*0.95, BF.inLen/1000); cl.fadeInShape=BF.inShape; did.push("in "+BF.inLen+"ms"); }
+  if(BF.outLen>0){ cl.fadeOut=Math.min(cl.buffer.duration*0.95, BF.outLen/1000); cl.fadeOutShape=BF.outShape; did.push("out "+BF.outLen+"ms"); }
+  if(BF.xLen>0){
+    const cls=clipsOf(t).slice().sort((a,b)=>a.start-b.start), i=cls.indexOf(cl);
+    let A=null,B=null; if(i>=0&&i<cls.length-1){ A=cl; B=cls[i+1]; } else if(i>0){ A=cls[i-1]; B=cl; }
+    if(A&&B){ const L=Math.min(A.buffer.duration*0.95, B.buffer.duration*0.95, BF.xLen/1000);
+      B.start=(A.start+A.buffer.duration)-L; A.fadeOut=L; A.fadeOutShape=BF.xShape; B.fadeIn=L; B.fadeInShape=BF.xShape; did.push("crossfade "+Math.round(L*1000)+"ms"); }
+    else did.push("(no adjacent clip to crossfade)");
+  }
+  syncPrimary(t); selClip={trackId:t.id,clipId:cl.id}; drawLane(t); if(playing) restartPlayback();
+  flash("Fades: "+(did.join(", ")||"set lengths above first"));
+  return true;
+}
+function openBatchFades(){
+  if(!_selFadeClip()){ flash("Select a clip first (click it)"); return; }
+  const ex=document.getElementById('bfDlg'); if(ex) ex.remove();
+  const ov=document.createElement('div'); ov.className='modal-ov'; ov.id='bfDlg';
+  const radios=(sec)=>BF_SHAPES.map(([v,n])=>`<label><input type="radio" name="bf-${sec}" value="${v}"> ${n}</label>`).join('');
+  ov.innerHTML=`<div class="modal bf-modal" role="dialog" aria-label="Batch Fades">
+    <div class="modal-h"><h3>BATCH FADES</h3><button class="modal-x" title="close">✕</button></div>
+    <div class="modal-body">
+      <div class="bf-presets"><span class="bf-plabel">PRESETS</span>${[1,2,3,4,5].map(n=>`<button class="bf-preset" data-p="${n-1}">${n}</button>`).join('')}<span style="flex:1"></span><span class="bf-plabel" id="bfPSave" style="cursor:pointer">＋ save to slot…</span></div>
+      <div class="bf-cols">
+        <div class="bf-col"><h4>Fade In</h4><canvas class="bf-canvas" id="bfCvIn" width="220" height="70"></canvas>
+          <div class="bf-shapes" data-sec="in">${radios('in')}</div>
+          <div class="bf-len"><input type="range" id="bfInR" min="0" max="2000" step="1"><input type="number" id="bfInN" min="0" max="2000"><span class="bf-ms">ms</span></div></div>
+        <div class="bf-col"><h4>Crossfade</h4><canvas class="bf-canvas" id="bfCvX" width="220" height="70"></canvas>
+          <div class="bf-shapes" data-sec="x">${radios('x')}</div>
+          <div class="bf-len"><input type="range" id="bfXR" min="0" max="2000" step="1"><input type="number" id="bfXN" min="0" max="2000"><span class="bf-ms">ms</span></div>
+          <div class="bf-place">${['pre','centered','post'].map(p=>`<label><input type="radio" name="bf-place" value="${p}"> ${p.charAt(0).toUpperCase()+p.slice(1)}</label>`).join('')}</div></div>
+        <div class="bf-col"><h4>Fade Out</h4><canvas class="bf-canvas" id="bfCvOut" width="220" height="70"></canvas>
+          <div class="bf-shapes" data-sec="out">${radios('out')}</div>
+          <div class="bf-len"><input type="range" id="bfOutR" min="0" max="2000" step="1"><input type="number" id="bfOutN" min="0" max="2000"><span class="bf-ms">ms</span></div></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="modal-btn" id="bfCancel">Cancel</button><button class="modal-btn go" id="bfOk">Create fades</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const q=(id)=>ov.querySelector('#'+id);
+  function syncUI(){
+    q('bfInR').value=BF.inLen; q('bfInN').value=BF.inLen; q('bfXR').value=BF.xLen; q('bfXN').value=BF.xLen; q('bfOutR').value=BF.outLen; q('bfOutN').value=BF.outLen;
+    ov.querySelectorAll('[data-sec="in"] input').forEach(r=>r.checked=(r.value===BF.inShape));
+    ov.querySelectorAll('[data-sec="x"] input').forEach(r=>r.checked=(r.value===BF.xShape));
+    ov.querySelectorAll('[data-sec="out"] input').forEach(r=>r.checked=(r.value===BF.outShape));
+    ov.querySelectorAll('[name="bf-place"]').forEach(r=>r.checked=(r.value===BF.place));
+    _bfDrawCurve(q('bfCvIn'),BF.inShape,'in'); _bfDrawCurve(q('bfCvX'),BF.xShape,'x'); _bfDrawCurve(q('bfCvOut'),BF.outShape,'out');
+  }
+  const bindLen=(rid,nid,key)=>{ const r=q(rid),n=q(nid); const set=(v)=>{ v=Math.max(0,Math.min(2000,Math.round(+v||0))); BF[key]=v; r.value=v; n.value=v; }; r.oninput=()=>set(r.value); n.oninput=()=>set(n.value); };
+  bindLen('bfInR','bfInN','inLen'); bindLen('bfXR','bfXN','xLen'); bindLen('bfOutR','bfOutN','outLen');
+  ov.querySelectorAll('[data-sec] input').forEach(r=>r.onchange=()=>{ BF[r.closest('[data-sec]').dataset.sec+'Shape']=r.value; syncUI(); });
+  ov.querySelectorAll('[name="bf-place"]').forEach(r=>r.onchange=()=>{ BF.place=r.value; });
+  ov.querySelectorAll('.bf-preset').forEach(b=>b.onclick=()=>{ BF=Object.assign({},BF_PRESETS[+b.dataset.p]); syncUI(); flash("Preset "+(+b.dataset.p+1)+" loaded"); });
+  q('bfPSave').onclick=()=>{ const n=prompt("Save current settings to which preset slot (1–5)?",""); const i=parseInt(n,10)-1; if(i>=0&&i<5){ BF_PRESETS[i]=Object.assign({},BF); try{localStorage.setItem('ark_bf_presets',JSON.stringify(BF_PRESETS));}catch(e){} flash("Saved to preset "+(i+1)); } };
+  const close=()=>ov.remove();
+  ov.querySelector('.modal-x').onclick=close; q('bfCancel').onclick=close;
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(); });
+  q('bfOk').onclick=()=>{ if(_applyBatchFades()!==false) close(); };
+  syncUI();
 }
 function showWaveMenu(t, wv, e){
   e.preventDefault();
@@ -5624,11 +5725,15 @@ async function openLoadMenu(anchor) {
   menu.id = "loadMenu";
   menu.className = "load-menu";
   menu.innerHTML = `<div class="load-menu-h">Saved projects</div><div class="load-menu-body">loading…</div>`;
-  // anchor under the Load button
-  const r = (_loadAnchor || $("loadBtn")).getBoundingClientRect();
-  menu.style.top = (r.bottom + 6) + "px";
-  menu.style.right = (window.innerWidth - r.right) + "px";
+  // anchor under the menu/button that opened it — LEFT-aligned + clamped on-screen
+  // (was right-anchored, which threw it off the left edge when opened from the File menu)
   document.body.appendChild(menu);
+  const _anchorEl = _loadAnchor || $("loadBtn");
+  const r = _anchorEl ? _anchorEl.getBoundingClientRect() : { bottom: 34, left: 10, right: 10 };
+  const mw = menu.offsetWidth || 320, mh = menu.offsetHeight || 200;
+  menu.style.right = "auto";
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + "px";
+  menu.style.top  = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - mh - 8)) + "px";
   // dismiss on outside click
   setTimeout(() => document.addEventListener("pointerdown", onLoadMenuOutside, true), 0);
   try {
@@ -6432,6 +6537,9 @@ function laneUiTake(t, placeAt) {
     view:       [/Narrow Mix/i, /Real-Time Properties/i, /Scene and Take/i, /Processing State/i, /Trim Playlist/i, /Composite Playlist/i, /^Samples$/i],
     audiosuite: [/^Pitch Shift/i, /^Reverb/i, /^Delay/i, /^Modulation/i, /^Harmonic/i, /^Instrument/i, /^Effect/i],
   };
+  // The Clip menu is clip-OBJECT ops only — Pro Tools keeps Cut/Copy/Paste/Fades/Separate/Strip-Silence/Trim in the
+  // EDIT menu, NOT Clip. Allow-list the TOP-LEVEL Clip items so it stops mirroring Edit (owner: "same menu twice").
+  const CLIP_KEEP = [/^Send to Back/i, /^Bring to Front/i, /^Clip Gain/i, /^Clip Effects/i, /^Melodyne/i, /^Rename/i, /^Commit/i];
   const _helpMenu = window.PT_MENUS.find(m => m.id === 'help');
   if (_helpMenu) {
     _helpMenu.title = "Updates";   // owner: the Help menu IS the update center now
@@ -6497,20 +6605,12 @@ function laneUiTake(t, placeAt) {
     if (menuId === "edit" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));   // top-level only — the Automation submenu has its own Cut/Copy/Paste leaves that must NOT wire to clip cut
     if (menuId === "edit" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
     if (menuId === "edit" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
-    // Clip-menu clipboard — same selection-based engine (grab a word/phrase, drop it elsewhere)
-    if (menuId === "clip" && !parentLabel && L === "Cut")   return onSel(t => cutCmd(t));
-    if (menuId === "clip" && !parentLabel && L === "Copy")  return onSel(t => copyCmd(t));
-    if (menuId === "clip" && !parentLabel && L === "Paste") return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track to paste into"); pasteCmd(t); };
-    // Fades submenu (Edit + Clip) — reuse the per-clip fade engine on the selected clip
-    if ((menuId === "edit" || menuId === "clip") && parentLabel === "Fades" && /^Create/.test(L)) return () => createFades();
-    if ((menuId === "edit" || menuId === "clip") && /^Fade to Start/.test(L)) return () => fadeToStart();
-    if ((menuId === "edit" || menuId === "clip") && /^Fade to End/.test(L))   return () => fadeToEnd();
-    if ((menuId === "edit" || menuId === "clip") && /^Delete Fades/.test(L))   return () => deleteFadesCmd();
-    if (menuId === "clip" && parentLabel === "Fades" && /^Standard/.test(L))    return () => setFadeShape('lin');
-    if (menuId === "clip" && parentLabel === "Fades" && /^Equal Gain/.test(L))  return () => setFadeShape('lin');
-    if (menuId === "clip" && parentLabel === "Fades" && /^Equal Power/.test(L)) return () => setFadeShape('pow');
-    if (menuId === "clip" && parentLabel === "Fades" && /^S-Curve/.test(L))     return () => setFadeShape('scv');
-    if ((menuId === "edit" || menuId === "clip") && /^Strip Silence/.test(L))   return () => stripSilence();   // gate breaths/room tone out of the selected clip
+    // Fades + Strip Silence live in the EDIT menu ONLY (Pro Tools keeps these out of the Clip menu — Clip is clip-object ops)
+    if (menuId === "edit" && parentLabel === "Fades" && /^Create/.test(L)) return () => openBatchFades();
+    if (menuId === "edit" && /^Fade to Start/.test(L)) return () => fadeToStart();
+    if (menuId === "edit" && /^Fade to End/.test(L))   return () => fadeToEnd();
+    if (menuId === "edit" && /^Delete Fades/.test(L))   return () => deleteFadesCmd();
+    if (menuId === "edit" && /^Strip Silence/.test(L))  return () => stripSilence();   // gate breaths/room tone out of the selected clip
     if (menuId === "edit" && /^Select All/.test(L)) return () => selectAllCmd();
     if (menuId === "track" && parentLabel === "Bypass Inserts" && /^All/.test(L))      return () => bypassInserts('all');
     if (menuId === "track" && parentLabel === "Bypass Inserts" && /^EQ/.test(L))       return () => bypassInserts('eq');
@@ -6524,8 +6624,8 @@ function laneUiTake(t, placeAt) {
     if (menuId === "file"        && /^Open Recent/.test(L))    return () => openLoadMenu(titleEl);   // recent-first saved-projects list
     if (menuId === "file"        && /^Revert to Saved/.test(L)) return () => { if(currentProjectId) loadProject(currentProjectId); else flash("Nothing to revert to — this session was never saved"); };
     if (menuId === "file"        && /^Open Session/.test(L))   return () => openLoadMenu(titleEl);
-    if ((menuId === "edit" || menuId === "clip") && /start to insertion/i.test(L)) return () => trimStartToCursor();
-    if ((menuId === "edit" || menuId === "clip") && /end to insertion/i.test(L))   return () => trimEndToCursor();
+    if (menuId === "edit" && /start to insertion/i.test(L)) return () => trimStartToCursor();
+    if (menuId === "edit" && /end to insertion/i.test(L))   return () => trimEndToCursor();
     if (menuId === "setup" && /^I\/O/.test(L)) return () => openIODialog();
     if (menuId === "file"        && /^Open Project/.test(L))   return () => openSessionFromFolder();   // open a .ark from a disk folder
     if (menuId === "file"        && /^Save$/.test(L))          return () => saveProject();
@@ -6554,8 +6654,10 @@ function laneUiTake(t, placeAt) {
   }
   // dead weight for a vocal studio → don't render. Safety net: a wired item is always kept.
   function isHiddenItem(menuId, it, parentLabel){
-    if (menuItemWired(menuId, it, parentLabel)) return false;
     const L = it.label || "";
+    // Clip menu: top-level items must be on the allow-list (clip-object ops only — not the Edit clipboard/fades set).
+    if (menuId === 'clip' && !parentLabel) return !CLIP_KEEP.some(r => r.test(L));
+    if (menuItemWired(menuId, it, parentLabel)) return false;
     return MENU_HIDE_GLOBAL.some(r => r.test(L)) || (MENU_HIDE_BY[menuId] || []).some(r => r.test(L));
   }
 
