@@ -152,6 +152,10 @@
   .arkhero .crew b { font: 700 13px Oxanium; letter-spacing: .05em; color: var(--text); display: block; }
   .arkhero .crew small { font: 500 10px Inter; color: var(--dim); display: block; max-width: 168px; line-height: 1.4; margin-top: 2px; }
   .arkhero .ark-go { font: 500 12px Inter; color: rgba(198,201,208,.6); margin-top: 2px; }
+  .arkhero .ark-smarter { margin-top: 18px; font: 600 12.5px Inter; cursor: pointer; padding: 9px 16px; border-radius: 11px;
+    color: #CFE6EE; background: rgba(62,156,184,.10); border: 1px solid rgba(95,180,206,.38); transition: all .14s; }
+  .arkhero .ark-smarter:hover { color: #fff; background: rgba(62,156,184,.20); border-color: rgba(95,180,206,.7); transform: translateY(-1px); }
+  .arkhero .ark-smarter small { display:block; font: 500 10.5px Inter; color: rgba(198,201,208,.6); margin-top: 3px; letter-spacing: 0; }
 
   /* ── input dock ── */
   .dock { padding: 12px 18px 18px; }
@@ -272,6 +276,7 @@
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make ARKITECT smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
       </div>
     </div></div>
@@ -541,6 +546,7 @@ function newChat() {
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make ARKITECT smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
       </div>`;
   clearAtts();

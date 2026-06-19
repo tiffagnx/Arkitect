@@ -5,6 +5,29 @@ $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
+# ---------- SINGLE INSTANCE — a 2nd double-click shouldn't spawn a 2nd ARKITECT ----------
+# A system-wide mutex: the first launch holds it for the life of the server (this process
+# runs uvicorn in the foreground). A later launch can't acquire it → it just brings the
+# existing ARKITECT window to the front (or reopens it if it was closed) and exits.
+$script:ArkMutex = New-Object System.Threading.Mutex($false, 'Global\ARKITECT_singleton')
+$gotIt = $false
+try { $gotIt = $script:ArkMutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $gotIt = $true }
+if (-not $gotIt) {
+  try {
+    Add-Type -ErrorAction SilentlyContinue -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public class ArkWin {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+}
+'@
+    $w = Get-Process msedge,chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*ARKITECT*' } | Select-Object -First 1
+    if ($w) { [ArkWin]::ShowWindow($w.MainWindowHandle, 9) | Out-Null; [ArkWin]::SetForegroundWindow($w.MainWindowHandle) | Out-Null }
+    else { Start-Process 'http://localhost:7777' }   # window was closed but server's up → reopen one
+  } catch { }
+  exit
+}
+
 function Head($m){ Write-Host $m -ForegroundColor Magenta }
 function Info($m){ Write-Host $m -ForegroundColor Gray }
 function Warn($m){ Write-Host $m -ForegroundColor Yellow }

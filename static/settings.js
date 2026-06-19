@@ -118,6 +118,7 @@
 
   const open = () => { ov.classList.add("open"); load(); };
   const close = () => ov.classList.remove("open");
+  window.arkOpenSettings = open;   // let the "Make ARKITECT smarter" CTA (and anything else) open Settings
   gear.onclick = open;
   $("asClose").onclick = close;
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
