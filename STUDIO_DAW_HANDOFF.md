@@ -1,9 +1,35 @@
 # ARKITECT — Studio DAW · HANDOFF (read this first, in full)
 
-You are continuing a multi-session build of **ARKITECT**, an in-browser, **Pro-Tools-faithful** DAW.
-The owner ("B" / tiffagnx, koonce47@gmail.com) drives it feature-by-feature. Read this whole doc,
-then keep building. **Commit per verified slice. He is picky and wants the TRUTH, not a yes-man** —
-when something's wrong, say so plainly and fix it.
+You are continuing a multi-session build of **ARKITECT**, an in-browser, **Pro-Tools-faithful** DAW
+(plus a wider app: a main chat, image/video rooms, etc.). The owner ("B" / tiffagnx,
+koonce47@gmail.com) drives it feature-by-feature. Read this whole doc, then keep building.
+**Commit per verified slice. He is picky and wants the TRUTH, not a yes-man** — when something's
+wrong, say so plainly and fix it. He talks via voice-to-text (long, sometimes garbled — read intent).
+
+---
+## ⏩ LATEST SESSION (2026-06-18, "session 2") — READ THIS FIRST
+
+A huge session. Beyond the DAW, it spread into the **main chat + the whole-app plumbing**. Everything
+below is committed on `master` + browser/curl-verified. Files touched this session span the WHOLE app,
+not just studio.html: `static/studio.html`, `static/index.html` (main chat), `static/settings.js`,
+`app.py`, `swarm_routes.py`, `setup-and-run.ps1`, `RESTART ARKITECT.bat` (new), `static/kit-hero.png` (new).
+
+**What shipped this session (newest → oldest), all verified + committed:**
+1. **Cloud models live-list + smarter defaults** (2c1b69d): Groq preset defaults to `meta-llama/llama-4-scout-17b-16e-instruct` (vision + tool use), Google to `gemini-3.5-flash` (newest GA — vision/tools/1M ctx). NEW `POST /api/swarm/models` fetches a provider's LIVE catalog with the user's key; settings.js **"↻ list"** button pulls the real current models into the dropdown (no stale ids). Verified pulling Groq's 17 live models via the saved key.
+2. **App-wide updater** (e3fcd07): `app.py` owns `APP_VERSION` ("1.0.0") + `GET /api/version`; `settings.js` (the ⚙ gear, on EVERY room) checks GitHub Releases → badges the gear + one-click Install when a newer version exists. The updater downloads the WHOLE app ZIP (every room + backend), not one room.
+3. **Dev-loop fixes** (3a442d8): `setup-and-run.ps1` adds `uvicorn --reload` when a `.git` checkout is present (auto-reload on .py edits); **`RESTART ARKITECT.bat`** = one-click clean restart (kills the 7777 listener + reloader-parent tree, relaunches); single-instance is now a safe **port check** (a mutex deadlocked relaunches); **⟳ refresh** button by the chat model picker.
+4. **Chat bring-your-own cloud model** (d9d5365): main chat picker shows ☁ cloud models via the user's own key (Featherless/Z.ai-GLM/Google/Groq/xAI-Grok presets). `/api/models` returns cloud slots; `/api/chat` streams from the provider via new `swarm_routes.provider_stream` when a `cloud:<id>` model is picked. "Make ARKITECT smarter" CTA (a6e5c43) on the empty chat screen → opens Settings. **Full detail in [[chat-byo-cloud-model]].**
+5. **Menu fixes** (5c0c2f6): Clip menu DE-DUPLICATED (was mirroring Edit → now clip-object ops only via a `CLIP_KEEP` allow-list); Open-Session list position fixed; **Batch Fades dialog** (Edit ▸ Fades ▸ Create — In/Crossfade/Out curve previews, shapes, ms lengths, Presets 1-5, equal-power crossfade between adjacent clips).
+6. **Menu wirings** (15e8afc, be2cd4d, 6e109dd, f89e11e, 47eed8f): Strip Silence, Fades submenu, Select All, Bypass Inserts, Trim-to-cursor, File Create New / Open Recent / Close / Revert, Setup ▸ I/O, Clip/Track Cut-Copy-Paste / Duplicate. **Full detail in [[studio-menu-audit]].**
+7. **Menu declutter** (5da4ee1): cut the Event menu + hide MIDI/scoring/surround/film-timecode/cloud/quantize/loop-record dead weight (wired-safety-net: a live item is never hidden). Earlier: **Vocal Doctor** (1cd5b84/161dd4c) + **DeMartin quote fix** (f47af9a) + **Kit hero** (611bbd0). Plus Phase 3/4/L&F (start of session).
+
+**🔴 CURRENT LIVE STATE — where we left off:** The owner is **setting up his cloud keys in chat Settings ⚙**. He'd saved **Groq · llama-3.3-70b** but is switching to **Llama 4 Scout** (delete + re-add, or ↻ list + pick); next he'll add **Google gemini-3.5-flash** and **Featherless** (`moonshotai/Kimi-K2.6` — he has a paid Featherless sub for ~a week, then moving to Z.ai GLM). I restarted his **live 7777 server several times** onto the latest code (last background launch = a detached `uvicorn app:app --port 7777`); **he still needs to RELOAD his browser window once** to pick up the newest `static/settings.js` (the ↻ button + Gemini-3.5 default). The **real cloud-chat end-to-end has NOT been live-tested with his key** — that's his next move (paste Featherless key → pick ☁ model → send).
+
+**⚙ DEV-LOOP GOTCHA (cost real time — don't repeat):** Python does NOT hot-reload, so editing `.py` does NOT change the owner's RUNNING server. Symptom: "owner sees old code / new presets missing." Diagnose by curling the LIVE server: `curl localhost:7777/api/version` and `/api/swarm/presets` — that shows what it ACTUALLY serves. Fixes now in place: launcher uses `--reload` on a `.git` checkout (auto-reload), and **`RESTART ARKITECT.bat`** one-click restarts cleanly. If stuck, `Stop-Process` the 7777 listener + its parent, then restart. A fresh DOWNLOAD never hits this (clean first launch loads current code). NOTE the single-instance port-check means **a relaunch while the old server is still up will just focus it** — you must free the port first (RESTART.bat does).
+
+**📦 RELEASE PROCESS (how updates reach users):** commits alone don't update anyone. To ship: **tag `vX.Y.Z` on GitHub `tiffagnx/Arkitect` + upload the distributable ZIP as the release asset, and bump `APP_VERSION` in `app.py`** (also the hardcoded copy in `static/studio.html`'s updater until unified). Then every user's ⚙ gear shows "Update available" → one click pulls the whole new app ZIP, applied on relaunch (zip-slip-safe, ARKITECT-sanity-checked, backs up, preserves `data/`+`venv/`). **Owner wants to cut his FIRST release WITH you present** — and pass-2's live restart needs one real on-his-machine test.
+
+**▶ WHAT'S NEXT (owner's call — the 3 gated audio features + polish):** #18 **Auto-Tune as its OWN plugin** (his stated #1 "hugest question"; SEPARATE from Melodyne/openTune; key + strength natural→hard — but HIGHEST risk to nail in-browser, don't build blind/rushed); #19 **FX-Throw bar** + note-division render-FX (reuses the proven tempo-synced clipFx — lower risk); #20 polish (aux→`laneUi` unify per [[studio-aux-and-pt-track-reference]], dB-tapered fader throw). He picked Vocal Doctor first off this list last time; ASK which is next. Verification this session: Claude_Preview MCP on **7791** (`arkitect-studio` launch config; restart it when the screenshot renderer wedges — it wedges a lot, use `preview_eval` DOM-inspection instead), `curl` the live 7777, `node`/`py_compile` syntax checks per slice.
 
 ---
 ## WHO HE IS + HOW TO WORK WITH HIM
