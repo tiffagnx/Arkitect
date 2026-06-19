@@ -68,6 +68,15 @@
   .as-btns .save{background:linear-gradient(120deg,#5FB4CE,#3E9CB8);color:#0B1417;border:none;}
   .as-btns .ghost{color:rgba(198,201,208,.7);}
   .as-status{font:400 11.5px 'Space Mono';} .as-status.ok{color:#7fe8c0;} .as-status.bad{color:#FF9DAB;}
+  .as-gear{position:relative;}
+  .as-gear.upd::after{content:"";position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#D9A441;box-shadow:0 0 7px #D9A441;animation:asPulse 1.5s ease-in-out infinite;}
+  @keyframes asPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .as-upd{display:flex;align-items:center;gap:10px;font:500 12.5px Inter;color:rgba(198,201,208,.85);padding:11px 13px;border-radius:12px;border:1px solid var(--hairline);background:rgba(255,255,255,.025);margin-bottom:14px;line-height:1.5;}
+  .as-upd.avail{border-color:rgba(217,164,65,.5);background:rgba(217,164,65,.08);color:#F0D49A;}
+  .as-upd b{color:#CFE6EE;}
+  .as-upd a{color:#9CD3E4;}
+  .as-upd-btn{margin-left:auto;flex:none;font:600 11.5px Inter;padding:7px 14px;border-radius:9px;cursor:pointer;border:none;color:#0B1417;background:linear-gradient(120deg,#E6C16A,#D9A441);}
+  .as-upd-btn:hover{filter:brightness(1.08);}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -87,6 +96,7 @@
     <div class="as-panel" role="dialog" aria-label="Settings">
       <div class="as-head"><h2>SETTINGS</h2><button class="as-x" id="asClose">✕</button></div>
       <div class="as-body">
+        <div class="as-sec" id="asUpdSec" style="display:none"><div class="as-upd" id="asUpd"></div></div>
         <div class="as-sec">
           <h3>Cloud models &amp; API keys — make ARKITECT smarter</h3>
           <div class="as-sub">Add a provider with <b>your own API key</b> and its model shows up in your <b>chat model picker</b> (☁) and powers <b>Swarm</b> research. Keys stay on this machine — nothing is shared. On a light PC, this is how you run a frontier brain — flat-monthly picks like <b>Featherless</b> &amp; <b>Z.ai GLM</b>, or free <b>Groq</b>.</div>
@@ -116,7 +126,7 @@
     </div>`;
   document.body.appendChild(ov);
 
-  const open = () => { ov.classList.add("open"); load(); };
+  const open = () => { ov.classList.add("open"); load(); checkAppUpdate(); };
   const close = () => ov.classList.remove("open");
   window.arkOpenSettings = open;   // let the "Make ARKITECT smarter" CTA (and anything else) open Settings
   gear.onclick = open;
@@ -166,6 +176,45 @@
     await loadProviders(); window.dispatchEvent(new Event("ark:providers-changed")); return r;   // refresh the chat model picker live
   }
   async function load() { loadPresets(); loadProviders(); }
+
+  // ── APP-WIDE UPDATER — on every room (the gear is everywhere). Checks GitHub Releases for the
+  //    WHOLE app; if a newer version is out, badges the gear + offers a one-click whole-app update. ──
+  const UPD_REPO = "tiffagnx/Arkitect";
+  function cmpVer(a, b) { const p = s => String(s || "").replace(/^v/i, "").split(/[.\-+]/).map(n => parseInt(n, 10) || 0); const A = p(a), B = p(b), n = Math.max(A.length, B.length); for (let i = 0; i < n; i++) { const d = (A[i] || 0) - (B[i] || 0); if (d) return d < 0 ? -1 : 1; } return 0; }
+  async function checkAppUpdate() {
+    const box = $("asUpd"), sec = $("asUpdSec"); if (!box) return;
+    let cur = "?"; try { cur = (await fetch("/api/version").then(r => r.json())).version || "?"; } catch (e) { }
+    let rel = null; try { const r = await fetch("https://api.github.com/repos/" + UPD_REPO + "/releases/latest", { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" }); if (r.ok) rel = await r.json(); } catch (e) { }
+    const tag = rel && (rel.tag_name || rel.name);
+    if (sec) sec.style.display = "";
+    if (tag && cmpVer(tag, cur) > 0) {
+      const zip = (rel.assets || []).find(a => /\.zip$/i.test(a.name || ""));
+      const url = (zip && zip.browser_download_url) || rel.zipball_url || ("https://github.com/" + UPD_REPO + "/releases/latest");
+      const ver = String(tag).replace(/^v/i, "");
+      box.className = "as-upd avail";
+      box.innerHTML = `<span>⬆ <b>Update available</b> — v${cur} → v${ver}. Updates the whole app (every room), keeps your sessions &amp; keys.</span><button class="as-upd-btn" id="asUpdGo">Install</button>`;
+      gear.classList.add("upd");
+      box.querySelector("#asUpdGo").onclick = () => installAppUpdate(url, ver);
+    } else {
+      box.className = "as-upd";
+      box.innerHTML = `<span>✓ ARKITECT <b>v${cur}</b> — you're on the latest.</span>`;
+      gear.classList.remove("upd");
+    }
+  }
+  async function installAppUpdate(url, ver) {
+    const box = $("asUpd");
+    box.innerHTML = `<span>Saving + downloading v${ver}…</span>`;
+    try {
+      const r = await fetch("/api/studio/update/stage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, version: ver }) }).then(r => r.json());
+      if (!r.ok) throw new Error(r.error || "couldn't stage the update");
+      box.className = "as-upd avail";
+      box.innerHTML = `<span>✓ <b>v${ver} is ready.</b> ARKITECT restarts to finish — your sessions &amp; keys stay put.</span><button class="as-upd-btn" id="asUpdRestart">Restart now</button>`;
+      box.querySelector("#asUpdRestart").onclick = async () => { box.innerHTML = `<span>Restarting…</span>`; try { await fetch("/api/studio/update/restart", { method: "POST" }); } catch (e) { } };
+    } catch (e) {
+      box.innerHTML = `<span>Update failed: ${e.message}. <a href="https://github.com/${UPD_REPO}/releases/latest" target="_blank" rel="noopener">Download it manually ↗</a></span>`;
+    }
+  }
+  checkAppUpdate();   // run once on load so the gear badges even before the panel is opened
 
   $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus(""); };
   $("asAdvToggle").onclick = () => { $("asAdv").classList.toggle("open"); };

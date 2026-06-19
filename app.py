@@ -31,6 +31,7 @@ DATA = ROOT / "data"
 SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"
 KB_SEED = DATA / "kb_export.json"
+APP_VERSION = "1.0.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -346,6 +347,12 @@ def memory_block(messages: list[dict]) -> str:
     block = "\n\n".join(f"[{m.get('title','memory')}]\n{m['text']}" for m in hits)
     return ("\n\n---\nMEMORY (your real knowledge about B and your craft — use naturally, never "
             "recite or mention that you 'have notes'):\n" + block)
+
+
+# ── version (single source of truth for the app-wide updater) ───────────────
+@app.get("/api/version")
+async def app_version():
+    return {"version": APP_VERSION}
 
 
 # ── LM Studio ───────────────────────────────────────────────────────────────
