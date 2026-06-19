@@ -185,6 +185,25 @@ insert, verb is the global send); an Edit-view / right-click entry (today it's M
 panel kept wedging the preview renderer (environmental) — verified instead by DOM-inspection eval (button present, 5→6
 inserts, 6 bounded macros, idempotency, user-insert preservation) + 0 console errors.
 
+**MENU-BAR AUDIT + DECLUTTER (2026-06-18, owner: "audit it, don't do anything backwards"; commits 5da4ee1 + 47eed8f).**
+Audited all 11 menus (multi-agent workflow `arkitect-menu-audit-v2`; ground-truth extracted deterministically into
+`studio-research/menu-*.json` — gitignored). **Done:** CUT the whole **Event** menu + a hide-filter in `buildMenuBar`
+(`MENU_HIDE_GLOBAL` regex list + `MENU_HIDE_BY` per-menu) applied in `buildPanel` via `isHiddenItem()` with a
+**wired-safety-net** (`menuItemWired` — a live item is NEVER hidden) + trailing-separator cleanup → hides MIDI, scoring,
+surround, film-timecode, Avid-cloud, quantize/elastic, punch/loop-record, window-layout, DSP-accounting (verified: 0 wired
+items hidden). Fixed a latent `actionFor` bug (Edit Automation submenu's Cut/Copy/Paste hijacked the clip commands — now
+`!parentLabel`-scoped). **Wired (safe reuse):** Clip Cut/Copy/Paste (→ `cutCmd/copyCmd/pasteCmd`) + Track Duplicate (→
+`duplicateTrack`). **WIRE-NEXT roadmap (ranked, NOT built):** Strip Silence (new DSP) · Fades submenu (reuses the per-clip
+fade engine; needs a selected-clip target + Ctrl+F) · Select All · Trim Start/End to cursor · Bypass Inserts (All/EQ/Dyn) ·
+Setup I/O dialog · File Create New / Open Recent. **RISKS (heed):** dispatch keys off the visible label (don't relabel a
+wired item — silently un-wires); don't rebuild Melodyne; double-check Track Delete before touching; Click items must point
+at the existing ♪ toolbar toggle; never re-add loop-record; Commit/Render must route to the existing Bounce/Commit. Full
+detail in the [[studio-menu-audit]] memory. **Asset self-containment: PASS** — every image/sprite/icon/JS is git-tracked
+(0 missing/untracked); only optional gap = fonts via Google CDN (offline falls back to system fonts; bundling touches
+several room HTMLs incl. the PARALLEL-session editor.html — leave that one alone). **DeMartin quotes fixed** (f47af9a):
+re-bylined the made-up "DeMartin" lines to "DeMartin Audio Labs" + added a namesake nod (Édouard-Léon Scott de Martinville,
+first recorded voice 1860).
+
 **Big discoveries (so we don't rebuild):** **Auto-Tune ALREADY EXISTS** — `openTune` (5533) is a real Melodyne-style
 pitch editor (detectPitchTrack→segmentNotes→piano-roll→snap-to-key→`fxPitchBuf` retune→print). **Auto-mix** already
 FFT-analyzes + applies bounded EQ/comp/de-ess (the seed for "Vocal Doctor"). `clipFx_chop` (1/16 stutter) + `clipFx_bpmDelay`
