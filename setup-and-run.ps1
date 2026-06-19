@@ -6,13 +6,13 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
 # ---------- SINGLE INSTANCE — a 2nd double-click shouldn't spawn a 2nd ARKITECT ----------
-# A system-wide mutex: the first launch holds it for the life of the server (this process
-# runs uvicorn in the foreground). A later launch can't acquire it → it just brings the
-# existing ARKITECT window to the front (or reopens it if it was closed) and exits.
-$script:ArkMutex = New-Object System.Threading.Mutex($false, 'Global\ARKITECT_singleton')
-$gotIt = $false
-try { $gotIt = $script:ArkMutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $gotIt = $true }
-if (-not $gotIt) {
+# A PORT CHECK (not a mutex — a mutex can deadlock a real relaunch): if the server is already
+# listening on 7777, this launch just brings the existing window to the front (or reopens one)
+# and exits — it never starts a duplicate. "RESTART ARKITECT.bat" frees the port first, so it
+# always relaunches cleanly onto the latest code.
+$alreadyUp = $false
+try { $alreadyUp = [bool](Get-NetTCPConnection -LocalPort 7777 -State Listen -ErrorAction SilentlyContinue) } catch { }
+if ($alreadyUp) {
   try {
     Add-Type -ErrorAction SilentlyContinue -TypeDefinition @'
 using System; using System.Runtime.InteropServices;
@@ -216,5 +216,9 @@ Head "  KEEP THIS WINDOW OPEN while you use it."
 Head "  Close this window to stop the room."
 Head "=================================================="
 Write-Host ""
-& $VENV -m uvicorn app:app --host 127.0.0.1 --port 7777
+# On the DEV machine (a git checkout) auto-reload on .py edits, so code changes apply WITHOUT a
+# manual restart. Shipped ZIP installs (no .git) run the stable single-process server. uvicorn's
+# reloader only watches *.py by default, so session writes under data/ never trigger a reload.
+$reloadArgs = @(); if (Test-Path (Join-Path $Root ".git")) { $reloadArgs = @("--reload") }
+& $VENV -m uvicorn app:app --host 127.0.0.1 --port 7777 @reloadArgs
 Read-Host "Server stopped. Press Enter to close"
