@@ -53,8 +53,8 @@ _KEYS_LOCK = asyncio.Lock()                 # serialize key writes so concurrent
 # native_web flags whether the MODELS themselves can browse (almost none can — the
 # swarm feeds them pages either way; this is just guidance shown in the UI).
 PRESETS = [
-    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "openai/gpt-oss-120b, llama-3.3-70b-versatile, meta-llama/llama-4-scout-17b-16e-instruct", "free": "free ~1K calls/day, fastest inference",       "native_web": "no", "key_url": "https://console.groq.com/keys"},
-    {"name": "Google Gemini","base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "models_hint": "gemini-2.5-flash, gemini-2.5-pro, gemini-2.5-flash-lite", "free": "big free token budget · vision + tools + reasoning", "native_web": "grounding (native API only)", "key_url": "https://aistudio.google.com/apikey"},
+    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b, llama-3.3-70b-versatile", "free": "free ~1K/day, fastest · Llama 4 Scout = vision + tool use", "native_web": "no", "key_url": "https://console.groq.com/keys"},
+    {"name": "Google Gemini","base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "models_hint": "gemini-3.5-flash, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash", "free": "big free budget · 3.5 Flash = vision + tools + 1M context", "native_web": "grounding (native API only)", "key_url": "https://aistudio.google.com/apikey"},
     {"name": "Featherless", "base_url": "https://api.featherless.ai/v1",                   "models_hint": "moonshotai/Kimi-K2.6, deepseek-ai/DeepSeek-V4, zai-org/GLM-5.1, Qwen/Qwen3-235B-A22B", "free": "FLAT MONTHLY — unlimited tokens ($10 ≤15B / $25 all sizes)", "native_web": "no", "key_url": "https://featherless.ai/account/api-keys"},
     {"name": "Z.ai GLM",    "base_url": "https://api.z.ai/api/coding/paas/v4",             "models_hint": "glm-5.2, glm-4.6, glm-4.5-air",              "free": "FLAT MONTHLY coding plan (quota, not per-token) · GLM-5.2 is Claude-class", "native_web": "no", "key_url": "https://z.ai/manage-apikey/apikey-list"},
     {"name": "xAI Grok",    "base_url": "https://api.x.ai/v1",                             "models_hint": "grok-4, grok-4-fast, grok-2-vision-1212",    "free": "pay-per-use (vision + tools + reasoning)",   "native_web": "live X search (native)", "key_url": "https://console.x.ai"},
@@ -541,6 +541,34 @@ async def swarm_test(req: Request):
         return {"ok": False, "error": str(e)}
     except Exception as e:
         return {"ok": False, "error": f"couldn't reach it: {e}"}
+
+
+@router.post("/api/swarm/models")
+async def swarm_models(req: Request):
+    """List the models a provider actually serves RIGHT NOW — GET {base_url}/models with the
+    user's key. Lets the Add-provider form show the LIVE catalog instead of stale hardcoded ids,
+    so "there's a newer model" is just a click away. Capped + sorted."""
+    d = await req.json()
+    base_url = (d.get("base_url") or "").strip().rstrip("/")
+    key = (d.get("api_key") or "").strip()
+    if not base_url:
+        return JSONResponse({"ok": False, "error": "need a base URL"}, status_code=400)
+    if not key:                                            # allow a saved slot's key (by id)
+        pid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or "")
+        key = _load_keys().get(pid, "")
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    try:
+        async with httpx.AsyncClient(timeout=20) as cx:
+            r = await cx.get(f"{base_url}/models", headers=headers)
+        if r.status_code != 200:
+            return JSONResponse({"ok": False, "error": f"{r.status_code}: {(r.text or '')[:160]}"}, status_code=200)
+        j = r.json()
+        data = j.get("data") or j.get("models") or (j if isinstance(j, list) else [])
+        ids = sorted({ (m.get("id") if isinstance(m, dict) else str(m)) for m in data
+                       if (isinstance(m, dict) and m.get("id")) or isinstance(m, str) })
+        return {"ok": True, "models": ids[:400], "total": len(ids)}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"couldn't list models: {e}"}, status_code=200)
 
 
 @router.post("/api/research-for-build")

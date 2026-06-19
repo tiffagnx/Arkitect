@@ -77,6 +77,10 @@
   .as-upd a{color:#9CD3E4;}
   .as-upd-btn{margin-left:auto;flex:none;font:600 11.5px Inter;padding:7px 14px;border-radius:9px;cursor:pointer;border:none;color:#0B1417;background:linear-gradient(120deg,#E6C16A,#D9A441);}
   .as-upd-btn:hover{filter:brightness(1.08);}
+  .as-modelrow{display:flex;gap:6px;} .as-modelrow input{flex:1;min-width:0;}
+  .as-listbtn{flex:none;white-space:nowrap;font:600 10.5px Inter;padding:0 11px;border-radius:10px;cursor:pointer;color:#9CD3E4;background:rgba(62,156,184,.10);border:1px solid rgba(95,180,206,.35);}
+  .as-listbtn:hover{color:#E9EAED;border-color:rgba(95,180,206,.6);background:rgba(62,156,184,.18);}
+  .as-listbtn:disabled{opacity:.6;cursor:default;}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -110,7 +114,7 @@
             <div class="as-adv" id="asAdv">
               <div class="as-frow">
                 <div class="as-field"><label>Name</label><input id="asName" placeholder="Groq" /></div>
-                <div class="as-field"><label>Model</label><input id="asModel" list="asModelList" placeholder="llama-3.3-70b-versatile" /><datalist id="asModelList"></datalist></div>
+                <div class="as-field"><label>Model</label><div class="as-modelrow"><input id="asModel" list="asModelList" placeholder="llama-3.3-70b-versatile" /><button type="button" class="as-listbtn" id="asListModels" title="List this provider's current models (uses your key)">↻ list</button></div><datalist id="asModelList"></datalist><div class="h" id="asModelHint"></div></div>
               </div>
               <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
             </div>
@@ -216,6 +220,19 @@
   }
   checkAppUpdate();   // run once on load so the gear badges even before the panel is opened
 
+  $("asListModels").onclick = async () => {
+    const base = $("asBase").value.trim(), key = $("asKey").value.trim();
+    if (!base) { setStatus("pick a provider (or fill the Base URL) first", "bad"); return; }
+    const btn = $("asListModels"); btn.disabled = true; const lbl = btn.textContent; btn.textContent = "↻ …";
+    const r = await fetch("/api/swarm/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_url: base, api_key: key }) }).then(r => r.json()).catch(() => ({ ok: false, error: "couldn't reach it" }));
+    btn.disabled = false; btn.textContent = lbl;
+    if (r.ok) {
+      const dl = $("asModelList"); dl.innerHTML = ""; (r.models || []).forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); });
+      const hint = $("asModelHint"); if (hint) hint.textContent = (r.models || []).length + " live models" + (r.total > (r.models || []).length ? (" (of " + r.total + ", showing first " + r.models.length + ")") : "") + " — click the Model box to pick";
+      setStatus("✓ pulled " + (r.models || []).length + " live models", "ok");
+      $("asModel").focus();
+    } else setStatus("couldn't list models: " + (r.error || "?"), "bad");
+  };
   $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus(""); };
   $("asAdvToggle").onclick = () => { $("asAdv").classList.toggle("open"); };
   $("asTest").onclick = async () => {
