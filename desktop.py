@@ -21,6 +21,17 @@ import socket
 import threading
 import subprocess
 
+# Let the start-screen intro video (Tiff + Kit walk-in) autoplay WITH its footstep
+# audio. WebView2 is Chromium, which blocks audible autoplay until a user gesture; this
+# flag flips that policy. WebView2 reads WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS when it
+# creates the browser environment (inside webview.start), and APPENDS it to pywebview's
+# own args, so this can't clobber them. Must be set BEFORE webview.start(). The page also
+# ships a muted-autoplay fallback, so the intro still plays even if this flag is ignored.
+_wv2_args = os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "")
+if "--autoplay-policy" not in _wv2_args:
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (
+        _wv2_args + " --autoplay-policy=no-user-gesture-required").strip()
+
 # A PyInstaller --windowed (no-console) build sets sys.stdout / sys.stderr to None.
 # Anything that calls sys.stdout.isatty() then dies with
 # "'NoneType' object has no attribute 'isatty'" — uvicorn's log formatter does exactly

@@ -1688,10 +1688,13 @@ function drawMatted(ctx,bEntry,matteEntry,mode,f,W,H,srcOverride){
   const [B,Mt]=_tmCanvases(W,H),bg=B.getContext('2d'),mg=Mt.getContext('2d');
   const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.filter='none';};
   reset(bg);bg.clearRect(0,0,W,H);
+  if(bEntry.c.adjustment)bg.drawImage(ctx.canvas,0,0);       // an adjustment needs the real composite beneath as its backdrop
   if(!drawOneClip(bg,bEntry,f,W,H,srcOverride))return;        // matted layer not ready → draw nothing (matte stays consumed)
   reset(mg);mg.clearRect(0,0,W,H);
+  if(matteEntry.c.adjustment)mg.drawImage(ctx.canvas,0,0);
+  const inv=/inv/i.test(mode);
   if(drawOneClip(mg,matteEntry,f,W,H,srcOverride)){
-    const luma=/luma/i.test(mode),inv=/inv/i.test(mode);
+    const luma=/luma/i.test(mode);
     if(luma||inv){const im=mg.getImageData(0,0,W,H),d=im.data;
       for(let i=0;i<d.length;i+=4){let al=d[i+3];
         if(luma)al=Math.round((0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])*(al/255));
@@ -1699,7 +1702,7 @@ function drawMatted(ctx,bEntry,matteEntry,mode,f,W,H,srcOverride){
         d[i+3]=al;}
       mg.putImageData(im,0,0);}
     reset(bg);bg.globalCompositeOperation='destination-in';bg.drawImage(Mt,0,0);reset(bg);  // matted.alpha *= matte alpha
-  }
+  }else if(!inv){return;}   // matte source not ready: non-inverted → hide the matted layer (never leak it un-matted)
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation=bEntry.c.blend||'source-over';ctx.globalAlpha=1;ctx.filter='none';
   ctx.drawImage(B,0,0);ctx.restore();
 }
@@ -1711,7 +1714,9 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
     if(consumed.has(i))continue;
     const entry=vis[i],c=entry.c;
     if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export
-    if(c.trackMatte&&i+1<vis.length){consumed.add(i+1);drawMatted(ctx,entry,vis[i+1],c.trackMatte,f,W,H,srcOverride);continue;} // layer above = the matte
+    if(c.trackMatte&&i+1<vis.length){const me=vis[i+1];consumed.add(i+1); // layer above = the matte
+      if(me.c.guide&&srcOverride){drawOneClip(ctx,entry,f,W,H,srcOverride);continue;} // a guide matte is preview-only → ignore on export
+      drawMatted(ctx,entry,me,c.trackMatte,f,W,H,srcOverride);continue;}
     drawOneClip(ctx,entry,f,W,H,srcOverride);
   }
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
@@ -2894,7 +2899,10 @@ window.addEventListener('resize',fitScreen);
   function setTrackMatte(mode){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Track mattes are for visual layers',1);
     s.clip.trackMatte=mode;renderTimeline();refreshInspector();drawFrame();save();
-    toast(mode?('Track matte: '+mode+' — uses the layer above as the matte'):'Track matte off');}
+    if(!mode)return toast('Track matte off');
+    const ti=project.tracks.findIndex(t=>t.id===s.track.id);
+    const above=ti>=0&&project.tracks.slice(ti+1).some(t=>t.clips.length);
+    toast(above?('Track matte: '+mode+' — uses the layer above'):('Track matte set — now add a layer ABOVE this one to use as the matte'),above?0:1);}
   function clipDisplayName(c){return c.name||(clipKind(c)==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
   function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     const cur=clipDisplayName(s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;

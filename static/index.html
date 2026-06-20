@@ -250,11 +250,47 @@
   ::-webkit-scrollbar { width: 9px; } ::-webkit-scrollbar-thumb { background: rgba(62,156,184,.25); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(62,156,184,.45); }
   @media (max-width: 760px) { .side { display: none; } .bubble { max-width: 88%; } }
+  /* ── Start-screen intro: Tiff + Kit walk in (transparent video), then the UI drops in ── */
+  .ark-intro { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+               pointer-events: none; background: transparent; opacity: 1; transition: opacity .7s ease; }
+  .ark-intro.is-out { opacity: 0; }
+  .ark-intro.is-done { display: none; }                 /* hard-remove after the fade so it never eats clicks */
+  .ark-intro__vid { width: auto; height: auto; max-width: min(82vw, 1040px); max-height: 84vh;
+                    object-fit: contain; background: transparent; }
+  /* While the intro is arming (set pre-paint), the whole UI starts hidden + clipped shut. */
+  html.ark-intro-armed .app { opacity: 0; }
+  /* The reveal: a curtain hem descending — the UI is uncovered from the top down. */
+  .app.ark-reveal { animation: arkCurtain .95s cubic-bezier(.22,.61,.36,1) forwards; will-change: opacity, clip-path; }
+  @keyframes arkCurtain {
+    from { opacity: 0; clip-path: inset(0 0 100% 0); }
+    55%  { opacity: 1; }
+    to   { opacity: 1; clip-path: inset(0 0 0 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {           /* no flash, no motion — just show the UI */
+    html.ark-intro-armed .app { opacity: 1; }
+    .app.ark-reveal { animation: none; }
+  }
 </style>
+<script>
+/* ARKITECT intro — arm the "curtain closed" state BEFORE first paint (no flash of the UI).
+   The walk-in plays once per app launch; reduced-motion users skip straight to the UI. */
+(function(){
+  try{
+    var seen   = sessionStorage.getItem('arkIntroSeen') === '1';
+    var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!seen && !reduce){ document.documentElement.classList.add('ark-intro-armed'); }
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <div class="aura"><div class="a1"></div><div class="a2"></div><div class="a3"></div></div>
 <div class="grain"></div>
+
+<!-- Intro: Tiff + Kit walk in (transparent VP9-alpha video, footstep audio), freeze, then the UI drops in. Once per launch. -->
+<div id="arkIntro" class="ark-intro" aria-hidden="true">
+  <video id="arkIntroVid" class="ark-intro__vid" playsinline preload="auto" src="/static/tiff-kit-intro.webm"></video>
+</div>
 
 <div class="app">
   <aside class="side">
@@ -852,6 +888,50 @@ function startArkTips() {
   }, 12000);
 }
 startArkTips();
+</script>
+<script>
+/* ARKITECT intro controller — play the Tiff+Kit walk-in once, hold the last frame, then
+   crossfade the video out while the UI drops in like a curtain from above. */
+(function(){
+  function run(){
+    var html  = document.documentElement;
+    var intro = document.getElementById('arkIntro');
+    var vid   = document.getElementById('arkIntroVid');
+    var app   = document.querySelector('.app');
+    var armed = html.classList.contains('ark-intro-armed');
+
+    // Not armed (already seen this launch / reduced-motion / missing pieces): show the UI now.
+    if(!armed || !intro || !vid){
+      if(intro) intro.classList.add('is-done');
+      html.classList.remove('ark-intro-armed');
+      return;
+    }
+    // Mark seen immediately, so a mid-intro New-Chat rebuild or a refresh won't replay it.
+    try{ sessionStorage.setItem('arkIntroSeen','1'); }catch(e){}
+
+    var FREEZE_MS = 2500, done = false;
+    function reveal(){
+      if(done) return; done = true;
+      intro.classList.add('is-out');               // crossfade the video out
+      if(app) app.classList.add('ark-reveal');     // drop the UI in — curtain from above
+      setTimeout(function(){
+        intro.classList.add('is-done');
+        html.classList.remove('ark-intro-armed');
+        try{ vid.pause(); vid.removeAttribute('src'); vid.load(); }catch(e){}  // free the alpha decoder
+      }, 950);
+    }
+    vid.addEventListener('ended', function(){ setTimeout(reveal, FREEZE_MS); }, {once:true});
+    vid.addEventListener('error', reveal, {once:true});       // missing/corrupt file -> just show the UI
+    setTimeout(function(){ if(!done) reveal(); }, 13000);      // hard safety cap
+
+    // Try WITH sound (works when the WebView2 autoplay flag is set); fall back to muted so it ALWAYS plays.
+    vid.muted = false; vid.volume = 1.0;
+    var p = vid.play();
+    if(p && p.catch){ p.catch(function(){ vid.muted = true; vid.play().catch(reveal); }); }
+  }
+  if(document.readyState !== 'loading') run();
+  else document.addEventListener('DOMContentLoaded', run);
+})();
 </script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>

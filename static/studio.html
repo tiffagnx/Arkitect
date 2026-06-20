@@ -1850,6 +1850,53 @@ TIFF_PLUGINS.list.push(
         set(id,v){ ({ time:()=>ramp(dl.delayTime, v/1000), fb:()=>ramp(fb.gain, v), mix:()=>ramp(wet.gain, v) })[id]?.(); },
         dispose(){ try{ i.disconnect(); o.disconnect(); dl.disconnect(); fb.disconnect(); wet.disconnect(); dry.disconnect(); damp.disconnect(); }catch(e){} } };
     } },
+  /* ── DeMartin Chorus — LFO-modulated short delay → width & shimmer (live insert + renderable). ── */
+  { name: "DeMartin Chorus",
+    params: [
+      { id:"rate",  label:"RATE",  min:0.05, max:6, value:0.8, fmt:v=>v.toFixed(2)+"Hz" },
+      { id:"depth", label:"DEPTH", min:0, max:1, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+      { id:"mix",   label:"MIX",   min:0, max:1, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dl = c.createDelay(0.05); dl.delayTime.value = 0.018;
+      const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.8;
+      const lfoG = c.createGain(); lfoG.gain.value = 0.006;          // modulation depth (seconds)
+      lfo.connect(lfoG); lfoG.connect(dl.delayTime); lfo.start();
+      const wet = c.createGain(); wet.gain.value = 0.5;
+      const dry = c.createGain(); dry.gain.value = 1;
+      i.connect(dry); dry.connect(o);
+      i.connect(dl); dl.connect(wet); wet.connect(o);
+      const ramp = (p,v) => p.setTargetAtTime(v, c.currentTime, 0.02);
+      return { input: i, output: o,
+        set(id,v){ ({ rate:()=>ramp(lfo.frequency, v), depth:()=>ramp(lfoG.gain, v*0.012), mix:()=>ramp(wet.gain, v) })[id]?.(); },
+        dispose(){ try{ lfo.stop(); }catch(e){} try{ i.disconnect(); o.disconnect(); dl.disconnect(); wet.disconnect(); dry.disconnect(); lfo.disconnect(); lfoG.disconnect(); }catch(e){} } };
+    } },
+  /* ── DeMartin Flanger — short modulated delay WITH feedback → the jet-sweep whoosh. ── */
+  { name: "DeMartin Flanger",
+    params: [
+      { id:"rate",  label:"RATE",  min:0.05, max:8, value:0.5, fmt:v=>v.toFixed(2)+"Hz" },
+      { id:"depth", label:"DEPTH", min:0, max:1, value:0.6, fmt:v=>Math.round(v*100)+"%" },
+      { id:"fb",    label:"FBACK", min:0, max:0.9, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+      { id:"mix",   label:"MIX",   min:0, max:1, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dl = c.createDelay(0.02); dl.delayTime.value = 0.002;
+      const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.5;
+      const lfoG = c.createGain(); lfoG.gain.value = 0.002;
+      lfo.connect(lfoG); lfoG.connect(dl.delayTime); lfo.start();
+      const fb = c.createGain(); fb.gain.value = 0.5;
+      dl.connect(fb); fb.connect(dl);
+      const wet = c.createGain(); wet.gain.value = 0.5;
+      const dry = c.createGain(); dry.gain.value = 1;
+      i.connect(dry); dry.connect(o);
+      i.connect(dl); dl.connect(wet); wet.connect(o);
+      const ramp = (p,v) => p.setTargetAtTime(v, c.currentTime, 0.02);
+      return { input: i, output: o,
+        set(id,v){ ({ rate:()=>ramp(lfo.frequency, v), depth:()=>ramp(lfoG.gain, v*0.004), fb:()=>ramp(fb.gain, v), mix:()=>ramp(wet.gain, v) })[id]?.(); },
+        dispose(){ try{ lfo.stop(); }catch(e){} try{ i.disconnect(); o.disconnect(); dl.disconnect(); wet.disconnect(); dry.disconnect(); lfo.disconnect(); lfoG.disconnect(); fb.disconnect(); }catch(e){} } };
+    } },
   /* ── EQ-6 — full parametric (native biquad chain), surgical EQ per track ── */
   { name: "EQ-6", params: [
       { id:"hpf", label:"HP Hz", min:20, max:400, value:35 },
@@ -6996,7 +7043,7 @@ function laneUiTake(t, placeAt) {
   if (_clipMenu) { const _ml = _clipMenu.items.find(it => /^Melodyne/i.test(it.label)); if (_ml) _ml.label = "DeMartin Tune"; }
   // Plugin-backed DeMartin Suite procs — the SAME plugins, rendered offline onto a clip (added here,
   // after the plugin registry is fully built, so both the menu and the suite's proc list include them).
-  [['DeMartin Reverb',{reverse:true, tailBeats:4, tail:2.5}],['DeMartin Delay',{reverse:true, tailBeats:4, tail:2.0}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
+  [['DeMartin Reverb',{reverse:true, tailBeats:4, tail:2.5}],['DeMartin Delay',{reverse:true, tailBeats:4, tail:2.0}],['DeMartin Chorus',{}],['DeMartin Flanger',{}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
     if(!AUDIOSUITE.some(p=>p.name===nm)){ const pp=pluginProc(nm,ex); if(pp) AUDIOSUITE.push(pp); }
   });
   // "AudioSuite" is an Avid term — the top menu is OUR "DeMartin Suite", listing OUR procs only
