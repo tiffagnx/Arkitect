@@ -1859,6 +1859,7 @@ TIFF_PLUGINS.list.push(
        Flat string-id params (bN.type/freq/gain/q/on) so persistence + Auto-mix wire for free.
        Exposes eqBands/eqState on the node so the custom editor can draw real getFrequencyResponse. ── */
   { name: "DeMartin EQ",
+    custom: true,   // opens the canvas EQ editor (openEqWindow) instead of the knob grid
     params: (() => {
       const T = { peaking:0, lowshelf:1, highshelf:2, lowpass:3, highpass:4, notch:5 };
       const L = [["lowshelf",80,1],["peaking",200,1],["peaking",500,0],["peaking",1200,1],
@@ -3790,6 +3791,7 @@ function lighten(hex, a){ const m=hex.replace("#",""); const r=parseInt(m.slice(
 function openPluginWindow(t, i){
   const ins = t.inserts[i]; if(!ins) return;
   const def = TIFF_PLUGINS.byName(ins.name); if(!def) return;
+  if (def.custom === true && typeof openEqWindow === "function") return openEqWindow(t, i);   // DeMartin EQ → canvas editor
   const id = `pw-${t.id}-${i}`;
   let w = document.getElementById(id);
   if (w){ w.style.display="block"; bringFront(w); return; }
@@ -3815,6 +3817,66 @@ function openPluginWindow(t, i){
   w.querySelector(".pw-x").onclick = () => w.remove();
   const n = (_pwZ % 7); w.style.left = (150 + n*30) + "px"; w.style.top = (110 + n*28) + "px";
   document.body.appendChild(w);
+  makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
+}
+function _freqNote(f){ const n=Math.round(12*Math.log2(f/440)+69), N=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]; return N[((n%12)+12)%12]+(Math.floor(n/12)-1); }
+// ── DeMartin EQ canvas editor — log-freq response curve from real biquads + draggable bands (the pro face) ──
+function openEqWindow(t, i){
+  const ins = t.inserts[i]; if(!ins) return;
+  const def = TIFF_PLUGINS.byName(ins.name); if(!def) return;
+  def.params.forEach(p=>{ if(ins.params[p.id]==null) ins.params[p.id]=p.value; });
+  const id = `pw-${t.id}-${i}`;
+  let w = document.getElementById(id);
+  if(w){ w.style.display="block"; bringFront(w); return; }
+  const col = pluginColor(def.name) || "#ff4f9a";
+  const W=560, H=300, DPR=2;
+  w=document.createElement("div"); w.className="plugwin"; w.id=id;
+  w.style.width=(W+24)+"px"; w.style.borderColor=hexA(col,.42);
+  w.style.boxShadow=`0 18px 54px rgba(0,0,0,.62), 0 0 0 1px ${hexA(col,.15)}, 0 0 46px ${hexA(col,.10)}`;
+  w.innerHTML=`<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}"><span class="vw-title" style="color:${col};-webkit-text-fill-color:${col}">DeMartin EQ</span><span class="pw-track">${t.name}</span><button class="pw-x" title="close">✕</button></div>`+
+    `<div style="padding:10px 12px 12px"><canvas class="eqc" width="${W*DPR}" height="${H*DPR}" style="width:${W}px;height:${H}px;display:block;border-radius:11px;background:linear-gradient(180deg,#14161d,#0c0e13);border:1px solid ${hexA(col,.22)};cursor:crosshair"></canvas>`+
+    `<div class="eq-read" style="font:600 10px 'Space Mono',monospace;color:${hexA(col,.85)};margin-top:7px;height:13px;letter-spacing:.03em">drag a dot · scroll a dot for Q</div></div>`;
+  const n=(_pwZ%7); w.style.left=(110+n*30)+"px"; w.style.top=(96+n*28)+"px";
+  document.body.appendChild(w);
+  const cv=w.querySelector(".eqc"), g=cv.getContext("2d"), readEl=w.querySelector(".eq-read");
+  const TYPES=["peaking","lowshelf","highshelf","lowpass","highpass","notch"];
+  const BC=["#ff4f9a","#38e0bf","#ffb454","#8b7bff","#5fb4ce","#f0529c","#9bd8c9","#e6c16a"];
+  const lo=Math.log10(20), hi=Math.log10(20000), DB=18;
+  const HzToX=f=>((Math.log10(f)-lo)/(hi-lo))*W, xToHz=x=>Math.pow(10,lo+(Math.max(0,Math.min(W,x))/W)*(hi-lo));
+  const dbToY=db=>H/2-(db/DB)*(H/2-16), yToDb=y=>((H/2-y)/(H/2-16))*DB;
+  const tmpCtx=new OfflineAudioContext(1,1,44100);
+  const freqs=new Float32Array(W); for(let x=0;x<W;x++) freqs[x]=xToHz(x);
+  const mag=new Float32Array(W), ph=new Float32Array(W);
+  const P=(N,f)=>ins.params[`b${N}.${f}`];
+  const setP=(N,f,v)=>{ ins.params[`b${N}.${f}`]=v; t.live&&t.live.insertNodes&&t.live.insertNodes[i]&&t.live.insertNodes[i].set(`b${N}.${f}`, v); };
+  function draw(){
+    g.save(); g.scale(DPR,DPR); g.clearRect(0,0,W,H);
+    g.lineWidth=1; g.font="9px 'Space Mono',monospace";
+    [100,1000,10000].forEach(f=>{ const x=HzToX(f); g.strokeStyle="rgba(255,255,255,.06)"; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); g.fillStyle="rgba(150,165,185,.45)"; g.fillText(f>=1000?(f/1000)+"k":""+f, x+3, H-5); });
+    g.strokeStyle="rgba(255,255,255,.11)"; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); g.stroke();
+    [9,-9].forEach(db=>{ const y=dbToY(db); g.strokeStyle="rgba(255,255,255,.05)"; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); });
+    const sum=new Float32Array(W).fill(1);
+    for(let N=0;N<8;N++){ if(!P(N,'on')) continue; const bq=tmpCtx.createBiquadFilter(); bq.type=TYPES[Math.round(P(N,'type')||0)]||"peaking"; bq.frequency.value=P(N,'freq'); bq.Q.value=P(N,'q'); bq.gain.value=P(N,'gain'); bq.getFrequencyResponse(freqs,mag,ph);
+      g.beginPath(); g.moveTo(0,H/2); for(let x=0;x<W;x++) g.lineTo(x, dbToY(20*Math.log10(mag[x]||1e-6))); g.lineTo(W,H/2); g.closePath(); g.fillStyle=hexA(BC[N%8], .09); g.fill();   // per-band translucent lobe (the FabFilter rainbow)
+      for(let x=0;x<W;x++) sum[x]*=mag[x]; }
+    const yOf=x=>dbToY(20*Math.log10(sum[x]||1e-6));
+    g.beginPath(); g.moveTo(0,yOf(0)); for(let x=1;x<W;x++) g.lineTo(x,yOf(x)); g.lineTo(W,H); g.lineTo(0,H); g.closePath(); g.fillStyle=hexA(col,.12); g.fill();
+    g.beginPath(); g.moveTo(0,yOf(0)); for(let x=1;x<W;x++) g.lineTo(x,yOf(x)); g.strokeStyle=col; g.lineWidth=2; g.shadowBlur=9; g.shadowColor=col; g.stroke(); g.shadowBlur=0;
+    for(let N=0;N<8;N++){ if(!P(N,'on')) continue; const x=HzToX(P(N,'freq')), y=dbToY(P(N,'gain')); g.beginPath(); g.arc(x,y,5.5,0,7); g.fillStyle="#0c0e13"; g.fill(); g.lineWidth=2.5; g.strokeStyle=BC[N%8]; g.stroke(); }
+    g.restore();
+  }
+  let drag=-1;
+  const hit=(mx,my)=>{ for(let N=0;N<8;N++){ if(!P(N,'on')) continue; const dx=mx-HzToX(P(N,'freq')), dy=my-dbToY(P(N,'gain')); if(dx*dx+dy*dy<=121) return N; } return -1; };
+  const xy=e=>{ const r=cv.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+  cv.addEventListener("pointerdown", e=>{ const [mx,my]=xy(e); drag=hit(mx,my); if(drag>=0) cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", e=>{ const [mx,my]=xy(e); if(drag<0){ cv.style.cursor=hit(mx,my)>=0?"grab":"crosshair"; return; }
+    const f=Math.max(20,Math.min(20000,xToHz(mx))), gv=Math.max(-DB,Math.min(DB,yToDb(my))); setP(drag,'freq',f); setP(drag,'gain',gv);
+    readEl.textContent=`B${drag+1}   ${f<1000?f.toFixed(0)+' Hz':(f/1000).toFixed(2)+' kHz'}   ${gv>0?'+':''}${gv.toFixed(1)} dB   ${_freqNote(f)}`; draw(); });
+  const end=()=>{ drag=-1; cv.style.cursor="crosshair"; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("wheel", e=>{ const [mx,my]=xy(e); const N=hit(mx,my); if(N<0) return; e.preventDefault(); const q=Math.max(0.1,Math.min(18, P(N,'q')*(e.deltaY<0?1.1:0.9))); setP(N,'q',q); readEl.textContent=`B${N+1}   Q ${q.toFixed(2)}`; draw(); }, {passive:false});
+  draw();
+  w.querySelector(".pw-x").onclick=()=>w.remove();
   makeDraggable(w, w.querySelector(".pw-bar")); bringFront(w);
 }
 // ── AUX / FX BUSES + SENDS — stack plugins on a bus, send stems to it (Pro Tools style) ──

@@ -21,7 +21,14 @@ Owner B asked: "go through the effects list and make them ALL, make every plugin
 - **Verified in Chrome** via Chrome MCP (`tabs_context` → navigate 7788 → `javascript_tool`/screenshot). Owner's `pym3odm` untouched (pixel tests run in-memory with `save` stubbed). Two adversarial-review workflows run; all confirmed bugs fixed.
 - **NEXT (audit roadmap, don't redo done work):** Levels (multi-param card), Adjustment Layers, Track Mattes, Parenting, Motion Blur, Mask keyframing, noise generator, WebGL path. **SKIP per owner:** perspective/3D/Camera, simulation, Mocha, precompose, shape layers, paint/roto/puppet.
 
-Full detail in the auto-memory `editor-ae-overhaul.md` (SESSION 2026-06-19 block).
+**Later same day (owner iterating, NOW COMMITTED + PUSHED to master — `8703e6f`, `2a2c92a`, `af5219c`):**
+- **Resizable panels** — draggable gutters (`#gBin/#gInsp/#gTL`, `initGutters()`) resize Media / Inspector / Timeline via CSS vars `--bin-w/--insp-w/--tl-h`, persisted to localStorage, dbl-click resets. Inspector widened to 336px + more padding (owner: cramped).
+- **ELITE CHROMA KEY** (`fxKey`, replaced the weak Color Key) — Keylight-grade colour-difference keyer: Screen Colour / Balance / Gain, Clip Black/White, Shrink-Grow + Softness (`morphMatte`/`blurMatte`), Despill, and **View: Final / Matte / Status** (the pro matte-tuning workflow). Verified on a synthetic green screen.
+- **Levels** (`fxLevels`) — Input/Gamma/Output LUT, multi-slider card. **35 effects total.**
+- `ARKITECT.exe` (25MB) + `*.log` added to `.gitignore` (exe ships via release.ps1 as a Release asset, not git).
+- NEXT foundation: **Adjustment Layers**, then Track Mattes / Parenting / Motion Blur.
+
+Full detail in the auto-memory `editor-ae-overhaul.md` (SESSION 2026-06-19 blocks).
 
 ---
 
