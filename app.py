@@ -486,7 +486,7 @@ def memory_block(messages: list[dict]) -> str:
 
 def craft_kb_block(messages: list[dict]) -> str:
     """Relevant CRAFT knowledge for this turn — pulled from Kit's KB binder
-    (data/kit_kb/**.md: the deep mixing / production / editing how-to) and appended
+    (static/kit_kb/**.md: the deep mixing / production / editing how-to) and appended
     to the LAST user message, same pattern as memory_block so the cacheable persona
     prefix stays byte-identical. Tiff is the cross-room collaborator, so we search the
     WHOLE binder (an unknown room makes kb.retrieve pool ALL chunks) and only inject
@@ -3824,7 +3824,7 @@ app.include_router(swarm_router)
 #    set any, else the local model), room-aware: he knows the room you're in and
 #    walks you through it. Separate from Tiff, who owns the main chat. ───────────
 from swarm_routes import _enabled_slots, _call_with_fallback  # noqa: E402
-import kit_kb as kb  # noqa: E402  — Kit's knowledge layer (RAG over data/kit_kb/*.md)
+import kit_kb as kb  # noqa: E402  — Kit's knowledge layer (RAG over static/kit_kb/**/*.md)
 
 KIT_SYSTEM = """You are Kit — the build-bot who lives inside ARKITECT, a private creative studio that runs on the user's own machine.
 

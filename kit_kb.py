@@ -347,7 +347,8 @@ def as_prompt_block(chunks: list[dict]) -> str:
 
 
 if __name__ == "__main__":  # quick self-test: python kit_kb.py
-    print(f"KB dir: {KB_DIR}  (exists={KB_DIR.is_dir()})")
+    for d in KB_DIRS:
+        print(f"KB dir: {d}  (exists={d.is_dir()})")
     print(f"rooms: {rooms()}  total chunks: {len(all_chunks())}")
     for room, q in [
         ("studio", "how do I add a plugin to a track"),
