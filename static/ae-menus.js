@@ -1948,7 +1948,7 @@ window.AE_MENUS = [
    },
    {
     "label": "Layer Settings…",
-    "shortcut": null,
+    "shortcut": "Ctrl+Shift+Y",
     "aeShortcut": null,
     "behavior": "Context-sensitive in AE: for a solid it opens Solid Settings (name/size/color); for text/shape/camera/light it opens the matching settings dialog. We have no solids yet; the closest live equivalent is the Inspector, which already edits the selected clip's name-adjacent fields. Buildable-now once Solids exist (a solidSettings() dialog); for now route to refreshInspector() / focus the Inspector.",
     "feasibility": "buildable-now",
@@ -1997,7 +1997,7 @@ window.AE_MENUS = [
     "submenu": [
      {
       "label": "New Mask",
-      "shortcut": null,
+      "shortcut": "Ctrl+Shift+N",
       "aeShortcut": "Ctrl+Shift+N",
       "behavior": "AE adds a full-layer rectangular mask you then reshape. No masks in our editor. Buildable-later.",
       "feasibility": "buildable-later",
@@ -3046,7 +3046,7 @@ window.AE_MENUS = [
    },
    {
     "label": "Last Effect",
-    "shortcut": null,
+    "shortcut": "Ctrl+Alt+Shift+E",
     "aeShortcut": "Ctrl+Alt+Shift+E",
     "behavior": "AE: re-applies the most recently applied effect to the current selection without browsing the menu. LePrince: no effect stack to re-apply; could re-apply the last-used filter tweak/preset to the selected clip. Low priority.",
     "feasibility": "buildable-now",
