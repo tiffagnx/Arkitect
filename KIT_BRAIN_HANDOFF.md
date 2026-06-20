@@ -1,4 +1,80 @@
-# KIT'S BRAIN — Handoff (2026-06-18)
+# KIT'S BRAIN — Handoff
+
+> ⏩ **READ THE 2026-06-20 SECTION FIRST.** The deep "how to mix" binder + Tiff
+> wiring landed on top of V1. The V1 section (dated 2026-06-18, further down) is
+> still accurate for the architecture, but where it says "not committed" or uses
+> "sidechain" as an example of something Kit DOESN'T know, that's now outdated —
+> committed in `56c9c34`, and sidechain (+ 300 other techniques) is now in the KB.
+
+---
+
+## ⏩ 2026-06-20 — Mixing brain + Tiff wired + INTEGRATION NOTES (4-worker merge)
+
+**Context for integrators:** B has ~4 people/agents working in parallel branches;
+he merges everything at the end and cuts ONE new version that ships it all together.
+This section is what you need so this work survives the merge and ships correctly.
+
+### What landed
+- **Deep mixing binder** → `data/kit_kb/studio/` — **28 cards, 347 `##` chunks, ~242 KB.**
+  Every mixing/production/creative-FX technique: gain staging, cleanup, editing, phase,
+  EQ (fundamentals/by-source/surgical), compression (fundamentals/by-source/parallel-
+  sidechain/advanced), reverb (incl. **reverse-reverb, gated, shimmer, throws**), delay
+  (incl. **throws, dub, Haas**), modulation, saturation, width/depth, **full vocal
+  production**, **the trick box** (stutters/drops/risers/tape-stop/telephone/pitch-FX/
+  half-time), bus glue, mastering, metering, mix workflow, troubleshooting, genre notes,
+  mistakes. Each move maps to the DAW's REAL tools and was fact-checked by a 2nd agent pass.
+- **Multi-file-per-room loader** (`kit_kb.py`): now `rglob`s the KB dir and a file's room
+  = its top subfolder, so `data/kit_kb/<room>/*.md` ALL load as `<room>`. One room's binder
+  can span many files (top-level `studio.md` still works too). Also: expanded `_SYNONYMS`
+  with mixing/creative-FX vocabulary, and a new `min_terms` relevance floor on `retrieve()`.
+- **Tiff (main chat) is now wired into the binder** — `app.py` `craft_kb_block()`:
+  cross-room retrieval (unknown room → ALL chunks) appended to the last user message
+  (keeps the cacheable persona prefix stable, same trick as `memory_block`), gated
+  `min_terms=2` so casual chat doesn't pull craft notes. So **both Kit (in-room, floor 1)
+  and Tiff (cross-room, floor 2) read the same brain.** NOTE: this is only the KB-binder
+  half of "give Tiff knowledge" — her *personal* Supabase memory (V1 Phase 1) is still open.
+
+### Committed
+- **`56c9c34` on `master`** — `kit_kb.py` + `app.py` ONLY. The binder markdown is gitignored
+  (see #1 below). Verify: `python kit_kb.py` → should print **~347 studio chunks**.
+
+### ⚠ INTEGRATION CHECKLIST (for whoever merges the branches + cuts the version)
+1. **The binder is gitignored — it does NOT travel through a git merge.** All of `data/`
+   is gitignored, so the 28 files in `data/kit_kb/studio/` (and the existing
+   `data/kit_kb/*.md`) will NOT come across a clean branch merge. They live on disk in
+   **THIS** working copy (B's main repo). Do the final integration **in this tree**, or
+   physically copy `data/kit_kb/` across. Post-merge sanity: `python kit_kb.py` prints ~347
+   studio chunks; if it's ~30, the binder didn't make it.
+2. **To SHIP the mixing brain to users, edit `build_zip.py`.** It currently EXCLUDES all of
+   `data/` (the EXCLUDE list, ~line 15), so the binder is NOT in the distributable yet.
+   For the new version to carry it: **include `data/kit_kb/` specifically** while keeping the
+   rest of `data/` (sessions, keys, personal memory) OUT. This is the "everything ships
+   together" item — **no Firebase/cloud account needed; it's just a packaging include.**
+   (Optional later: a Cloudflare mirror for over-the-air KB updates — B's preferred tier.)
+   Safety: `data/kit_kb/` today is all PUBLIC program knowledge (safe to ship). If Tiff's
+   personal Supabase memory ever gets ingested into it, keep THAT out of the zip.
+3. **Bump `APP_VERSION`** (`app.py` line 40, currently `"1.1.0"`) to the new release tag and
+   confirm `build_zip.py` actually included the binder, BEFORE cutting the GitHub release
+   (`tiffagnx/Arkitect`) — so the in-app updater ships the engine + the knowledge together.
+4. **Merge-conflict map** (only matters if another worker also touched these 2 files):
+   - `kit_kb.py`: changed `_signature()` (`glob`→`rglob`), `_load()` (subfolder→room loader),
+     added a block to `_SYNONYMS`, and added the `min_terms` param + floor to `retrieve()`.
+     Synonyms are additive — keep BOTH sides if someone else added entries.
+   - `app.py`: added the `craft_kb_block()` function (right after `memory_block`) and ONE
+     line in `chat()`: `mem += craft_kb_block(messages)` right after `mem = memory_block(...)`.
+5. **Staged-update note:** I synced the new loader into `_update/staged/kit_kb.py` because a
+   pending v1.1.0 staged update carried the OLD top-level-only loader (would blind Kit to the
+   subfolder). `_update/` is gitignored runtime — fine to discard at integration; just don't
+   let a stale staged `kit_kb.py` apply over the new one.
+
+### How to teach Kit/Tiff more (unchanged, still the payoff)
+Add a `## Heading` + plain sentences to any `data/kit_kb/<room>/*.md` (or a new file in
+`data/kit_kb/<room>/`) and save — live instantly, no restart, no rebuild. Headings should
+read like the words a user would type.
+
+---
+
+## V1 — original handoff (2026-06-18, architecture still accurate)
 
 > Pick this up cold tomorrow. V1 of Kit's knowledge brain is **built, wired, and
 > verified**. It just needs the server bounced to go live. This doc says what
