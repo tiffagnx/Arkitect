@@ -90,8 +90,8 @@
   /* ── main ── */
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--hairline); }
-  .avatar { width: 30px; height: 30px; border-radius: 50%; background:
-    radial-gradient(circle at 32% 30%, #8FD4E4, var(--pink) 60%, #0E323D);
+  .avatar { width: 32px; height: 32px; border-radius: 50%;
+    background: url('/static/tiff.png') top center / 150% no-repeat, radial-gradient(circle at 32% 30%, #8FD4E4, var(--pink) 60%, #0E323D);
     box-shadow: 0 0 14px rgba(62,156,184,.6); position: relative; }
   .avatar.live::after { content: ""; position: absolute; inset: -4px; border-radius: 50%;
     border: 2px solid rgba(62,156,184,.5); animation: pulse 1.2s ease-out infinite; }
@@ -144,7 +144,12 @@
   /* ── ARKITECT front door (replaces the old chat greeting + orb) ── */
   .arkhero { max-width: 580px; margin: 0 auto; }
   .arkhero .ark-logo { height: 44px; width: auto; opacity: .96; margin-bottom: 18px; filter: drop-shadow(0 4px 16px rgba(62,156,184,.28)); }
-  .arkhero .ark-tag { font: 500 14px Inter; color: var(--dim); line-height: 1.65; margin: 0 auto 24px; max-width: 470px; }
+  .arkhero .ark-tag { font: 500 14px Inter; color: var(--dim); line-height: 1.65; margin: 0 auto 24px; max-width: 470px;
+    min-height: 70px; transition: opacity .35s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .arkhero .ark-tag.fading { opacity: 0; }
+  .arkhero .ark-tag .tiptag { font: 700 9.5px 'Space Mono', monospace; letter-spacing: .14em; text-transform: uppercase;
+    color: #8FE9DF; background: rgba(0,209,196,.1); border: 1px solid rgba(0,209,196,.3); border-radius: 6px;
+    padding: 3px 9px; margin-bottom: 9px; display: inline-block; }
   .arkhero .ark-wings { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 26px; }
   .arkhero .ark-wings span { font: 700 10px 'Space Mono'; letter-spacing: .1em; color: #C9D2E0;
     background: rgba(124,138,165,.12); border: 1px solid var(--hairline); border-radius: 8px; padding: 7px 11px; }
@@ -152,6 +157,7 @@
   .arkhero .crew { display: flex; align-items: center; gap: 10px; text-align: left;
     background: rgba(255,255,255,.025); border: 1px solid var(--hairline); border-radius: 13px; padding: 9px 14px 9px 10px; }
   .arkhero .crew img, .arkhero .crew .disc { width: 40px; height: 40px; border-radius: 10px; flex: none; object-fit: contain; }
+  .arkhero .crew img.tiff-pfp { transform: translateY(-2px) scale(1.16); }   /* B: a hair bigger + lifted a touch */
   .arkhero .crew .disc { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8FD4E4, #3E9CB8 68%);
     box-shadow: 0 0 16px rgba(62,156,184,.45); }
   .arkhero .crew b { font: 700 13px Oxanium; letter-spacing: .05em; color: var(--text); display: block; }
@@ -213,8 +219,8 @@
     background: rgba(0,0,0,.28); border: 1px solid var(--hairline); font: 500 11px Inter; color: #CFC3DB; }
 
   /* ── memory drawer ── */
-  .drawer { position: fixed; top: 0; right: -420px; width: min(420px, 94vw); height: 100vh; z-index: 60;
-    background: rgba(12,8,18,0.92); backdrop-filter: blur(30px); border-left: 1px solid var(--hairline);
+  .drawer { position: fixed; top: 0; right: -420px; width: min(420px, 94vw); height: 100vh; z-index: 100001;
+    background: rgba(12,8,18,0.96); backdrop-filter: blur(30px); border-left: 1px solid var(--hairline);
     display: flex; flex-direction: column; transition: right .25s cubic-bezier(.3,.8,.3,1); }
   .drawer.open { right: 0; box-shadow: -30px 0 80px rgba(0,0,0,.5); }
   .drawer header { display: flex; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--hairline);
@@ -229,6 +235,17 @@
   .memadd { padding: 12px 14px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 8px; }
   .memadd input, .memadd textarea { border: 1px solid var(--hairline); border-radius: 10px; outline: none;
     background: rgba(255,255,255,.04); color: var(--text); font: 400 12.5px Inter; padding: 9px 11px; resize: none; }
+  /* memory rail buttons (sidebar) — styled exactly like the room links */
+  .memlink { background: none; width: 100%; box-sizing: border-box; }
+  /* LOCAL | CLOUD tabs inside the drawer */
+  .memtabs { display: flex; gap: 6px; padding: 12px 14px 0; }
+  .memtab { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--hairline);
+    background: rgba(255,255,255,.03); color: var(--dim); cursor: pointer; font: 600 12px Inter; transition: color .14s, border-color .14s, background .14s; }
+  .memtab:hover { color: var(--text); border-color: rgba(62,156,184,.45); }
+  .memtab.on { color: #B9FFF8; border-color: rgba(0,209,196,.5); background: rgba(0,209,196,.08); }
+  .memhint { padding: 9px 16px 2px; font: 400 11px Inter; color: var(--dim); line-height: 1.5; }
+  .memitem .badge { margin-left: 6px; font: 600 8.5px 'Space Mono', monospace; letter-spacing: .08em;
+    color: #8FE9DF; background: rgba(0,209,196,.12); border: 1px solid rgba(0,209,196,.3); border-radius: 5px; padding: 1px 5px; text-transform: uppercase; }
 
   ::-webkit-scrollbar { width: 9px; } ::-webkit-scrollbar-thumb { background: rgba(62,156,184,.25); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(62,156,184,.45); }
@@ -244,6 +261,11 @@
     <div class="brand"><img class="brandlogo" src="/static/arkitect-logo.png" alt="ARKITECT" draggable="false" /><small>local · private · yours</small></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
+    <div class="raillabel">Memory</div>
+    <div class="roomrail">
+      <button type="button" class="roomlink memlink" data-scope="local"><span class="ri">⚡</span><span>Local memory</span></button>
+      <button type="button" class="roomlink memlink" data-scope="cloud"><span class="ri">☁</span><span>Cloud memory</span></button>
+    </div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
@@ -257,7 +279,6 @@
         <span><span id="sBrain" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#555; margin-right:5px; vertical-align:middle;"></span>brain</span>
         <span><span id="sEngine" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#555; margin-right:5px; vertical-align:middle;"></span>engine</span>
       </div>
-      <button class="ghostbtn" id="memBtn">🧠 Her memory</button>
     </div>
   </aside>
 
@@ -266,19 +287,19 @@
       <div class="avatar" id="avatar"></div>
       <div class="who">TIFF<small id="status">ready</small></div>
       <select class="model" id="model"></select>
-      <button class="model-refresh" id="modelRefresh" title="Refresh the model list (after adding a cloud key in Settings)">⟳</button>
+      <button class="model-refresh" id="modelRefresh" title="Refresh ARKITECT — reload the app to pick up the latest (no exit + restart)">⟳</button>
     </div>
 
     <div class="scroll" id="scroll"><div class="col" id="col">
       <div class="hello" id="hello">
         <div class="arkhero">
           <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
-          <p class="ark-tag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
+          <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
           </div>
           <div class="ark-crew">
-            <div class="crew"><span class="disc"></span><span><b>TIFF</b><small>your collaborator — the most honest voice in the room</small></span></div>
+            <div class="crew"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>your creative homie — and the creative partner of heytiff.ai</small></span></div>
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
@@ -315,7 +336,12 @@
 </div>
 
 <div class="drawer" id="drawer">
-  <header>🧠 HER MEMORY <button class="ghostbtn" id="memClose" style="flex:0;padding:6px 12px">close</button></header>
+  <header><span id="memHead">🧠 HER MEMORY</span> <button class="ghostbtn" id="memClose" style="flex:0;padding:6px 12px">close</button></header>
+  <div class="memtabs">
+    <button type="button" class="memtab on" id="tabLocal" data-scope="local">⚡ Local</button>
+    <button type="button" class="memtab" id="tabCloud" data-scope="cloud">☁ Cloud</button>
+  </div>
+  <p class="memhint" id="memHint"></p>
   <div class="memlist" id="memList"></div>
   <div class="memadd">
     <input id="memTitle" placeholder="Title — e.g. 'New song: Static'" />
@@ -350,6 +376,11 @@ async function arkRebuildModels(){
   return r;
 }
 window.arkRebuildModels = arkRebuildModels;
+// The model actually sent with a message. Falls back to the SAVED preference if the
+// picker hasn't populated yet (e.g. right after a reload) — so a cloud user's pick
+// (Gemini) is never silently dropped to the local brain mid-load. Was a real bug: an
+// empty value here routes to LM Studio and errors with "her brain won't start".
+const currentModel = () => $("model").value || localStorage.getItem("pinkroom-model") || "";
 window.addEventListener("ark:providers-changed", arkRebuildModels);   // Settings adds a cloud key → picker refreshes live
 (async () => {
   const sel = $("model");
@@ -357,7 +388,9 @@ window.addEventListener("ark:providers-changed", arkRebuildModels);   // Setting
   if (r.error) setStatus(r.error, true);
   sel.onchange = () => localStorage.setItem("pinkroom-model", sel.value);
   const _mref = $("modelRefresh");
-  if (_mref) _mref.onclick = async () => { _mref.classList.add("spin"); await arkRebuildModels(); setTimeout(() => _mref.classList.remove("spin"), 600); };
+  // Refresh = reload the WHOLE app, so the latest code/UI shows up without exiting and
+  // restarting ARKITECT. (A full reload also re-fetches the model list, so nothing's lost.)
+  if (_mref) _mref.onclick = () => { _mref.classList.add("spin"); location.reload(); };
   const think = $("think");
   think.value = localStorage.getItem("pinkroom-think") || "low";
   think.onchange = () => localStorage.setItem("pinkroom-think", think.value);
@@ -454,8 +487,8 @@ async function send() {
     const url = mode === "research" ? (swarmOn ? "/api/research-swarm" : "/api/research") : "/api/chat";
     const effort = $("think").value;
     const body = mode === "research"
-      ? { question: modelText || typed, messages, model: $("model").value, effort }
-      : { messages, model: $("model").value, mode, effort };
+      ? { question: modelText || typed, messages, model: currentModel(), effort }
+      : { messages, model: currentModel(), mode, effort };
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
                                    body: JSON.stringify(body), signal: abortCtl.signal });
     if (!res.ok) throw new Error(`server error ${res.status}`);
@@ -545,12 +578,12 @@ function newChat() {
     `<div class="hello" id="hello">
         <div class="arkhero">
           <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
-          <p class="ark-tag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
+          <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
           </div>
           <div class="ark-crew">
-            <div class="crew"><span class="disc"></span><span><b>TIFF</b><small>your collaborator — the most honest voice in the room</small></span></div>
+            <div class="crew"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>your creative homie — and the creative partner of heytiff.ai</small></span></div>
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
@@ -561,19 +594,67 @@ function newChat() {
   const ta = $("input"); if (ta) { ta.value = ""; ta.style.height = "auto"; }
   setStatus("ready");
   loadSessions();   // refresh the sidebar so the active highlight clears
+  startArkTips();   // restart the rotating tagline/tips on the freshly-rebuilt hero
 }
 $("newChat").onclick = newChat;
 
-/* ── memory drawer ── */
-$("memBtn").onclick = async () => { $("drawer").classList.add("open"); loadMemory(); };
-$("memClose").onclick = () => $("drawer").classList.remove("open");
+/* ── memory drawer — two stores: LOCAL (quick facts) + CLOUD (deep HeyTiff brain) ── */
+let memScope = "local";
+const MEM_COPY = {
+  local: { head: "🧠 LOCAL MEMORY",
+    hint: "Her quick scratchpad — the simple facts she picks up as you talk. She files these herself; add or forget any.",
+    title: "Title — e.g. 'New song: Static'", text: "What should she never forget?" },
+  cloud: { head: "☁ CLOUD MEMORY",
+    hint: "Her deep knowledge, carried over from HeyTiff — B's catalog, his people, his craft, the whole world. The smart memory.",
+    title: "Title — e.g. 'New collaborator: Swig 616'", text: "Deep knowledge to fold into her HeyTiff brain…" },
+};
+function selectMem(scope) {
+  memScope = scope;
+  $("tabLocal").classList.toggle("on", scope === "local");
+  $("tabCloud").classList.toggle("on", scope === "cloud");
+  const c = MEM_COPY[scope];
+  $("memHead").textContent = c.head;
+  $("memHint").textContent = c.hint;
+  $("memTitle").placeholder = c.title;
+  $("memText").placeholder = c.text;
+  loadMemory();
+}
+// Kit (the floating mascot) sits over the send button — z-index above the drawer.
+// On a narrow window the drawer covers that spot, so fade him out while it's open
+// (reuses his own .in entrance fade) and bring him back when it closes.
+function setMascotForDrawer(open) { document.querySelector(".tec-mascot")?.classList.toggle("in", !open); }
+function closeMem() { $("drawer").classList.remove("open"); setMascotForDrawer(false); }
+function openMem(scope) {
+  const d = $("drawer");
+  // clicking the memory you're ALREADY viewing toggles it shut — no hunting for the X.
+  if (d.classList.contains("open") && memScope === scope) { closeMem(); return; }
+  // clicking the OTHER one just flips the panel (stays open) — switch freely.
+  d.classList.add("open"); setMascotForDrawer(true); selectMem(scope || memScope);
+}
+document.querySelectorAll(".memlink").forEach(b => b.onclick = () => openMem(b.dataset.scope));
+$("tabLocal").onclick = () => selectMem("local");
+$("tabCloud").onclick = () => selectMem("cloud");
+$("memClose").onclick = closeMem;
+// Click anywhere outside the drawer (and not on a memory rail button) dismisses it.
+// So peeking/switching never traps you — you're not forced to find the close button.
+document.addEventListener("mousedown", (e) => {
+  const d = $("drawer");
+  if (!d.classList.contains("open")) return;
+  if (d.contains(e.target) || e.target.closest(".memlink")) return;
+  closeMem();
+});
 async function loadMemory() {
-  const r = await fetch("/api/memory").then(r => r.json()).catch(() => ({ memory: [] }));
+  const scope = memScope;
+  const r = await fetch(`/api/memory?scope=${scope}`).then(r => r.json()).catch(() => ({ memory: [] }));
+  if (scope !== memScope) return;   // user flipped tabs while this was in flight
   const el = $("memList"); el.innerHTML = "";
   (r.memory || []).slice().reverse().forEach(m => {
     const d = document.createElement("div"); d.className = "memitem";
-    d.innerHTML = `<h4>${md(m.title || "memory")} <button>forget</button></h4><p>${md(m.text)}</p>`;
-    d.querySelector("button").onclick = async () => { await fetch(`/api/memory/${m.id}`, { method: "DELETE" }); loadMemory(); };
+    const badge = m.always ? ` <span class="badge">always on</span>` : "";
+    d.innerHTML = `<h4>${md(m.title || "memory")}${badge} <button>forget</button></h4><p>${md(m.text)}</p>`;
+    d.querySelector("button").onclick = async () => {
+      await fetch(`/api/memory/${m.id}?scope=${scope}`, { method: "DELETE" }); loadMemory();
+    };
     el.appendChild(d);
   });
 }
@@ -581,7 +662,7 @@ $("memAdd").onclick = async () => {
   const title = $("memTitle").value.trim(), text = $("memText").value.trim();
   if (!text) return;
   await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, text }) });
+    body: JSON.stringify({ title, text, scope: memScope }) });
   $("memTitle").value = ""; $("memText").value = "";
   loadMemory();
 };
@@ -727,6 +808,50 @@ $("input").addEventListener("paste", (e) => {
   async function pollHealth(){ try{ const h=await fetch('/api/health').then(r=>r.json()); setDot('sBrain',!!h.brain); setDot('sEngine',!!h.engine); }catch{ setDot('sBrain',false); setDot('sEngine',false); } }
   pollHealth(); setInterval(pollHealth, 12000);
 })();
+
+/* ── rotating welcome line: the studio intro, then real per-room tips ──
+   Pure client-side, no network. Opens on the ARKITECT intro, then cycles
+   through genuine tips (a daily offset keeps the first tip fresh). ── */
+const ARK_INTRO = "Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.";
+const ARK_TIPS = [
+  { room: "Chat",        t: "Talk to Tiff like a real person. Use the ⚡ Quick / 🧠 Balanced / 🔥 Deep dial to set how hard she thinks before she answers." },
+  { room: "Memory",      t: "Tiff keeps two memories — ⚡ Local for quick facts she picks up, ☁ Cloud for her deep HeyTiff knowledge. Open either from the sidebar." },
+  { room: "Research",    t: "Flip to 🔬 Research and Tiff searches the live web for free, reads the pages, and writes back a synthesized answer — every step visible." },
+  { room: "Write",       t: "Switch to ✍️ Write for long-form — lyrics, bios, treatments — and Tiff stretches out in her full voice instead of quick replies." },
+  { room: "Attach",      t: "Drag images, PDFs, or docs straight into the chat — Tiff sees the images and reads the rest before she answers." },
+  { room: "Voice",       t: "Tap 🎙 to talk to Tiff out loud — pause as long as you need, tap again when you're done, then hit send." },
+  { room: "DeMartin Audio Labs", t: "DeMartin is a full DAW — record, edit, mix, and bounce. Hit the 🩺 Vocal Doctor on a vocal track for an instant pro chain." },
+  { room: "LePrince Visual Labs", t: "LePrince cuts video on a real timeline — drop clips, layer text, render it out. No subscription, all on your machine." },
+  { room: "Imagination Station",  t: "Imagination Station makes images locally with FLUX — just describe what you want; the engine spins itself up on the first ask." },
+  { room: "Blueprint Builds",     t: "Blueprint Builds is where Kit turns your idea into a working app — describe the thing and watch him build it." },
+  { room: "Cloud",       t: "Light PC? Open ⚙ Settings and plug in a cloud model with your own key — Tiff runs off that instead of leaning on your GPU." },
+  { room: "Private",     t: "Everything here stays on your machine. Nothing phones home — local by default, the cloud only when you choose it." },
+];
+let arkTipTimer = null;
+function startArkTips() {
+  if (arkTipTimer) { clearInterval(arkTipTimer); arkTipTimer = null; }
+  const el = document.getElementById("arkTag");
+  if (!el) return;
+  // sequence = intro first, then every tip, starting from today's offset so it feels fresh daily
+  const off = new Date().getDate();
+  const seq = [{ intro: true }];
+  for (let i = 0; i < ARK_TIPS.length; i++) seq.push(ARK_TIPS[(off + i) % ARK_TIPS.length]);
+  let idx = 0;
+  const render = () => {
+    const item = seq[idx];
+    el.innerHTML = item.intro
+      ? ARK_INTRO
+      : `<span class="tiptag">💡 ${item.room} tip</span><span>${item.t}</span>`;
+  };
+  render();
+  arkTipTimer = setInterval(() => {
+    const cur = document.getElementById("arkTag");
+    if (!cur) { clearInterval(arkTipTimer); arkTipTimer = null; return; }  // hero gone (chat started)
+    cur.classList.add("fading");
+    setTimeout(() => { idx = (idx + 1) % seq.length; render(); cur.classList.remove("fading"); }, 350);
+  }, 12000);
+}
+startArkTips();
 </script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>

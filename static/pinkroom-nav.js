@@ -26,4 +26,17 @@
   document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
   // load Kit, the in-room build-bot helper (kit-helper.js self-skips the main chat + non-rooms)
   if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
+  // version badge — ONE number for the WHOLE app, shown in every room so it's watchable as it grows.
+  // Deferred + id-guarded: a room with the settings.js gear shows the nicer gear-adjacent badge instead
+  // of this corner one; rooms without a gear (DAW, editor) get this corner fallback.
+  setTimeout(() => {
+    if (document.getElementById("ark-ver-badge")) return;
+    const vb = document.createElement("div");
+    vb.id = "ark-ver-badge";
+    vb.title = "ARKITECT version — the whole app";
+    vb.textContent = "v…";
+    vb.style.cssText = "position:fixed;bottom:8px;right:11px;z-index:99997;pointer-events:none;font:600 10px ui-monospace,'Space Mono',monospace;letter-spacing:.04em;color:rgba(156,211,228,.6);background:rgba(20,22,28,.74);border:1px solid rgba(95,180,206,.24);border-radius:7px;padding:3px 8px;";
+    document.body.appendChild(vb);
+    fetch("/api/version").then(r => r.json()).then(d => { vb.textContent = "v" + (d.version || "?"); }).catch(() => { vb.remove(); });
+  }, 450);
 })();

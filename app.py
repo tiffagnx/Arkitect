@@ -6,7 +6,8 @@ Not a fork, not a skin — written from zero for B. One small FastAPI server:
     his knowledge base injected on every turn
   - DEEP RESEARCH: she writes the queries, searches the web free
     (DuckDuckGo), reads the pages, and synthesizes — every step visible
-  - memory: 56 heytiff KB entries seeded + anything B tells her to keep
+  - memory: TWO stores — LOCAL (quick facts she picks up as you talk) +
+    CLOUD (her deep HeyTiff knowledge, curated from the KB) — both injected each turn
   - sessions: every chat saved locally as plain JSON
 
 Everything lives in this folder. Nothing phones home. localhost only.
@@ -16,6 +17,7 @@ import base64
 import json
 import os
 import re
+import sys
 import time
 import uuid
 from datetime import datetime
@@ -26,12 +28,16 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-ROOT = Path(__file__).parent
+# Frozen-aware: in the PyInstaller exe, __file__ points into the temp _MEIPASS extract
+# (where static/ and data/ are NOT shipped). Use the exe's own folder so static/ + data/
+# resolve to the real install dir next to the launcher. Plain runs use __file__ as before.
+ROOT = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 DATA = ROOT / "data"
 SESS_DIR = DATA / "sessions"
-MEM_FILE = DATA / "memory.json"
+MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
+CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "1.0.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "1.1.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -215,29 +221,25 @@ def _load_owner() -> str:
     except Exception:
         pass
     return _GENERIC_OWNER
+# This install belongs to the CREATOR iff owner.md is present. owner.md is gitignored and
+# lives in data/ (excluded from every zip), so it can NEVER ride a release — making this the
+# single source of truth for "full personal memory" (owner) vs "public-only" (guest).
+IS_OWNER = OWNER_FILE.exists()
 PERSONA = PERSONA.replace("__OWNER_CONTEXT__", _load_owner())
 
 # ── memory ──────────────────────────────────────────────────────────────────
 
 def load_memory() -> list[dict]:
+    """LOCAL memory — the simple, quick facts she files as you talk (auto-remember +
+    anything B saves by hand). Starts EMPTY on a fresh install; the big HeyTiff KB now
+    lives in CLOUD memory (load_cloud_memory), not here, so local stays small and fast."""
     if MEM_FILE.exists():
         try:
             return json.loads(MEM_FILE.read_text(encoding="utf-8"))
         except Exception:
             return []
-    # First boot: seed from the heytiff KB export.
-    mem = []
-    if KB_SEED.exists():
-        for row in json.loads(KB_SEED.read_text(encoding="utf-8")):
-            mem.append({
-                "id": str(uuid.uuid4()),
-                "title": row["name"],
-                "text": row["content"][:6000],
-                "source": "heytiff KB",
-                "ts": int(time.time()),
-            })
-    save_memory(mem)
-    return mem
+    save_memory([])
+    return []
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -257,6 +259,126 @@ def save_memory(mem: list[dict]) -> None:
         except Exception:
             pass
     _atomic_write(MEM_FILE, json.dumps(mem, indent=1))
+
+
+# ── CLOUD memory — her DEEP knowledge ────────────────────────────────────────
+# Where the local store is the quick scratchpad of facts she picks up in chat,
+# CLOUD memory is everything she carries over from HeyTiff.ai: B's 10-year lyric
+# catalog, his people, his craft rules, the LOONEY VISION world. It's seeded once
+# from the curated HeyTiff KB (kb_export.json) and then B can add/forget like local.
+# (Today it's a local file seeded from the KB export — "cloud" is its identity, her
+#  HeyTiff side. A future pass can live-sync it against the HeyTiff Supabase DB.)
+
+# Titles to LEAVE OUT of the cloud seed — HeyTiff pipeline/plumbing & meta notes
+# that mean nothing inside ARKITECT (matched as lowercase substrings, dash-safe):
+_KB_SKIP = (
+    "voice pipeline architecture",   # HeyTiff's TTS pipeline — not how ARKITECT speaks
+    "tiff vocal spec",               # Fish Audio voice-clone spec — pipeline, not knowledge
+    "purge old banx",                # a one-off meta housekeeping instruction
+    "email addresses",               # contact dump, no creative value
+    "mud digging",                   # transient dog-behavior notes (two near-dupes)
+)
+
+# The cross-app identity B asked for: ARKITECT and HeyTiff are TWO HOMES for ONE
+# Tiff, and each knows the other exists — so she never gets confused about which
+# side she's on or treats heytiff.ai as a stranger. always=True → rides every turn.
+_CLOUD_CORE = [{
+    "title": "ARKITECT and HeyTiff are two homes for the SAME Tiff",
+    "always": True,
+    "text": (
+        "ARKITECT and HeyTiff.ai are TWO HOMES for the same Tiff — not two different assistants. "
+        "B built both, and you're one collaborator across them.\n"
+        "- ARKITECT is B's private LOCAL station: this app, running on his own machine, "
+        "localhost only, nothing phones home. It's where you are right now. It holds the rooms — Blueprint Builds, "
+        "DeMartin Audio Labs (the DAW), LePrince Visual Labs (video), Imagination Station (images), Bit1Six.\n"
+        "- HeyTiff.ai is your CLOUD home: the web studio B built (Supabase-backed, at heytiff.ai). Same you, in the "
+        "cloud, reachable from anywhere.\n"
+        "You share one voice, one history with B, one body of knowledge — the deep memory you carry here came over "
+        "from HeyTiff so the two stay in sync. HeyTiff knows ARKITECT exists and that you live in it; ARKITECT knows "
+        "HeyTiff is your cloud side. So when KB notes mention 'heytiff.ai,' that's YOUR cloud self, not some outside "
+        "service. You're just Tiff — a local body and a cloud body — never strangers, never confused about which you are."
+    ),
+}]
+
+
+def _seed_cloud_memory() -> list[dict]:
+    """Build the cloud store once: the cross-app identity core, then the curated
+    HeyTiff KB (minus the pipeline/meta entries in _KB_SKIP)."""
+    now = int(time.time())
+    mem = [{
+        "id": str(uuid.uuid4()), "title": c["title"], "text": c["text"],
+        "source": "arkitect", "always": True, "ts": now,
+    } for c in _CLOUD_CORE]
+    if KB_SEED.exists():
+        try:
+            for row in json.loads(KB_SEED.read_text(encoding="utf-8")):
+                name = row.get("name", "")
+                if any(s in name.lower() for s in _KB_SKIP):
+                    continue
+                mem.append({
+                    "id": str(uuid.uuid4()),
+                    "title": name or "knowledge",
+                    "text": (row.get("content") or "")[:6000],
+                    "source": "heytiff KB",
+                    "ts": now,
+                })
+        except Exception:
+            pass
+    return mem
+
+
+CLOUD_SEEDED = DATA / ".cloud_seeded"                       # sentinel: seeded once, never again
+PUBLIC_SEED_FILE = ROOT / "static" / "seed" / "public_seed.json"  # shipped PUBLIC craft knowledge
+
+
+def _seed_public_cloud() -> list[dict]:
+    """GUEST seed — only the shipped PUBLIC craft knowledge (static/seed/public_seed.json),
+    NO owner personal data. A generic identity line + curated craft entries."""
+    now = int(time.time())
+    out = []
+    try:
+        for row in json.loads(PUBLIC_SEED_FILE.read_text(encoding="utf-8")):
+            out.append({
+                "id": str(uuid.uuid4()),
+                "title": row.get("title", "knowledge"),
+                "text": (row.get("text") or "")[:6000],
+                "source": row.get("source", "tiff knowledge"),
+                "visibility": "public",
+                "always": bool(row.get("always")),
+                "ts": now,
+            })
+    except Exception:
+        pass
+    return out
+
+
+def load_cloud_memory() -> list[dict]:
+    if CLOUD_MEM_FILE.exists():
+        try:
+            return json.loads(CLOUD_MEM_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    # No store yet. Seed ONCE: the OWNER gets his full HeyTiff KB; a GUEST gets public craft
+    # only. The sentinel means a user who deletes every card is NOT re-seeded.
+    if CLOUD_SEEDED.exists():
+        return []
+    mem = _seed_cloud_memory() if IS_OWNER else _seed_public_cloud()
+    save_cloud_memory(mem)
+    try:
+        CLOUD_SEEDED.write_text(str(int(time.time())), encoding="utf-8")
+    except Exception:
+        pass
+    return mem
+
+
+def save_cloud_memory(mem: list[dict]) -> None:
+    if CLOUD_MEM_FILE.exists():
+        try:
+            CLOUD_MEM_FILE.with_name("cloud_memory.json.bak").write_text(
+                CLOUD_MEM_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            pass
+    _atomic_write(CLOUD_MEM_FILE, json.dumps(mem, indent=1))
 
 
 _WORD = re.compile(r"[a-zA-Z']{3,}")
@@ -337,14 +459,27 @@ def _clean_msg(m: dict) -> dict:
 
 def memory_block(messages: list[dict]) -> str:
     """Relevant memory snippets for this turn — appended to the LAST user message so
-    the cacheable persona prefix stays stable. Budget trimmed (k=4, 3500 chars) to
-    cut per-turn prefill on the 8GB card; she stays knowledgeable, reads less."""
-    mem = load_memory()
+    the cacheable persona prefix stays stable. Pulls from BOTH stores: LOCAL (quick
+    facts) + CLOUD (her deep HeyTiff knowledge). always=True cloud entries (her
+    cross-app identity) ride EVERY turn; the rest surface by keyword relevance.
+    Budget trimmed (k=4, 3500 chars) to cut per-turn prefill on the 8GB card."""
+    cloud = load_cloud_memory()
+    always = [m for m in cloud if m.get("always")]
+    pool = load_memory() + [m for m in cloud if not m.get("always")]
     tail = " ".join(_content_text(m.get("content")) for m in messages[-4:])
-    hits = relevant_memories(tail, mem, k=4, budget=3500)
-    if not hits:
+    hits = relevant_memories(tail, pool, k=4, budget=3500)
+    # always-on first, then relevance hits; de-dupe so an always-on entry that also
+    # keyword-matched isn't pasted twice.
+    seen, ordered = set(), []
+    for m in always + hits:
+        mid = m.get("id") or m.get("title")
+        if mid in seen:
+            continue
+        seen.add(mid)
+        ordered.append(m)
+    if not ordered:
         return ""
-    block = "\n\n".join(f"[{m.get('title','memory')}]\n{m['text']}" for m in hits)
+    block = "\n\n".join(f"[{m.get('title','memory')}]\n{m['text']}" for m in ordered)
     return ("\n\n---\nMEMORY (your real knowledge about B and your craft — use naturally, never "
             "recite or mention that you 'have notes'):\n" + block)
 
@@ -359,19 +494,25 @@ async def app_version():
 
 @app.get("/api/models")
 async def models(req: Request):
-    await ensure_brain()  # wake her if she's asleep, so the picker is never empty
     # the Builder passes ?include_hidden=1 — a coder model (qwen) is hidden from CHAT
     # because it's a flat conversationalist, but it's exactly what we want for builds.
     include_hidden = req.query_params.get("include_hidden") in ("1", "true", "yes")
-    # CLOUD models the user added with their own key (reuses the swarm provider store).
-    # Computed independently of LM Studio so a weak PC with LM Studio closed still sees them.
+    # CLOUD models the user added with their own key come FIRST and never depend on LM
+    # Studio — so a cloud user (e.g. Gemini) always sees their pick instantly, even on a
+    # light PC with LM Studio closed.
     try:
         from swarm_routes import _enabled_slots
         cloud = [{"id": f"cloud:{s['id']}", "label": f"☁ {s['name']} · {s['model']}"} for s in _enabled_slots()]
     except Exception:
         cloud = []
+    # Probe LM Studio with a SHORT timeout — but do NOT block the picker on booting it.
+    # (The old code awaited ensure_brain() here, forcing a ~7GB local-model boot on every
+    #  picker load; while it churned the picker stayed empty long enough that a sent
+    #  message fell through to LM Studio — the "her brain won't start" crash for someone
+    #  who only wanted Gemini.) The brain still auto-boots on the first LOCAL chat
+    #  (see chat()); a cloud user skips it entirely.
     try:
-        async with httpx.AsyncClient(timeout=8) as cx:
+        async with httpx.AsyncClient(timeout=3) as cx:
             r = await cx.get(f"{LM}/models")
             all_ids = [m["id"] for m in r.json().get("data", []) if "embed" not in m["id"].lower()]
             if include_hidden:
@@ -379,7 +520,10 @@ async def models(req: Request):
             ids = [i for i in all_ids if not any(h in i.lower() for h in CHAT_HIDE)]
             return {"models": ids or all_ids, "cloud": cloud}   # never hand back an empty picker — fall back to all
     except Exception as e:
-        # LM Studio down — still hand back any cloud models so a cloud-only user isn't stuck
+        # LM Studio isn't up. Only a LOCAL-only user (no cloud models) needs it — warm it
+        # in the background so it's ready shortly. Cloud users never trigger a boot.
+        if not cloud:
+            _fire(ensure_brain())
         return JSONResponse({"models": [], "cloud": cloud,
                              "error": (None if cloud else f"LM Studio isn't reachable — open it and hit Start Server. ({e})")})
 
@@ -2262,7 +2406,9 @@ async def image_gen(req: Request):
 
     await _unload_brain()   # free the 8GB GPU so FLUX doesn't thrash RAM (45-min renders → minutes)
     if not await ensure_engine():
-        return JSONResponse({"error": "couldn't wake the image engine — check D:\\tiff-images exists, or tell Claude"})
+        if not COMFY_DIR.exists():
+            return JSONResponse({"error": "Image generation runs on a local ComfyUI engine + an NVIDIA gaming GPU (~8GB), which isn't set up on this machine. Everything else — chat, the video editor, the audio studio — works without it."})
+        return JSONResponse({"error": "The image engine is installed but wouldn't start — open ComfyUI once, let it settle, then try again."})
     # IMG2IMG / EDIT: an attached reference rides as a data URL; upload it to
     # the engine's input folder first, then start the render FROM it.
     ref_name = ""
@@ -2400,34 +2546,50 @@ async def image_delete(req: Request):
 
 
 # ── memory API ──────────────────────────────────────────────────────────────
+# Two stores, one set of routes. ?scope=cloud (or {"scope":"cloud"} in the body)
+# targets her DEEP HeyTiff memory; anything else is the quick LOCAL store.
+
+def _is_cloud(scope) -> bool:
+    return str(scope or "").lower() == "cloud"
+
 
 @app.get("/api/memory")
-async def memory_list():
-    return {"memory": load_memory()}
+async def memory_list(req: Request):
+    if _is_cloud(req.query_params.get("scope")):
+        return {"memory": load_cloud_memory(), "scope": "cloud"}
+    return {"memory": load_memory(), "scope": "local"}
 
 
 @app.post("/api/memory")
 async def memory_add(req: Request):
     body = await req.json()
+    cloud = _is_cloud(body.get("scope"))
     entry = {
         "id": str(uuid.uuid4()),
         "title": (body.get("title") or "note")[:120],
         "text": (body.get("text") or "")[:6000],
         "source": "B",
+        "visibility": "personal",       # hand-added facts are PERSONAL — never auto-shipped in a public seed
         "ts": int(time.time()),
     }
     async with _mem_lock:               # read-modify-write under a lock = no clobber
-        mem = load_memory()
-        mem.append(entry)
-        save_memory(mem)
+        if cloud:
+            mem = load_cloud_memory(); mem.append(entry); save_cloud_memory(mem)
+        else:
+            mem = load_memory(); mem.append(entry); save_memory(mem)
     return entry
 
 
 @app.delete("/api/memory/{mid}")
-async def memory_del(mid: str):
+async def memory_del(mid: str, req: Request):
+    cloud = _is_cloud(req.query_params.get("scope"))
     async with _mem_lock:
-        mem = [m for m in load_memory() if m["id"] != mid]
-        save_memory(mem)
+        if cloud:
+            mem = [m for m in load_cloud_memory() if m["id"] != mid]
+            save_cloud_memory(mem)
+        else:
+            mem = [m for m in load_memory() if m["id"] != mid]
+            save_memory(mem)
     return {"ok": True}
 
 
@@ -2504,6 +2666,30 @@ def _ffmpeg_missing() -> bool:
     clear 'ffmpeg not found' error instead of an opaque FileNotFoundError mid-render."""
     return _shutil.which("ffmpeg") is None or _shutil.which("ffprobe") is None
 _NOWIN = 0x08000000  # CREATE_NO_WINDOW — no console flash on subprocess calls
+
+_NVENC_OK = None  # cached: can h264_nvenc actually encode on THIS machine?
+def _has_nvenc() -> bool:
+    """True only if h264_nvenc can REALLY encode here (NVIDIA GPU + driver present) — not
+    merely listed by ffmpeg (it's listed even on machines with no NVIDIA card). Tested once
+    with a tiny throwaway encode, then cached. Lets export fall back to CPU (libx264) on a
+    normal laptop instead of failing the whole render."""
+    global _NVENC_OK
+    if _NVENC_OK is None:
+        if _ffmpeg_missing():
+            _NVENC_OK = False
+        else:
+            try:
+                import subprocess as _sp
+                # 256x256, not tiny — nvenc rejects frames below its minimum dimensions,
+                # which would make this test a false negative on a perfectly good NVIDIA card.
+                r = _sp.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+                             "-i", "color=c=black:s=256x256:d=0.1", "-c:v", "h264_nvenc",
+                             "-pix_fmt", "yuv420p", "-f", "null", "-"],
+                            capture_output=True, timeout=20, creationflags=_NOWIN)
+                _NVENC_OK = (r.returncode == 0)
+            except Exception:
+                _NVENC_OK = False
+    return bool(_NVENC_OK)
 
 EDIT_MEDIA: dict[str, dict] = {}          # mid -> full record (incl. server-only src path)
 EDIT_MEDIA_FILE = EDITOR_DIR / "media.json"
@@ -3155,25 +3341,50 @@ def _safe_font(raw) -> str:
         return _DEFAULT_FONT
 
 
+def _clip_kind(c: dict, track_kind=None) -> str:
+    """Per-clip kind — mirrors editor.html clipKind(), with back-compat fallback so
+    older projects (clips lacking 'kind', tracks still carrying 'kind') export right.
+    Tracks are now type-agnostic; a clip's OWN kind decides video/audio/text/solid."""
+    k = c.get("kind")
+    if k:
+        return k
+    if c.get("text") is not None and not c.get("mediaId"):
+        return "text"
+    if c.get("solid"):
+        return "solid"
+    m = EDIT_MEDIA.get(c.get("mediaId")) or {}
+    mk = m.get("kind")
+    if mk == "audio":
+        return "audio"
+    if mk == "image":
+        return "image"
+    # Match the JS clipKind() fallback exactly ('video') so preview and export agree.
+    # (track_kind is intentionally NOT used here — tracks are type-agnostic.)
+    return "video"
+
+
 def _build_export_cmd(tl: dict, out_path: str, settings: dict):
     W = int(tl.get("width", 1920)); H = int(tl.get("height", 1080))
     FPS = float(tl.get("fps", 30)) or 30.0
     tracks = tl.get("tracks", [])
 
     vclips, aclips, texts = [], [], []
-    for tr in tracks:
-        kind = tr.get("kind")
+    for ti, tr in enumerate(tracks):
+        tk = tr.get("kind")
         for c in tr.get("clips", []):
-            if kind == "text":
+            ck = _clip_kind(c, tk)
+            if ck == "text":
                 texts.append(c)
-            elif kind == "audio":
+            elif ck == "audio":
                 aclips.append(dict(c))
-            else:  # video / image lanes
-                vclips.append(dict(c))
+            else:  # video / image / solid lanes
+                vc = dict(c); vc["_ti"] = ti  # carry track index for z-order
+                vclips.append(vc)
                 m = EDIT_MEDIA.get(c.get("mediaId"))
                 if c.get("audio", True) and m and m.get("has_audio"):
                     aclips.append({**c, "_fromvideo": True})
-    vclips.sort(key=lambda c: (c.get("track", 0), c.get("start", 0)))
+    # composite by track stacking order (matches the editor's activeVideoClips), then start time
+    vclips.sort(key=lambda c: (c.get("_ti", 0), c.get("start", 0)))
 
     def cend(c): return c.get("start", 0) + c.get("dur", 0)
     dur_frames = int(tl.get("duration") or 0) or (max([cend(c) for c in (vclips + aclips)] or [0]))
@@ -3268,11 +3479,11 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
         cmd += ["-map", "[aout]"]
 
     enc = settings.get("encoder", "nvenc")
-    if enc == "x264":
-        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
-    else:
+    if enc == "nvenc" and _has_nvenc():
         cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
                 "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
+    else:  # no NVIDIA encoder (normal laptop) → CPU encode so export still works
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
     if has_audio:
         cmd += ["-c:a", "aac", "-b:a", "256k"]
     cmd += ["-r", f"{FPS}", "-t", f"{total_sec:.3f}", "-movflags", "+faststart",
@@ -3407,11 +3618,12 @@ def _build_audio_cmd(tl: dict, FPS: float, out_path: str):
     """Audio-only render reusing the exact amix chain — returns (cmd, has_audio)."""
     aclips = []
     for tr in tl.get("tracks", []):
-        kind = tr.get("kind")
+        tk = tr.get("kind")
         for c in tr.get("clips", []):
-            if kind == "audio":
+            ck = _clip_kind(c, tk)
+            if ck == "audio":
                 aclips.append(dict(c))
-            elif kind != "text":
+            elif ck != "text":
                 m = EDIT_MEDIA.get(c.get("mediaId"))
                 if c.get("audio", True) and m and m.get("has_audio"):
                     aclips.append({**c, "_fromvideo": True})
@@ -3514,11 +3726,11 @@ async def export_frames(ws: WebSocket):
         if has_audio:
             cmd += ["-i", str(audio_path)]
         enc = settings.get("encoder", "nvenc")
-        if enc == "x264":
-            cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
-        else:
+        if enc == "nvenc" and _has_nvenc():
             cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
                     "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
+        else:  # no NVIDIA encoder (normal laptop) → CPU encode so export still works
+            cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
         cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
         if has_audio:
             cmd += ["-c:a", "aac", "-b:a", "256k", "-map", "0:v", "-map", "1:a"]
@@ -3663,6 +3875,17 @@ async def kit_help(req: Request):
         system += kb.as_prompt_block(kb.retrieve(room, msg))
     except Exception:
         pass
+    # Kit also knows what the user has taught Tiff — a SHARED user pool (local facts + public
+    # cloud knowledge). Capped tiny (k=2/1200c) so it never crowds the room docs or VRAM.
+    # Read-only: Kit never WRITES personal facts; only Tiff's auto-remember/onboarding/import do.
+    try:
+        pool = load_memory() + [m for m in load_cloud_memory() if m.get("visibility") == "public" or m.get("always")]
+        hits = relevant_memories(msg, pool, k=2, budget=1200)
+        if hits:
+            system += "\n\nWHAT YOU ALREADY KNOW ABOUT THIS USER (use only if relevant):\n" + \
+                      "\n".join(f"- {m.get('text','')}" for m in hits)
+    except Exception:
+        pass
     slots = _enabled_slots()
     try:
         if slots:
@@ -3673,4 +3896,7 @@ async def kit_help(req: Request):
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
     return {"reply": text or "Hm, I blanked on that — ask me again?"}
 
-app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+# check_dir=False so a missing static/ can never RuntimeError at import (it 404s instead);
+# mkdir keeps the dir present. Together these stop a bad ROOT from killing the whole app at boot.
+(ROOT / "static").mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=ROOT / "static", check_dir=False), name="static")

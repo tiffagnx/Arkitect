@@ -184,6 +184,12 @@
   .ruler-side .rs-bars { color:rgba(160,168,182,.7); }
   .ruler-side .rs-secs { color:rgba(160,168,182,.42); }
   .ruler-cv { flex:1; min-width:0; height:34px; display:block; cursor:text; }
+  /* UNIVERSE / OVERVIEW mini-map — the whole session at a glance; drag the box to navigate */
+  .overview { position:sticky; top:0; z-index:9; display:flex; align-items:stretch; height:44px; background:rgba(8,9,13,.97); border-bottom:1px solid var(--hairline); }
+  .overview-side { width:508px; flex:none; border-right:1px solid var(--hairline); display:flex; flex-direction:column; justify-content:center; padding:0 9px; gap:2px; background:rgba(255,255,255,.012); }
+  .overview-side .ov-l { font:700 7.5px 'Space Mono'; letter-spacing:.14em; color:rgba(160,168,182,.72); }
+  .overview-side .ov-h { font:500 8px Inter; color:rgba(160,168,182,.4); line-height:1.2; }
+  .overview-cv { flex:1; min-width:0; height:44px; display:block; cursor:pointer; }
   .col-header { position:sticky; top:34px; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
   .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:17px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
@@ -238,11 +244,20 @@
   /* zoom / snap controls */
   .zoomctl { display:inline-flex; align-items:center; gap:4px; margin-left:8px; flex:none; }
   .zb { padding:6px 9px; border-radius:7px; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--dim); font:700 11px 'Space Mono'; cursor:pointer; }
-  .toolsel { display:inline-flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; margin-right:5px; flex:none; }
+  .toolsel { display:inline-flex; flex-direction:column; gap:3px; margin-right:5px; flex:none; }
+  .toolrow { display:inline-flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; }
   .tb { padding:6px 9px; background:transparent; border:none; border-right:1px solid var(--hairline); cursor:pointer; color:var(--dim); font:600 13px Inter; line-height:1; flex:none; white-space:nowrap; }
   .tb:last-child { border-right:none; }
   .tb.on { background:rgba(62,156,184,.2); color:#9FCFDD; }
   .tb:hover { color:var(--text); }
+  /* PT Smart Tool — a bracket under the three tools; lights ALL three at once */
+  .smartbtn { width:100%; box-sizing:border-box; padding:3px 0; text-align:center; cursor:pointer;
+    font:700 8px 'Space Mono',monospace; letter-spacing:.16em; color:var(--dim);
+    background:rgba(255,255,255,.03); border:1px solid var(--hairline); border-radius:6px; }
+  .smartbtn:hover { color:var(--text); }
+  .smartbtn.on { color:#06222b; background:linear-gradient(180deg,#43b0c8,#2c7f99); border-color:transparent; box-shadow:0 2px 8px rgba(62,156,184,.45); }
+  .toolsel.smart .toolrow { border-color:rgba(0,209,196,.55); }
+  .toolsel.smart .tb { background:rgba(0,209,196,.13); color:#B9FFF8; }
   .zb:hover { border-color:rgba(62,156,184,.5); color:#DCE7EC; }
   .zb.on { background:rgba(0,209,196,.16); color:var(--teal); border-color:rgba(0,209,196,.4); }
   #zoomLbl { font:600 10px 'Space Mono'; color:var(--dim); min-width:36px; text-align:center; }
@@ -741,12 +756,17 @@
     <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
   </div>
   <div class="tgroup"><span class="tg-l">TOOLS</span>
-    <span class="toolsel" title="edit tool">
-      <button class="tb on" id="toolGrab" title="Grab — move clips (drag anywhere)">✋</button>
-      <button class="tb" id="toolTrim" title="Trim — resize a clip's edge">✂</button>
-      <button class="tb" id="toolSel" title="Select — highlight a range">⌶</button>
-      <button class="tb" id="toolSmart" title="Smart — auto: middle moves, edge trims, bottom selects">◆</button>
+    <span class="toolsel" id="toolsel" title="edit tool">
+      <span class="toolrow">
+        <button class="tb" id="toolGrab" title="Grabber — move clips (drag the LOWER half of a clip)">✋</button>
+        <button class="tb" id="toolTrim" title="Trimmer — resize a clip's edge">✂</button>
+        <button class="tb" id="toolSel" title="Selector — highlight a time range (drag the UPPER half of a clip)">⌶</button>
+      </span>
+      <button class="smartbtn" id="toolSmart" title="Smart Tool — all three at once: UPPER half of a clip selects, LOWER half moves, edges trim, top corners fade. No tool-switching.">⌐ SMART</button>
     </span>
+  </div>
+  <div class="tgroup"><span class="tg-l">FX</span>
+    <button class="tb" id="throwToggle" onclick="toggleThrowBar()" title="FX Throw — print a tempo-synced delay/reverb throw onto the selected clip" style="width:auto;padding:0 10px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">⟿ THROW</button>
   </div>
   <div class="tgroup"><span class="tg-l">ZOOM · GRID</span>
     <div class="zoomctl">
@@ -836,7 +856,7 @@
     </div>
     <!-- TIFF VERB faceplate: hidden window; ids preserved so the audio wiring + clip-print-verb stay bound (opened from the plugin chain on the right) -->
     <div class="verbwin" id="verbWin" style="display:none">
-      <div class="vw-bar"><span class="vw-title">TIFF VERB</span><span class="vw-sub">convolution reverb</span><button class="vw-x" id="verbClose" title="close">✕</button></div>
+      <div class="vw-bar"><span class="vw-title">DeMartin Reverb</span><span class="vw-sub">convolution reverb</span><button class="vw-x" id="verbClose" title="close">✕</button></div>
       <div class="vw-body">
         <div class="vw-knob"><output id="vSizeO">2.2s</output><div class="vknob" id="knob-vSize"><span class="vknob-ind"></span></div><label>SIZE</label></div>
         <div class="vw-knob"><output id="vToneO">6.0k</output><div class="vknob" id="knob-vTone"><span class="vknob-ind"></span></div><label>TONE</label></div>
@@ -1072,6 +1092,25 @@ async function renderBuf(buf, build, tailSec=0){
   const s=off.createBufferSource(); s.buffer=buf; build(off,s); s.start();
   return await off.startRendering();
 }
+// Run a DeMartin plugin OFFLINE over a buffer (the DeMartin Suite render path). Uses the SAME
+// plugin factory the live insert uses, so an offline render matches playback exactly.
+async function offlineProcess(def, buf, params, opts={}){
+  const sr=buf.sampleRate, ch=buf.numberOfChannels;
+  const tail=opts.tail!=null?opts.tail:((def.audioSuite&&def.audioSuite.tail)||0);
+  const oc=new OfflineAudioContext(ch, Math.max(1, buf.length+Math.ceil(tail*sr)), sr);
+  if(typeof ensureWorklets==='function'){ try{ await ensureWorklets(oc); }catch(e){} }   // worklet plugins (comp/lo-fi/gate) need this offline
+  const node=def.create(oc);
+  const src=oc.createBufferSource(); src.buffer=buf; src.connect(node.input); node.output.connect(oc.destination);
+  (def.params||[]).forEach(pp=>{ const v=(params&&params[pp.id]!=null)?params[pp.id]:pp.value; (node.setImmediate||node.set||function(){}).call(node, pp.id, v); });
+  src.start(0);
+  const out=await oc.startRendering();
+  try{ node.dispose&&node.dispose(); }catch(e){}
+  return out;
+}
+// Wrap a DeMartin plugin as a DeMartin-Suite proc (renders it offline onto the selection/clip).
+function pluginProc(name, extra){ const def=TIFF_PLUGINS.byName(name); if(!def) return null;
+  return Object.assign({ id:'plug:'+def.name, name:def.name, params:def.params, plugin:true,
+    run:(buf,p)=>offlineProcess(def, buf, p, extra||{}) }, extra||{}); }
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
@@ -1091,13 +1130,14 @@ function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.
   const hz=document.getElementById("hzoomSlider"); if(hz && document.activeElement!==hz) hz.value=zoomToSlider(zoom);   // keep slider thumb in lockstep with +/- buttons + Ctrl+wheel
   const hp=document.getElementById("hzoomPct"); if(hp){ const vd=viewDur(); hp.textContent = vd<1 ? (vd*1000).toFixed(vd<0.05?1:0)+"ms" : vd.toFixed(vd<10?2:1)+"s"; }   // show the visible span so you can see how deep you are
   const vz=document.getElementById("vzoomSlider"); if(vz && document.activeElement!==vz) vz.value=laneH; }
-function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); drawRuler(); }
+function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); drawRuler(); drawOverview(); }
 function setZoom(z){ zoom=Math.max(ZMIN,Math.min(zMax(),z)); relayoutAll(); }
 // zoom by a factor while keeping the playhead (or view centre) under the same spot —
 // so pressing + drills straight into where you're working, all the way to milliseconds
-function zoomAround(factor){
+function zoomAround(factor, anchorT){
   const vd=viewDur(); const ph=(typeof pos==='function')?pos():0;
-  const anchor=(ph>=scrollT && ph<=scrollT+vd) ? ph : scrollT+vd/2;
+  // anchor on the MOUSE time (anchorT) if given, else the playhead-if-visible, else view centre
+  const anchor=(anchorT!=null) ? anchorT : ((ph>=scrollT && ph<=scrollT+vd) ? ph : scrollT+vd/2);
   const frac=vd>0 ? (anchor-scrollT)/vd : 0.5;
   zoom=Math.max(ZMIN,Math.min(zMax(),zoom*factor));
   scrollT=Math.max(0, anchor-frac*viewDur());
@@ -1177,7 +1217,7 @@ async function clipFx_verb(t, cl){
   const ret=parseFloat($("vRet").value)||0.8;
   const out=await renderBuf(cl.buffer,(off,s)=>{ const dry=off.createGain(); dry.gain.value=1; s.connect(dry); dry.connect(off.destination);
     const cv=off.createConvolver(); cv.buffer=ir; const wet=off.createGain(); wet.gain.value=ret; s.connect(cv); cv.connect(wet); wet.connect(off.destination); }, ir.duration);
-  pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,"TIFF VERB printed onto clip"); }
+  pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,"DeMartin Reverb printed onto clip"); }
 async function clipFx_revReverb(t, cl){
   const ir=makeIR(ctx, parseFloat($("vSize").value)||2.5, parseFloat($("vTone").value)||6000);
   const rev=reverseBuffer(cl.buffer);
@@ -1190,6 +1230,115 @@ async function clipFx_bpmDelay(t, cl){
     const dl=off.createDelay(2.0); dl.delayTime.value=dt; const fb=off.createGain(); fb.gain.value=0.42; const w=off.createGain(); w.gain.value=0.5;
     s.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(w); w.connect(off.destination); }, 2.4);
   pushUndoClips(t); cl.buffer=out; afterClipFx(t,cl,`BPM delay @ ${curTempo()}`); }
+
+// ── FX THROW — the vocal-engineer "throw": a tempo-synced delay/reverb tail
+//    printed onto the selected clip. Generalizes clipFx_bpmDelay: pick the note
+//    division, the type (delay / verb / both), feedback + wet. Prints WITH a tail
+//    so the throw rings out past the word like it should. ──
+const THROW_DIVS = [
+  { id:'1/4',  label:'1/4',  beats:1.0  },
+  { id:'1/8D', label:'1/8 dotted', beats:0.75 },   // the classic
+  { id:'1/8',  label:'1/8',  beats:0.5  },
+  { id:'1/16', label:'1/16', beats:0.25 },
+  { id:'1/4T', label:'1/4 triplet', beats:2/3 },
+  { id:'1/8T', label:'1/8 triplet', beats:1/3 },
+];
+async function throwFx(t, cl, opts){
+  const beat = 60/curTempo(), dt = Math.max(0.01, beat * opts.beats);
+  const type = opts.type || 'delay';
+  const fb  = Math.min(0.85, Math.max(0, opts.fb ?? 0.42));
+  const wet = Math.max(0, Math.min(1.2, opts.wet ?? 0.5));
+  // tail = let the echoes/verb ring out past the clip (more feedback → longer)
+  const tailSec = Math.min(7, Math.max(2.2, dt * (6 + fb*14), type!=='delay' ? 2.8 : 0));
+  const ir = (type!=='delay') ? makeIR(ctx, 2.6, 6500) : null;
+  // region = {f1,f2,startSec} → throw ONLY that word; the full clip still plays dry and the
+  // wet echo is sourced from just the word, started at its offset. null = throw the whole clip.
+  const reg = opts.region || null;
+  const out = await renderBuf(cl.buffer, (off, s) => {
+    const dry = off.createGain(); dry.gain.value = 1; s.connect(dry); dry.connect(off.destination);  // full clip stays dry
+    let wetSrc = s;                                                          // throw INPUT: whole clip…
+    if(reg){ wetSrc = off.createBufferSource(); wetSrc.buffer = bufSlice(cl.buffer, reg.f1, reg.f2); }  // …or just the word
+    let dl = null;
+    if(type==='delay' || type==='both'){
+      dl = off.createDelay(2.0); dl.delayTime.value = dt;
+      const f = off.createGain(); f.gain.value = fb;
+      wetSrc.connect(dl); dl.connect(f); f.connect(dl);          // feedback loop
+    }
+    if(type==='delay'){
+      const w = off.createGain(); w.gain.value = wet; dl.connect(w); w.connect(off.destination);
+    } else if(type==='verb'){
+      const cv = off.createConvolver(); cv.buffer = ir; const w = off.createGain(); w.gain.value = wet;
+      wetSrc.connect(cv); cv.connect(w); w.connect(off.destination);
+    } else { // both — the echoes wash into reverb (a delayed, smeared throw)
+      const cv = off.createConvolver(); cv.buffer = ir;
+      const wv = off.createGain(); wv.gain.value = wet;       dl.connect(cv); cv.connect(wv); wv.connect(off.destination);
+      const wd = off.createGain(); wd.gain.value = wet*0.5;   dl.connect(wd); wd.connect(off.destination);  // a touch of dry echo too
+    }
+    if(reg) wetSrc.start(Math.max(0, reg.startSec));            // land the word's echo at the right spot
+  }, tailSec);
+  pushUndoClips(t); cl.buffer = out;
+  afterClipFx(t, cl, `Threw ${reg?'word · ':''}${opts.label} · ${type==='delay'?'delay':type==='verb'?'verb':'delay→verb'}`);
+}
+
+/* ── FX THROW bar — floating, draggable control strip; prints throwFx onto the
+      selected clip. Toggled by the toolbar ⟿ THROW button. ── */
+(function(){
+  const css = `
+  .throw-bar{position:fixed;left:50%;top:104px;transform:translateX(-50%);z-index:1400;display:none;
+    align-items:center;gap:13px;padding:9px 13px;border-radius:12px;background:rgba(14,16,22,.96);
+    border:1px solid rgba(120,150,170,.28);box-shadow:0 18px 50px rgba(0,0,0,.55);backdrop-filter:blur(14px);color:#cfe0e8;}
+  .throw-bar.open{display:flex;}
+  .throw-bar .tb-grip{cursor:move;color:#6f8390;font-size:12px;letter-spacing:1px;user-select:none}
+  .throw-bar .tb-ttl{font:700 10px 'Space Mono',monospace;letter-spacing:.12em;color:#8FE9DF;text-transform:uppercase}
+  .throw-bar .tb-tgt{font:600 10.5px Inter,sans-serif;color:#9aa7b2;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .throw-bar label{display:flex;flex-direction:column;gap:3px;font:700 8.5px 'Space Mono',monospace;letter-spacing:.08em;color:#7f93a0;text-transform:uppercase}
+  .throw-bar select{background:rgba(255,255,255,.05);color:#dfeaf0;border:1px solid rgba(120,150,170,.3);border-radius:7px;padding:4px 6px;font:600 11px Inter,sans-serif;outline:none}
+  .throw-bar input[type=range]{width:72px;accent-color:#3E9CB8}
+  .throw-bar .tb-val{color:#bcd;font:600 10px 'Space Mono',monospace}
+  .throw-bar .tb-go{background:linear-gradient(180deg,#43b0c8,#2c7f99);color:#06222b;border:none;border-radius:9px;padding:8px 15px;font:800 11px Inter,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(62,156,184,.4)}
+  .throw-bar .tb-go:hover{filter:brightness(1.08)} .throw-bar .tb-go:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .throw-bar .tb-x{background:none;border:none;color:#8aa;cursor:pointer;font-size:15px;padding:0 2px}
+  `;
+  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+  let bar=null, divSel, typeSel, fbR, wetR, fbV, wetV, goBtn, tgt;
+  function curClip(){ if(typeof selClip==='undefined'||!selClip) return null; const t=tracks.find(x=>x.id===selClip.trackId); if(!t) return null; const cl=clipsOf(t).find(c=>c.id===selClip.clipId); return cl?{t,cl}:null; }
+  function selRegion(c){ try{ const r=(typeof _selRange==='function')?_selRange(c.t):null; if(!r) return null;
+    const [a,b]=r, dur=c.cl.buffer.duration, f1=Math.max(0,(a-c.cl.start)/dur), f2=Math.min(1,(b-c.cl.start)/dur);
+    if(f2-f1>0.01 && f1<1 && f2>0) return {f1,f2,startSec:Math.max(0,a-c.cl.start),sec:b-a}; }catch(e){} return null; }
+  function refresh(){ if(!bar) return; const c=curClip();
+    if(c){ const rg=selRegion(c); tgt.textContent = rg ? `→ word · ${rg.sec.toFixed(2)}s` : '→ '+(c.cl.name||c.t.name||'clip'); goBtn.disabled=false; }
+    else { tgt.textContent='— click a clip to throw —'; goBtn.disabled=true; } }
+  function build(){
+    bar=document.createElement('div'); bar.className='throw-bar'; bar.id='throwBar';
+    bar.innerHTML=
+      `<span class="tb-grip">⋮⋮</span><span class="tb-ttl">⟿ Throw</span><span class="tb-tgt" id="tbTgt">—</span>`+
+      `<label>Div<select id="tbDiv">`+THROW_DIVS.map(d=>`<option value="${d.id}"${d.id==='1/8D'?' selected':''}>${d.label}</option>`).join('')+`</select></label>`+
+      `<label>Type<select id="tbType"><option value="delay" selected>Delay</option><option value="verb">Verb</option><option value="both">Both</option></select></label>`+
+      `<label>Feedback <span class="tb-val" id="tbFbV">42%</span><input type="range" id="tbFb" min="0" max="85" value="42"></label>`+
+      `<label>Wet <span class="tb-val" id="tbWetV">50%</span><input type="range" id="tbWet" min="0" max="100" value="50"></label>`+
+      `<button class="tb-go" id="tbGo">⟿ Throw</button><button class="tb-x" id="tbX" title="close">✕</button>`;
+    document.body.appendChild(bar);
+    divSel=bar.querySelector('#tbDiv'); typeSel=bar.querySelector('#tbType');
+    fbR=bar.querySelector('#tbFb'); wetR=bar.querySelector('#tbWet'); fbV=bar.querySelector('#tbFbV'); wetV=bar.querySelector('#tbWetV');
+    goBtn=bar.querySelector('#tbGo'); tgt=bar.querySelector('#tbTgt');
+    fbR.oninput=()=>fbV.textContent=fbR.value+'%'; wetR.oninput=()=>wetV.textContent=wetR.value+'%';
+    bar.querySelector('#tbX').onclick=()=>bar.classList.remove('open');
+    goBtn.onclick=async ()=>{ const c=curClip(); if(!c){ flash('Select a clip to throw'); return; }
+      const d=THROW_DIVS.find(x=>x.id===divSel.value)||THROW_DIVS[1];
+      const region=selRegion(c);   // if a word is highlighted (⌶), throw just that range
+      const lbl=goBtn.textContent; goBtn.disabled=true; goBtn.textContent='throwing…';
+      try{ await throwFx(c.t, c.cl, {beats:d.beats, label:d.label, type:typeSel.value, fb:fbR.value/100, wet:wetR.value/100, region}); }
+      catch(e){ flash('Throw failed'); console.error(e); }
+      goBtn.textContent=lbl; refresh();
+    };
+    const grip=bar.querySelector('.tb-grip'); let dx=0,dy=0,drag=false;
+    grip.onmousedown=(e)=>{ drag=true; const r=bar.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top; bar.style.transform='none'; bar.style.left=r.left+'px'; bar.style.top=r.top+'px'; e.preventDefault(); };
+    window.addEventListener('mousemove',(e)=>{ if(!drag) return; bar.style.left=(e.clientX-dx)+'px'; bar.style.top=(e.clientY-dy)+'px'; });
+    window.addEventListener('mouseup',()=>{ drag=false; });
+  }
+  window.toggleThrowBar=function(){ if(!bar) build(); bar.classList.toggle('open'); if(bar.classList.contains('open')) refresh(); };
+  window.throwBarRefresh=function(){ if(bar && bar.classList.contains('open')) refresh(); };
+})();
 
 /* ═══ AUDIOSUITE — offline destructive processes rendered onto ONE clip,
    all LOCAL (no cloud). Gain/Normalize are exact; Pitch/Stretch use a Hann
@@ -1224,7 +1373,7 @@ const AUDIOSUITE = [
 let _asState = {};   // {procId, params:{}}
 function openAudioSuite(t){
   const cl = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
-  if(!cl){ flash("Pick a clip first (click or right-click one)"); return; }
+  if(!cl && !_selRange(t)){ flash("Highlight a range (⌶ Select tool) or pick a clip first"); return; }
   let w = document.getElementById("audiosuite");
   if(!w){ w=document.createElement("div"); w.className="plugwin fxface"; w.id="audiosuite"; document.body.appendChild(w); }
   if(!_asState.procId) _asState.procId='gain';
@@ -1232,7 +1381,7 @@ function openAudioSuite(t){
     const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
     _asState.params = _asState.params || {};
     proc.params.forEach(p=>{ if(_asState.params[p.id]==null) _asState.params[p.id]=p.value; });
-    w.innerHTML = `<div class="pw-bar"><span class="vw-title">AUDIOSUITE</span><span class="pw-track">${t.name} · clip</span><button class="pw-x" title="close">✕</button></div>
+    w.innerHTML = `<div class="pw-bar"><span class="vw-title">DEMARTIN SUITE</span><span class="pw-track">${t.name} · clip</span><button class="pw-x" title="close">✕</button></div>
       <div style="padding:13px 16px 4px"><select class="as-proc">${AUDIOSUITE.map(p=>`<option value="${p.id}"${p.id===_asState.procId?' selected':''}>${p.name}</option>`).join("")}</select></div>
       <div class="fx-knobs"></div>
       <div style="padding:4px 16px 16px"><button class="as-render">⏏ Render onto clip</button></div>
@@ -1254,18 +1403,34 @@ function openAudioSuite(t){
   w.style.left="150px"; w.style.top="120px"; w.style.display="block"; bringFront(w);
 }
 function renderAudioSuite(t){
-  const cl = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
-  if(!cl){ flash("Clip went away — pick another"); return; }
   const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
+  if(!proc){ flash("Pick a processor"); return; }
+  const r = _selRange(t);   // a highlighted time RANGE (⌶ Select tool) — else fall back to the whole clip
+  let srcBuf, clRef=null;
+  if(r){ srcBuf = _renderRange(t, r[0], r[1]); }      // flatten the range (any time past the clip is free silence for a tail to print into)
+  else { clRef = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
+         if(!clRef){ flash("Highlight a range (⌶) or pick a clip first"); return; }
+         srcBuf = clRef.buffer; }
   const lane = document.getElementById("lane-"+t.id); lane?.classList.add("rendering");
   const btn = document.querySelector("#audiosuite .as-render"); if(btn){ btn.disabled=true; btn.textContent="rendering…"; }
-  setTimeout(()=>{                                  // let the "rendering…" paint before the (sync) DSP
+  setTimeout(async ()=>{                            // let the "rendering…" paint before the DSP (plugin procs render async)
     try{
-      const out = proc.run(cl.buffer, _asState.params);
-      pushUndoClips(t); cl.buffer = out; afterClipFx(t, cl, `${proc.name} rendered onto clip`);
+      const out = await proc.run(srcBuf, _asState.params);
+      pushUndoClips(t, proc.name+" render");
+      if(r){
+        const a=r[0], b=r[1];                        // overwrite the source region (PT consolidate) + drop a NEW rendered clip at a; its tail rings PAST b into space
+        const sA=clipsOf(t).find(c=> c.start < a-0.001 && (c.start+c.buffer.duration) > a+0.001); if(sA) _splitAt(t,sA,a);
+        const sB=clipsOf(t).find(c=> c.start < b-0.001 && (c.start+c.buffer.duration) > b+0.001); if(sB) _splitAt(t,sB,b);
+        const inside=clipsOf(t).filter(c=> c.start >= a-0.001 && (c.start+c.buffer.duration) <= b+0.001 && c.start < b-0.0001);
+        t.clips=clipsOf(t).filter(c=> !inside.includes(c));
+        const nc={id:rid(), buffer:out, start:a}; t.clips.push(nc); t.clips.sort((x,y)=>x.start-y.start);
+        syncPrimary(t); selClip={trackId:t.id,clipId:nc.id}; SEL=null; drawLane(t);
+        if(playing) restartPlayback(); flash(`${proc.name} rendered onto selection`);
+        if(selTrackId===t.id) renderChannel(t);
+      } else { clRef.buffer = out; afterClipFx(t, clRef, `${proc.name} rendered onto clip`); }
     }catch(e){ flash("Render failed: "+e.message); }
     lane?.classList.remove("rendering");
-    if(btn){ btn.disabled=false; btn.textContent="⏏ Render onto clip"; }
+    if(btn){ btn.disabled=false; btn.textContent="⏏ Render"; }
   }, 30);
 }
 
@@ -1493,26 +1658,28 @@ function showWaveMenu(t, wv, e){
   const m=ctxMenuEl(); m.innerHTML="";
   const add=(label,fn,enabled=true)=>{ const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
   const sep=()=>{ const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
-  if(SEL && SEL.trackId===t.id && Math.abs(SEL.a-SEL.b)>0.01){     // a highlighted range is active
-    add("✂  Separate at selection", ()=>separateAtSelection(t));
-    add("🗑  Delete selection", ()=>deleteSelection(t));
+  const hasSel = SEL && SEL.trackId===t.id && Math.abs(SEL.a-SEL.b)>0.01;
+  if(hasSel){                                                       // a highlight is active → ONE Separate + ONE Delete that act on the highlight
+    add("✂  Separate", ()=>separateAtSelection(t));                 // isolate the highlighted range into its own clip
+    add("🗑  Delete", ()=>deleteSelection(t));                       // remove the highlighted range (leaves a gap)
     add("✕  Clear selection", ()=>clearSelection());
+    sep();
+  } else if(cl){                                                    // no highlight → act on the whole clip under the cursor
+    add("✂  Separate here", ()=>separateClip(t,cl,atTime));
+    add("🗑  Delete clip", ()=>deleteClip(t,cl));
     sep();
   }
   if(cl){
-    add("✂  Separate here", ()=>separateClip(t,cl,atTime));
-    add("🗑  Delete this clip", ()=>deleteClip(t,cl));
-    sep();
     add("◁  Reverse", ()=>clipFx_reverse(t,cl));
     add("🌀  Reverse reverb", ()=>clipFx_revReverb(t,cl));
-    add("🌀  Print TIFF VERB", ()=>clipFx_verb(t,cl));
+    add("🌀  Print DeMartin Reverb", ()=>clipFx_verb(t,cl));
     add("⟿  BPM delay", ()=>clipFx_bpmDelay(t,cl));
     add("⋮⋮  Chop (1/16)", ()=>clipFx_chop(t,cl));
     add("⌫  Delete fades", ()=>{ if(!cl.fadeIn && !cl.fadeOut){ flash("No fades on this clip — drag a top corner to make one"); return; } pushUndoClips(t,"Delete fades"); cl.fadeIn=0; cl.fadeOut=0; drawLane(t); if(playing) restartPlayback(); flash("Fades cleared"); });
     { const _SH=['lin','pow','scv'], _SN={lin:'Standard',pow:'Equal-Power',scv:'S-Curve'};
       add("◢◣  Fade shape: "+_SN[cl.fadeInShape||'lin'], ()=>{ const nx=_SH[(_SH.indexOf(cl.fadeInShape||'lin')+1)%3]; cl.fadeInShape=nx; cl.fadeOutShape=nx; drawLane(t); if(playing) restartPlayback(); flash("Fade shape: "+_SN[nx]); }); }
     sep();
-    add("⚙  AudioSuite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
+    add("⚙  DeMartin Suite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
   } else { const cx=e.clientX, cy=e.clientY; add("✨  Generate a sound here…", ()=>openSfxPrompt(t, atTime, cx, cy)); }
   sep();
   add("↶  Undo", undoLast);
@@ -1575,6 +1742,9 @@ let master = null;              // {gain, limiter, analyserL, analyserR, splitte
 window.TIFF_PLUGINS = {
   list: [],
   register(p) { this.list.push(p); refreshPlugUi(); },
+  // Legacy plugin-name aliases so a session saved BEFORE a rename still resolves its inserts.
+  RENAMES: { "TIFF VERB": "DeMartin Reverb", "TIFF EQ": "DeMartin EQ" },
+  byName(n) { return this.list.find(p => p.name === (this.RENAMES[n] || n)); },
 };
 /* built-ins */
 TIFF_PLUGINS.list.push(
@@ -1635,6 +1805,60 @@ TIFF_PLUGINS.list.push(
         pF:()=>ramp(p.frequency,v), pG:()=>ramp(p.gain,v), pQ:()=>ramp(p.Q,v),
         air:()=>ramp(air.gain,v), lpf:()=>ramp(lp.frequency,v),
       })[id]?.(); } };
+    } },
+  /* ── DeMartin EQ — 8-band parametric (pro-grade; canvas editor added in later phase).
+       Flat string-id params (bN.type/freq/gain/q/on) so persistence + Auto-mix wire for free.
+       Exposes eqBands/eqState on the node so the custom editor can draw real getFrequencyResponse. ── */
+  { name: "DeMartin EQ",
+    params: (() => {
+      const T = { peaking:0, lowshelf:1, highshelf:2, lowpass:3, highpass:4, notch:5 };
+      const L = [["lowshelf",80,1],["peaking",200,1],["peaking",500,0],["peaking",1200,1],
+                 ["peaking",2500,1],["peaking",5000,0],["highshelf",10000,1],["peaking",8000,0]];
+      const out = [];
+      L.forEach(([type,freq,on],N) => {
+        out.push({ id:`b${N}.type`, label:`B${N+1} type`, min:0,  max:5,     value:T[type] });
+        out.push({ id:`b${N}.freq`, label:`B${N+1} Hz`,   min:20, max:20000, value:freq });
+        out.push({ id:`b${N}.gain`, label:`B${N+1} dB`,   min:-18,max:18,    value:0 });
+        out.push({ id:`b${N}.q`,    label:`B${N+1} Q`,    min:0.1,max:18,    value:0.7 });
+        out.push({ id:`b${N}.on`,   label:`B${N+1} on`,   min:0,  max:1,     value:on });
+      });
+      return out;
+    })(),
+    create(c) {
+      const TYPES = ["peaking","lowshelf","highshelf","lowpass","highpass","notch"];
+      const inG = c.createGain(), outG = c.createGain();
+      const L = [["lowshelf",80,1],["peaking",200,1],["peaking",500,0],["peaking",1200,1],
+                 ["peaking",2500,1],["peaking",5000,0],["highshelf",10000,1],["peaking",8000,0]];
+      const bands = [], state = [];
+      L.forEach(([type,freq,on]) => {
+        const b = c.createBiquadFilter(); b.type = type; b.frequency.value = freq; b.Q.value = 0.7; b.gain.value = 0;
+        bands.push(b); state.push({ type, freq, gain:0, q:0.7, on });
+      });
+      inG.connect(bands[0]);
+      for (let j = 0; j < bands.length - 1; j++) bands[j].connect(bands[j + 1]);
+      bands[bands.length - 1].connect(outG);
+      const ramp = (p, v) => p.setTargetAtTime(v, c.currentTime, 0.01);
+      const gainType = (t) => t === "peaking" || t === "lowshelf" || t === "highshelf";
+      const apply = (N) => {
+        const b = bands[N], s = state[N]; b.type = s.type;
+        if (s.on) { ramp(b.frequency, s.freq); ramp(b.Q, s.q); if (gainType(s.type)) ramp(b.gain, s.gain); }
+        else if (gainType(s.type)) ramp(b.gain, 0);          // peaking/shelf off = flat (gain 0)
+        else if (s.type === "lowpass") ramp(b.frequency, 20000);  // pass-all
+        else if (s.type === "highpass") ramp(b.frequency, 20);
+        else ramp(b.Q, 0.0001);
+      };
+      return {
+        input: inG, output: outG, eqBands: bands, eqState: state,   // exposed for the canvas editor
+        set(id, v) {
+          const m = /^b([0-7])\.(type|freq|gain|q|on)$/.exec(id); if (!m) return;
+          const N = +m[1], f = m[2], s = state[N]; if (!s) return;
+          if (f === "type") s.type = TYPES[Math.round(v)] || "peaking";
+          else if (f === "on") s.on = v ? 1 : 0;
+          else s[f] = v;
+          apply(N);
+        },
+        dispose() { try { inG.disconnect(); outG.disconnect(); bands.forEach(b => b.disconnect()); } catch (e) {} },
+      };
     } },
   /* ── De-Ess — split-band sibilance tamer (native), for vocals ── */
   { name: "De-Ess", params: [
@@ -2163,7 +2387,7 @@ $("plugfile").onchange = async (e) => {
    20ms / 0.80). Now a first-class INSERT in the chain — pre-delay → convolver →
    return, parallel with the dry signal (same feel as his send verb). ── */
 TIFF_PLUGINS.register({
-  name: "TIFF VERB",
+  name: "DeMartin Reverb",
   subtitle: "convolution reverb",
   foot: "your sound · drag a knob up / down · drag the top bar to move me",
   params: [
@@ -2794,7 +3018,7 @@ function buildMasterChain(c, isOffline){
   try { sum.disconnect(); } catch {}                 // drop sum's current outputs (chain or direct)
   let tail = sum; const nodes = [];
   for (const ins of (masterTrack.present ? (masterTrack.inserts || []) : [])) {   // no Master Fader → no master inserts (output sum still runs)
-    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    const def = TIFF_PLUGINS.byName(ins.name);
     if (!def || ins.bypassed) { nodes.push(null); continue; }
     try { const node = def.create(c); tail.connect(node.input); tail = node.output; def.params.forEach(pp => node.set(pp.id, ins.params[pp.id] ?? pp.value)); nodes.push(node); }
     catch { nodes.push(null); }
@@ -3034,7 +3258,7 @@ function openPluginMenu(anchorEl, masterFirst, onPick, onTune){
       it.onclick=(e)=>{ e.stopPropagation(); menu.remove(); onPick(p.name); }; menu.appendChild(it); }); };
   if(onTune){ // pitch editor (Melodyne) — opens the Tune window for this track's clip, not an insert
     const g=document.createElement("div"); g.className="pmenu-g"; g.textContent="PITCH"; menu.appendChild(g);
-    const it=document.createElement("div"); it.className="pmenu-i"; it.textContent="🎵 Tune (Melodyne)"; it.style.color="#9FCFDD";
+    const it=document.createElement("div"); it.className="pmenu-i"; it.textContent="🎵 DeMartin Tune"; it.style.color="#9FCFDD";
     it.onmousedown=(e)=>e.stopPropagation();
     it.onclick=(e)=>{ e.stopPropagation(); menu.remove(); onTune(); }; menu.appendChild(it);
   }
@@ -3162,8 +3386,31 @@ function ensureRuler(){
     cv.addEventListener('dblclick', (e)=>{ const rc=cv.getBoundingClientRect(); const x=e.clientX-rc.left;
       const i=markers.findIndex(m=>Math.abs(t2x(m.t,cv.width)-x)<=7); if(i>=0){ markers.splice(i,1); drawRuler(); flash("Marker removed"); } });
   }
+  // OVERVIEW / Universe mini-map — sits ABOVE the ruler; click jumps the view, drag the box pans
+  let ov=document.getElementById('overview');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='overview'; ov.className='overview';
+    ov.innerHTML=`<div class="overview-side"><span class="ov-l">SESSION</span><span class="ov-h">drag the box · click to jump</span></div><canvas class="overview-cv" id="overviewCv" height="44"></canvas>`;
+    tr.insertBefore(ov, r);                                  // overview above the ruler
+    const ocv=ov.querySelector('#overviewCv');
+    const clampS=(v)=> Math.max(0, Math.min(Math.max(0, maxDur()-viewDur()), v));
+    ocv.addEventListener('mousedown', (e)=>{
+      const rc=ocv.getBoundingClientRect(), W=rc.width, x=e.clientX-rc.left;
+      const vx=(scrollT/maxDur())*W, vw=(viewDur()/maxDur())*W;
+      let grabDX;
+      if(x>=vx-3 && x<=vx+vw+3){ grabDX=x-vx; }               // grabbed the viewport box → pan from here
+      else { scrollT=clampS((x/W)*maxDur() - viewDur()/2); relayoutAll(); grabDX=vw/2; }   // clicked empty → jump (center), then keep dragging
+      const mv=(ev)=>{ const rc2=ocv.getBoundingClientRect();
+        scrollT=clampS(((ev.clientX-rc2.left-grabDX)/rc2.width)*maxDur()); relayoutAll(); };
+      const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+  }
+  const showOv = tracks.length>0 && viewMode!=='mix';
+  ov.style.display = showOv ? 'flex' : 'none';
+  r.style.top = showOv ? '44px' : '0';                       // ruler sticks just below the overview
   r.style.display = tracks.length ? 'flex' : 'none';
-  drawRuler();
+  drawRuler(); drawOverview();
 }
 // drop a memory location at the playhead (Enter) — recall by clicking it on the ruler, remove by double-click
 function addMarker(t){
@@ -3208,6 +3455,38 @@ function drawRuler(){
   const ph=t2x(pos(),W);
   if(ph>=0 && ph<=W){ g.fillStyle="#E6557A"; g.beginPath(); g.moveTo(ph-4,0); g.lineTo(ph+4,0); g.lineTo(ph,6); g.closePath(); g.fill();
     g.strokeStyle="rgba(230,85,122,0.5)"; g.lineWidth=1; g.beginPath(); g.moveTo(ph,0); g.lineTo(ph,H); g.stroke(); }
+}
+// UNIVERSE / OVERVIEW mini-map — the WHOLE session miniaturized (every track's clips as
+// colored blocks across the full timeline), with a viewport box marking what you're looking
+// at. Click jumps the view; drag the box pans. Mapping uses the FULL session length (maxDur),
+// not the visible window, so it always shows the whole song. Flat rects only — never scans
+// audio buffers — so it's cheap to repaint every frame.
+function drawOverview(){
+  const cv=document.getElementById('overviewCv'), ov=document.getElementById('overview');
+  if(!cv || !ov) return;
+  if(!tracks.length || viewMode==='mix'){ ov.style.display='none'; return; }
+  ov.style.display='flex';
+  if(cv.clientWidth && cv.width!==cv.clientWidth) cv.width=cv.clientWidth;
+  if(cv.clientHeight && cv.height!==cv.clientHeight) cv.height=cv.clientHeight;
+  const g=cv.getContext('2d'), W=cv.width, H=cv.height; g.clearRect(0,0,W,H);
+  const total=maxDur(); if(total<=0) return;
+  const mx=(t)=> t/total*W;
+  // shade where your MATERIAL actually lives, so empty timeline reads as empty
+  const cd=contentDur(); if(cd>0){ g.fillStyle='rgba(120,150,170,.06)'; g.fillRect(0,0,mx(cd),H); }
+  // each track = a thin row of its clip blocks, in the track's real color
+  const vis=tracks.filter(t=>t.type!=='master');
+  const n=Math.max(1,vis.length), pad=3, rowH=Math.max(2, Math.min(9,(H-pad*2)/n));
+  vis.forEach((t,i)=>{ const y=pad+i*rowH, col=t.color||'#3E9CB8';
+    clipsOf(t).forEach(c=>{ if(!c.buffer) return; const x=mx(c.start), w=Math.max(1, mx(c.start+c.buffer.duration)-x);
+      g.fillStyle=hexA(col,.9); g.fillRect(x,y,w,Math.max(2,rowH-1)); }); });
+  // markers + playhead
+  for(const mk of markers){ const x=mx(mk.t); g.strokeStyle='rgba(230,180,80,.55)'; g.lineWidth=1; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke(); }
+  const ph=mx(pos()); if(ph>=0&&ph<=W){ g.strokeStyle='rgba(230,85,122,.9)'; g.lineWidth=1; g.beginPath(); g.moveTo(ph,0); g.lineTo(ph,H); g.stroke(); }
+  // VIEWPORT box — the slice currently visible in the main edit window
+  const vx=mx(scrollT), vw=Math.max(3, mx(viewDur()));
+  g.fillStyle='rgba(255,255,255,.10)'; g.fillRect(vx,0,vw,H);
+  g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=1.5;
+  g.strokeRect(Math.min(W-2,Math.max(0.75,vx))+0.5, .75, Math.max(2,Math.min(W-1.5,vw-1)), H-1.5);
 }
 function laneUi(t) {
   if (!t.color) t.color = nextStemColor();
@@ -3269,7 +3548,7 @@ function laneUi(t) {
         selectTrack(t); selClip = { trackId:t.id, clipId:cl.id }; drawLane(t); renderChannel(t);
         const startG = (cl.gain==null?1:cl.gain), sy = e.clientY; let changed = false;
         const mv = (ev) => { if (!changed && Math.abs(ev.clientY - sy) > 2) { changed = true; pushUndoClips(t, "Clip gain"); }
-          if (changed) { let db = 20*Math.log10(startG||0.0001) + (sy - ev.clientY)/4; db = Math.max(-24, Math.min(12, db)); cl.gain = Math.pow(10, db/20); drawLane(t); } };
+          if (changed) { let db = 20*Math.log10(startG||0.0001) + (sy - ev.clientY)/4; db = Math.max(-36, Math.min(36, db)); cl.gain = Math.pow(10, db/20); drawLane(t); } };
         const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); if (changed) { if (playing) restartPlayback(); flash("Clip gain " + gdbStr(cl.gain) + " dB"); } };
         document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up); return;
       }
@@ -3297,22 +3576,30 @@ function laneUi(t) {
         }
       }
     }
-    // SELECT: drag to highlight a time range (or Smart tool in the bottom strip of a clip)
-    if (tool==='select' || (tool==='smart' && cl && (e.clientY-r.top) > r.height*0.62)) {
+    // SMART tool → derive the effective action from cursor position (Pro Tools):
+    //   near a clip edge = Trim · UPPER half of the clip = Select · LOWER half = Grab/move.
+    let smartAct=null;
+    if (tool==='smart' && cl){
+      const _lX=((cl.start-scrollT)/vd)*r.width, _rX=((cl.start+cl.buffer.duration-scrollT)/vd)*r.width, _rx=e.clientX-r.left, _ry=e.clientY-r.top;
+      if (Math.abs(_rx-_lX)<=7 || Math.abs(_rx-_rX)<=7) smartAct='trim';
+      else if (_ry < r.height*0.5) smartAct='select';
+      else smartAct='grab';
+    }
+    // SELECT: drag to highlight a time range (Selector tool, or Smart in the UPPER half of a clip)
+    if (tool==='select' || smartAct==='select') {
       SEL = { trackId:t.id, a:atTime, b:atTime }; drawLane(t);
       const mv=(ev)=>{ SEL.b = Math.max(0, scrollT + (ev.clientX-r.left)/r.width*vd); drawLane(t); };
       const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up);
         if(Math.abs(SEL.a-SEL.b)<0.01){ SEL=null; drawLane(t); } else flash("Selection made — right-click for options"); };
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
-    if (!cl) { selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); return; }   // empty → playhead
-    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t); seek(atTime);   // drop the edit cursor right where you click the clip
+    if (!cl) { selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); window.throwBarRefresh?.(); return; }   // empty → playhead
+    selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t); seek(atTime); window.throwBarRefresh?.();   // drop the edit cursor right where you click the clip
     const sx = e.clientX;
     const leftX = r.left + ((cl.start - scrollT)/vd)*r.width, rightX = r.left + ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
     // TRIM: only with the Trim tool (nearest edge), or Smart tool when right on an edge
     let edge=null;
-    if (tool==='trim') edge = (Math.abs(e.clientX-leftX) <= Math.abs(e.clientX-rightX)) ? 'L' : 'R';
-    else if (tool==='smart') edge = (Math.abs(e.clientX-leftX)<=7) ? 'L' : (Math.abs(e.clientX-rightX)<=7) ? 'R' : null;
+    if (tool==='trim' || smartAct==='trim') edge = (Math.abs(e.clientX-leftX) <= Math.abs(e.clientX-rightX)) ? 'L' : 'R';
     if (edge) {
       const oB=cl.buffer, oS=cl.start, oD=cl.buffer.duration; let trimmed=false;
       const mv=(ev)=>{ if(!trimmed && Math.abs(ev.clientX-sx)>2){ trimmed=true; pushUndoClips(t); }
@@ -3323,11 +3610,24 @@ function laneUi(t) {
       const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); if(trimmed){ syncPrimary(t); if(playing) restartPlayback(); flash("Trimmed clip"); } };
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
-    // GRAB / MOVE (default) — drag anywhere on the clip slides it left/right, never resizes
-    const startStart = cl.start; let moved = false; const wasPlaying = playing;   // capture at drag-START so a clip-move never wrongly (re)starts playback
-    const mv = (ev) => { if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); }
-      if (moved) { const dx = (ev.clientX - sx) / r.width * vd; cl.start = snapTime(Math.max(0, startStart + dx)); drawLane(t); } };
+    // GRAB / MOVE (default) — drag slides the clip. PUSH THE VIEWPORT EDGE and the timeline
+    // auto-scrolls under it, so you can drag a stem all the way to the start (bar 1) in ONE
+    // motion — no more drag-scroll-drag-scroll. Tracks the absolute time UNDER the cursor so
+    // the clip keeps following correctly even as the view scrolls.
+    const grabOff = atTime - cl.start; let moved = false; const wasPlaying = playing; let lastX = e.clientX, raf = null;
+    const placeAt = (cx) => { const mt = scrollT + (cx - r.left)/r.width * viewDur(); cl.start = snapTime(Math.max(0, mt - grabOff)); };
+    const edgeScroll = () => {
+      const EDGE = 42, room = Math.max(0, maxDur()-viewDur()); let dir = 0;
+      if (lastX < r.left + EDGE) dir = -1; else if (lastX > r.left + r.width - EDGE) dir = 1;
+      if (dir) { const b = scrollT; scrollT = Math.max(0, Math.min(room, scrollT + dir * viewDur() * 0.013));
+        if (scrollT !== b) { placeAt(lastX); relayoutAll(); } }
+      raf = requestAnimationFrame(edgeScroll);
+    };
+    const mv = (ev) => { lastX = ev.clientX;
+      if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); raf = requestAnimationFrame(edgeScroll); }
+      if (moved) { placeAt(ev.clientX); drawLane(t); } };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
+      if (raf) cancelAnimationFrame(raf);
       if (!moved) seek(atTime); else { resolveOverlaps(t, cl); syncPrimary(t); drawLane(t); if (wasPlaying) restartPlayback(); flash("Moved clip"); } };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
@@ -3343,7 +3643,7 @@ function laneUi(t) {
     else if (tool==='trim') cur = cl ? 'ew-resize' : 'crosshair';
     else if (tool==='grab') cur = cl ? 'grab' : 'crosshair';
     else if (tool==='smart' && cl){ const lX=r.left+((cl.start-scrollT)/vd)*r.width, rX=r.left+((cl.start+cl.buffer.duration-scrollT)/vd)*r.width;
-      cur = (Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7) ? 'ew-resize' : ((e.clientY-r.top)>r.height*0.62 ? 'text' : 'grab'); }
+      cur = (Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7) ? 'ew-resize' : ((e.clientY-r.top) < r.height*0.5 ? 'text' : 'grab'); }   // upper half = I-beam (select), lower = hand (grab)
     wv.style.cursor=cur;
   };
   wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
@@ -3371,7 +3671,7 @@ function renderInserts(t) {
   if (!host) return;
   host.innerHTML = "";
   (t.inserts || []).forEach((ins, i) => {
-    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    const def = TIFF_PLUGINS.byName(ins.name);
     const slot = document.createElement("div");
     slot.className = "ins-slot" + (ins.bypassed ? " byp" : "") + (def ? "" : " miss");
     slot.innerHTML = `<button class="ins-power" title="bypass on / off"></button>
@@ -3416,7 +3716,7 @@ function bindFxKnob(knobEl, outEl, p, getV, setV){
 // every plugin opens as a faceplate: gradient title, rotary KNOBS w/ numbers (no more ugly sliders)
 // ── per-plugin identity color (cohesive desaturated set, ID-able at a glance) ──
 const PLUG_COLOR = {
-  "TIFF VERB": "#3E9CB8",        // house steel
+  "DeMartin Reverb": "#3E9CB8",  // house steel
   "EQ-6":      "#4D8FB0",        // blue (control)
   "Saturator": "#C8924A",        // amber (drive/warmth)
   "De-Ess":    "#46B0A0",        // teal
@@ -3440,7 +3740,7 @@ function lighten(hex, a){ const m=hex.replace("#",""); const r=parseInt(m.slice(
 
 function openPluginWindow(t, i){
   const ins = t.inserts[i]; if(!ins) return;
-  const def = TIFF_PLUGINS.list.find(p => p.name === ins.name); if(!def) return;
+  const def = TIFF_PLUGINS.byName(ins.name); if(!def) return;
   const id = `pw-${t.id}-${i}`;
   let w = document.getElementById(id);
   if (w){ w.style.display="block"; bringFront(w); return; }
@@ -3751,10 +4051,10 @@ function renderChannel(t){
   html+=`<div class="chan-section">Clip${cl?' · selected':''}</div>`;
   if(cl){
     html+=`<div class="clip-fx">`+[['cf-rev','◁ Reverse'],['cf-rr','🌀 Rev reverb'],['cf-verb','🌀 Print VERB'],['cf-dly','⟿ BPM delay'],['cf-chop','⋮⋮ Chop 1/16'],['cf-del','🗑 Delete clip']].map(([id,l])=>`<button class="cbtn cfx" id="${id}">${l}</button>`).join("")+`</div>`;
-    html+=`<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ AudioSuite — Gain · Normalize · Pitch · Stretch</button>`;
-    html+=`<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 Tune — see the notes (Melodyne)</button>`;
+    html+=`<button class="cbtn" id="cf-as" style="width:100%;margin-top:8px;color:#9BF0E8;border-color:rgba(0,209,196,.35)">⚙ DeMartin Suite — Gain · Normalize · Pitch · Stretch</button>`;
+    html+=`<button class="cbtn" id="cf-tune" style="width:100%;margin-top:7px;color:#9FCFDD;border-color:rgba(62,156,184,.4)">🎵 DeMartin Tune — see the notes</button>`;
   } else {
-    html+=`<div class="chan-hint">Click a clip in the lane to edit it — separate, reverse, print VERB, BPM-delay, AudioSuite, or open it in Tune. <b>Volume, pan & plugins are on the track strip (left).</b></div>`;
+    html+=`<div class="chan-hint">Click a clip in the lane to edit it — separate, reverse, print VERB, BPM-delay, DeMartin Suite, or open it in Tune. <b>Volume, pan & plugins are on the track strip (left).</b></div>`;
   }
   panel.innerHTML=html;
   renderSends(t);
@@ -4297,7 +4597,7 @@ async function runAutoMix(t, btn) {
     }
     if (!t.inserts[idx].params) t.inserts[idx].params = {};
     // clamp the value to the plugin's declared min/max before storing
-    const def = TIFF_PLUGINS.list.find(p => p.name === mv.insert);
+    const def = TIFF_PLUGINS.byName(mv.insert);
     const pdef = def && def.params.find(p => p.id === mv.param);
     let val = mv.value;
     if (pdef && typeof val === "number") val = _clamp(val, pdef.min, pdef.max);
@@ -4564,7 +4864,7 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   let tail = hi;
   const insertNodes = [];
   for (const ins of (t.inserts || [])) {
-    const def = TIFF_PLUGINS.list.find(p => p.name === ins.name);
+    const def = TIFF_PLUGINS.byName(ins.name);
     if (!def || ins.bypassed) { insertNodes.push(null); continue; }  // bypassed/missing → null keeps index aligned with t.inserts
     try {
       const node = def.create(c);
@@ -4716,7 +5016,7 @@ const VDOC_MACROS = [
 ];
 function vdIsDoc(ins){ return !!(ins && (ins._doc || (ins.params && ins.params.__doc))); }
 function vdInsByName(t, name){ return (t.inserts||[]).find(ins => vdIsDoc(ins) && ins.name===name) || null; }
-function vdPdef(name, param){ const d = TIFF_PLUGINS.list.find(p=>p.name===name); return d ? (d.params.find(p=>p.id===param)||null) : null; }
+function vdPdef(name, param){ const d = TIFF_PLUGINS.byName(name); return d ? (d.params.find(p=>p.id===param)||null) : null; }
 function vdSourceBuffer(t){
   let src = (t && t.buffer) ? t.buffer : null;
   if (t && !t.buffer && typeof clipsOf === 'function'){
@@ -5022,12 +5322,16 @@ $("laneTall").onclick = () => { _lhi = (_lhi+1) % _LANE_H.length; setLaneH(_LANE
 $("snapBtn").onclick = (e) => { snapOn = !snapOn; e.currentTarget.classList.toggle("on", snapOn); flash(snapOn ? "Snap to grid: ON (1/"+gridNote+")" : "Snap: OFF"); };
 $("gridSel").onchange = (e) => { gridNote = +e.target.value; tracks.forEach(t=>drawLane(t)); flash("Grid: 1/"+gridNote); };
 function setTool(tk){ tool=tk;
+  const smart=tk==='smart';
   $("toolGrab").classList.toggle("on", tk==='grab'); $("toolTrim").classList.toggle("on", tk==='trim');
-  $("toolSel").classList.toggle("on", tk==='select'); $("toolSmart").classList.toggle("on", tk==='smart');
+  $("toolSel").classList.toggle("on", tk==='select'); $("toolSmart").classList.toggle("on", smart);
+  document.getElementById("toolsel")?.classList.toggle("smart", smart);   // Smart lights all three together (PT)
+  try{ localStorage.setItem('arkitect-studio-tool', tk); }catch(e){}      // remember across reloads (was resetting to Grab)
   if(tk!=='select' && tk!=='smart'){ SEL=null; tracks.forEach(t=>drawLane(t)); }
-  flash("Tool: "+{grab:"Grab — move clips",trim:"Trim — resize edges",select:"Select — highlight a range",smart:"Smart — auto"}[tk]);
+  flash("Tool: "+{grab:"Grabber — move clips",trim:"Trimmer — resize edges",select:"Selector — highlight a range",smart:"Smart Tool — top selects · bottom moves · edges trim"}[tk]);
 }
 $("toolGrab").onclick=()=>setTool('grab'); $("toolTrim").onclick=()=>setTool('trim'); $("toolSel").onclick=()=>setTool('select'); $("toolSmart").onclick=()=>setTool('smart');
+setTool(localStorage.getItem('arkitect-studio-tool')||'smart');   // default to the Smart Tool (PT workflow); restore the last pick
 function separateAtSelection(t){
   if(!SEL||SEL.trackId!==t.id||Math.abs(SEL.a-SEL.b)<0.01){ flash("Make a selection first (⌶ Select tool)"); return null; }
   const a=Math.min(SEL.a,SEL.b), b=Math.max(SEL.a,SEL.b), mid=(a+b)/2;
@@ -5053,7 +5357,11 @@ document.addEventListener("mousedown", (e) => { if (!e.target.closest("#fileBtn,
 $("hscroll").oninput = (e) => { scrollT = parseFloat(e.target.value); tracks.forEach(t=>drawLane(t)); };
 $("tracks").addEventListener("wheel", (e) => {
   if (viewMode === 'mix') return;
-  if (e.ctrlKey || e.metaKey) { zoomAround(e.deltaY < 0 ? 1.15 : 1/1.15); e.preventDefault(); return; }   // Ctrl+wheel = zoom toward the playhead
+  if (e.ctrlKey || e.metaKey) {   // Ctrl+wheel = zoom INTO the spot under the mouse (PT-style), falling back to the playhead
+    const wv=document.querySelector('.lane .wave'); let at=null;
+    if(wv){ const r=wv.getBoundingClientRect(); if(e.clientX>=r.left && e.clientX<=r.left+r.width && r.width>0) at=scrollT+(e.clientX-r.left)/r.width*viewDur(); }
+    zoomAround(e.deltaY < 0 ? 1.15 : 1/1.15, at); e.preventDefault(); return;
+  }
   if (zoom > 1) { scrollT += (e.deltaY || e.deltaX) * viewDur() / 700; clampScroll(); updateZoomUi(); tracks.forEach(t=>drawLane(t)); e.preventDefault(); }  // wheel = pan when zoomed
 }, { passive:false });
 
@@ -5079,7 +5387,7 @@ function tickUi() {
     else { const b = 0.4 + 0.45 * Math.sin(performance.now() / 240); g.strokeStyle = "rgba(130,205,255," + b.toFixed(2) + ")"; g.lineWidth = 1.6; }   // blinking edit cursor when stopped (where the next take lands)
     g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
   });
-  if (viewMode !== 'mix') drawRuler();                  // ruler ticks + moving playhead marker
+  if (viewMode !== 'mix') { drawRuler(); drawOverview(); }   // ruler ticks + moving playhead marker + overview viewport box
   // meters
   const lvlOf = (a) => { const d = new Uint8Array(a.fftSize); a.getByteTimeDomainData(d);
     let mx = 0; for (const v of d) mx = Math.max(mx, Math.abs(v - 128) / 128); return mx; };
@@ -6539,7 +6847,7 @@ function laneUiTake(t, placeAt) {
   };
   // The Clip menu is clip-OBJECT ops only — Pro Tools keeps Cut/Copy/Paste/Fades/Separate/Strip-Silence/Trim in the
   // EDIT menu, NOT Clip. Allow-list the TOP-LEVEL Clip items so it stops mirroring Edit (owner: "same menu twice").
-  const CLIP_KEEP = [/^Send to Back/i, /^Bring to Front/i, /^Clip Gain/i, /^Clip Effects/i, /^Melodyne/i, /^Rename/i, /^Commit/i];
+  const CLIP_KEEP = [/^Send to Back/i, /^Bring to Front/i, /^Clip Gain/i, /^Clip Effects/i, /^DeMartin Tune/i, /^Rename/i, /^Commit/i];
   const _helpMenu = window.PT_MENUS.find(m => m.id === 'help');
   if (_helpMenu) {
     _helpMenu.title = "Updates";   // owner: the Help menu IS the update center now
@@ -6550,6 +6858,22 @@ function laneUiTake(t, placeAt) {
   }
   const _fileMenu = window.PT_MENUS.find(m => m.id === 'file');   // flatten "Open Recent" → a clickable item (opens the recent-projects list), since submenu parents get no click action
   if (_fileMenu) { const _orc = _fileMenu.items.find(it => /^Open Recent/.test(it.label)); if (_orc) _orc.submenu = null; }
+  // Trademark-safe: the Clip menu's pitch editor is OUR "DeMartin Tune", never the real product name.
+  const _clipMenu = window.PT_MENUS.find(m => m.id === 'clip');
+  if (_clipMenu) { const _ml = _clipMenu.items.find(it => /^Melodyne/i.test(it.label)); if (_ml) _ml.label = "DeMartin Tune"; }
+  // Plugin-backed DeMartin Suite procs — the SAME plugins, rendered offline onto a clip (added here,
+  // after the plugin registry is fully built, so both the menu and the suite's proc list include them).
+  [['DeMartin Reverb',{tail:2.5}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
+    if(!AUDIOSUITE.some(p=>p.name===nm)){ const pp=pluginProc(nm,ex); if(pp) AUDIOSUITE.push(pp); }
+  });
+  // "AudioSuite" is an Avid term — the top menu is OUR "DeMartin Suite", listing OUR procs only
+  // (no borrowed plugin names). Each leaf opens the suite preset to that processor.
+  const _asMenu = window.PT_MENUS.find(m => m.id === 'audiosuite' || /audio ?suite/i.test(m.title || ''));
+  if (_asMenu) {
+    _asMenu.title = "DeMartin Suite";
+    _asMenu.items = AUDIOSUITE.map(p => ({ label: p.name, shortcut: null, feasibility: "buildable-now", mapsTo: null, separator_after: false, submenu: null }));
+    if (typeof MENU_HIDE_BY !== "undefined") MENU_HIDE_BY.audiosuite = [];   // old filter hid the borrowed submenus; our procs replace them
+  }
 
   // current selected track (clip-context ops read selClip / SEL internally)
   const curTrack = () => tracks.find(t => t.id === selTrackId) || null;
@@ -6639,6 +6963,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
     if (menuId === "help"        && /Update/i.test(L))         return () => { if (window.__updateInfo) openUpdatesDialog(); else checkForUpdates(true); };
     if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT v" + (window.APP_VERSION||"?") + " — DeMartin Audio Labs · in-browser DAW");
+    if (menuId === "audiosuite") { const _p = AUDIOSUITE.find(p => p.name === L); if (_p) return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track first"); _asState.procId = _p.id; openAudioSuite(t); }; }
     if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
     return null;
   }
@@ -6661,6 +6986,29 @@ function laneUiTake(t, placeAt) {
     return MENU_HIDE_GLOBAL.some(r => r.test(L)) || (MENU_HIDE_BY[menuId] || []).some(r => r.test(L));
   }
 
+  // Clean-room: the menu spec is modeled on a pro DAW, but NOTHING user-visible may carry a
+  // trademark (product/company/plugin names). Scrub every rendered label + tooltip through this.
+  function tmScrub(s){
+    return String(s == null ? "" : s)
+      .replace(/Audio ?Suite/gi, "DeMartin Suite")
+      .replace(/Avid Media Composer|Media[- ]?Composer/gi, "a video editor")
+      .replace(/Pro ?Tools Ultimate/gi, "the full studio")
+      .replace(/Pro ?Tools/gi, "ARKITECT")
+      .replace(/Melodyne(?: Editor)?/gi, "DeMartin Tune")
+      .replace(/\bARA2?\b/gi, "")
+      .replace(/DigiDelivery/gi, "cloud delivery")
+      .replace(/Sibelius/gi, "notation")
+      .replace(/iZotope/gi, "the processor")
+      .replace(/\biLok\b/gi, "your license")
+      .replace(/QuickTime/gi, "video")
+      .replace(/System ?5/gi, "a console")
+      .replace(/Adobe After ?Effects|After ?Effects/gi, "the editor")
+      .replace(/Adobe Premiere(?: Pro)?|Premiere/gi, "a video editor")
+      .replace(/\bAdobe\b/gi, "")
+      .replace(/\bAvid\b/gi, "the studio")
+      .replace(/\(\s*\)/g, "").replace(/\s{2,}/g, " ").trim();
+  }
+
   function buildPanel(menu, items, parentLabel, level, titleEl){
     const panel = document.createElement("div");
     panel.className = "mb-panel " + (level === 0 ? "mb-drop" : "mb-fly");
@@ -6680,13 +7028,13 @@ function laneUiTake(t, placeAt) {
       row.appendChild(chk);
 
       const lab = document.createElement("span"); lab.className = "mb-lab";
-      lab.textContent = LABELFN[key] ? LABELFN[key]() : it.label;
+      lab.textContent = tmScrub(LABELFN[key] ? LABELFN[key]() : it.label);
       row.appendChild(lab);
 
       if (hasSub) { const a = document.createElement("span"); a.className = "mb-arrow"; a.textContent = "›"; row.appendChild(a); }
       else if (it.shortcut) { const s = document.createElement("span"); s.className = "mb-sc"; s.textContent = it.shortcut; row.appendChild(s); }
 
-      if (it.behavior) row.title = it.behavior + (it.ptShortcut && it.ptShortcut !== it.shortcut ? "   ·   Pro Tools: " + it.ptShortcut : "");
+      if (it.behavior) row.title = tmScrub(it.behavior);
 
       row.addEventListener("mouseenter", () => {
         clearFly(level + 1);

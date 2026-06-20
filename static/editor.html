@@ -237,6 +237,56 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .chip{padding:5px 9px;border-radius:7px;background:var(--surf);border:1px solid var(--line);font-size:11px;font-weight:600;color:var(--dim)}
 .chip.on{background:var(--cy-soft);color:#bfe6f1;border-color:var(--cy-line)}
 .chip:hover{color:var(--txt)}
+.masklab{font:700 9px var(--mono);letter-spacing:.05em;color:var(--dim);padding:8px 2px 3px;cursor:pointer;text-transform:uppercase}
+.masklab.on{color:#bfe6f1}
+.masklab:hover{color:var(--txt)}
+
+/* ── EFFECT CONTROLS (per-effect plugin cards) ───────────────────────── */
+.efx-wrap{display:flex;flex-direction:column;gap:8px}
+.efx-top{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-bottom:1px}
+.efx-addbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;width:100%;justify-content:center;
+  background:var(--cy-soft);border:1px solid var(--cy-line);color:#bfe6f1;font:600 11.5px var(--ui);transition:.12s}
+.efx-addbtn:hover{background:rgba(62,156,184,.26);box-shadow:0 0 0 1px var(--cy-line)}
+.efx-empty{font-size:11px;color:var(--dim2);padding:4px 2px 2px;line-height:1.55}
+.efx-card{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.004));transition:.14s}
+.efx-card:hover{border-color:rgba(255,255,255,.15)}
+.efx-card.byp{opacity:.45}
+.efx-card.byp .efx-body{filter:grayscale(.7)}
+.efx-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc,#3E9CB8);box-shadow:0 0 12px -1px var(--acc)}
+.efx-card-top{display:flex;align-items:center;gap:7px;padding:8px 8px 8px 13px}
+.efx-dot{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc);flex:none}
+.efx-cat{font:700 8px var(--mono);letter-spacing:.16em;color:var(--dim2);text-transform:uppercase;flex:none}
+.efx-title{font:700 11.5px var(--ui);color:var(--txt);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.efx-ico{width:21px;height:21px;border-radius:6px;display:grid;place-items:center;color:var(--dim);
+  background:var(--surf);border:1px solid var(--line);font-size:11px;flex:none;transition:.1s}
+.efx-ico:hover{color:var(--txt);border-color:var(--cy-line)}
+.efx-ico.on{color:var(--cy);border-color:var(--cy-line);background:var(--cy-soft)}
+.efx-ico.rm:hover{color:#f0a0a3;border-color:rgba(229,86,91,.4);background:rgba(229,86,91,.12)}
+.efx-body{padding:1px 12px 12px 13px;display:flex;flex-direction:column;gap:10px}
+.efx-ctrl{display:flex;flex-direction:column;gap:6px}
+.efx-ctrl-top{display:flex;align-items:center;gap:7px}
+.efx-clab{font-size:10.5px;color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.efx-cval{width:52px;background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:3px 6px;
+  font:600 11px var(--mono);color:var(--txt);text-align:right}
+.efx-cval:focus{outline:none;border-color:var(--cy-line);background:var(--surf2)}
+.efx-slide{position:relative;height:16px;border-radius:8px;background:var(--bg0);border:1px solid var(--line);
+  cursor:ew-resize;overflow:hidden;touch-action:none;box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+.efx-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(62,156,184,.25),var(--acc));border-radius:8px;pointer-events:none}
+.efx-thumb{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 2.5px rgba(0,0,0,.4),0 1px 3px rgba(0,0,0,.6);transform:translate(-50%,-50%);pointer-events:none}
+.efx-slide.hue{background:linear-gradient(90deg,#ff5b5b,#ffe24a,#5bff7a,#4ad9ff,#5b6bff,#ff5bf0,#ff5b5b)}
+.efx-slide.hue .efx-fill{display:none}
+.efx-slide.hue .efx-thumb{box-shadow:0 0 0 2px rgba(0,0,0,.55),0 0 0 3.5px rgba(255,255,255,.5)}
+.efx-rowflex{display:flex;align-items:center;gap:8px}
+.efx-swatch{width:30px;height:21px;border-radius:6px;border:1px solid var(--line);padding:0;cursor:pointer;flex:none;background:none}
+.efx-swatch::-webkit-color-swatch-wrapper{padding:2px}
+.efx-swatch::-webkit-color-swatch{border:none;border-radius:4px}
+.efx-grad{height:16px;border-radius:8px;border:1px solid var(--line);flex:1;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+.efx-seg{display:flex;gap:3px;flex-wrap:wrap}
+.efx-seg button{padding:4px 8px;border-radius:6px;background:var(--surf);border:1px solid var(--line);font:600 10px var(--ui);color:var(--dim);transition:.1s}
+.efx-seg button:hover{color:var(--txt)}
+.efx-seg button.on{background:var(--cy-soft);color:#bfe6f1;border-color:var(--cy-line)}
 
 /* ── TIMELINE ────────────────────────────────────────────────────────── */
 .tl{display:flex;flex-direction:column;min-height:0;background:var(--bg1)}
@@ -263,12 +313,29 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .thead .tname{font:700 10px var(--mono);letter-spacing:.08em;color:var(--dim)}
 .thead .ttype{font-size:9px;color:var(--dim2);margin-left:auto;text-transform:uppercase;letter-spacing:.1em}
 /* twirl-down property rows (AE-style) */
-.tl-ghead{height:20px;display:flex;align-items:center;padding-left:10px;font:700 8.5px var(--mono);letter-spacing:.12em;color:var(--cy);text-transform:uppercase;border-top:1px solid var(--line2)}
+.tl-ghead{height:20px;display:flex;align-items:center;gap:3px;padding-left:8px;font:700 8.5px var(--mono);letter-spacing:.12em;color:var(--cy);text-transform:uppercase;border-top:1px solid var(--line2)}
 .tl-prow{height:20px;display:flex;align-items:center;gap:5px;padding-left:14px;border-top:1px solid var(--line2)}
+.tl-prow.d1{padding-left:22px}
+.tl-prow.d2{padding-left:34px}
+.tl-prow.add{padding-left:22px}
 .tl-prow .tl-sw{width:15px;flex:none;font-size:11px;color:var(--dim2);background:none;text-align:center}
 .tl-prow .tl-sw.on{color:var(--cy)}
 .tl-prow .tl-sw.off{visibility:hidden}
-.tl-prow .tl-pn{font:500 10px var(--ui);color:var(--dim);white-space:nowrap}
+.tl-prow .tl-pn{font:500 10px var(--ui);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* nested twirl arrow (group / effect headers) + add/remove affordances */
+.tl-tw{flex:none;width:11px;text-align:center;font-size:8px;color:var(--dim2);cursor:pointer;user-select:none}
+.tl-tw:hover{color:var(--txt)}
+.tl-tw.head{font-size:9px;margin-right:1px}
+.tl-tw.head.on{color:var(--cy)}
+.tl-add{font:700 8.5px var(--mono);color:var(--cy);background:none;letter-spacing:.06em;cursor:pointer;padding:1px 7px;border:1px dashed var(--cy-line);border-radius:5px}
+.tl-add:hover{background:var(--cy-soft)}
+.tl-prow .tl-x{margin-left:auto;flex:none;color:var(--dim2);background:none;font-size:13px;line-height:1;cursor:pointer;padding:0 5px}
+.tl-prow .tl-x:hover{color:#f0a0a3}
+.tl-prow .tl-chip{flex:none;font:700 7.5px var(--mono);letter-spacing:.04em;color:var(--dim);background:var(--surf);border:1px solid var(--line);border-radius:4px;padding:1px 4px;cursor:pointer}
+.tl-prow .tl-chip:hover{color:var(--txt)}
+.tl-prow .tl-chip.on{color:#bfe6f1;background:var(--cy-soft);border-color:var(--cy-line)}
+.tl-prow .tl-val{margin-left:auto;flex:none;font:600 9px var(--mono);color:var(--cy)}
+.tl-prow.maskon{background:rgba(62,156,184,.07)}
 .lane-props{position:absolute;left:0;right:0;top:var(--lane-h,58px)}
 .tl-glane{height:20px;border-top:1px solid var(--line2)}
 .tl-plane{height:20px;position:relative;border-top:1px solid var(--line2)}
@@ -371,7 +438,7 @@ body.mode-simple .director-only{display:none!important}
 <body class="mode-director">
 <div class="app">
 
-  <!-- MENU BAR (After Effects style) -->
+  <!-- MENU BAR (motion-graphics style) -->
   <div class="menubar">
     <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
     <nav class="mbar" id="aeMenubar"></nav>
@@ -445,9 +512,8 @@ body.mode-simple .director-only{display:none!important}
       <button class="tool" id="toolRazor" title="Razor — split (C)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4l-8 16M5 4l14 16"/><circle cx="5.5" cy="6" r="2"/><circle cx="5.5" cy="18" r="2"/></svg></button>
       <div class="sep"></div>
-      <button class="tool director-only" id="addVid" title="Add video track">V＋</button>
-      <button class="tool" id="addText" title="Add title">T＋</button>
-      <button class="tool director-only" id="addAud" title="Add audio track">A＋</button>
+      <button class="tool" id="addVid" title="Add a track — drop video OR audio on it" style="width:auto;padding:0 9px;font:700 11px var(--mono)">＋ Track</button>
+      <button class="tool" id="addText" title="Add a title">T＋</button>
       <div class="sep"></div>
       <button class="tool" id="snapBtn" title="Snap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v8a6 6 0 0012 0V3"/><path d="M3 21h18"/></svg></button>
       <button class="tool" id="delBtn" title="Delete (Del)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
@@ -573,15 +639,30 @@ const OV={safe:false,prop:false,grid:false,guides:false,rulers:false}; // viewer
 let playhead=0;
 let playing=false, clockStart=0, rafId=0;
 let sel=null;
-const LANE_H=58;
+const LANE_H=46;   // a touch shorter than AE so a busy timeline saves vertical room
 document.documentElement.style.setProperty('--lane-h',LANE_H+'px');
 
+// A track is a GENERIC container (no fixed type). A clip's OWN kind decides how it
+// renders/plays: 'video' | 'image' | 'audio' | 'solid' | 'text'. clipKind() also
+// infers the kind for older saved clips that predate c.kind, so old projects load.
+function clipKind(c){
+  if(!c)return 'video';
+  if(c.kind)return c.kind;
+  if(c.text!=null&&c.mediaId==null)return 'text';
+  if(c.solid)return 'solid';
+  const m=MEDIA[c.mediaId]||{};
+  if(m.kind==='audio')return 'audio';
+  if(m.kind==='image')return 'image';
+  return 'video';
+}
+function trackSummaryKind(t){
+  const ks=[...new Set((t.clips||[]).map(clipKind))];
+  return ks.length===0?'empty':ks.length===1?ks[0]:'mixed';
+}
+
 function newProject(){
-  return {id:uid(),title:'Untitled',fps:30,width:1920,height:1080,tracks:[
-    {id:uid(),kind:'video',name:'V1',clips:[]},
-    {id:uid(),kind:'text',name:'Titles',clips:[]},
-    {id:uid(),kind:'audio',name:'A1',clips:[]},
-  ]};
+  // Start BLANK — no preset V1/Titles/A1 lanes. Add a track, then drop anything on it.
+  return {id:uid(),title:'Untitled',fps:30,width:1920,height:1080,tracks:[]};
 }
 const FPS=()=>project.fps;
 function timelineFrames(){let m=0;for(const t of project.tracks)for(const c of t.clips)m=Math.max(m,c.start+c.dur);return m;}
@@ -614,7 +695,10 @@ async function pollMedia(id){
 }
 async function loadExistingMedia(){
   try{const r=await fetch('/api/editor/media').then(r=>r.json());
-    for(const m of (r.media||[])){MEDIA[m.id]=m;if(!m.ready)pollMedia(m.id);}renderBin();}catch{}
+    for(const m of (r.media||[])){MEDIA[m.id]=m;if(!m.ready)pollMedia(m.id);}
+    // Re-render once media metadata is known: clipKind() infers an old clip's kind from
+    // MEDIA, so back-compat clips (no c.kind) must repaint after this populates MEDIA.
+    renderBin();renderTimeline();if(sel)refreshInspector();}catch{}
 }
 function renderBin(){
   const body=$('#binBody');
@@ -639,65 +723,247 @@ function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>'
 
 // ── ADD CLIP FROM MEDIA ────────────────────────────────────────────────
 function addClipFromMedia(mid,trackId,startFrame){
-  const m=MEDIA[mid];if(!m)return;
-  const tr=project.tracks.find(t=>t.id===trackId);if(!tr)return;
+  const m=MEDIA[mid];if(!m)return null;
+  const tr=project.tracks.find(t=>t.id===trackId);if(!tr)return null;
   const fps=FPS();
-  let dur=m.kind==='image'?Math.round(5*fps):Math.max(1,Math.round((m.dur||0)*fps));
-  if(tr.kind==='audio'){
-    if(!m.has_audio&&m.kind!=='audio'){toast('That clip has no audio',1);return;}
-    tr.clips.push({id:uid(),mediaId:mid,start:startFrame,in:0,dur,volume:1,audioFadeIn:0,audioFadeOut:0});
+  // The clip carries its OWN kind — any track accepts video, image, or audio.
+  const kind=m.kind==='audio'?'audio':m.kind==='image'?'image':'video';
+  let dur=kind==='image'?Math.round(5*fps):Math.max(1,Math.round((m.dur||0)*fps));
+  let c;
+  if(kind==='audio'){
+    c={id:uid(),kind,mediaId:mid,start:startFrame,in:0,dur,volume:1,audioFadeIn:0,audioFadeOut:0};
   }else{
-    if(m.kind==='audio'){toast('Audio goes on an audio track',1);return;}
-    tr.clips.push({id:uid(),mediaId:mid,start:startFrame,in:0,dur,transIn:0,transOut:0,opacity:1,audio:true,volume:1});
+    c={id:uid(),kind,mediaId:mid,start:startFrame,in:0,dur,transIn:0,transOut:0,opacity:1,audio:true,volume:1};
   }
+  tr.clips.push(c);
   renderTimeline();save(true);
+  return {trackId:tr.id,clipId:c.id};
 }
 function addClipToBestTrack(mid){
-  const m=MEDIA[mid];if(!m)return;
-  const want=(m.kind==='audio')?'audio':'video';
-  let tr=project.tracks.find(t=>t.kind===want);
-  if(!tr){tr={id:uid(),kind:want,name:want==='audio'?'A1':'V1',clips:[]};insertTrack(tr,want);}
-  addClipFromMedia(mid,tr.id,playhead);
+  const m=MEDIA[mid];if(!m)return null;
+  // No typed tracks — drop onto the selected track, else the first, else make one.
+  let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[0];
+  if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
+  return addClipFromMedia(mid,tr.id,playhead);
 }
 
 // ── TIMELINE RENDER ────────────────────────────────────────────────────
 const lanes=$('#lanes'),heads=$('#heads'),ruler=$('#ruler'),lanesWrap=$('#lanesWrap');
 function tlWidthFrames(){return Math.max(timelineFrames()+FPS()*8, project.duration||0, FPS()*30);}
-// ── TWIRL-DOWN PROPERTY ROWS (AE-style layer properties) ──
+// ── PER-STEM PROPERTY TREE (After-Effects layer twirl: Masks ▸ / Effects ▸ / Transform ▸ / Audio ▸) ──
 const PROP_H=20;
+// Every working effect, with its house name (renamed so it's recognizable, not a trademark).
+const FX_DEFS=[
+  ['fxBlur','Soft Focus',0,'Blur',12],
+  ['fxBright','Lift & Punch',1,'Brightness',1.12],
+  ['fxContrast','Crush Contrast',1,'Contrast',1.3],
+  ['fxSat','Color Boost',1,'Saturation',1.4],
+  ['fxHue','Hue Shift',0,'Hue°',30],
+  ['fxGray','Mono',0,'Amount',1],
+  ['fxSepia','Old Film',0,'Amount',0.6],
+  ['fxInvert','Negative',0,'Amount',1],
+  ['fxShadow','Cast Shadow',0,'Distance',8],
+  ['fxVignette','Edge Burn',0,'Amount',0.45],
+  ['fxTint','Color Wash',0,'Strength',0.4],
+  ['fxGrain','Grain',0,'Amount',0.3],
+  ['fxPixel','Pixelate',0,'Block',14],
+  ['fxGlow','Dream Glow',0,'Amount',0.6],
+  ['fxPosterize','Posterize',0,'Levels',6],
+  ['fxExposure','Exposure',0,'Stops',0.6],
+  ['fxGamma','Gamma',1,'Gamma',1.6],
+  ['fxTemp','Warmth',0,'Temp',30],
+  ['fxVibrance','Vibrance',0,'Amount',0.6],
+  ['fxThreshold','Threshold',0,'Level',0.5],
+  ['fxSolarize','Solarize',0,'Amount',0.8],
+  ['fxDuotone','Duotone',0,'Amount',1],
+  ['fxSharpen','Sharpen',0,'Amount',0.8],
+  ['fxEmboss','Emboss',0,'Amount',1],
+  ['fxEdges','Find Edges',0,'Amount',1],
+  ['fxRGB','RGB Split',0,'Shift',6],
+  ['fxHalftone','Halftone',0,'Dot',6],
+  ['fxLeak','Light Leak',0,'Amount',0.5],
+  ['fxScan','Scanlines',0,'Amount',0.5],
+  ['fxKeyColor','Color Key',0,'Tolerance',0.35],
+  ['fxLumaKey','Luma Key',0,'Cutoff',0.3],
+  ['fxDirBlur','Directional Blur',0,'Length',16],
+  ['fxRadBlur','Radial Blur',0,'Amount',0.4],
+  ['fxWarp','Warp',0,'Strength',0.5],
+];
+function fxActive(c,f,def){return isKeyed(c,f)||(c[f]!=null&&c[f]!==def);}
+function twOpen(c,key,def){if(!c._tw)return def;return c._tw[key]==null?def:c._tw[key];}
+function twSet(c,key,val){c._tw=c._tw||{};c._tw[key]=val;}
+// A FLAT list of 20px row-nodes; collapsed groups simply omit their children, so the
+// stem grows/shrinks with what's open (the whole point — keep a busy timeline compact).
 function clipPropGroups(track,c){
-  if(track.kind==='audio')return [{group:'Audio',rows:[{label:'Audio Levels',fields:['volume']},{label:'Waveform'}]}];
-  return [{group:'Transform',rows:[{label:'Position',fields:['posX','posY']},{label:'Scale',fields:['scale']},{label:'Rotation',fields:['rotation']},{label:'Opacity',fields:['opacity']}]}];
+  const k=clipKind(c),nodes=[],audio=(k==='audio');
+  // Masks — each mask lists Mask Path / Feather / Opacity / Expansion (AE-style)
+  {const masks=clipMasks(c);const open=twOpen(c,'masks',masks.length>0);
+   nodes.push({type:'group',key:'masks',label:'Masks',open});
+   if(open){
+     for(const m of masks){
+       const mo=twOpen(c,'mask:'+m.id,false);
+       nodes.push({type:'mask',mask:m,open:mo});
+       if(mo){
+         nodes.push({type:'maskprop',mask:m,prop:'shape',label:'Mask Path'});
+         nodes.push({type:'maskprop',mask:m,prop:'feather',label:'Mask Feather'});
+         nodes.push({type:'maskprop',mask:m,prop:'opacity',label:'Mask Opacity'});
+         nodes.push({type:'maskprop',mask:m,prop:'expansion',label:'Mask Expansion'});
+       }
+     }
+     nodes.push({type:'add',what:'mask',label:'+ Mask'});
+   }}
+  if(!audio){
+    // Effects — rows are DERIVED from which fx fields are active on this clip
+    const anyFx=FX_DEFS.some(([f,,def])=>fxActive(c,f,def));
+    const open=twOpen(c,'effects',anyFx);
+    nodes.push({type:'group',key:'effects',label:'Effects',open});
+    if(open){
+      for(const [f,label,def,plabel] of FX_DEFS){
+        if(!fxActive(c,f,def))continue;
+        const eo=twOpen(c,'fx:'+f,false);
+        nodes.push({type:'effect',field:f,label,open:eo});
+        if(eo)nodes.push({type:'prop',label:plabel,fields:[f],depth:2});
+      }
+      nodes.push({type:'add',what:'effect',label:'+ Effect'});
+    }
+    // Transform — full AE order, Anchor Point first
+    const to=twOpen(c,'transform',true);
+    nodes.push({type:'group',key:'transform',label:'Transform',open:to});
+    if(to){
+      nodes.push({type:'prop',label:'Anchor Point',fields:['anchorX','anchorY'],depth:1});
+      nodes.push({type:'prop',label:'Position',fields:['posX','posY'],depth:1});
+      nodes.push({type:'prop',label:'Scale',fields:['scale'],depth:1});
+      nodes.push({type:'prop',label:'Rotation',fields:['rotation'],depth:1});
+      nodes.push({type:'prop',label:'Opacity',fields:['opacity'],depth:1});
+    }
+  }
+  // Audio — for audio clips, and for video clips that carry their own audio
+  if(audio||(k==='video'&&c.audio!==false)){
+    const ao=twOpen(c,'audio',audio);
+    nodes.push({type:'group',key:'audio',label:'Audio',open:ao});
+    if(ao){nodes.push({type:'prop',label:'Audio Levels',fields:['volume'],depth:1});
+      if(audio)nodes.push({type:'prop',label:'Waveform',depth:1});}
+  }
+  return nodes;
 }
-function clipRowCount(track,c){let n=0;for(const g of clipPropGroups(track,c))n+=1+g.rows.length;return n;}
+function clipRowCount(track,c){return clipPropGroups(track,c).length;}
 function openClipIn(t){if(!sel||sel.trackId!==t.id)return null;const c=t.clips.find(x=>x.id===sel.clipId);return (c&&c._open)?c:null;}
 function trackHeight(t){const c=openClipIn(t);return LANE_H+(c?clipRowCount(t,c)*PROP_H:0);}
+function removeEffect(c,field){c[field]=KDEF[field];if(c._tw)delete c._tw['fx:'+field];if(c._fxOff)delete c._fxOff[field];
+  for(const ex of (FX_EXTRA[field]||[])){if(ex.sub){if(ex.sub in KDEF)c[ex.sub]=KDEF[ex.sub];else delete c[ex.sub];if(c._tw)delete c._tw['fx:'+ex.sub];}} // clear sub-params + bypass so a re-add starts clean
+  renderTimeline();refreshInspector();drawFrame();save(true);toast('Effect removed');}
+function addMask(c){
+  c.masks=c.masks||[];const m=newMask('Mask '+(c.masks.length+1));c.masks.push(m);
+  twSet(c,'masks',true);twSet(c,'mask:'+m.id,true);selMaskId=m.id;
+  const tr=trackOf(c);if(tr)sel={trackId:tr.id,clipId:c.id};
+  renderTimeline();refreshInspector();drawFrame();save(true);toast('Mask added — drag it on the monitor');return m;}
+function deleteMask(c,id){c.masks=(c.masks||[]).filter(m=>m.id!==id);if(selMaskId===id)selMaskId=null;
+  renderTimeline();refreshInspector();drawFrame();save(true);toast('Mask deleted');}
+let selMaskId=null;
+let penDraft=null;   // in-progress pen mask: {clipId, points:[{x,y}...]} in comp coords
+function findClipById(id){for(const t of project.tracks){const c=t.clips.find(x=>x.id===id);if(c)return c;}return null;}
+function penBBox(pts){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const p of pts){x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);}
+  return {x:Math.round(x0),y:Math.round(y0),w:Math.max(2,Math.round(x1-x0)),h:Math.max(2,Math.round(y1-y0))};}
+function isPenMask(m){return !!(m&&m.points&&m.points.length>=3);}
+function finishPenMask(){
+  if(!penDraft||penDraft.points.length<3){penDraft=null;setTool('select');drawFrame();toast('Need 3+ points',1);return;}
+  const clip=findClipById(penDraft.clipId);let made=false;
+  if(clip){clip.masks=clip.masks||[];
+    const m=newMask('Mask '+(clip.masks.length+1));m.shape='pen';m.points=penDraft.points;m.box=penBBox(penDraft.points);
+    clip.masks.push(m);twSet(clip,'masks',true);twSet(clip,'mask:'+m.id,true);selMaskId=m.id;
+    const tr=trackOf(clip);if(tr)sel={trackId:tr.id,clipId:clip.id};made=true;}
+  penDraft=null;setTool('select');renderTimeline();refreshInspector();drawFrame();save(true);
+  toast(made?'Pen mask created':'Pen cancelled — layer is gone',1);
+}
+function cancelPenDraft(){if(penDraft){penDraft=null;drawFrame();toast('Pen cancelled');}}
+function closeAddFx(){const m=document.getElementById('addFxMenu');if(m)m.remove();}
+function openAddFx(e,c){
+  closeAddFx();
+  const m=document.createElement('div');m.className='ease-menu';m.id='addFxMenu';
+  for(const [field,label,,,val] of FX_DEFS){
+    const b=document.createElement('button');b.textContent=label;
+    b.addEventListener('mousedown',ev=>{ev.preventDefault();ev.stopPropagation();
+      c[field]=val;twSet(c,'effects',true);twSet(c,'fx:'+field,true);
+      const tr=trackOf(c);if(tr)sel={trackId:tr.id,clipId:c.id};
+      closeAddFx();renderTimeline();refreshInspector();drawFrame();save(true);toast(label+' added');});
+    m.appendChild(b);}
+  document.body.appendChild(m);
+  const r=m.getBoundingClientRect();let L=e.clientX,T=e.clientY;
+  if(L+r.width>innerWidth)L=Math.max(4,innerWidth-r.width-6);if(T+r.height>innerHeight)T=Math.max(4,innerHeight-r.height-6);
+  m.style.left=L+'px';m.style.top=T+'px';
+}
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#addFxMenu'))closeAddFx();});
 function buildHeadProps(track,c){
   const wrap=document.createElement('div');
-  for(const g of clipPropGroups(track,c)){
-    const gh=document.createElement('div');gh.className='tl-ghead';gh.textContent=g.group;wrap.appendChild(gh);
-    for(const r of g.rows){
-      const row=document.createElement('div');row.className='tl-prow';
+  for(const n of clipPropGroups(track,c)){
+    if(n.type==='group'){
+      const gh=document.createElement('div');gh.className='tl-ghead';
+      const tw=document.createElement('span');tw.className='tl-tw';tw.textContent=n.open?'▾':'▸';
+      tw.onclick=e=>{e.stopPropagation();twSet(c,n.key,!n.open);renderTimeline();drawFrame();save(true);};
+      const lab=document.createElement('span');lab.textContent=n.label;
+      gh.append(tw,lab);wrap.appendChild(gh);
+    }else if(n.type==='effect'){
+      const row=document.createElement('div');row.className='tl-prow d1';
+      const tw=document.createElement('span');tw.className='tl-tw';tw.textContent=n.open?'▾':'▸';
+      tw.onclick=e=>{e.stopPropagation();twSet(c,'fx:'+n.field,!n.open);renderTimeline();save(true);};
+      const sw=document.createElement('button');sw.className='tl-sw'+(isKeyed(c,n.field)?' on':'');sw.textContent='◷';sw.title='Animate '+n.label;
+      sw.onclick=e=>{e.stopPropagation();toggleAnim(c,n.field);renderTimeline();drawFrame();save(true);};
+      const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=n.label;
+      const rm=document.createElement('button');rm.className='tl-x';rm.textContent='×';rm.title='Remove effect';
+      rm.onclick=e=>{e.stopPropagation();removeEffect(c,n.field);};
+      row.append(tw,sw,nm,rm);wrap.appendChild(row);
+    }else if(n.type==='prop'){
+      const row=document.createElement('div');row.className='tl-prow d'+(n.depth||1);
       const sw=document.createElement('button');
-      if(r.fields){sw.className='tl-sw'+(r.fields.some(f=>isKeyed(c,f))?' on':'');sw.textContent='◷';sw.title='Animate '+r.label;
-        sw.onclick=e=>{e.stopPropagation();r.fields.forEach(f=>toggleAnim(c,f));renderTimeline();drawFrame();save(true);};}
+      if(n.fields){sw.className='tl-sw'+(n.fields.some(f=>isKeyed(c,f))?' on':'');sw.textContent='◷';sw.title='Animate '+n.label;
+        sw.onclick=e=>{e.stopPropagation();n.fields.forEach(f=>toggleAnim(c,f));renderTimeline();drawFrame();save(true);};}
       else{sw.className='tl-sw off';sw.textContent='◷';}
-      const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=r.label;
+      const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=n.label;
       row.append(sw,nm);wrap.appendChild(row);
+    }else if(n.type==='mask'){
+      const m=n.mask;
+      const row=document.createElement('div');row.className='tl-prow d1'+(selMaskId===m.id?' maskon':'');
+      const tw=document.createElement('span');tw.className='tl-tw';tw.textContent=n.open?'▾':'▸';
+      tw.onclick=e=>{e.stopPropagation();twSet(c,'mask:'+m.id,!n.open);renderTimeline();save(true);};
+      const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=m.name;nm.style.cursor='pointer';
+      nm.onclick=e=>{e.stopPropagation();selMaskId=m.id;renderTimeline();drawFrame();}; // select this mask to edit on the monitor
+      const mode=document.createElement('button');mode.className='tl-chip';mode.textContent=(m.mode||'add')==='add'?'Add':'Sub';mode.title='Mask mode';
+      mode.onclick=e=>{e.stopPropagation();m.mode=(m.mode||'add')==='add'?'subtract':'add';renderTimeline();drawFrame();save(true);};
+      const inv=document.createElement('button');inv.className='tl-chip'+(m.inverted?' on':'');inv.textContent='Inv';inv.title='Inverted';
+      inv.onclick=e=>{e.stopPropagation();m.inverted=!m.inverted;renderTimeline();drawFrame();save(true);};
+      const rm=document.createElement('button');rm.className='tl-x';rm.textContent='×';rm.title='Delete mask';
+      rm.onclick=e=>{e.stopPropagation();deleteMask(c,m.id);};
+      row.append(tw,nm,mode,inv,rm);wrap.appendChild(row);
+    }else if(n.type==='maskprop'){
+      const m=n.mask;
+      const row=document.createElement('div');row.className='tl-prow d2';
+      const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=n.label;
+      const val=document.createElement('span');val.className='tl-val';
+      val.textContent = n.prop==='shape'?(isPenMask(m)?('Pen · '+m.points.length+' pts'+(m.smooth?' ∿':'')):(m.shape==='ellipse'?'Ellipse':'Rectangle'))
+        : n.prop==='feather'?((m.feather||0)+' px')
+        : n.prop==='opacity'?(Math.round((m.opacity==null?1:m.opacity)*100)+'%')
+        : ((m.expansion||0)+' px');
+      if(n.prop==='shape'&&!isPenMask(m)){val.style.cursor='pointer';val.title='Toggle shape';
+        val.onclick=e=>{e.stopPropagation();m.shape=m.shape==='ellipse'?'rect':'ellipse';renderTimeline();drawFrame();save(true);};}
+      row.append(nm,val);wrap.appendChild(row);
+    }else if(n.type==='add'){
+      const row=document.createElement('div');row.className='tl-prow add';
+      const b=document.createElement('button');b.className='tl-add';b.textContent=n.label;
+      b.onclick=e=>{e.stopPropagation();n.what==='effect'?openAddFx(e,c):addMask(c);};
+      row.appendChild(b);wrap.appendChild(row);
     }
   }
   return wrap;
 }
 function buildLaneProps(track,c){
   const wrap=document.createElement('div');wrap.className='lane-props';
-  for(const g of clipPropGroups(track,c)){
-    wrap.appendChild(Object.assign(document.createElement('div'),{className:'tl-glane'}));
-    for(const r of g.rows){
-      const pl=document.createElement('div');pl.className='tl-plane';
-      if(r.fields){const times=new Set();for(const f of r.fields)if(c[f]&&c[f].k)for(const kf of c[f].k)times.add(kf.t);
-        for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';attachKeyDrag(d,c,tt);attachKeyEase(d,c,tt,r.fields);pl.appendChild(d);}}
-      wrap.appendChild(pl);
-    }
+  for(const n of clipPropGroups(track,c)){
+    if(n.type==='group'){wrap.appendChild(Object.assign(document.createElement('div'),{className:'tl-glane'}));continue;}
+    const pl=document.createElement('div');pl.className='tl-plane';
+    const fields=n.type==='effect'?[n.field]:n.fields;
+    if(fields){const times=new Set();for(const f of fields)if(c[f]&&c[f].k)for(const kf of c[f].k)times.add(kf.t);
+      for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';attachKeyDrag(d,c,tt);attachKeyEase(d,c,tt,fields);pl.appendChild(d);}}
+    wrap.appendChild(pl);
   }
   return wrap;
 }
@@ -706,8 +972,19 @@ function renderHeads(){
   project.tracks.forEach(t=>{
     const th=trackHeight(t);
     const h=document.createElement('div');h.className='thead';h.style.height=th+'px';
-    h.innerHTML=`<div class="thead-top"><span class="tname">${t.name}</span><span class="ttype">${t.kind}</span></div>`;
-    const oc=openClipIn(t);if(oc)h.appendChild(buildHeadProps(t,oc));
+    const oc=openClipIn(t),hasClips=t.clips.length>0;
+    const top=document.createElement('div');top.className='thead-top';
+    const tw=document.createElement('span');tw.className='tl-tw head'+(oc?' on':'');tw.textContent=oc?'▾':'▸';
+    tw.title=hasClips?'Show layer properties (effects · transform · mask)':'Drop a clip on this track first';
+    tw.style.opacity=hasClips?'1':'.3';
+    tw.onclick=()=>{ if(!t.clips.length)return;
+      let c=(sel&&sel.trackId===t.id)?t.clips.find(x=>x.id===sel.clipId):null;if(!c)c=t.clips[0];
+      c._open=!c._open;sel={trackId:t.id,clipId:c.id};
+      renderTimeline();refreshInspector();drawFrame();save(true); };
+    const nm=document.createElement('span');nm.className='tname';nm.textContent=t.name;
+    const ty=document.createElement('span');ty.className='ttype';ty.textContent=trackSummaryKind(t);
+    top.append(tw,nm,ty);h.appendChild(top);
+    if(oc)h.appendChild(buildHeadProps(t,oc));
     heads.appendChild(h);total+=th;
   });
   heads.style.height=total+'px';
@@ -721,7 +998,7 @@ function renderTimeline(){
   [...lanes.querySelectorAll('.lane')].forEach(e=>e.remove());
   project.tracks.forEach((t)=>{
     const lane=document.createElement('div');
-    lane.className='lane '+(t.kind==='audio'?'aud':t.kind==='text'?'txt':'vid');
+    lane.className='lane';   // generic lane — per-clip color comes from the clip class
     lane.dataset.tid=t.id;lane.style.width=W+'px';lane.style.height=trackHeight(t)+'px';
     for(const c of t.clips)lane.appendChild(clipEl(t,c));
     const oc=openClipIn(t);if(oc)lane.appendChild(buildLaneProps(t,oc));
@@ -735,7 +1012,7 @@ function renderTimeline(){
 }
 function clipEl(track,c){
   const el=document.createElement('div');
-  const t=track.kind==='audio'?'a':track.kind==='text'?'t':'v';
+  const k=clipKind(c);const t=k==='audio'?'a':k==='text'?'t':'v';
   el.className='clip '+t;el.dataset.cid=c.id;el.dataset.tid=track.id;
   el.style.left=(c.start*ppf)+'px';el.style.width=Math.max(6,c.dur*ppf)+'px';
   if(c.label){el.style.borderTopColor=c.label;el.style.boxShadow='inset 4px 0 0 '+c.label+', 0 1px 4px rgba(0,0,0,.35)';}
@@ -844,7 +1121,13 @@ function setPlayhead(f,scrollInto){
 }
 
 // ── ANIMATABLE PROPERTIES (P2 keyframe engine) ───────────────────────────
-const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,fxBlur:0,fxBright:1,fxContrast:1,fxSat:1,fxHue:0,volume:1};
+const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
+  fxBlur:0,fxBright:1,fxContrast:1,fxSat:1,fxHue:0,fxGray:0,fxSepia:0,fxInvert:0,fxShadow:0,fxVignette:0,fxTint:0,
+  fxGrain:0,fxPixel:0,fxGlow:0,fxPosterize:0,
+  fxExposure:0,fxGamma:1,fxTemp:0,fxVibrance:0,fxThreshold:0,fxSolarize:0,fxDuotone:0,
+  fxSharpen:0,fxEmboss:0,fxEdges:0,fxRGB:0,fxHalftone:0,fxLeak:0,fxScan:0,
+  fxKeyColor:0,fxLumaKey:0,fxKeySoft:0,fxDirBlur:0,fxDirAngle:0,fxRadBlur:0,fxWarp:0,
+  volume:1};
 const KEYABLE=Object.keys(KDEF);
 const BLENDS=[['Normal','source-over'],['Add','lighter'],['Screen','screen'],['Multiply','multiply'],
   ['Overlay','overlay'],['Lighten','lighten'],['Darken','darken'],['Soft Light','soft-light'],
@@ -876,20 +1159,324 @@ function pval(c,field,fr,def){
 function shiftKeys(c,df){for(const f of KEYABLE){const p=c[f];if(p&&p.k)for(const kf of p.k)kf.t+=df;}}
 function clipFilter(c,f,kpx){
   const fr=f-c.start,parts=[];
-  const bl=pval(c,'fxBlur',fr,0);if(bl>0)parts.push(`blur(${(bl*kpx).toFixed(2)}px)`);
   const br=pval(c,'fxBright',fr,1);if(br!==1)parts.push(`brightness(${br})`);
+  const ex=pval(c,'fxExposure',fr,0);if(ex!==0)parts.push(`brightness(${Math.pow(2,ex).toFixed(4)})`);
   const co=pval(c,'fxContrast',fr,1);if(co!==1)parts.push(`contrast(${co})`);
   const sa=pval(c,'fxSat',fr,1);if(sa!==1)parts.push(`saturate(${sa})`);
   const hu=pval(c,'fxHue',fr,0);if(hu!==0)parts.push(`hue-rotate(${hu}deg)`);
+  const gr=pval(c,'fxGray',fr,0);if(gr>0)parts.push(`grayscale(${clamp(gr,0,1)})`);
+  const sp=pval(c,'fxSepia',fr,0);if(sp>0)parts.push(`sepia(${clamp(sp,0,1)})`);
+  const iv=pval(c,'fxInvert',fr,0);if(iv>0)parts.push(`invert(${clamp(iv,0,1)})`);
+  const bl=pval(c,'fxBlur',fr,0);if(bl>0)parts.push(`blur(${(bl*kpx).toFixed(2)}px)`);
+  // drop-shadow LAST so it shadows the already-filtered result (CSS filters are left→right)
+  const sh=pval(c,'fxShadow',fr,0);if(sh>0)parts.push(`drop-shadow(0 ${(sh*kpx*0.4).toFixed(1)}px ${(sh*kpx).toFixed(1)}px rgba(0,0,0,.55))`);
   return parts.length?parts.join(' '):'none';
+}
+// Edge Burn (vignette) + Color Wash (tint) are post-draw canvas overlays clipped to the
+// drawn image rect — not CSS filters. r = {x,y,w,h} returned by stageFit.
+let _grainTile=null;
+function grainTile(){
+  if(_grainTile)return _grainTile;
+  const n=128,cv=document.createElement('canvas');cv.width=cv.height=n;const g=cv.getContext('2d');
+  const im=g.createImageData(n,n);
+  for(let i=0;i<im.data.length;i+=4){const v=((i*1103515245+12345)>>>8)&255;im.data[i]=im.data[i+1]=im.data[i+2]=v;im.data[i+3]=255;}
+  g.putImageData(im,0,0);_grainTile=cv;return cv;
+}
+function clipOverlayFX(ctx,c,f,r){
+  if(!r)return;
+  const fr=f-c.start,vg=clamp(pval(c,'fxVignette',fr,0),0,1),tn=clamp(pval(c,'fxTint',fr,0),0,1),gn=clamp(pval(c,'fxGrain',fr,0),0,1);
+  const lk=clamp(pval(c,'fxLeak',fr,0),0,1),sc=clamp(pval(c,'fxScan',fr,0),0,1);
+  if(vg<=0&&tn<=0&&gn<=0&&lk<=0&&sc<=0)return;
+  ctx.save();ctx.filter='none';
+  ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();   // keep the overlay inside the image, never the letterbox
+  if(tn>0){ctx.globalCompositeOperation='multiply';ctx.globalAlpha=tn;ctx.fillStyle=c.fxTintColor||'#ff5fa2';ctx.fillRect(r.x,r.y,r.w,r.h);}
+  if(vg>0){ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+    const cx=r.x+r.w/2,cy=r.y+r.h/2,rad=Math.hypot(r.w,r.h)/2;
+    const g=ctx.createRadialGradient(cx,cy,rad*0.5,cx,cy,rad);
+    g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(0,0,0,${vg})`);
+    ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Light Leak — a warm gradient screened in from a corner (filmic flare)
+  if(lk>0){ctx.globalCompositeOperation='screen';ctx.globalAlpha=lk;
+    const g=ctx.createLinearGradient(r.x+r.w,r.y,r.x+r.w*0.25,r.y+r.h);
+    g.addColorStop(0,'#ff8a3d');g.addColorStop(0.45,'rgba(255,90,140,0.55)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  if(gn>0){ctx.globalCompositeOperation='overlay';ctx.globalAlpha=clamp(gn*0.6,0,1);
+    const pat=ctx.createPattern(grainTile(),'repeat');ctx.fillStyle=pat;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Scanlines — dark horizontal CRT lines
+  if(sc>0){ctx.globalCompositeOperation='multiply';ctx.globalAlpha=clamp(sc,0,1);
+    const pat=ctx.createPattern(scanTile(),'repeat');ctx.fillStyle=pat;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  ctx.restore();
+}
+let _scanTile=null;
+function scanTile(){
+  if(_scanTile)return _scanTile;
+  const cv=document.createElement('canvas');cv.width=4;cv.height=4;const g=cv.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,4,4);g.fillStyle='#000';g.fillRect(0,0,4,2);
+  _scanTile=cv;return cv;
+}
+function hasOverlayFX(c,f){const fr=f-c.start;return pval(c,'fxVignette',fr,0)>0||pval(c,'fxTint',fr,0)>0||pval(c,'fxGrain',fr,0)>0||pval(c,'fxLeak',fr,0)>0||pval(c,'fxScan',fr,0)>0;}
+// pixel-level effects need the layer rendered in isolation (an offscreen buffer)
+function hasLayerBufferFX(c,f){const fr=f-c.start;
+  return pval(c,'fxPixel',fr,0)>0||pval(c,'fxGlow',fr,0)>0||pval(c,'fxPosterize',fr,0)>=2
+    ||pval(c,'fxGamma',fr,1)!==1||pval(c,'fxTemp',fr,0)!==0||pval(c,'fxVibrance',fr,0)!==0
+    ||pval(c,'fxThreshold',fr,0)>0||pval(c,'fxSolarize',fr,0)>0||pval(c,'fxDuotone',fr,0)>0
+    ||pval(c,'fxSharpen',fr,0)>0||pval(c,'fxEmboss',fr,0)>0||pval(c,'fxEdges',fr,0)>0
+    ||pval(c,'fxRGB',fr,0)!==0||pval(c,'fxHalftone',fr,0)>=2
+    ||pval(c,'fxKeyColor',fr,0)>0||pval(c,'fxLumaKey',fr,0)>0||pval(c,'fxDirBlur',fr,0)>0
+    ||pval(c,'fxRadBlur',fr,0)>0||pval(c,'fxWarp',fr,0)!==0;}
+function needsLayerBuffer(c,f){return clipMasks(c).length>0||hasLayerBufferFX(c,f);}
+
+// ── MASKS (per-clip vector mattes) ───────────────────────────────────────
+// A mask is a rectangle/ellipse box in COMP coordinates, combined per mode
+// (add reveals inside, subtract hides inside), with feather/expansion/opacity/inverted.
+function clipMasks(c){return (c.masks||[]).filter(m=>m&&!m.hidden);}
+function newMask(name){return {id:uid(),name:name||'Mask',shape:'rect',mode:'add',inverted:false,
+  feather:0,opacity:1,expansion:0,box:{x:project.width*0.2,y:project.height*0.2,w:project.width*0.6,h:project.height*0.6}};}
+// three reusable offscreen canvases: L = layer, M = combined alpha, S = per-mask scratch
+let _mkL=null,_mkM=null,_mkS=null;
+function _mkCanvases(W,H){
+  if(!_mkL){_mkL=document.createElement('canvas');_mkM=document.createElement('canvas');_mkS=document.createElement('canvas');}
+  if(_mkL.width!==W||_mkL.height!==H){for(const cv of [_mkL,_mkM,_mkS]){cv.width=W;cv.height=H;}}
+  return [_mkL,_mkM,_mkS];
+}
+function _maskShapePath(g,m,k,ox,oy){
+  if(isPenMask(m)){          // free-form pen path — straight segments, or a closed Catmull-Rom spline when smooth
+    const P=m.points.map(p=>({x:ox+p.x*k,y:oy+p.y*k})),n=P.length;
+    g.beginPath();
+    if(m.smooth&&n>=3){
+      g.moveTo(P[0].x,P[0].y);
+      for(let i=0;i<n;i++){
+        const p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];
+        g.bezierCurveTo(p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6, p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6, p2.x, p2.y);
+      }
+    }else{
+      P.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));
+    }
+    g.closePath();return;
+  }
+  const e=m.expansion||0;
+  const x=ox+(m.box.x-e)*k, y=oy+(m.box.y-e)*k, w=(m.box.w+2*e)*k, h=(m.box.h+2*e)*k;
+  g.beginPath();
+  if(m.shape==='ellipse')g.ellipse(x+w/2,y+h/2,Math.max(0.5,w/2),Math.max(0.5,h/2),0,0,Math.PI*2);
+  else g.rect(x,y,w,h);
+}
+// Text is positioned around baseX/baseY (its own anchor on the comp), not the comp centre.
+function textBase(c,W,H,k){const ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  return {bx:ox+(c.x==null?project.width/2:c.x)*k, by:oy+(c.y==null?project.height*0.82:c.y)*k};}
+// The clip's transform (position/rotation/scale/anchor) applied to a canvas ctx — shared by
+// drawClip/drawSolidClip AND the mask renderer so masks track the layer. Identity when the layer
+// is untransformed, so old projects are byte-identical. Text pivots about its base, others about comp centre.
+function applyClipTransform(g,c,f,W,H,k){
+  const fr=f-c.start;
+  if(clipKind(c)==='text'){
+    const {bx,by}=textBase(c,W,H,k);
+    g.translate(bx+pval(c,'posX',fr,0)*k, by+pval(c,'posY',fr,0)*k);
+    const rot=pval(c,'rotation',fr,0);if(rot)g.rotate(rot*Math.PI/180);
+    const us=pval(c,'scale',fr,1),sx=us*(c.scaleX==null?1:c.scaleX),sy=us*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)g.scale(sx,sy);
+    const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);if(ax||ay)g.translate(-ax*k,-ay*k);
+    g.translate(-bx,-by);return;
+  }
+  g.translate(W/2+pval(c,'posX',fr,0)*k, H/2+pval(c,'posY',fr,0)*k);
+  const rot=pval(c,'rotation',fr,0);if(rot)g.rotate(rot*Math.PI/180);
+  const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)g.scale(sx,sy);
+  const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);
+  g.translate(-(W/2+ax*k), -(H/2+ay*k));
+}
+// Same transform as a DOMMatrix mapping COMP coords → canvas — for the on-monitor mask overlay/editing.
+function clipMatrix(c,f,W,H){
+  const k=stageK(W,H),fr=f-c.start,ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  let m=new DOMMatrix();
+  if(clipKind(c)==='text'){
+    const {bx,by}=textBase(c,W,H,k);
+    m=m.translate(bx+pval(c,'posX',fr,0)*k, by+pval(c,'posY',fr,0)*k);
+    const rot=pval(c,'rotation',fr,0);if(rot)m=m.rotate(rot);
+    const us=pval(c,'scale',fr,1),sx=us*(c.scaleX==null?1:c.scaleX),sy=us*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)m=m.scale(sx,sy);
+    const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);if(ax||ay)m=m.translate(-ax*k,-ay*k);
+    m=m.translate(-bx,-by);
+  }else{
+    m=m.translate(W/2+pval(c,'posX',fr,0)*k, H/2+pval(c,'posY',fr,0)*k);
+    const rot=pval(c,'rotation',fr,0);if(rot)m=m.rotate(rot);
+    const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)m=m.scale(sx,sy);
+    const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);
+    m=m.translate(-(W/2+ax*k), -(H/2+ay*k));
+  }
+  return m.translate(ox,oy).scale(k);
+}
+// A zero-scale layer makes clipMatrix singular; DOMMatrix.inverse() then returns NaNs.
+// Return null in that case so callers skip mask editing instead of writing NaN into the mask.
+function safeInverse(M){let inv;try{inv=M.inverse();}catch(e){return null;}
+  return (inv&&isFinite(inv.a)&&isFinite(inv.b)&&isFinite(inv.c)&&isFinite(inv.d)&&isFinite(inv.e)&&isFinite(inv.f))?inv:null;}
+// Build the combined mask alpha for clip c into M (using S as per-mask scratch).
+function buildMaskAlpha(M,S,c,f,W,H){
+  const mg=M.getContext('2d'),sg=S.getContext('2d');
+  const k=stageK(W,H),ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.filter='none';};
+  reset(mg);mg.clearRect(0,0,W,H);
+  const masks=clipMasks(c);
+  if(masks.length&&masks.every(m=>(m.mode||'add')==='subtract')){mg.fillStyle='#fff';mg.fillRect(0,0,W,H);} // only subtracts → start fully visible
+  for(const m of masks){
+    const add=(m.mode||'add')==='add';
+    reset(sg);sg.clearRect(0,0,W,H);
+    sg.save();
+    sg.filter=(m.feather>0)?`blur(${(m.feather*k).toFixed(1)}px)`:'none';
+    applyClipTransform(sg,c,f,W,H,k);   // mask tracks the layer's transform (text pivots about its base)
+    sg.fillStyle='#fff';_maskShapePath(sg,m,k,ox,oy);sg.fill();
+    sg.restore();
+    if(m.inverted){sg.filter='none';sg.globalCompositeOperation='xor';sg.fillStyle='#fff';sg.fillRect(0,0,W,H);} // white OUTSIDE the shape
+    mg.globalCompositeOperation=add?'source-over':'destination-out';
+    mg.globalAlpha=add?clamp(m.opacity==null?1:m.opacity,0,1):1;
+    mg.drawImage(S,0,0);
+  }
+  reset(mg);
+}
+// Wrap an inner draw (which bakes transform+effects+alpha into L) with the clip's masks,
+// then blit the masked result onto ctx with the clip's blend mode.
+// Render the layer in isolation (L), apply pixel-level FX (pixelate/glow) + masks to it,
+// then blit the result onto ctx with the clip's blend mode.
+function withLayerFX(ctx,c,f,W,H,drawInner){
+  const [L,M,S]=_mkCanvases(W,H);const lg=L.getContext('2d'),sg=S.getContext('2d');
+  const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-over';g.globalAlpha=1;g.filter='none';};
+  reset(lg);lg.clearRect(0,0,W,H);
+  lg.save();drawInner(lg);lg.restore();
+  const fr=f-c.start,k=stageK(W,H);
+  // Pixelate — shrink then nearest-neighbour upscale
+  const px=pval(c,'fxPixel',fr,0);
+  if(px>0){const bs=Math.max(2,px*k),dw=Math.max(1,Math.round(W/bs)),dh=Math.max(1,Math.round(H/bs));
+    reset(sg);sg.clearRect(0,0,W,H);sg.imageSmoothingEnabled=false;sg.drawImage(L,0,0,W,H,0,0,dw,dh);
+    reset(lg);lg.clearRect(0,0,W,H);lg.imageSmoothingEnabled=false;lg.drawImage(S,0,0,dw,dh,0,0,W,H);lg.imageSmoothingEnabled=true;}
+  // Dream Glow — screen a blurred, brightened copy back over the layer
+  const gl=clamp(pval(c,'fxGlow',fr,0),0,1);
+  if(gl>0){reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${(8+gl*14).toFixed(1)}px) brightness(1.7)`;sg.drawImage(L,0,0);sg.filter='none';
+    reset(lg);lg.globalCompositeOperation='screen';lg.globalAlpha=gl;lg.drawImage(S,0,0);reset(lg);}
+  // Posterize — quantise each colour channel to N levels (keeps alpha so masks/transparency survive)
+  const po=Math.round(pval(c,'fxPosterize',fr,0));
+  if(po>=2){const im=lg.getImageData(0,0,W,H),d=im.data,step=255/(po-1);
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]=Math.round(Math.round(d[i]/step)*step);d[i+1]=Math.round(Math.round(d[i+1]/step)*step);d[i+2]=Math.round(Math.round(d[i+2]/step)*step);}
+    lg.putImageData(im,0,0);}
+  // ── Per-pixel tone/colour passes — one combined loop (gamma → warmth → vibrance → duotone → solarize → threshold)
+  const ga=pval(c,'fxGamma',fr,1),tp=pval(c,'fxTemp',fr,0),vb=clamp(pval(c,'fxVibrance',fr,0),-1,2),
+        du=clamp(pval(c,'fxDuotone',fr,0),0,1),so=clamp(pval(c,'fxSolarize',fr,0),0,1),th=clamp(pval(c,'fxThreshold',fr,0),0,1);
+  if(ga!==1||tp!==0||vb!==0||du>0||so>0||th>0){
+    const gExp=ga>0?1/ga:1,tShift=tp*0.5;        // warmth ±100 → ±50 on R/B
+    const ds=hex2rgb(c.fxDuoA||'#13123a'),dh=hex2rgb(c.fxDuoB||'#ff5fa2'); // duotone endpoints (shadows → highlights)
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){
+      if(d[i+3]===0)continue;
+      let r=d[i],g=d[i+1],b=d[i+2];
+      if(ga!==1){r=255*Math.pow(r/255,gExp);g=255*Math.pow(g/255,gExp);b=255*Math.pow(b/255,gExp);}
+      if(tp!==0){r=clamp(r+tShift,0,255);b=clamp(b-tShift,0,255);}
+      if(vb!==0){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),avg=(r+g+b)/3,amt=vb*(1-(mx-mn)/255);
+        r=clamp(avg+(r-avg)*(1+amt),0,255);g=clamp(avg+(g-avg)*(1+amt),0,255);b=clamp(avg+(b-avg)*(1+amt),0,255);}
+      if(du>0){const L=(0.299*r+0.587*g+0.114*b)/255;
+        r+=(ds[0]+(dh[0]-ds[0])*L-r)*du;g+=(ds[1]+(dh[1]-ds[1])*L-g)*du;b+=(ds[2]+(dh[2]-ds[2])*L-b)*du;}
+      if(so>0){r+=((r>128?255-r:r)-r)*so;g+=((g>128?255-g:g)-g)*so;b+=((b>128?255-b:b)-b)*so;}
+      if(th>0){const v=(0.299*r+0.587*g+0.114*b)/255>=th?255:0;r=g=b=v;}
+      d[i]=r;d[i+1]=g;d[i+2]=b;
+    }
+    lg.putImageData(im,0,0);
+  }
+  // Sharpen — 3×3 cross kernel (centre 1+4a, neighbours −a)
+  const sh=clamp(pval(c,'fxSharpen',fr,0),0,3);
+  if(sh>0){const im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),a=sh,cen=1+4*a;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;
+      const xl=x>0?i-4:i,xr=x<W-1?i+4:i,yu=y>0?i-W*4:i,yd=y<H-1?i+W*4:i;
+      for(let ch=0;ch<3;ch++){ // transparent neighbours fall back to the centre so edges don't pull black
+        const nl=s[xl+3]===0?s[i+ch]:s[xl+ch],nr=s[xr+3]===0?s[i+ch]:s[xr+ch],nu=s[yu+3]===0?s[i+ch]:s[yu+ch],nd=s[yd+3]===0?s[i+ch]:s[yd+ch];
+        let v=cen*s[i+ch]-a*(nl+nr+nu+nd);d[i+ch]=v<0?0:v>255?255:v;}}
+    lg.putImageData(im,0,0);}
+  // Emboss — diagonal luminance relief + 128 bias, blended by amount
+  const em=clamp(pval(c,'fxEmboss',fr,0),0,1);
+  if(em>0){const im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;
+      const ul=((y>0?y-1:y)*W+(x>0?x-1:x))*4,dn=((y<H-1?y+1:y)*W+(x<W-1?x+1:x))*4;
+      const cl=0.299*s[i]+0.587*s[i+1]+0.114*s[i+2]; // transparent neighbours fall back to the centre luminance
+      const lu=s[ul+3]===0?cl:0.299*s[ul]+0.587*s[ul+1]+0.114*s[ul+2],ld=s[dn+3]===0?cl:0.299*s[dn]+0.587*s[dn+1]+0.114*s[dn+2];
+      let v=128+(ld-lu);v=v<0?0:v>255?255:v;
+      d[i]+=(v-d[i])*em;d[i+1]+=(v-d[i+1])*em;d[i+2]+=(v-d[i+2])*em;}
+    lg.putImageData(im,0,0);}
+  // Find Edges — Sobel magnitude, white background / dark edges, blended by amount
+  const ed=clamp(pval(c,'fxEdges',fr,0),0,1);
+  if(ed>0){const im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    let cl=0;const L=idx=>s[idx+3]===0?cl:0.299*s[idx]+0.587*s[idx+1]+0.114*s[idx+2]; // transparent neighbours → centre, no false outline
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;
+      cl=0.299*s[i]+0.587*s[i+1]+0.114*s[i+2];
+      const x0=x>0?x-1:x,x1=x<W-1?x+1:x,y0=y>0?y-1:y,y1=y<H-1?y+1:y;
+      const tl=(y0*W+x0)*4,tc=(y0*W+x)*4,tr=(y0*W+x1)*4,ml=(y*W+x0)*4,mr=(y*W+x1)*4,bl=(y1*W+x0)*4,bc=(y1*W+x)*4,br=(y1*W+x1)*4;
+      const gx=-L(tl)-2*L(ml)-L(bl)+L(tr)+2*L(mr)+L(br),gy=-L(tl)-2*L(tc)-L(tr)+L(bl)+2*L(bc)+L(br);
+      let mag=Math.sqrt(gx*gx+gy*gy);if(mag>255)mag=255;const v=255-mag;
+      d[i]+=(v-d[i])*ed;d[i+1]+=(v-d[i+1])*ed;d[i+2]+=(v-d[i+2])*ed;}
+    lg.putImageData(im,0,0);}
+  // RGB Split — chromatic aberration: red sampled one way, blue the other (shift in comp px → canvas px)
+  const rs=pval(c,'fxRGB',fr,0);
+  if(rs!==0){const off=Math.round(rs*k),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;
+      const xr=clamp(x+off,0,W-1),xb=clamp(x-off,0,W-1),ri=(y*W+xr)*4,bi=(y*W+xb)*4;
+      d[i]=s[ri+3]===0?s[i]:s[ri];d[i+2]=s[bi+3]===0?s[i+2]:s[bi+2];}
+    lg.putImageData(im,0,0);}
+  // Halftone — newsprint dots: white card per cell, black dot sized by darkness (replaces the layer)
+  const ht=Math.round(pval(c,'fxHalftone',fr,0));
+  if(ht>=2){const n=Math.max(2,Math.round(ht*k)),im=lg.getImageData(0,0,W,H),d=im.data;
+    reset(sg);sg.clearRect(0,0,W,H);sg.putImageData(im,0,0);   // stash the layer's real silhouette (alpha) for the re-cut
+    reset(lg);lg.clearRect(0,0,W,H);
+    for(let by=0;by<H;by+=n)for(let bx=0;bx<W;bx+=n){
+      const cxp=Math.min(W-1,bx+(n>>1)),cyp=Math.min(H-1,by+(n>>1)),idx=(cyp*W+cxp)*4;
+      if(d[idx+3]<8)continue;
+      lg.fillStyle='#fff';lg.fillRect(bx,by,n,n);
+      const lum=(0.299*d[idx]+0.587*d[idx+1]+0.114*d[idx+2])/255,rad=(1-lum)*(n*0.62);
+      if(rad>0.3){lg.fillStyle='#000';lg.beginPath();lg.arc(bx+n/2,by+n/2,rad,0,Math.PI*2);lg.fill();}}
+    reset(lg);lg.globalCompositeOperation='destination-in';lg.drawImage(S,0,0);reset(lg);} // cut the dots back to the layer's silhouette
+  // Warp — per-pixel coordinate sampler: Twirl / Bulge / Spherize / Wave (samples alpha too, so transparency survives)
+  const wp=pval(c,'fxWarp',fr,0);
+  if(wp!==0){const type=c.fxWarpType||'twirl',im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    const ccx=W/2,ccy=H/2,rad=Math.min(W,H)*0.5;
+    const samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;const ddx=x-ccx,ddy=y-ccy,dist=Math.sqrt(ddx*ddx+ddy*ddy),nd=dist/rad;let sx=x,sy=y;
+      if(type==='wave'){const amp=wp*W*0.05;sx=x+Math.sin(y/H*Math.PI*6)*amp;sy=y+Math.sin(x/W*Math.PI*6)*amp*0.5;}
+      else if(nd<1){
+        if(type==='twirl'){const a=(1-nd)*(1-nd)*wp*3,ca=Math.cos(a),sa=Math.sin(a);sx=ccx+ddx*ca+ddy*sa;sy=ccy-ddx*sa+ddy*ca;}
+        else{let sc=(type==='spherize')?1-wp*0.6*Math.sqrt(1-nd*nd):1-wp*0.6*(1-nd);if(sc<0.05)sc=0.05;sx=ccx+ddx*sc;sy=ccy+ddy*sc;}}
+      d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Directional Blur — average N offset copies along an angle (motion-blur streak)
+  const db=pval(c,'fxDirBlur',fr,0);
+  if(db>0){const len=db*k,ang=pval(c,'fxDirAngle',fr,0)*Math.PI/180,steps=Math.min(20,Math.max(3,Math.round(len/2)));
+    const dx=Math.cos(ang)*len/steps,dy=Math.sin(ang)*len/steps;
+    reset(sg);sg.clearRect(0,0,W,H);let j=0;for(let st=-steps;st<=steps;st++){sg.globalAlpha=1/(j+1);sg.drawImage(L,st*dx,st*dy);j++;}reset(sg); // 1/(j+1) = running mean, keeps full alpha
+    reset(lg);lg.clearRect(0,0,W,H);lg.drawImage(S,0,0);}
+  // Radial Blur — Zoom (scaled copies) or Spin (rotated copies) about the layer centre
+  const rb=pval(c,'fxRadBlur',fr,0);
+  if(rb>0){const type=c.fxRadType||'zoom',steps=10,cxp=W/2,cyp=H/2;
+    reset(sg);sg.clearRect(0,0,W,H);let j=0;
+    for(let st=0;st<=steps;st++){const t=st/steps;sg.globalAlpha=1/(j+1);sg.save();sg.translate(cxp,cyp); // 1/(j+1) = running mean, keeps full alpha
+      if(type==='spin')sg.rotate((t-0.5)*rb*0.5);else{const scz=1+(t-0.5)*rb*0.6;sg.scale(scz,scz);}
+      sg.translate(-cxp,-cyp);sg.drawImage(L,0,0);sg.restore();j++;}
+    reset(sg);reset(lg);lg.clearRect(0,0,W,H);lg.drawImage(S,0,0);}
+  // Color Key — knock the key colour to alpha within tolerance, soft falloff (green/blue-screen)
+  const kc=clamp(pval(c,'fxKeyColor',fr,0),0,1);
+  if(kc>0){const kr=hex2rgb(c.fxKeyColorVal||'#00ff00'),tol=kc*300,soft=clamp(pval(c,'fxKeySoft',fr,0),0,1)*200+1;
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const dr=d[i]-kr[0],dg=d[i+1]-kr[1],dbb=d[i+2]-kr[2],dist=Math.sqrt(dr*dr+dg*dg+dbb*dbb);
+      if(dist<tol)d[i+3]=0;else if(dist<tol+soft)d[i+3]=Math.round(d[i+3]*(dist-tol)/soft);}
+    lg.putImageData(im,0,0);}
+  // Luma Key — knock dark pixels below the cutoff to alpha, soft edge
+  const lmk=clamp(pval(c,'fxLumaKey',fr,0),0,1);
+  if(lmk>0){const cut=lmk*255,soft=18,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lm=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+      if(Lm<cut-soft)d[i+3]=0;else if(Lm<cut+soft)d[i+3]=Math.round(d[i+3]*(Lm-(cut-soft))/(2*soft));}
+    lg.putImageData(im,0,0);}
+  // Masks
+  if(clipMasks(c).length){buildMaskAlpha(M,S,c,f,W,H);
+    reset(lg);lg.globalCompositeOperation='destination-in';lg.drawImage(M,0,0);reset(lg);}
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation=c.blend||'source-over';ctx.globalAlpha=1;ctx.filter='none';
+  ctx.drawImage(L,0,0);ctx.restore();
 }
 function isIdentity(c,f){
   if(c.blend&&c.blend!=='source-over')return false;
   if((c.scaleX!=null&&c.scaleX!==1)||(c.scaleY!=null&&c.scaleY!==1))return false;
+  if(clipFilter(c,f,1)!=='none'||hasOverlayFX(c,f))return false;   // any effect → full draw path
   const fr=f-c.start;
   return pval(c,'posX',fr,0)===0&&pval(c,'posY',fr,0)===0&&pval(c,'scale',fr,1)===1&&pval(c,'rotation',fr,0)===0
-    &&pval(c,'fxBlur',fr,0)===0&&pval(c,'fxBright',fr,1)===1&&pval(c,'fxContrast',fr,1)===1
-    &&pval(c,'fxSat',fr,1)===1&&pval(c,'fxHue',fr,0)===0;
+    &&pval(c,'anchorX',fr,0)===0&&pval(c,'anchorY',fr,0)===0;
 }
 function clipAlpha(c,f){
   const fr=f-c.start;
@@ -920,83 +1507,100 @@ function clipSrcFrame(c,f){
 }
 function activeVideoClips(f){
   const out=[];
-  project.tracks.forEach((t,ti)=>{if(t.kind!=='video')return;
-    for(const c of t.clips)if(f>=c.start&&f<c.start+c.dur){
-      if(c.solid){out.push({c,ti,solid:true});continue;}
-      const m=MEDIA[c.mediaId];if(m&&m.kind==='image'){out.push({c,ti,img:true});}else out.push({c,ti,img:false});}});
+  project.tracks.forEach((t,ti)=>{
+    for(const c of t.clips){
+      const k=clipKind(c);if(k==='audio'||k==='text')continue;   // visual clips only
+      if(f<c.start||f>=c.start+c.dur)continue;
+      if(k==='solid'||c.solid){out.push({c,ti,solid:true});continue;}
+      const m=MEDIA[c.mediaId];out.push({c,ti,img:k==='image'||(m&&m.kind==='image')});
+    }});
   out.sort((a,b)=>a.ti-b.ti);return out;
 }
-function activeTexts(f){const out=[];for(const t of project.tracks)if(t.kind==='text')
-  for(const c of t.clips)if(f>=c.start&&f<c.start+c.dur)out.push(c);return out;}
+function activeTexts(f){const out=[];for(const t of project.tracks)
+  for(const c of t.clips)if(clipKind(c)==='text'&&f>=c.start&&f<c.start+c.dur)out.push(c);return out;}
 // ONE uniform scale k maps project space → output canvas; the project frame is
 // letterboxed so there's never anamorphic skew; preview (project AR) is identical to P1.
 function stageK(W,H){return Math.min(W/project.width,H/project.height);}
 function stageFit(ctx,src,sw,sh,W,H){const k=stageK(W,H);
   const stW=project.width*k,stH=project.height*k,s=Math.min(stW/sw,stH/sh),w=sw*s,h=sh*s;
-  ctx.drawImage(src,(W-w)/2,(H-h)/2,w,h);}
+  const x=(W-w)/2,y=(H-h)/2;ctx.drawImage(src,x,y,w,h);return {x,y,w,h};}
+// anchor = AE pivot: rotation/scale pivot about the anchor, and Position places the anchor.
+// (anchor 0,0 = comp centre = identical to the pre-anchor behaviour, so old projects are unchanged.)
 function drawClip(ctx,c,f,src,sw,sh,W,H){
   const a=clipAlpha(c,f);if(a<=0)return;
-  if(isIdentity(c,f)){ctx.globalAlpha=a;stageFit(ctx,src,sw,sh,W,H);ctx.globalAlpha=1;return;}
-  const fr=f-c.start,k=stageK(W,H);
-  ctx.save();
-  ctx.globalAlpha=a;
-  ctx.globalCompositeOperation=c.blend||'source-over';
-  ctx.filter=clipFilter(c,f,k);
-  ctx.translate(W/2+pval(c,'posX',fr,0)*k, H/2+pval(c,'posY',fr,0)*k);
-  const rot=pval(c,'rotation',fr,0);if(rot)ctx.rotate(rot*Math.PI/180);
-  const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)ctx.scale(sx,sy);
-  ctx.translate(-W/2,-H/2);
-  stageFit(ctx,src,sw,sh,W,H);
-  ctx.restore();
+  const masks=clipMasks(c),buf=needsLayerBuffer(c,f);
+  if(!buf&&isIdentity(c,f)){ctx.globalAlpha=a;stageFit(ctx,src,sw,sh,W,H);ctx.globalAlpha=1;return;}
+  const k=stageK(W,H);
+  const drawInner=g=>{
+    const fr=f-c.start;
+    g.save();
+    g.globalAlpha=a;
+    g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over'); // blend applied at the mask blit
+    g.filter=clipFilter(c,f,k);
+    applyClipTransform(g,c,f,W,H,k);
+    const r=stageFit(g,src,sw,sh,W,H);
+    clipOverlayFX(g,c,f,r);
+    g.restore();
+  };
+  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
 }
 function drawTextClip(ctx,c,f,W,H){
   const fr=f-c.start;
   const a=isKeyed(c,'opacity')?clamp(pval(c,'opacity',fr,1),0,1):(c.opacity==null?1:c.opacity);
   if(a<=0)return;
+  const masks=clipMasks(c),buf=needsLayerBuffer(c,f);
   const k=stageK(W,H),ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
-  const sz=((c.size||72)*k)*pval(c,'scale',fr,1);
-  const baseX=ox+(c.x==null?project.width/2:c.x)*k, baseY=oy+(c.y==null?project.height*0.82:c.y)*k;
-  const rot=pval(c,'rotation',fr,0);
-  ctx.save();
-  ctx.globalAlpha=a;
-  ctx.filter=clipFilter(c,f,k);
-  ctx.font=`700 ${sz}px Inter, system-ui, sans-serif`;
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillStyle=c.color||'#ffffff';
-  ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=0;ctx.shadowOffsetX=2*k;ctx.shadowOffsetY=2*k;
-  ctx.translate(baseX+pval(c,'posX',fr,0)*k, baseY+pval(c,'posY',fr,0)*k);
-  if(rot)ctx.rotate(rot*Math.PI/180);
-  const _sx=(c.scaleX==null?1:c.scaleX),_sy=(c.scaleY==null?1:c.scaleY);if(_sx!==1||_sy!==1)ctx.scale(_sx,_sy);
-  ctx.fillText(c.text||'',0,0);
-  ctx.restore();
+  const drawInner=g=>{
+    const sz=((c.size||72)*k)*pval(c,'scale',fr,1);
+    const baseX=ox+(c.x==null?project.width/2:c.x)*k, baseY=oy+(c.y==null?project.height*0.82:c.y)*k;
+    const rot=pval(c,'rotation',fr,0);
+    g.save();
+    g.globalAlpha=a;
+    g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over');
+    g.filter=clipFilter(c,f,k);
+    g.font=`700 ${sz}px Inter, system-ui, sans-serif`;
+    g.textAlign='center';g.textBaseline='middle';
+    g.fillStyle=c.color||'#ffffff';
+    g.shadowColor='rgba(0,0,0,.6)';g.shadowBlur=0;g.shadowOffsetX=2*k;g.shadowOffsetY=2*k;
+    g.translate(baseX+pval(c,'posX',fr,0)*k, baseY+pval(c,'posY',fr,0)*k);
+    if(rot)g.rotate(rot*Math.PI/180);
+    const _sx=(c.scaleX==null?1:c.scaleX),_sy=(c.scaleY==null?1:c.scaleY);if(_sx!==1||_sy!==1)g.scale(_sx,_sy);
+    const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);if(ax||ay)g.translate(-ax*k,-ay*k);
+    g.fillText(c.text||'',0,0);
+    g.restore();
+  };
+  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
 }
 function drawSolidClip(ctx,c,f,W,H){
   const a=clipAlpha(c,f);if(a<=0)return;
-  const fr=f-c.start,k=stageK(W,H),fw=project.width*k,fh=project.height*k,ox=(W-fw)/2,oy=(H-fh)/2;
-  ctx.save();ctx.globalAlpha=a;ctx.globalCompositeOperation=c.blend||'source-over';ctx.filter=clipFilter(c,f,k);
-  ctx.translate(W/2+pval(c,'posX',fr,0)*k,H/2+pval(c,'posY',fr,0)*k);
-  const rot=pval(c,'rotation',fr,0);if(rot)ctx.rotate(rot*Math.PI/180);
-  const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);if(sx!==1||sy!==1)ctx.scale(sx,sy);
-  ctx.translate(-W/2,-H/2);
-  ctx.fillStyle=c.color||'#6a6a6a';ctx.fillRect(ox,oy,fw,fh);
-  ctx.restore();
+  const masks=clipMasks(c),buf=needsLayerBuffer(c,f);
+  const k=stageK(W,H),fw=project.width*k,fh=project.height*k,ox=(W-fw)/2,oy=(H-fh)/2;
+  const drawInner=g=>{
+    const fr=f-c.start;
+    g.save();g.globalAlpha=a;g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over');g.filter=clipFilter(c,f,k);
+    applyClipTransform(g,c,f,W,H,k);
+    g.fillStyle=c.color||'#6a6a6a';g.fillRect(ox,oy,fw,fh);
+    clipOverlayFX(g,c,f,{x:ox,y:oy,w:fw,h:fh});
+    g.restore();
+  };
+  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
 }
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   for(const {c,img,solid} of activeVideoClips(f)){
-    if(solid){drawSolidClip(ctx,c,f,W,H);continue;}
+    if(solid){drawSolidClip(ctx,effClip(c),f,W,H);continue;}
     let src,sw,sh;
     if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))continue;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
     else{const v=(srcOverride&&srcOverride[c.id])||videoFor(c);
       if(!srcOverride&&!playing){const want=clipSrcFrame(c,f)/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
       if(!(v.readyState>=2&&v.videoWidth))continue;src=v;sw=v.videoWidth;sh=v.videoHeight;}
-    drawClip(ctx,c,f,src,sw,sh,W,H);
+    drawClip(ctx,effClip(c),f,src,sw,sh,W,H);
   }
-  for(const c of activeTexts(f))drawTextClip(ctx,c,f,W,H);
+  for(const c of activeTexts(f))drawTextClip(ctx,effClip(c),f,W,H);
   ctx.filter='none';
 }
-function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);}
+function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);drawMaskOverlay(sctx,screen.width,screen.height);}
 // Viewer overlays — AE's separate toggles, ALL OFF by default. Preview-only (never exported).
 function drawOverlays(ctx,W,H){
   if(!(OV.safe||OV.prop||OV.grid||OV.guides||OV.rulers))return;
@@ -1090,7 +1694,7 @@ function pickLayerAt(x,y,W,H){
   const act=activeVideoClips(playhead).slice().reverse();
   for(const o of act){const q=clipQuad(o.c,W,H);if(q&&pointInQuad(x,y,q))return {clip:o.c,track:trackOf(o.c)};}return null;}
 function drawSelOverlay(ctx,W,H){
-  if(tool!=='select')return;const sc=selClip();if(!sc||!sc.clip||sc.track.kind==='audio')return;
+  if(tool!=='select')return;const sc=selClip();if(!sc||!sc.clip||clipKind(sc.clip)==='audio')return;
   const q=clipQuad(sc.clip,W,H);if(!q)return;const {sx}=screenCSS();
   ctx.save();ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.lineWidth=1;ctx.strokeStyle='rgba(62,156,184,.95)';
@@ -1102,6 +1706,57 @@ function drawSelOverlay(ctx,W,H){
   ctx.beginPath();ctx.moveTo(ax-r,ay);ctx.lineTo(ax+r,ay);ctx.moveTo(ax,ay-r);ctx.lineTo(ax,ay+r);ctx.stroke();
   ctx.beginPath();ctx.arc(ax,ay,r*0.7,0,7);ctx.stroke();ctx.restore();
 }
+// ── MASK EDITING ON THE MONITOR ──
+function maskBoxRect(m,W,H){const k=stageK(W,H),ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  return {x:ox+m.box.x*k,y:oy+m.box.y*k,w:m.box.w*k,h:m.box.h*k};}
+function rectQuad(r){return [{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}];}
+// the 8 box-handle points in COMP coords (corners + edge mids), order matches handlePoints (nw,ne,se,sw,n,e,s,w)
+function maskBoxHandlesComp(m){const b=m.box,x=b.x,y=b.y,w=b.w,h=b.h;
+  return [{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h},{x:x+w/2,y},{x:x+w,y:y+h/2},{x:x+w/2,y:y+h},{x,y:y+h/2}];}
+// the box's 4 corners mapped through the layer matrix → a (possibly rotated/scaled) screen quad
+function maskScreenQuad(m,M){const b=m.box,c=[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h]];
+  return c.map(([px,py])=>{const q=M.transformPoint(new DOMPoint(px,py));return {x:q.x,y:q.y};});}
+function drawMaskOverlay(ctx,W,H){
+  if(tool!=='select'&&tool!=='pen')return;
+  const sc=selClip();const {sx}=screenCSS();
+  const k=stageK(W,H),ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  const clip=sc&&sc.clip;
+  const M=clip?clipMatrix(clip,playhead,W,H):null;
+  const toCanvas=p=>{if(!M)return {x:ox+p.x*k,y:oy+p.y*k};const q=M.transformPoint(new DOMPoint(p.x,p.y));return {x:q.x,y:q.y};};
+  ctx.save();ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  const masks=clip?clipMasks(clip):[];
+  for(const m of masks){
+    const active=(m.id===selMaskId);
+    ctx.lineWidth=1;ctx.setLineDash(active?[]:[5*sx,4*sx]);
+    ctx.strokeStyle=active?'rgba(229,196,90,.95)':'rgba(229,196,90,.5)';
+    ctx.save();if(clip)applyClipTransform(ctx,clip,playhead,W,H,k);   // outline follows the layer's transform
+    if(isPenMask(m)){_maskShapePath(ctx,m,k,ox,oy);}
+    else{ctx.beginPath();const r=maskBoxRect(m,W,H);if(m.shape==='ellipse')ctx.ellipse(r.x+r.w/2,r.y+r.h/2,Math.max(1,r.w/2),Math.max(1,r.h/2),0,0,Math.PI*2);else ctx.rect(r.x,r.y,r.w,r.h);}
+    ctx.stroke();ctx.restore();
+    if(active){const s=HANDLE_CSS*sx;ctx.setLineDash([]);ctx.fillStyle='#0b0c10';ctx.strokeStyle='rgba(229,196,90,1)';
+      const pts=isPenMask(m)?m.points.map(p=>({p:toCanvas(p)})):maskBoxHandlesComp(m).map(p=>({p:toCanvas(p)}));
+      for(const h of pts){ctx.fillRect(h.p.x-s/2,h.p.y-s/2,s,s);ctx.strokeRect(h.p.x-s/2,h.p.y-s/2,s,s);}}
+  }
+  if(penDraft&&penDraft.points.length){   // in-progress pen path (mapped through the selected layer)
+    ctx.setLineDash([]);ctx.strokeStyle='rgba(98,197,201,.95)';ctx.lineWidth=1.2;
+    ctx.beginPath();penDraft.points.forEach((p,i)=>{const c=toCanvas(p);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y);});ctx.stroke();
+    const s=HANDLE_CSS*sx;
+    penDraft.points.forEach((p,i)=>{const c=toCanvas(p);ctx.fillStyle=i===0?'rgba(98,197,201,1)':'#0b0c10';ctx.strokeStyle='rgba(98,197,201,1)';ctx.fillRect(c.x-s/2,c.y-s/2,s,s);ctx.strokeRect(c.x-s/2,c.y-s/2,s,s);});
+  }
+  ctx.setLineDash([]);ctx.restore();
+}
+function penVertexAt(m,x,y,M){const {sx}=screenCSS(),r=HANDLE_CSS*sx/2+4*sx;
+  for(let i=0;i<m.points.length;i++){const q=M.transformPoint(new DOMPoint(m.points[i].x,m.points[i].y));if(Math.abs(x-q.x)<=r&&Math.abs(y-q.y)<=r)return i;}return -1;}
+function penClick(x,y,W,H){
+  const sc=selClip();if(!sc||!sc.clip){toast('Select a layer first',1);return;}
+  const M=clipMatrix(sc.clip,playhead,W,H),Minv=safeInverse(M);
+  if(!Minv){toast('Reset the layer scale to draw a mask on it',1);return;}
+  const cp=Minv.transformPoint(new DOMPoint(x,y));
+  if(!penDraft||penDraft.clipId!==sc.clip.id)penDraft={clipId:sc.clip.id,points:[]};
+  if(penDraft.points.length>=3){const p0=penDraft.points[0];const c0=M.transformPoint(new DOMPoint(p0.x,p0.y));if(Math.hypot(c0.x-x,c0.y-y)<10){finishPenMask();return;}}
+  penDraft.points.push({x:Math.round(cp.x),y:Math.round(cp.y)});drawFrame();
+}
+function activeMask(c){return c&&clipMasks(c).find(m=>m.id===selMaskId)||null;}
 function writeProp(c,field,v){if(isKeyed(c,field))upsertKey(c,field,v);else c[field]=v;}
 // view zoom (preview-only CSS transform — never touches the backing store or export)
 let viewZoom=1;
@@ -1111,13 +1766,31 @@ function showZoomBadge(t){let z=$('#zoomBadge');if(!z){z=document.createElement(
   z.textContent=t;z.classList.add('show');clearTimeout(_zbT);_zbT=setTimeout(()=>z.classList.remove('show'),900);}
 let vdrag=null;
 screen.addEventListener('pointerdown',e=>{
-  if(e.button!==0||tool!=='select')return;
+  if(e.button!==0)return;
   const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),sc=selClip();
-  if(sc&&sc.clip&&sc.track.kind!=='audio'){const q=clipQuad(sc.clip,W,H);
+  if(tool==='pen'){penClick(x,y,W,H);return;}
+  if(tool!=='select')return;
+  // a selected mask takes priority — drag its box/handles (or a pen vertex) to reshape it.
+  // editing happens through the layer matrix so it lines up on a transformed layer.
+  if(sc&&sc.clip){const am=activeMask(sc.clip);
+    if(am){const M=clipMatrix(sc.clip,playhead,W,H),Minv=safeInverse(M);
+      if(Minv){
+        if(isPenMask(am)){const vi=penVertexAt(am,x,y,M);if(vi>=0)return startVertexDrag(e,am,vi,Minv);}
+        else{const q=maskScreenQuad(am,M);const h=hitHandle(x,y,q);
+          if(h)return startMaskScale(e,am,h,{x,y},Minv);
+          if(pointInQuad(x,y,q))return startMaskMove(e,am,{x,y},Minv);}}}}
+  if(sc&&sc.clip&&clipKind(sc.clip)!=='audio'){const q=clipQuad(sc.clip,W,H);
     if(q){const h=hitHandle(x,y,q);if(h)return startScale(e,sc,h,{x,y},W,H);if(pointInQuad(x,y,q))return startMove(e,sc,{x,y},W,H);}}
   const hit=pickLayerAt(x,y,W,H);
   if(hit){select(hit.track.id,hit.clip.id);startMove(e,{track:hit.track,clip:hit.clip},{x,y},W,H);}else deselect();
 });
+function startMaskMove(e,m,p0,Minv){screen.setPointerCapture(e.pointerId);
+  const c0=Minv.transformPoint(new DOMPoint(p0.x,p0.y));
+  vdrag={mode:'maskmove',m,Minv,cx0:c0.x,cy0:c0.y,bx0:m.box.x,by0:m.box.y};}
+function startMaskScale(e,m,handle,p0,Minv){screen.setPointerCapture(e.pointerId);
+  const c0=Minv.transformPoint(new DOMPoint(p0.x,p0.y));
+  vdrag={mode:'maskscale',m,handle,Minv,cx0:c0.x,cy0:c0.y,box0:{...m.box}};}
+function startVertexDrag(e,m,vi,Minv){screen.setPointerCapture(e.pointerId);vdrag={mode:'vertexdrag',m,vi,Minv};}
 function startMove(e,sc,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start,{k}=stageBox(W,H);
   vdrag={mode:'move',c,p0,posX0:pval(c,'posX',fr,0),posY0:pval(c,'posY',fr,0),k};}
 function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start;
@@ -1128,10 +1801,20 @@ function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);co
 screen.addEventListener('pointermove',e=>{
   if(!vdrag){ // cursor affordance
     if(tool==='select'){const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),sc=selClip();
-      let cur='default';if(sc&&sc.clip&&sc.track.kind!=='audio'){const q=clipQuad(sc.clip,W,H);
+      let cur='default';if(sc&&sc.clip&&clipKind(sc.clip)!=='audio'){const q=clipQuad(sc.clip,W,H);
         if(q){const h=hitHandle(x,y,q);cur=h?((h==='nw'||h==='se')?'nwse-resize':(h==='ne'||h==='sw')?'nesw-resize':(h==='n'||h==='s')?'ns-resize':(h==='e'||h==='w')?'ew-resize':'move'):(pointInQuad(x,y,q)?'move':'default');}}
       screen.style.cursor=cur;}return;}
   const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),c=vdrag.c;
+  if(vdrag.mode==='vertexdrag'){const cp=vdrag.Minv.transformPoint(new DOMPoint(x,y));
+    vdrag.m.points[vdrag.vi]={x:Math.round(cp.x),y:Math.round(cp.y)};drawFrame();return;}
+  if(vdrag.mode==='maskmove'){const cp=vdrag.Minv.transformPoint(new DOMPoint(x,y));
+    vdrag.m.box.x=Math.round(vdrag.bx0+(cp.x-vdrag.cx0));vdrag.m.box.y=Math.round(vdrag.by0+(cp.y-vdrag.cy0));drawFrame();return;}
+  if(vdrag.mode==='maskscale'){const cp=vdrag.Minv.transformPoint(new DOMPoint(x,y)),b=vdrag.box0,h=vdrag.handle,dx=cp.x-vdrag.cx0,dy=cp.y-vdrag.cy0;
+    let nx=b.x,ny=b.y,nw=b.w,nh=b.h;
+    if(h.includes('w')){nx=b.x+dx;nw=b.w-dx;}if(h.includes('e')){nw=b.w+dx;}
+    if(h.includes('n')){ny=b.y+dy;nh=b.h-dy;}if(h.includes('s')){nh=b.h+dy;}
+    if(nw<4){nw=4;if(h.includes('w'))nx=b.x+b.w-4;}if(nh<4){nh=4;if(h.includes('n'))ny=b.y+b.h-4;}
+    vdrag.m.box={x:Math.round(nx),y:Math.round(ny),w:Math.round(nw),h:Math.round(nh)};drawFrame();return;}
   if(vdrag.mode==='move'){const k=vdrag.k;let nx=vdrag.posX0+(x-vdrag.p0.x)/k,ny=vdrag.posY0+(y-vdrag.p0.y)/k;
     if(e.shiftKey){if(Math.abs(x-vdrag.p0.x)>Math.abs(y-vdrag.p0.y))ny=vdrag.posY0;else nx=vdrag.posX0;}
     writeProp(c,'posX',Math.round(nx));writeProp(c,'posY',Math.round(ny));}
@@ -1141,12 +1824,14 @@ screen.addEventListener('pointermove',e=>{
     else{const d=Math.hypot(x-vdrag.pivot.x,y-vdrag.pivot.y);writeProp(c,'scale',Math.max(0.01,+(vdrag.scale0*(d/vdrag.d0)).toFixed(3)));}}
   drawFrame();
 });
-screen.addEventListener('pointerup',e=>{if(!vdrag)return;try{screen.releasePointerCapture(e.pointerId);}catch{}vdrag=null;refreshInspector();save(true);});
+screen.addEventListener('pointerup',e=>{if(!vdrag)return;try{screen.releasePointerCapture(e.pointerId);}catch{}
+  if(vdrag.mode==='vertexdrag'&&isPenMask(vdrag.m))vdrag.m.box=penBBox(vdrag.m.points);
+  const wasMask=/^(mask|vertex)/.test(vdrag.mode);vdrag=null;if(wasMask)renderTimeline();refreshInspector();save(true);});
 screen.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:1/1.1;viewZoom=Math.min(8,Math.max(0.1,viewZoom*f));applyViewZoom();showZoomBadge(Math.round(viewZoom*100)+'%');},{passive:false});
 screen.addEventListener('dblclick',()=>{viewZoom=1;applyViewZoom();showZoomBadge('Fit');});
 screen.addEventListener('dragover',e=>e.preventDefault());
 screen.addEventListener('drop',e=>{e.preventDefault();const mid=e.dataTransfer.getData('mid')||e.dataTransfer.getData('text/plain');if(!mid)return;
-  addClipToBestTrack(mid);const tr=project.tracks.find(t=>t.kind==='video');if(tr&&tr.clips.length){const c=tr.clips[tr.clips.length-1];select(tr.id,c.id);}});
+  const added=addClipToBestTrack(mid);if(added)select(added.trackId,added.clipId);});
 
 function fitScreen(){
   const ar=project.width/project.height;
@@ -1170,8 +1855,8 @@ function syncPlay(start){
       v.play().catch(()=>{});}}
   for(const id in vels)if(!wantIds.has(id)){try{vels[id].pause();}catch{}}
   const wantA=new Set();
-  for(const t of project.tracks)if(t.kind==='audio')for(const c of t.clips)
-    if(f>=c.start&&f<c.start+c.dur){wantA.add(c.id);
+  for(const t of project.tracks)for(const c of t.clips)
+    if(clipKind(c)==='audio'&&f>=c.start&&f<c.start+c.dur){wantA.add(c.id);
       let a=audioEls[c.id];if(!a){a=new Audio(`/api/editor/media/${c.mediaId}/proxy`);audioEls[c.id]=a;}
       a.volume=clamp(pval(c,'volume',f-c.start,1),0,1);
       const want=(c.in+(f-c.start))/fps;if(start||Math.abs(a.currentTime-want)>0.25){try{a.currentTime=want;}catch{}}
@@ -1204,21 +1889,22 @@ function attachClipDrag(el,track,c){
     const handle=e.target.classList.contains('handle')?(e.target.classList.contains('l')?'l':'r'):null;
     e.preventDefault();el.setPointerCapture(e.pointerId);
     const sx=e.clientX,start0=c.start,dur0=c.dur,in0=c.in||0;
-    const m=MEDIA[c.mediaId];const maxSrc=m&&m.kind!=='image'?Math.round((m.dur||0)*FPS()):Infinity;
+    const ck=clipKind(c),hasSrc=(ck!=='text'&&ck!=='solid'&&!c.solid); // text/solid have no source media
+    const m=MEDIA[c.mediaId];const maxSrc=(hasSrc&&m&&ck!=='image')?Math.round((m.dur||0)*FPS()):Infinity;
     const move=ev=>{
       let df=Math.round((ev.clientX-sx)/ppf);
       if(handle==='l'){
         let ns=clamp(start0+df,0,start0+dur0-1);let delta=ns-start0;
-        if(track.kind!=='text'){let ni=in0+delta;if(ni<0){ni=0;delta=-in0;ns=start0+delta;}c.in=ni;}
+        if(hasSrc){let ni=in0+delta;if(ni<0){ni=0;delta=-in0;ns=start0+delta;}c.in=ni;}
         c.start=ns;c.dur=dur0-delta;
       }else if(handle==='r'){
-        let nd=clamp(dur0+df,1,track.kind==='text'?99999:(maxSrc-(c.in||0))||99999);c.dur=nd;
+        let nd=clamp(dur0+df,1,hasSrc?((maxSrc-(c.in||0))||99999):99999);c.dur=nd;
       }else{
         c.start=Math.max(0,start0+df);
         if(snap)c.start=snapFrame(c.start,c);
       }
       el.style.left=(c.start*ppf)+'px';el.style.width=Math.max(6,c.dur*ppf)+'px';
-      if(track.kind==='audio')drawClipWave(el,c);
+      if(ck==='audio')drawClipWave(el,c);
       refreshInspector();drawFrame();
     };
     const up=ev=>{el.releasePointerCapture(e.pointerId);el.removeEventListener('pointermove',move);
@@ -1242,7 +1928,7 @@ function doSplit(track,c,f){
   const nc=JSON.parse(JSON.stringify(c));nc.id=uid();
   c.dur=left;
   nc.start=f;nc.dur=total-left;
-  if(track.kind!=='text')nc.in=(c.in||0)+left;
+  {const k=clipKind(c);if(k!=='text'&&k!=='solid'&&!c.solid)nc.in=(c.in||0)+left;}
   shiftKeys(nc,-left);
   if(c.transOut){c.transOut=0;}
   track.clips.push(nc);renderTimeline();save(true);toast('Split');
@@ -1251,9 +1937,11 @@ function frameAtEvent(e){const rect=lanesWrap.getBoundingClientRect();
   return Math.max(0,Math.round((e.clientX-rect.left+lanesWrap.scrollLeft)/ppf));}
 
 // ── SELECTION + INSPECTOR ──────────────────────────────────────────────
-function select(tid,cid){sel={trackId:tid,clipId:cid};
+function select(tid,cid){if(!sel||sel.clipId!==cid)selMaskId=null; // a different clip → drop the stale active mask
+  if(penDraft&&penDraft.clipId!==cid)penDraft=null; // never finish a half-drawn path onto a different clip
+  sel={trackId:tid,clipId:cid};
   $$('.clip').forEach(e=>e.classList.toggle('sel',e.dataset.cid===cid));refreshInspector();drawFrame();}
-function deselect(){sel=null;$$('.clip').forEach(e=>e.classList.remove('sel'));refreshInspector();drawFrame();}
+function deselect(){sel=null;selMaskId=null;$$('.clip').forEach(e=>e.classList.remove('sel'));refreshInspector();drawFrame();}
 function selClip(){if(!sel)return null;const t=project.tracks.find(t=>t.id===sel.trackId);
   return t?{track:t,clip:t.clips.find(c=>c.id===sel.clipId)}:null;}
 function refreshInspector(){
@@ -1272,7 +1960,7 @@ function refreshInspector(){
     return;
   }
   const {track,clip}=sc;const fps=FPS();
-  if(track.kind==='text'){
+  if(clipKind(clip)==='text'){
     b.innerHTML=`<div class="grp"><div class="gt">Title</div>
       <div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
         <label>Text</label><textarea class="fld" id="cText">${esc(clip.text||'')}</textarea></div>
@@ -1299,8 +1987,8 @@ function refreshInspector(){
     $('#cDel').onclick=deleteSel;return;
   }
   const m=MEDIA[clip.mediaId]||{};
-  const isAud=track.kind==='audio';
-  const isSolid=!!clip.solid;
+  const isAud=clipKind(clip)==='audio';
+  const isSolid=clipKind(clip)==='solid'||!!clip.solid;
   const opaKeyed=isKeyed(clip,'opacity');
   b.innerHTML=`<div class="grp"><div class="gt">${isSolid?'Solid':isAud?'Audio Clip':'Clip'}</div>
     <div class="hint" style="margin-bottom:2px">${esc(isSolid?(clip.name||''):(m.name||''))}</div>
@@ -1308,15 +1996,16 @@ function refreshInspector(){
     ${numRow('Start (f)','cStart',clip.start)}${isSolid?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
     </div>
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
-      ${numRowK('Opacity','opacity',clip)}${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}
-      ${numRowK('Scale','scale',clip)}${numRow('Scale X','cScaleX',clip.scaleX==null?1:clip.scaleX)}${numRow('Scale Y','cScaleY',clip.scaleY==null?1:clip.scaleY)}${numRowK('Rotate','rotation',clip)}</div>
-    <div class="grp director-only"><div class="gt">Effects</div>
-      ${numRowK('Blur','fxBlur',clip)}${numRowK('Bright','fxBright',clip)}${numRowK('Contrast','fxContrast',clip)}
-      ${numRowK('Saturate','fxSat',clip)}${numRowK('Hue','fxHue',clip)}
-      <div class="row"><label>Blend</label><select class="fld" id="cBlend">${BLENDS.map(bm=>`<option value="${bm[1]}" ${(clip.blend||'source-over')===bm[1]?'selected':''}>${bm[0]}</option>`).join('')}</select></div></div>
+      ${numRowK('Anchor X','anchorX',clip)}${numRowK('Anchor Y','anchorY',clip)}
+      ${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}
+      ${numRowK('Scale','scale',clip)}${numRow('Scale X','cScaleX',clip.scaleX==null?1:clip.scaleX)}${numRow('Scale Y','cScaleY',clip.scaleY==null?1:clip.scaleY)}${numRowK('Rotate','rotation',clip)}${numRowK('Opacity','opacity',clip)}</div>
+    <div class="grp director-only"><div class="gt">Effect Controls</div>
+      <div id="efxMount"></div>
+      <div class="row" style="margin-top:7px"><label>Blend</label><select class="fld" id="cBlend">${BLENDS.map(bm=>`<option value="${bm[1]}" ${(clip.blend||'source-over')===bm[1]?'selected':''}>${bm[0]}</option>`).join('')}</select></div></div>
     <div class="grp director-only"><div class="gt">Transitions</div>
       ${opaKeyed?`<div class="hint">Opacity is keyframed — edge fades follow the opacity curve.</div>`:numRow('Fade in (f)','tIn',clip.transIn||0)+numRow('Fade out (f)','tOut',clip.transOut||0)}
-      <div class="row"><label>Use clip audio</label><button class="chip ${clip.audio!==false?'on':''}" id="cAud">${clip.audio!==false?'On':'Off'}</button></div></div>`}
+      <div class="row"><label>Use clip audio</label><button class="chip ${clip.audio!==false?'on':''}" id="cAud">${clip.audio!==false?'On':'Off'}</button></div></div>
+    ${masksInspector(clip)}`}
     <div class="grp"><div class="gt">Level</div>
       <div class="row"><label>Volume${isKeyed(clip,'volume')?' ◷':''}</label><input type="range" id="cVol" min="0" max="1.5" step="0.01" value="${isKeyed(clip,'volume')?pval(clip,'volume',playhead-clip.start,1):(clip.volume==null?1:clip.volume)}"></div>
       ${isAud?numRow('Fade in (f)','aFi',clip.audioFadeIn||0)+numRow('Fade out (f)','aFo',clip.audioFadeOut||0):''}</div>
@@ -1326,15 +2015,17 @@ function refreshInspector(){
   bindNum('cDur',v=>{clip.dur=Math.max(1,v|0);renderTimeline();save(true);});
   if(isSolid){const cc=$('#cSolColor');if(cc)cc.oninput=e=>{clip.color=e.target.value;renderTimeline();drawFrame();save(true);};}
   if(!isAud){
-    for(const fld of ['opacity','posX','posY','scale','rotation','fxBlur','fxBright','fxContrast','fxSat','fxHue'])bindKRow(fld,clip);
+    for(const fld of ['opacity','posX','posY','scale','rotation','anchorX','anchorY'])bindKRow(fld,clip);
     bindNum('cScaleX',v=>{clip.scaleX=v;drawFrame();save(true);});
     bindNum('cScaleY',v=>{clip.scaleY=v;drawFrame();save(true);});
+    mountEffectControls(clip);
     $('#cBlend').onchange=e=>{clip.blend=e.target.value;drawFrame();save(true);};
     if(!opaKeyed){
       bindNum('tIn',v=>{clip.transIn=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
       bindNum('tOut',v=>{clip.transOut=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
     }
     $('#cAud').onclick=()=>{clip.audio=!(clip.audio!==false)?false:true;refreshInspector();save(true);};
+    bindMasksInspector(clip);
   }else{bindNum('aFi',v=>{clip.audioFadeIn=Math.max(0,v|0);save(true);});
         bindNum('aFo',v=>{clip.audioFadeOut=Math.max(0,v|0);save(true);});}
   $('#cVol').oninput=e=>{writeProp(clip,'volume',+e.target.value);save(true);};
@@ -1351,8 +2042,194 @@ function bindNum(id,fn){const el=$('#'+id);if(!el)return;
       if(moved)el.blur();};
     document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up);});
 }
+// ── MASK INSPECTOR (full editing — shape/mode/feather/opacity/expansion/box/inverted) ──
+function masksInspector(clip){
+  const masks=clip.masks||[];
+  const rows=masks.map(m=>{
+    const pen=isPenMask(m);
+    const shapeRow = pen
+      ? `<div class="row"><label>Path</label><div class="chiprow">
+          <button class="chip ${!m.smooth?'on':''}" data-msm="${m.id}|0">Corners</button>
+          <button class="chip ${m.smooth?'on':''}" data-msm="${m.id}|1">Smooth</button></div></div>
+         <div class="hint" style="margin:2px 0 6px">Pen · ${m.points.length} points — drag the points on the monitor.</div>`
+      : `<div class="row"><label>Shape</label><div class="chiprow">
+          <button class="chip ${m.shape!=='ellipse'?'on':''}" data-msh="${m.id}|rect">Rect</button>
+          <button class="chip ${m.shape==='ellipse'?'on':''}" data-msh="${m.id}|ellipse">Ellipse</button></div></div>`;
+    const boxRows = pen ? '' :
+      `${numRow('Expansion','me_'+m.id,m.expansion||0)}
+       ${numRow('Box X','mx_'+m.id,Math.round(m.box.x))}${numRow('Box Y','my_'+m.id,Math.round(m.box.y))}
+       ${numRow('Box W','mw_'+m.id,Math.round(m.box.w))}${numRow('Box H','mh_'+m.id,Math.round(m.box.h))}`;
+    return `
+    <div class="masklab ${selMaskId===m.id?'on':''}" data-msel="${m.id}">◆ ${esc(m.name)}${pen?' (pen)':''}</div>
+    ${shapeRow}
+    <div class="row"><label>Mode</label><div class="chiprow">
+      <button class="chip ${(m.mode||'add')==='add'?'on':''}" data-mmd="${m.id}|add">Add</button>
+      <button class="chip ${m.mode==='subtract'?'on':''}" data-mmd="${m.id}|subtract">Subtract</button>
+      <button class="chip ${m.inverted?'on':''}" data-minv="${m.id}">Inverted</button></div></div>
+    ${numRow('Feather','mf_'+m.id,m.feather||0)}${numRow('Opacity %','mo_'+m.id,Math.round((m.opacity==null?1:m.opacity)*100))}
+    ${boxRows}
+    <button class="del-btn" data-mdel="${m.id}">Delete ${esc(m.name)}</button>`;}).join('');
+  return `<div class="grp director-only"><div class="gt">Masks</div>
+    ${rows||'<div class="hint">No masks. Add a box mask, or grab the Pen tool to draw a free shape.</div>'}
+    <button class="del-btn" id="mAdd" style="background:var(--cy-soft);border-color:var(--cy-line);color:#bfe6f1">+ Add Mask</button></div>`;
+}
+function bindMasksInspector(clip){
+  const add=$('#mAdd');if(add)add.onclick=()=>addMask(clip);
+  const byId=id=>(clip.masks||[]).find(m=>m.id===id);
+  $$('#inspBody [data-msel]').forEach(el=>el.onclick=()=>{selMaskId=el.dataset.msel;renderTimeline();drawFrame();});
+  $$('#inspBody [data-msh]').forEach(b=>b.onclick=()=>{const[id,sh]=b.dataset.msh.split('|');const m=byId(id);if(m){m.shape=sh;refreshInspector();drawFrame();save(true);}});
+  $$('#inspBody [data-msm]').forEach(b=>b.onclick=()=>{const[id,s]=b.dataset.msm.split('|');const m=byId(id);if(m){m.smooth=s==='1';refreshInspector();renderTimeline();drawFrame();save(true);}});
+  $$('#inspBody [data-mmd]').forEach(b=>b.onclick=()=>{const[id,md]=b.dataset.mmd.split('|');const m=byId(id);if(m){m.mode=md;refreshInspector();renderTimeline();drawFrame();save(true);}});
+  $$('#inspBody [data-minv]').forEach(b=>b.onclick=()=>{const m=byId(b.dataset.minv);if(m){m.inverted=!m.inverted;refreshInspector();renderTimeline();drawFrame();save(true);}});
+  $$('#inspBody [data-mdel]').forEach(b=>b.onclick=()=>deleteMask(clip,b.dataset.mdel));
+  for(const m of (clip.masks||[])){
+    bindNum('mf_'+m.id,v=>{m.feather=Math.max(0,v);renderTimeline();drawFrame();save(true);});
+    bindNum('mo_'+m.id,v=>{m.opacity=clamp(v/100,0,1);renderTimeline();drawFrame();save(true);});
+    bindNum('me_'+m.id,v=>{m.expansion=v|0;renderTimeline();drawFrame();save(true);});
+    bindNum('mx_'+m.id,v=>{m.box.x=v|0;drawFrame();save(true);});
+    bindNum('my_'+m.id,v=>{m.box.y=v|0;drawFrame();save(true);});
+    bindNum('mw_'+m.id,v=>{m.box.w=Math.max(2,v|0);drawFrame();save(true);});
+    bindNum('mh_'+m.id,v=>{m.box.h=Math.max(2,v|0);drawFrame();save(true);});
+  }
+}
 // ── KEYFRAME AUTHORING (inspector rows with a stopwatch) ─────────────────
 function valAt(c,field){const fr=playhead-c.start;return isKeyed(c,field)?pval(c,field,fr,KDEF[field]):(c[field]==null?KDEF[field]:c[field]);}
+function fmtNum(v){const n=+(+v).toFixed(3);return Number.isFinite(n)?String(n):'0';}
+function hex2rgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h||'000000',16)||0;return [(n>>16)&255,(n>>8)&255,n&255];}
+// Per-effect bypass (the ◉ toggle): a render-time clone where bypassed fx fields fall back to KDEF defaults.
+function effClip(c){
+  if(!c._fxOff)return c;
+  let any=false;for(const k in c._fxOff){if(c._fxOff[k]){any=true;break;}}
+  if(!any)return c;
+  const cc=Object.assign({},c);for(const k in c._fxOff){if(c._fxOff[k]&&k in KDEF)cc[k]=KDEF[k];}
+  return cc;
+}
+// ── EFFECT CONTROLS PANEL — each active effect becomes a plugin card (slider/colour/keyframe) ──
+const FX_CAT={ // field → [category label, accent colour]
+  fxBlur:['Blur','#5BA3C7'],fxSharpen:['Sharpen','#5BA3C7'],
+  fxBright:['Colour','#C77FB0'],fxExposure:['Colour','#C77FB0'],fxContrast:['Colour','#C77FB0'],fxSat:['Colour','#C77FB0'],
+  fxVibrance:['Colour','#C77FB0'],fxHue:['Colour','#C77FB0'],fxTemp:['Colour','#C77FB0'],fxGamma:['Colour','#C77FB0'],
+  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],
+  fxThreshold:['Stylize','#D9A441'],fxSolarize:['Stylize','#D9A441'],fxPosterize:['Stylize','#D9A441'],fxShadow:['Stylize','#D9A441'],
+  fxVignette:['Stylize','#D9A441'],fxGrain:['Stylize','#D9A441'],fxPixel:['Stylize','#D9A441'],fxGlow:['Stylize','#D9A441'],
+  fxEmboss:['Stylize','#D9A441'],fxEdges:['Stylize','#D9A441'],fxHalftone:['Stylize','#D9A441'],fxLeak:['Stylize','#D9A441'],fxScan:['Stylize','#D9A441'],
+  fxRGB:['Distort','#8B7FD0'],fxWarp:['Distort','#8B7FD0'],
+  fxDirBlur:['Blur','#5BA3C7'],fxRadBlur:['Blur','#5BA3C7'],
+  fxKeyColor:['Key','#5BB98C'],fxLumaKey:['Key','#5BB98C'],
+};
+const FX_RANGE={ // field → [min,max,step] for the slider
+  fxBlur:[0,40,.5],fxBright:[.2,2.5,.01],fxExposure:[-3,3,.05],fxContrast:[.2,3,.01],fxSat:[0,3,.01],fxVibrance:[-1,1.5,.01],
+  fxHue:[-180,180,1],fxTemp:[-100,100,1],fxGamma:[.2,3,.01],fxGray:[0,1,.01],fxSepia:[0,1,.01],fxInvert:[0,1,.01],
+  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
+  fxTint:[0,1,.01],fxGrain:[0,1,.01],fxPixel:[0,60,1],fxGlow:[0,1,.01],fxSharpen:[0,3,.05],fxEmboss:[0,1,.01],fxEdges:[0,1,.01],
+  fxRGB:[-20,20,1],fxHalftone:[2,20,1],fxLeak:[0,1,.01],fxScan:[0,1,.01],
+  fxKeyColor:[0,1,.01],fxLumaKey:[0,1,.01],fxDirBlur:[0,60,1],fxRadBlur:[0,1,.01],fxWarp:[-1,1,.02],
+};
+function efxRange(f){return FX_RANGE[f]||[0,1,.01];}
+// Extra per-effect controls beyond the main slider — swatch / second slider / segmented selector
+const FX_EXTRA={
+  fxTint:[{kind:'swatch',sub:'fxTintColor',def:'#ff5fa2',label:'Wash colour'}],
+  fxKeyColor:[{kind:'swatch',sub:'fxKeyColorVal',def:'#00ff00',label:'Key colour'},{kind:'slider',sub:'fxKeySoft',label:'Softness',min:0,max:1,step:.01}],
+  fxDirBlur:[{kind:'slider',sub:'fxDirAngle',label:'Angle°',min:0,max:360,step:1}],
+  fxRadBlur:[{kind:'seg',sub:'fxRadType',label:'Mode',opts:['zoom','spin'],def:'zoom'}],
+  fxWarp:[{kind:'seg',sub:'fxWarpType',label:'Type',opts:['twirl','bulge','spherize','wave'],def:'twirl'}],
+};
+function mountEffectControls(c){
+  const host=document.getElementById('efxMount');if(!host||!c)return;
+  host.innerHTML='';
+  const wrap=document.createElement('div');wrap.className='efx-wrap';
+  const top=document.createElement('div');top.className='efx-top';
+  const add=document.createElement('button');add.className='efx-addbtn';add.innerHTML='＋ Add Effect';
+  add.onclick=e=>{e.stopPropagation();openAddFx(e,c);};
+  top.appendChild(add);wrap.appendChild(top);
+  const active=FX_DEFS.filter(([f,,def])=>fxActive(c,f,def));
+  if(!active.length){const em=document.createElement('div');em.className='efx-empty';
+    em.textContent='No effects on this layer yet. Add one — its sliders, colours and keyframes appear here as a plugin card.';wrap.appendChild(em);}
+  for(const [field,name,,plabel] of active)wrap.appendChild(efxCard(c,field,name,plabel));
+  host.appendChild(wrap);
+}
+function efxCard(c,field,name,plabel){
+  const meta=FX_CAT[field]||['Effect','#3E9CB8'],cat=meta[0],acc=meta[1];
+  const off=!!(c._fxOff&&c._fxOff[field]);
+  const card=document.createElement('div');card.className='efx-card'+(off?' byp':'');card.style.setProperty('--acc',acc);
+  const top=document.createElement('div');top.className='efx-card-top';
+  const dot=document.createElement('span');dot.className='efx-dot';
+  const ct=document.createElement('span');ct.className='efx-cat';ct.textContent=cat;
+  const title=document.createElement('span');title.className='efx-title';title.textContent=name;
+  const byp=document.createElement('button');byp.className='efx-ico'+(off?'':' on');byp.textContent='◉';byp.title=off?'Bypassed — click to enable':'Enabled — click to bypass';
+  byp.onclick=e=>{e.stopPropagation();c._fxOff=c._fxOff||{};if(off)delete c._fxOff[field];else c._fxOff[field]=true;refreshInspector();renderTimeline();drawFrame();save(true);};
+  const rst=document.createElement('button');rst.className='efx-ico';rst.textContent='⟲';rst.title='Reset to default';
+  rst.onclick=e=>{e.stopPropagation();c[field]=KDEF[field];refreshInspector();drawFrame();save(true);toast(name+' reset');};
+  const rm=document.createElement('button');rm.className='efx-ico rm';rm.textContent='×';rm.title='Remove effect';
+  rm.onclick=e=>{e.stopPropagation();removeEffect(c,field);};
+  top.append(dot,ct,title,byp,rst,rm);card.appendChild(top);
+  const body=document.createElement('div');body.className='efx-body';
+  body.appendChild(efxControl(c,field,plabel));
+  if(field==='fxDuotone')body.appendChild(efxDuotoneRow(c));
+  for(const ex of (FX_EXTRA[field]||[]))body.appendChild(efxExtra(c,ex));
+  card.appendChild(body);
+  return card;
+}
+function efxExtra(c,ex){
+  if(ex.kind==='swatch')return efxColorRow(ex.label,()=>c[ex.sub]||ex.def,v=>{c[ex.sub]=v;});
+  if(ex.kind==='slider')return efxSlider(c,ex.sub,ex.label,ex.min,ex.max,ex.step,false);
+  if(ex.kind==='seg')return efxSeg(c,ex);
+  return document.createElement('div');
+}
+function efxSeg(c,ex){
+  const row=document.createElement('div');row.className='efx-ctrl';
+  const top=document.createElement('div');top.className='efx-ctrl-top';
+  const lab=document.createElement('span');lab.className='efx-clab';lab.textContent=ex.label;top.appendChild(lab);row.appendChild(top);
+  const seg=document.createElement('div');seg.className='efx-seg';
+  const cur=c[ex.sub]||ex.def;
+  for(const o of ex.opts){const b=document.createElement('button');b.textContent=o;if(o===cur)b.classList.add('on');
+    b.onclick=e=>{e.stopPropagation();c[ex.sub]=o;refreshInspector();drawFrame();save(true);};seg.appendChild(b);}
+  row.appendChild(seg);return row;
+}
+function efxControl(c,field,plabel){const rg=efxRange(field);return efxSlider(c,field,plabel,rg[0],rg[1],rg[2],field==='fxHue');}
+function efxSlider(c,field,plabel,min,max,step,hue){
+  const ctrl=document.createElement('div');ctrl.className='efx-ctrl';
+  const ct=document.createElement('div');ct.className='efx-ctrl-top';
+  const sw=document.createElement('button');sw.className='efx-ico'+(isKeyed(c,field)?' on':'');sw.textContent='◷';sw.title='Animate '+plabel+' (keyframe)';
+  sw.onclick=e=>{e.stopPropagation();toggleAnim(c,field);refreshInspector();renderTimeline();drawFrame();save(true);};
+  const lab=document.createElement('span');lab.className='efx-clab';lab.textContent=plabel;
+  const val=document.createElement('input');val.className='efx-cval';val.value=fmtNum(valAt(c,field));
+  ct.append(sw,lab,val);ctrl.appendChild(ct);
+  const slide=document.createElement('div');slide.className='efx-slide'+(hue?' hue':'');
+  const fill=document.createElement('div');fill.className='efx-fill';
+  const thumb=document.createElement('div');thumb.className='efx-thumb';
+  slide.append(fill,thumb);ctrl.appendChild(slide);
+  const setUI=v=>{const t=clamp((v-min)/((max-min)||1),0,1);fill.style.width=(t*100)+'%';thumb.style.left=(t*100)+'%';if(document.activeElement!==val)val.value=fmtNum(v);};
+  setUI(valAt(c,field));
+  const apply=v=>{v=clamp(v,min,max);if(step>=1)v=Math.round(v/step)*step;setAnimValue(c,field,+(+v).toFixed(4));setUI(v);renderTimeline();};
+  let drag=false;
+  const fromX=x=>{const r=slide.getBoundingClientRect();return min+clamp((x-r.left)/(r.width||1),0,1)*(max-min);};
+  slide.addEventListener('pointerdown',e=>{drag=true;try{slide.setPointerCapture(e.pointerId);}catch(_){}apply(fromX(e.clientX));e.preventDefault();});
+  slide.addEventListener('pointermove',e=>{if(drag)apply(fromX(e.clientX));});
+  slide.addEventListener('pointerup',()=>{if(drag){drag=false;save(true);}});
+  slide.addEventListener('dblclick',()=>{apply(KDEF[field]);save(true);});
+  val.addEventListener('change',()=>{const v=parseFloat(val.value);if(isFinite(v)){apply(v);save(true);}});
+  val.addEventListener('keydown',e=>{if(e.key==='Enter')val.blur();});
+  return ctrl;
+}
+function efxColorRow(label,get,set){
+  const row=document.createElement('div');row.className='efx-rowflex';
+  const lab=document.createElement('span');lab.className='efx-clab';lab.textContent=label;
+  const sw=document.createElement('input');sw.type='color';sw.className='efx-swatch';sw.value=get();
+  sw.oninput=e=>{set(e.target.value);drawFrame();save(true);};
+  row.append(lab,sw);return row;
+}
+function efxDuotoneRow(c){
+  const row=document.createElement('div');row.className='efx-rowflex';
+  const swa=document.createElement('input');swa.type='color';swa.className='efx-swatch';swa.value=c.fxDuoA||'#13123a';swa.title='Shadows colour';
+  const grad=document.createElement('div');grad.className='efx-grad';
+  const swb=document.createElement('input');swb.type='color';swb.className='efx-swatch';swb.value=c.fxDuoB||'#ff5fa2';swb.title='Highlights colour';
+  const paint=()=>grad.style.background=`linear-gradient(90deg,${c.fxDuoA||'#13123a'},${c.fxDuoB||'#ff5fa2'})`;
+  paint();
+  swa.oninput=e=>{c.fxDuoA=e.target.value;paint();drawFrame();save(true);};
+  swb.oninput=e=>{c.fxDuoB=e.target.value;paint();drawFrame();save(true);};
+  row.append(swa,grad,swb);return row;
+}
 function keyHere(c,field){if(!isKeyed(c,field))return false;const fr=playhead-c.start;return c[field].k.some(k=>k.t===fr);}
 function numRowK(label,field,c){
   const keyed=isKeyed(c,field),here=keyHere(c,field),v=valAt(c,field);
@@ -1402,15 +2279,25 @@ function deleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
   sc.track.clips=sc.track.clips.filter(c=>c.id!==sc.clip.id);
   if(vels[sc.clip.id]){vels[sc.clip.id].remove();delete vels[sc.clip.id];}
   deselect();renderTimeline();drawFrame();save(true);}
+// Ripple delete: remove the clip AND slide later clips on the same track left to close the gap.
+function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
+  const {track,clip}=sc, end=clip.start+clip.dur, gap=clip.dur;
+  track.clips=track.clips.filter(c=>c.id!==clip.id);
+  for(const c of track.clips)if(c.start>=end)c.start-=gap;   // close the gap behind it
+  if(vels[clip.id]){vels[clip.id].remove();delete vels[clip.id];}
+  deselect();renderTimeline();drawFrame();save(true);toast('Ripple deleted — gap closed');}
 
 // ── DROP MEDIA ONTO TIMELINE ───────────────────────────────────────────
 lanes.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';
   const lane=e.target.closest('.lane');$$('.lane').forEach(l=>l.classList.toggle('drop-ok',l===lane));});
 lanes.addEventListener('dragleave',()=>$$('.lane').forEach(l=>l.classList.remove('drop-ok')));
 lanes.addEventListener('drop',e=>{e.preventDefault();$$('.lane').forEach(l=>l.classList.remove('drop-ok'));
-  const mid=e.dataTransfer.getData('mid');const lane=e.target.closest('.lane');if(!mid||!lane)return;
+  const mid=e.dataTransfer.getData('mid');if(!mid)return;
+  const lane=e.target.closest('.lane');
+  let tid=lane&&lane.dataset.tid;
+  if(!tid){const tr={id:uid(),name:'Track '+(project.tracks.length+1),clips:[]};insertTrack(tr);tid=tr.id;} // dropped on empty area → make a track
   let f=frameAtEvent(e);if(snap)f=snapFrame(f);
-  addClipFromMedia(mid,lane.dataset.tid,f);});
+  const added=addClipFromMedia(mid,tid,f);if(added)select(added.trackId,added.clipId);});
 
 // ── RULER / PLAYHEAD SCRUB ─────────────────────────────────────────────
 ruler.addEventListener('pointerdown',e=>{ruler.setPointerCapture(e.pointerId);
@@ -1423,25 +2310,31 @@ lanesWrap.addEventListener('scroll',()=>{ruler.parentElement.scrollLeft=lanesWra
 // ── TOOLBAR / TOP BAR WIRING ───────────────────────────────────────────
 $('#binImport').onclick=doImport;$('#importZone').onclick=doImport;
 $('#toolSelect').onclick=()=>setTool('select');$('#toolRazor').onclick=()=>setTool('razor');
-function setTool(t){tool=t;$('#toolSelect').classList.toggle('on',t==='select');
-  $('#toolRazor').classList.toggle('on',t==='razor');lanes.style.cursor=t==='razor'?'crosshair':'';}
+function setTool(t){if(t!=='pen'&&penDraft)cancelPenDraft();tool=t;$('#toolSelect').classList.toggle('on',t==='select');
+  $('#toolRazor').classList.toggle('on',t==='razor');lanes.style.cursor=t==='razor'?'crosshair':'';
+  screen.style.cursor=t==='pen'?'crosshair':'';
+  if(window.aeSetActiveTool){const key={select:'selection',pen:'pen'}[t];   // keep the AE rail highlight in sync
+    const btn=key&&[...document.querySelectorAll('#aeTools .aetool')].find(b=>(b.dataset.tool||'').toLowerCase().includes(key));
+    window.aeSetActiveTool(btn?btn.dataset.tool:'');}
+}
 $('#snapBtn').classList.add('on');
 $('#snapBtn').onclick=()=>{snap=!snap;$('#snapBtn').classList.toggle('on',snap);toast('Snap '+(snap?'on':'off'));};
-$('#delBtn').onclick=deleteSel;
-$('#addVid').onclick=()=>{const n=project.tracks.filter(t=>t.kind==='video').length+1;
-  insertTrack({id:uid(),kind:'video',name:'V'+n,clips:[]},'video');};
-$('#addAud').onclick=()=>{const n=project.tracks.filter(t=>t.kind==='audio').length+1;
-  project.tracks.push({id:uid(),kind:'audio',name:'A'+n,clips:[]});renderTimeline();save(true);};
-$('#addText').onclick=()=>{let tt=project.tracks.find(t=>t.kind==='text');
-  if(!tt){tt={id:uid(),kind:'text',name:'Titles',clips:[]};insertTrack(tt,'text');}
-  const dur=Math.round(3*FPS());tt.clips.push({id:uid(),text:'Your title',start:playhead,dur,size:72,color:'#ffffff',x:null,y:null});
+$('#delBtn').onclick=e=>e.shiftKey?rippleDeleteSel():deleteSel();
+$('#delBtn').title='Delete (Del) · Shift-click = ripple delete (close the gap)';
+$('#addVid').onclick=()=>{const n=project.tracks.length+1;
+  insertTrack({id:uid(),name:'Track '+n,clips:[]});};
+$('#addText').onclick=()=>{
+  // titles are now just text CLIPS — drop one on the selected track, else first, else make one
+  let tt=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[0];
+  if(!tt){tt={id:uid(),name:'Track 1',clips:[]};insertTrack(tt);}
+  const dur=Math.round(3*FPS());
+  tt.clips.push({id:uid(),kind:'text',text:'Your title',start:playhead,dur,size:72,color:'#ffffff',x:null,y:null});
   renderTimeline();const c=tt.clips[tt.clips.length-1];select(tt.id,c.id);save(true);};
-function insertTrack(tr,kind){
-  const idx=project.tracks.findIndex(t=>t.kind==='audio');
-  if(kind==='video'){const ti=project.tracks.findIndex(t=>t.kind!=='video');project.tracks.splice(ti<0?project.tracks.length:ti,0,tr);}
-  else if(kind==='text'){project.tracks.splice(idx<0?project.tracks.length:idx,0,tr);}
-  else project.tracks.push(tr);
+function insertTrack(tr){
+  // Tracks are generic — order is purely user-driven; new track appends at the bottom.
+  project.tracks.push(tr);
   renderTimeline();save(true);
+  return tr;
 }
 function applyPpf(centerFrame){
   ppf=clamp(ppf,1,120);
@@ -1477,6 +2370,9 @@ $('#tNext').onclick=()=>{stop();setPlayhead(playhead+1);};
 // ── KEYBOARD ───────────────────────────────────────────────────────────
 window.addEventListener('keydown',e=>{
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  if(penDraft&&e.key==='Escape'){e.preventDefault();cancelPenDraft();return;}
+  if(penDraft&&e.key==='Enter'){e.preventDefault();finishPenMask();return;}
+  if(penDraft&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();penDraft.points.pop();penDraft.points.length?drawFrame():cancelPenDraft();return;} // undo last point, not the clip
   if(e.code==='Space'){e.preventDefault();togglePlay();}
   else if(e.key==='v'||e.key==='V')setTool('select');
   else if(e.key==='c'||e.key==='C')setTool('razor');
@@ -1484,7 +2380,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight'){stop();setPlayhead(playhead+(e.shiftKey?FPS():1));}
   else if(e.key==='Home'){stop();setPlayhead(0,true);}
   else if(e.key==='End'){stop();setPlayhead(timelineFrames(),true);}
-  else if(e.key==='Delete'||e.key==='Backspace')deleteSel();
+  else if(e.key==='Delete'||e.key==='Backspace'){e.shiftKey?rippleDeleteSel():deleteSel();}
   else if((e.key==='s'||e.key==='S')&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();toast('Saved');}
   else if((e.key==='z'||e.key==='Z')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey){e.preventDefault();undoEdit();}
   else if(((e.key==='z'||e.key==='Z')&&(e.ctrlKey||e.metaKey)&&e.shiftKey)||((e.key==='y'||e.key==='Y')&&(e.ctrlKey||e.metaKey))){e.preventDefault();redoEdit();}
@@ -1562,15 +2458,22 @@ function projectNeedsFrameServer(p){
   for(const t of p.tracks)for(const c of t.clips){
     for(const f of KEYABLE)if(c[f]&&typeof c[f]==='object'&&c[f].k)return true;
     if((c.posX&&c.posX!==0)||(c.posY&&c.posY!==0)||(c.scale!=null&&c.scale!==1)||c.rotation)return true;
-    if(c.fxBlur||(c.fxBright!=null&&c.fxBright!==1)||(c.fxContrast!=null&&c.fxContrast!==1)||(c.fxSat!=null&&c.fxSat!==1)||c.fxHue)return true;
+    if((c.scaleX!=null&&c.scaleX!==1)||(c.scaleY!=null&&c.scaleY!==1))return true; // flip — native path has no hflip/vflip
+    if((c.anchorX&&c.anchorX!==0)||(c.anchorY&&c.anchorY!==0))return true;
+    if(clipKind(c)==='solid'||c.solid)return true; // solids aren't drawn by the native ffmpeg path
+    if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
+    if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
+    // any working effect → render client-side per frame (the native ffmpeg path can't do these)
+    if(clipFilter(c,0,1)!=='none'||hasOverlayFX(c,0)||hasLayerBufferFX(c,0))return true;
     if(c.blend&&c.blend!=='source-over')return true;
   }
   return false;
 }
 async function preloadExportVideos(){
   const map={},proms=[];
-  for(const t of project.tracks){if(t.kind!=='video')continue;
-    for(const c of t.clips){const m=MEDIA[c.mediaId];if(!m||m.kind==='image'||map[c.id])continue;
+  for(const t of project.tracks){
+    for(const c of t.clips){const k=clipKind(c);if(k==='audio'||k==='text'||k==='solid'||c.solid)continue;
+      const m=MEDIA[c.mediaId];if(!m||m.kind==='image'||map[c.id])continue;
       const v=document.createElement('video');v.src=`/api/editor/media/${c.mediaId}/src`;v.muted=true;v.preload='auto';
       map[c.id]=v;proms.push(new Promise(res=>{const d=()=>{v.removeEventListener('loadeddata',d);res();};
         v.addEventListener('loadeddata',d);v.addEventListener('error',()=>{delete map[c.id];res();});}));}}
@@ -1578,8 +2481,10 @@ async function preloadExportVideos(){
 }
 function seekActiveVideos(f,fps,srcMap){
   const jobs=[];
-  for(const t of project.tracks){if(t.kind!=='video')continue;
-    for(const c of t.clips){if(f<c.start||f>=c.start+c.dur)continue;const m=MEDIA[c.mediaId];if(!m||m.kind==='image')continue;
+  for(const t of project.tracks){
+    for(const c of t.clips){if(f<c.start||f>=c.start+c.dur)continue;
+      const k=clipKind(c);if(k==='audio'||k==='text'||k==='solid'||c.solid)continue;
+      const m=MEDIA[c.mediaId];if(!m||m.kind==='image')continue;
       const v=srcMap[c.id];if(!v)continue;const want=clipSrcFrame(c,f)/fps;
       if(Math.abs(v.currentTime-want)<1e-3)continue;
       jobs.push(new Promise(res=>{let done=false;const d=()=>{if(done)return;done=true;v.removeEventListener('seeked',d);res();};
@@ -1743,12 +2648,12 @@ window.addEventListener('resize',fitScreen);
     s.track.clips.push(c);renderTimeline();select(s.track.id,c.id);save();toast('Duplicated');}
   let CLIP=null;
   function copySel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    CLIP={kind:s.track.kind,clip:JSON.parse(JSON.stringify(s.clip))};toast('Copied');}
+    CLIP={kind:clipKind(s.clip),clip:JSON.parse(JSON.stringify(s.clip))};toast('Copied');}
   function cutSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);copySel();deleteSel();}
   function pasteClip(){if(!CLIP)return toast('Nothing to paste',1);
-    let tr=sel&&project.tracks.find(t=>t.id===sel.trackId);
-    if(!tr||tr.kind!==CLIP.kind)tr=project.tracks.find(t=>t.kind===CLIP.kind);
-    if(!tr)return toast('No matching track to paste into',1);
+    // any track accepts the paste — the cloned clip carries its own kind
+    let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[0];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
     const c=JSON.parse(JSON.stringify(CLIP.clip));c.id=uid();c.start=playhead;tr.clips.push(c);
     renderTimeline();select(tr.id,c.id);save();toast('Pasted');}
   function splitSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
@@ -1763,11 +2668,15 @@ window.addEventListener('resize',fitScreen);
     const i=Math.max(0,BLENDS.findIndex(b=>b[1]===(s.clip.blend||'source-over')));
     const b=BLENDS[(i+d+BLENDS.length)%BLENDS.length];s.clip.blend=b[1];refreshInspector();drawFrame();save();toast('Blend: '+b[0]);}
   function applyEffect(field,val,label){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    if(s.track.kind==='audio')return toast('Effects apply to visual clips',1);
-    s.clip[field]=val;refreshInspector();drawFrame();save();toast(label+' applied — tune it in Properties →');}
+    if(clipKind(s.clip)==='audio')return toast('Effects apply to visual clips',1);
+    s.clip[field]=val;
+    if(s.clip._tw){s.clip._tw.effects=true;s.clip._tw['fx:'+field]=true;} // reveal it in the stem tree
+    refreshInspector();renderTimeline();drawFrame();save();toast(label+' applied — tune it in the stem ▸ Effects');}
   function clearEffects(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    s.clip.fxBlur=0;s.clip.fxBright=1;s.clip.fxContrast=1;s.clip.fxSat=1;s.clip.fxHue=0;
-    refreshInspector();drawFrame();save();toast('Effects removed');}
+    for(const [f,,def] of FX_DEFS){s.clip[f]=def;for(const ex of (FX_EXTRA[f]||[]))if(ex.sub){if(ex.sub in KDEF)s.clip[ex.sub]=KDEF[ex.sub];else delete s.clip[ex.sub];}}
+    if(s.clip._tw)for(const k of Object.keys(s.clip._tw))if(k.startsWith('fx:'))delete s.clip._tw[k];
+    if(s.clip._fxOff)s.clip._fxOff={};
+    renderTimeline();refreshInspector();drawFrame();save();toast('Effects removed');}
   const LABEL_COLORS={None:null,Red:'#E0544E',Yellow:'#D9C04A',Aqua:'#62C5C9',Pink:'#E59AC0',Lavender:'#9A8FD0',
     Peach:'#E0A878','Sea Foam':'#7FC9A3',Blue:'#4F86C6',Green:'#5BB98C',Purple:'#9A6FC2',Orange:'#D98C46',
     Brown:'#9A6B4F',Fuchsia:'#C95FA0',Cyan:'#46B5C9',Sandstone:'#C2A878','Dark Green':'#3E7A55'};
@@ -1778,29 +2687,29 @@ window.addEventListener('resize',fitScreen);
     if(/^Custom/.test(name)){const p=prompt('Resolution divisor (1 = Full, 2 = Half, 4 = Quarter):','1');if(p==null)return;const d=parseFloat(p);if(!(d>0))return toast('Bad value',1);v=1/d;name='1/'+d;}
     if(!v)return;project.previewRes=v;fitScreen();save();toast('Resolution: '+name);}
   function newSolid(){
-    let tr=project.tracks.find(t=>t.kind==='video');
-    if(!tr){tr={id:uid(),kind:'video',name:'V1',clips:[]};insertTrack(tr,'video');}
+    let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[0];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.solid).length,0)+1;
-    const c={id:uid(),solid:true,name:'Solid '+n,color:'#6a6a6a',start:playhead,dur:Math.round(5*FPS())};
+    const c={id:uid(),kind:'solid',solid:true,name:'Solid '+n,color:'#6a6a6a',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Solid “'+c.name+'” added');}
-  function clipDisplayName(track,c){return c.name||(track.kind==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
+  function clipDisplayName(c){return c.name||(clipKind(c)==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
   function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
-    const cur=clipDisplayName(s.track,s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
+    const cur=clipDisplayName(s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
     s.clip.name=(n.trim()||cur);renderTimeline();refreshInspector();save();toast('Renamed');}
   function centerInView(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     writeProp(s.clip,'posX',0);writeProp(s.clip,'posY',0);refreshInspector();drawFrame();save();toast('Centered in view');}
   function arrangeSel(dir){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
-    if(s.track.kind!=='video')return toast('Arrange applies to video layers',1);
-    const vids=project.tracks.filter(t=>t.kind==='video');const idx=vids.indexOf(s.track);
-    let ni=dir==='front'?vids.length-1:dir==='back'?0:dir==='fwd'?idx+1:idx-1;ni=clamp(ni,0,vids.length-1);
-    if(ni===idx)return toast(vids.length<2?'Only one video track':'Already there',1);
-    const dst=vids[ni],ci=s.track.clips.indexOf(s.clip);s.track.clips.splice(ci,1);dst.clips.push(s.clip);
+    if(clipKind(s.clip)==='audio')return toast('Arrange applies to visual layers',1);
+    const tracks=project.tracks;const idx=tracks.indexOf(s.track);   // z-order = track index
+    let ni=dir==='front'?tracks.length-1:dir==='back'?0:dir==='fwd'?idx+1:idx-1;ni=clamp(ni,0,tracks.length-1);
+    if(ni===idx)return toast(tracks.length<2?'Only one track':'Already there',1);
+    const dst=tracks[ni],ci=s.track.clips.indexOf(s.clip);s.track.clips.splice(ci,1);dst.clips.push(s.clip);
     sel={trackId:dst.id,clipId:s.clip.id};renderTimeline();refreshInspector();drawFrame();save();toast('Moved to '+dst.name);}
   function timeReverseSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
-    if(s.track.kind!=='video'||s.clip.solid)return toast('Time-Reverse needs a video layer',1);
+    if(clipKind(s.clip)!=='video'||s.clip.solid)return toast('Time-Reverse needs a video layer',1);
     s.clip.reversed=!s.clip.reversed;renderTimeline();drawFrame();save();toast('Time-Reverse '+(s.clip.reversed?'ON':'off'));}
   function freezeFrameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
-    if(s.track.kind!=='video'||s.clip.solid)return toast('Freeze Frame needs a video layer',1);
+    if(clipKind(s.clip)!=='video'||s.clip.solid)return toast('Freeze Frame needs a video layer',1);
     if(s.clip.freeze!=null){s.clip.freeze=null;toast('Freeze off');}
     else{s.clip.freeze=clamp(playhead-s.clip.start,0,Math.max(0,s.clip.dur-1));toast('Frozen @ frame '+s.clip.freeze);}
     drawFrame();save();}
@@ -1808,11 +2717,11 @@ window.addEventListener('resize',fitScreen);
   function flipV(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);s.clip.scaleY=-(s.clip.scaleY==null?1:s.clip.scaleY);refreshInspector();drawFrame();save();toast('Flip Vertical');}
   async function audioToKeyframes(){
     const s=sc();if(!s||!s.clip)return toast('Select a video/title layer first',1);
-    if(s.track.kind==='audio')return toast('Select the LAYER to drive (video/title), not the audio clip',1);
+    if(clipKind(s.clip)==='audio')return toast('Select the LAYER to drive (video/title), not the audio clip',1);
     const c=s.clip;
-    let aud=null; // audio clip overlapping this layer's time range
-    for(const t of project.tracks){if(t.kind!=='audio')continue;
-      for(const ac of t.clips){if(ac.start<c.start+c.dur&&ac.start+ac.dur>c.start){aud=ac;break;}}if(aud)break;}
+    let aud=null; // audio clip overlapping this layer's time range (any track)
+    for(const t of project.tracks){
+      for(const ac of t.clips){if(clipKind(ac)!=='audio')continue;if(ac.start<c.start+c.dur&&ac.start+ac.dur>c.start){aud=ac;break;}}if(aud)break;}
     if(!aud)return toast('No audio under this layer — drop an audio clip first',1);
     let pk=[];try{pk=(await fetch('/api/editor/media/'+aud.mediaId+'/peaks').then(r=>r.json())).peaks||[];}catch(e){}
     if(!pk.length)return toast('That audio has no waveform data',1);
@@ -1837,7 +2746,27 @@ window.addEventListener('resize',fitScreen);
     const f=Math.round(parseFloat(v)*FPS());if(isFinite(f)){stop();setPlayhead(clamp(f,0,timelineFrames()),true);}}
   function zoomTimeline(d){ppf=clamp(ppf*(d>0?1.3:1/1.3),1,120);applyPpf(playhead);}
   function togglePanel(cls){document.body.classList.toggle(cls);fitScreen();renderTimeline();}
-  function showShortcuts(){toast('V select · C razor · Space play · ←/→ frame · ⌫ delete · Ctrl+Z undo · Ctrl+K comp settings');}
+  function showShortcuts(){toast('V select · C razor · Space play · ←/→ frame · ⌫ delete · Shift+⌫ ripple delete · Ctrl+Z undo · Ctrl+K comp settings');}
+  function saveFrameAs(){
+    const cv=document.createElement('canvas');cv.width=project.width;cv.height=project.height;
+    const g=cv.getContext('2d');try{drawFrameInto(g,cv.width,cv.height,playhead);}catch(e){return toast('Could not render the frame',1);}
+    cv.toBlob(b=>{if(!b)return toast('Frame export failed',1);const a=document.createElement('a');a.href=URL.createObjectURL(b);
+      a.download=((project.title||'frame').replace(/\s+/g,'_'))+'_f'+playhead+'.png';document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('Frame saved as PNG');},'image/png');
+  }
+  function fitToComp(mode){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    const c=s.clip;if(clipKind(c)==='audio')return toast('Pick a visual layer',1);
+    const wh=mediaWH(c);if(!wh)return toast('Layer size not ready yet',1);
+    // the renderer already object-fit:contains the source (stageFit) before applying scale, so divide that factor out
+    const sfit=Math.min(project.width/wh.sw,project.height/wh.sh)||1;
+    const sx=project.width/(wh.sw*sfit),sy=project.height/(wh.sh*sfit),v=mode==='w'?sx:mode==='h'?sy:Math.min(sx,sy);
+    writeProp(c,'scale',+v.toFixed(4));writeProp(c,'posX',0);writeProp(c,'posY',0);
+    refreshInspector();drawFrame();save();toast('Fit to comp'+(mode==='w'?' width':mode==='h'?' height':''));}
+  function newMaskMenu(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(clipKind(s.clip)==='audio')return toast('Masks apply to visual layers',1);addMask(s.clip);}
+  function removeAllMasks(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(!(s.clip.masks&&s.clip.masks.length))return toast('No masks on this layer',1);
+    s.clip.masks=[];selMaskId=null;renderTimeline();refreshInspector();drawFrame();save();toast('All masks removed');}
 
   // ---- workspaces --------------------------------------------------------
   function applyWorkspace(ws){
@@ -1854,14 +2783,17 @@ window.addEventListener('resize',fitScreen);
     let want=null;try{want=localStorage.getItem('ae-ws');}catch(e){}
     host.innerHTML='';
     AE_WORKSPACES.forEach((ws,i)=>{const b=document.createElement('button');b.className='ws-tab';b.textContent=ws.name;
-      b.dataset.ws=ws.name;b.title=ws.description||'';b.onclick=()=>applyWorkspace(ws);host.appendChild(b);});
+      b.dataset.ws=ws.name;b.title=scrub(ws.description||'');b.onclick=()=>applyWorkspace(ws);host.appendChild(b);});
     const start=AE_WORKSPACES.find(w=>w.name===want)||AE_WORKSPACES[0];if(start)applyWorkspace(start);
   }
 
   // ---- tools rail --------------------------------------------------------
   function setActiveTool(name){document.querySelectorAll('#aeTools .aetool').forEach(b=>b.classList.toggle('on',b.dataset.tool===name));}
+  window.aeSetActiveTool=setActiveTool;   // let the global setTool() keep the rail in sync
   function toolAction(t){const n=(t.name||'').toLowerCase();
     if(/selection/.test(n))return ()=>{setTool('select');setActiveTool(t.name);};
+    if(/pen/.test(n))return ()=>{const s=selClip();if(!s||!s.clip||clipKind(s.clip)==='audio'){toast('Select a visual layer first',1);setActiveTool('Selection');return;}
+      setTool('pen');setActiveTool(t.name);toast('Pen — click to drop points, click the first point to close (Esc cancels)');};
     if(/type/.test(n))return ()=>{$('#addText').click();};
     if(/hand|pan behind|anchor/.test(n))return ()=>toast(t.name+' — panning the monitor is coming soon');
     if(/zoom/.test(n))return ()=>toast('Use the timeline Zoom slider for now');
@@ -1892,7 +2824,7 @@ window.addEventListener('resize',fitScreen);
       const wired=/selection|type/i.test(t.name);
       if(!wired)b.classList.add('soon');
       if(t.flyout&&t.flyout.length)b.classList.add('has-fly');
-      b.title=t.name+(t.shortcut?'  ('+t.shortcut+')':'')+(t.behavior?'\n'+t.behavior:'');
+      b.title=scrub(t.name+(t.shortcut?'  ('+t.shortcut+')':'')+(t.behavior?'\n'+t.behavior:''));
       b.onclick=toolAction(t);host.appendChild(b);});
     setActiveTool('Selection');
   }
@@ -1929,6 +2861,46 @@ window.addEventListener('resize',fitScreen);
     'view|Go to Time…':gotoTimePrompt,
     'help|Keyboard Shortcuts':showShortcuts,'help|Keyboard Shortcuts…':showShortcuts,
   };
+  // IP scrub — clean-room guarantee: nothing user-visible carries an Adobe / After Effects
+  // trademark, whatever the generated menu data says. Applied at EVERY render choke-point.
+  const scrub=s=>{if(s==null)return s;return String(s)
+    .replace(/Adobe After Effects/gi,'LePrince Visual Labs')
+    .replace(/After Effects/gi,'LePrince')
+    // third-party marks (handled before the bare \bAE\b rule so "Mocha AE" resolves as a unit)
+    .replace(/Boris ?FX ?Mocha|Mocha ?AE/gi,'planar tracker')
+    .replace(/Paste Mocha Mask/gi,'Paste Tracked Mask')
+    .replace(/mocha shape/gi,'tracked shape')
+    .replace(/\bMocha\b/gi,'planar tracker')
+    .replace(/Keylight(?:\s*\([^)]*\))?/gi,'Chroma Key')
+    .replace(/Lumetri Color|Lumetri/gi,'Colour')
+    .replace(/CINEWARE|Cineware/gi,'3D Link')
+    .replace(/Cryptomatte/gi,'ID Matte')
+    .replace(/EXtractoR|IDentifier/gi,'3D Channel')
+    .replace(/Frame\.io(?:\s*V\d+)?/gi,'Review')
+    .replace(/Adobe Media Encoder/gi,'the Render Queue')
+    .replace(/Adobe Premiere Pro/gi,'a video editor')
+    .replace(/Adobe Photoshop/gi,'an image editor')
+    .replace(/Adobe Audition/gi,'an audio editor')
+    .replace(/Adobe Bridge/gi,'the media browser')
+    .replace(/Adobe Dynamic Link/gi,'a linked source')
+    .replace(/Adobe Fonts/gi,'the font library')
+    .replace(/Adobe Exchange/gi,'the add-on store')
+    .replace(/Adobe Color/gi,'the colour library')
+    .replace(/Adobe Stock/gi,'the stock library')
+    .replace(/Creative Cloud/gi,'the cloud')
+    .replace(/MAXON CINEMA 4D|CINEMA 4D/gi,'3D')
+    .replace(/Dynamic Link/gi,'a linked source')
+    .replace(/Photoshop/gi,'an image editor')
+    .replace(/Premiere Pro|Premiere/gi,'a video editor')
+    .replace(/Audition/gi,'an audio editor')
+    .replace(/Typekit/gi,'the font library')
+    .replace(/\bAME\b/g,'the Render Queue')
+    .replace(/\bAE['’]s\b/g,'LePrince’s')
+    .replace(/\bAE:\s*/g,'')
+    .replace(/\bIn AE\b/gi,'Here')
+    .replace(/\bAE\b/g,'LePrince')
+    .replace(/Adobe/gi,'LePrince')
+    .replace(/\s{2,}/g,' ').trim();};
   const norm=s=>(s||'').replace(/\.\.\.$/,'…').trim();
   function actionFor(menuId,it){
     if(it._recent)return ()=>loadRecent(it._recent);
@@ -1957,18 +2929,65 @@ window.addEventListener('resize',fitScreen);
       if(/^Freeze Frame$/i.test(L))return freezeFrameSel;
       if(/^Flip Horizontal$/i.test(L))return flipH;
       if(/^Flip Vertical$/i.test(L))return flipV;
+      if(/^New Mask$/i.test(L))return newMaskMenu;
+      if(/Remove All Masks/i.test(L))return removeAllMasks;
+      if(/Fit to Comp Width/i.test(L))return ()=>fitToComp('w');
+      if(/Fit to Comp Height/i.test(L))return ()=>fitToComp('h');
+      if(/^Fit to Comp(?:osition)?$/i.test(L))return ()=>fitToComp('both');
     }
     if(menuId==='edit'&&LABEL_COLORS.hasOwnProperty(L))return ()=>setLabel(L);
     if(menuId==='view'&&/^(Full|Half|Third|Quarter)$/.test(L))return ()=>setResolution(L);
     if(menuId==='view'&&/^Custom/.test(L))return ()=>setResolution('Custom');
     if(menuId==='effect'||menuId==='layer'||menuId==='context-layer'){
-      if(/Gaussian Blur/i.test(L))return ()=>applyEffect('fxBlur',12,'Gaussian Blur');
-      if(/^Brightness\s*&?\s*Contrast$/i.test(L))return ()=>applyEffect('fxBright',1.12,'Brightness & Contrast');
-      if(/^Hue\/?\s*Saturation$/i.test(L))return ()=>applyEffect('fxSat',1.4,'Hue/Saturation');
-      if(/^Effect Controls/i.test(L))return ()=>{document.querySelector('.col.insp').scrollIntoView();toast('Adjust effects in Properties →');};
+      const applyFx=field=>{const fd=FX_DEFS.find(x=>x[0]===field);return fd?(()=>applyEffect(field,fd[4],fd[1])):null;};
+      // 1) exact house-name match — every working effect un-greys its own row
+      const own=FX_DEFS.find(([,name])=>name.toLowerCase()===L.toLowerCase());
+      if(own)return applyFx(own[0]);
+      // 2) AE-name aliases → the house effect that stands in for them (first match wins)
+      const ALIAS=[
+        [/Gaussian Blur|Fast Blur|Box Blur|Camera Lens Blur|Smart Blur|Bilateral Blur/i,'fxBlur'],
+        [/Brightness\s*&?\s*Contrast/i,'fxBright'],
+        [/^Exposure$/i,'fxExposure'],
+        [/Hue\/?\s*Saturation/i,'fxSat'],
+        [/Vibrance/i,'fxVibrance'],
+        [/Black\s*&?\s*White|Leave Color|Tint\b/i,'fxGray'],
+        [/Sepia/i,'fxSepia'],
+        [/Drop Shadow/i,'fxShadow'],
+        [/Vignette/i,'fxVignette'],
+        [/Color Overlay|^Fill$|Solid Composite/i,'fxTint'],
+        [/Add Grain|^Noise$|Match Grain|Remove Grain|Median/i,'fxGrain'],
+        [/Mosaic/i,'fxPixel'],
+        [/Glow\b/i,'fxGlow'],
+        [/Gradient Map|Tritone|Duotone/i,'fxDuotone'],
+        [/Sharpen|Unsharp Mask/i,'fxSharpen'],
+        [/Emboss|Bevel/i,'fxEmboss'],
+        [/Find Edges|Edge Detect|Cartoon/i,'fxEdges'],
+        [/Threshold/i,'fxThreshold'],
+        [/^Extract$/i,'fxThreshold'],
+        [/Solarize/i,'fxSolarize'],
+        [/Levels|Curves|Gamma\b|Pedestal/i,'fxGamma'],
+        [/Color Balance|Temperature|White Balance|Photo Filter|Warm/i,'fxTemp'],
+        [/Chromatic Aberration|RGB Split|Separate RGB/i,'fxRGB'],
+        [/Halftone/i,'fxHalftone'],
+        [/Light\s*Leak|Lens Flare|Light Burst|CC Light/i,'fxLeak'],
+        [/Scan\s*lines?|CRT|Venetian Blinds/i,'fxScan'],
+        [/Keylight|Chroma Key|Color Difference Key|Linear Color Key|Spill Sup/i,'fxKeyColor'],
+        [/Luma Key|Luminance Key|Extract Key/i,'fxLumaKey'],
+        [/Twirl|Bulge|Spherize|Wave Warp/i,'fxWarp'],
+        [/Radial Blur|Zoom Blur|Spin Blur/i,'fxRadBlur'],
+        [/Directional Blur/i,'fxDirBlur'],
+      ];
+      for(const [re,field] of ALIAS){if(re.test(L)){const fn=applyFx(field);if(!fn)continue;
+        let sub=null,val=null; // multi-mode effects: set the sub-type implied by the AE label
+        if(field==='fxWarp'){sub='fxWarpType';val=/Bulge/i.test(L)?'bulge':/Spherize/i.test(L)?'spherize':/Wave/i.test(L)?'wave':'twirl';}
+        else if(field==='fxRadBlur'){sub='fxRadType';val=/Spin/i.test(L)?'spin':'zoom';}
+        if(sub)return ()=>{const s=sc();if(s&&s.clip)s.clip[sub]=val;fn();};
+        return fn;}}
+      if(/^Effect Controls/i.test(L))return ()=>{document.querySelector('.col.insp').scrollIntoView();toast('Adjust effects in the stem ▸ Effects, or Properties →');};
       if(/^Remove All$/i.test(L))return clearEffects;
     }
     if(menuId==='comp'&&/^(Play|Preview)/i.test(L)&&!it.submenu)return ()=>togglePlay();
+    if(menuId==='comp'&&/Save Frame|Save Current Frame/i.test(L)&&!it.submenu)return saveFrameAs;
     if(menuId==='window'){
       if(/^(Project|Media)/i.test(L))return ()=>togglePanel('ws-no-bin');
       if(/^Properties/i.test(L))return ()=>togglePanel('ws-no-insp');
@@ -2012,10 +3031,10 @@ window.addEventListener('resize',fitScreen);
       const greyed=(!hasSub&&!act)||(df?df():false);
       if(greyed)row.classList.add('mb-dis');
       const chk=document.createElement('span');chk.className='mb-chk';const cf=CHECK[key];chk.textContent=(cf&&cf())?'✓':'';row.appendChild(chk);
-      const lab=document.createElement('span');lab.className='mb-lab';lab.textContent=it.label;row.appendChild(lab);
+      const lab=document.createElement('span');lab.className='mb-lab';lab.textContent=scrub(it.label);row.appendChild(lab);
       if(hasSub){const a=document.createElement('span');a.className='mb-arrow';a.textContent='›';row.appendChild(a);}
       else if(it.shortcut){const s=document.createElement('span');s.className='mb-sc';s.textContent=it.shortcut;row.appendChild(s);}
-      if(it.behavior)row.title=it.behavior;
+      if(it.behavior)row.title=scrub(it.behavior);
       row.addEventListener('mouseenter',()=>{clearFly(level);
         if(hasSub){const r=row.getBoundingClientRect();const fly=buildPanel(menu,subItems,level+1);document.body.appendChild(fly);
           const fr=fly.getBoundingClientRect();let left=r.right-3,top=r.top-5;
@@ -2036,7 +3055,7 @@ window.addEventListener('resize',fitScreen);
     drop.style.left=left+'px';drop.style.top=r.bottom+'px';titles[i].classList.add('on');openIdx=i;}
   function buildMenuBar(){
     const bar=$('#aeMenubar');if(!bar||!window.AE_MENUS)return;bar.innerHTML='';
-    AE_MENUS.forEach((m,i)=>{const b=document.createElement('button');b.className='mb-title';b.textContent=m.title;
+    AE_MENUS.forEach((m,i)=>{const b=document.createElement('button');b.className='mb-title';b.textContent=scrub(m.title);
       b.addEventListener('click',e=>{e.stopPropagation();(openIdx===i)?closeAll():openAt(i);});
       b.addEventListener('mouseenter',()=>{if(openIdx!==null&&openIdx!==i)openAt(i);});
       titles[i]=b;bar.appendChild(b);});

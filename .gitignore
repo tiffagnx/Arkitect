@@ -16,6 +16,14 @@ verify-*.png
 # Build output ZIPs
 *.zip
 
+# Native build binary (25MB — ships as a GitHub Release asset via release.ps1, not in git history)
+ARKITECT.exe
+build/
+dist/
+
+# Runtime logs
+*.log
+
 # In-app updater working dir (downloaded/staged release + rollback backups)
 _update/
 

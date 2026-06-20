@@ -166,6 +166,20 @@ if(-not (Test-Path $LMS)){
 }
 Good "AI engine: ready."
 
+# ---------- 4.5 ffmpeg (the video editor + audio MP3 export need it) ----------
+if(-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)){
+  Warn "ffmpeg (video/audio export) isn't installed - installing it for you..."
+  if($haveWinget){
+    winget install -e --id Gyan.FFmpeg --silent --accept-package-agreements --accept-source-agreements
+    # winget adds it to the Machine PATH; refresh THIS session so the server (started below) sees it
+    $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")
+  }
+  if(-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)){
+    Warn "Couldn't auto-install ffmpeg - the video editor's exports need it. Get it from ffmpeg.org"
+    Warn "(or run 'winget install Gyan.FFmpeg'), then restart ARKITECT. Everything else still works."
+  } else { Good "Video/audio engine (ffmpeg): ready." }
+} else { Good "Video/audio engine (ffmpeg): ready." }
+
 # ---------- 5. model: download (if missing) + load ----------
 & $LMS server start 2>$null
 $installed = (& $LMS ls 2>$null | Out-String)
@@ -177,36 +191,42 @@ Info "Loading the model onto your graphics card..."
 & $LMS load $model -c 16384 --gpu max -y 2>$null
 Good "Brain: loaded."
 
-# ---------- 5.5 desktop shortcut (so it's one click from now on) ----------
+# ---------- 5.5 desktop shortcut → the native ARKITECT app (its own icon, pins to taskbar) ----------
+# Points at ARKITECT.exe when it's been built (the real program), else at the launcher.
 try {
   $lnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "ARKITECT.lnk"
-  if(-not (Test-Path $lnk)){
-    $ws = New-Object -ComObject WScript.Shell
-    $sc = $ws.CreateShortcut($lnk)
-    $sc.TargetPath = Join-Path $Root "START HERE.bat"
-    $sc.WorkingDirectory = $Root
-    $ico = Join-Path $Root "static\kit.ico"
-    if(Test-Path $ico){ $sc.IconLocation = $ico }
-    $sc.Description = "ARKITECT - your local AI creative studio"
-    $sc.Save()
-    Good "Put an ARKITECT shortcut on your desktop (the little guy)."
-  }
+  $exe = Join-Path $Root "ARKITECT.exe"
+  $target = if (Test-Path $exe) { $exe } else { Join-Path $Root "START HERE.bat" }
+  $ws = New-Object -ComObject WScript.Shell
+  $sc = $ws.CreateShortcut($lnk)            # always (re)create so an old browser-shortcut updates
+  $sc.TargetPath = $target
+  $sc.WorkingDirectory = $Root
+  $ico = Join-Path $Root "static\app-icon.ico"
+  if(-not (Test-Path $ico)){ $ico = Join-Path $Root "static\kit.ico" }
+  if(Test-Path $ico){ $sc.IconLocation = $ico }
+  $sc.Description = "ARKITECT - your local AI creative studio"
+  $sc.Save()
+  Good "ARKITECT shortcut is on your desktop."
 } catch { }
 
 # ---------- 6. launch ----------
 Write-Host ""
-Good "Opening ARKITECT in your browser..."
-# open the browser a few seconds after the server starts (detached)
-# open ARKITECT in its OWN app window (no tabs/address bar) once the server warms — detached
 $arkUrl  = "http://localhost:7777"
-$arkProf = "$env:LOCALAPPDATA\ARKITECT\app-window"
-$arkEdge = @("$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe","${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-$arkChrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe","${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe","$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-$arkBrowser = if($arkEdge){ $arkEdge } elseif($arkChrome){ $arkChrome } else { $null }
-if($arkBrowser){
-  $launch = "Start-Sleep 7; Start-Process '$arkBrowser' -ArgumentList '--app=$arkUrl','--user-data-dir=$arkProf','--window-size=1500,950'"
+$arkExe  = Join-Path $Root "ARKITECT.exe"
+if (Test-Path $arkExe) {
+  # NATIVE window — its own taskbar icon (your logo), no browser. It attaches a window to
+  # the server this script hosts (so dev --reload + the single server model are unchanged).
+  Good "Opening ARKITECT (native window)..."
+  $launch = "Start-Sleep 7; Start-Process '$arkExe'"
 } else {
-  $launch = "Start-Sleep 7; Start-Process '$arkUrl'"
+  # fallback: a chrome-less browser app-window (shows the browser's taskbar icon)
+  Good "Opening ARKITECT..."
+  $arkProf = "$env:LOCALAPPDATA\ARKITECT\app-window"
+  $arkEdge = @("$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe","${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+  $arkChrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe","${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe","$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+  $arkBrowser = if($arkEdge){ $arkEdge } elseif($arkChrome){ $arkChrome } else { $null }
+  if($arkBrowser){ $launch = "Start-Sleep 7; Start-Process '$arkBrowser' -ArgumentList '--app=$arkUrl','--user-data-dir=$arkProf','--window-size=1500,950'" }
+  else { $launch = "Start-Sleep 7; Start-Process '$arkUrl'" }
 }
 Start-Process "powershell" -ArgumentList "-NoProfile","-Command",$launch -WindowStyle Hidden
 Write-Host ""

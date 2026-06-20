@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "arkitect",
+      "runtimeExecutable": "C:/Users/koonc/Desktop/Projects/pink-room/venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7777"],
+      "port": 7777
+    },
+    {
+      "name": "arkitect-preview",
+      "runtimeExecutable": "C:/Users/koonc/Desktop/Projects/pink-room/venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7788"],
+      "port": 7788,
+      "autoPort": false
+    },
+    {
+      "name": "arkitect-studio",
+      "runtimeExecutable": "C:/Users/koonc/Desktop/Projects/pink-room/venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7791"],
+      "port": 7791,
+      "autoPort": false
+    }
+  ]
+}
