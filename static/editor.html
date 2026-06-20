@@ -162,6 +162,9 @@ body.ws-no-bin.ws-no-insp .mid{grid-template-columns:0 minmax(0,1fr) 0}
 .phead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 9px;
   font:700 10px var(--mono);letter-spacing:.2em;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line2)}
 .phead .pact{display:flex;gap:6px}
+.binfilter{flex:1;min-width:0;margin:0 8px;height:22px;border-radius:6px;background:var(--surf);border:1px solid var(--line);color:var(--txt,#e9edf2);font:inherit;font-size:12px;padding:0 8px;outline:none}
+.binfilter:focus{border-color:var(--cy,#62c5c9)}
+.binfilter::placeholder{color:var(--dim2,#888)}
 .icbtn{width:26px;height:24px;border-radius:6px;background:var(--surf);border:1px solid var(--line);
   display:grid;place-items:center;color:var(--dim);transition:.12s}
 .icbtn:hover{background:var(--surf2);color:var(--txt)}
@@ -501,7 +504,9 @@ body.mode-simple .director-only{display:none!important}
   <div class="mid">
     <!-- BIN -->
     <div class="col bin">
-      <div class="phead">Media <div class="pact"><button class="icbtn" id="binImport" title="Import">＋</button></div></div>
+      <div class="phead">Media
+        <input id="binFilter" class="binfilter" type="search" placeholder="Find…" autocomplete="off" spellcheck="false" oninput="onBinFilter(this.value)" title="Filter media by name (Ctrl+F)">
+        <div class="pact"><button class="icbtn" id="binImport" title="Import">＋</button></div></div>
       <div class="bin-body" id="binBody">
         <div class="import-zone" id="importZone">
           <div class="big">⤓</div><div>Import media</div>
@@ -738,10 +743,15 @@ async function loadExistingMedia(){
     // MEDIA, so back-compat clips (no c.kind) must repaint after this populates MEDIA.
     renderBin();renderTimeline();if(sel)refreshInspector();}catch{}
 }
+let BIN_FILTER='';
+function findMedia(){const i=$('#binFilter');if(i){i.focus();i.select();}}   // File ▸ Find… → focus the bin filter box
+function onBinFilter(v){BIN_FILTER=(v||'').trim().toLowerCase();renderBin();}
 function renderBin(){
   const body=$('#binBody');
   [...body.querySelectorAll('.media')].forEach(e=>e.remove());
-  const list=Object.values(MEDIA).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  let list=Object.values(MEDIA).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(BIN_FILTER)list=list.filter(m=>(m.name||'').toLowerCase().includes(BIN_FILTER));
+  const iz=$('#importZone');if(iz)iz.style.display=BIN_FILTER?'none':'';
   for(const m of list){
     const el=document.createElement('div');el.className='media';el.dataset.id=m.id;el.draggable=true;
     const kind=m.kind==='audio'?'AUD':m.kind==='image'?'IMG':'VID';
@@ -783,6 +793,12 @@ function addClipToBestTrack(mid){
   let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[0];
   if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
   return addClipFromMedia(mid,tr.id,playhead);
+}
+function addSelectedFootageToComp(){   // File ▸ Add Footage to Comp — drop the selected (or newest) bin media at the playhead
+  const selEl=$('#binBody .media.sel');let mid=selEl?selEl.dataset.id:null;
+  if(!mid||!MEDIA[mid]){const newest=Object.values(MEDIA).sort((a,b)=>(b.ts||0)-(a.ts||0))[0];mid=newest&&newest.id;}
+  if(!mid||!MEDIA[mid])return toast('No footage in the bin — import a clip first',1);
+  const r=addClipToBestTrack(mid);if(r&&r.clipId)select(r.trackId,r.clipId);
 }
 
 // ── TIMELINE RENDER ────────────────────────────────────────────────────
@@ -1785,6 +1801,15 @@ function drawOneClipMB(ctx,entry,f,W,H,srcOverride){
     if(drawOneClip(sg,entry,f+t,W,H,srcOverride)){ag.globalCompositeOperation='lighter';ag.globalAlpha=1/MB_N;ag.drawImage(S,0,0);}}
   reset(ag);ctx.drawImage(A,0,0);
 }
+let panelBgMode='default';   // View ▸ Panel Background Color — the pasteboard AROUND the comp = the .stage DOM bg (the canvas is sized to the comp, so this is CSS-only and never touches the render/export)
+function setPanelBg(v){panelBgMode=v;const st=document.querySelector('.stage');if(st){const s=st.style;
+    s.backgroundImage='';s.backgroundSize='';s.backgroundPosition='';   // reset the checker longhands every time
+    if(v==='default'){s.backgroundColor='';}
+    else if(v==='checker'){s.backgroundColor='#2a2c31';
+      s.backgroundImage='linear-gradient(45deg,#3a3d44 25%,transparent 25%,transparent 75%,#3a3d44 75%),linear-gradient(45deg,#3a3d44 25%,transparent 25%,transparent 75%,#3a3d44 75%)';
+      s.backgroundSize='20px 20px';s.backgroundPosition='0 0,10px 10px';}
+    else{s.backgroundColor=v;}}
+  toast('Panel background: '+(v==='default'?'Default':v==='checker'?'Checkerboard':v==='#000'?'Black':'White'));}
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
@@ -3411,6 +3436,8 @@ window.addEventListener('resize',fitScreen);
     'layer|Freeze On Last Frame':freezeLastSel,
     'view|Zoom (Timeline)':()=>zoomTimeline(1),
     'animation|Sequence Layers…':sequenceLayers,
+    'file|Add Footage to Comp':addSelectedFootageToComp,'file|Find…':findMedia,
+    'view|Default':()=>setPanelBg('default'),'view|Black':()=>setPanelBg('#000'),'view|White':()=>setPanelBg('#fff'),'view|Checkerboard':()=>setPanelBg('checker'),
   };
   // IP scrub — clean-room guarantee: nothing user-visible carries an Adobe / After Effects
   // trademark, whatever the generated menu data says. Applied at EVERY render choke-point.
