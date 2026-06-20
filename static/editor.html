@@ -3322,6 +3322,13 @@ window.addEventListener('resize',fitScreen);
     'animation|Save Animation Preset…':saveAnimPreset,'animation|Apply Animation Preset…':applyAnimPreset,
     'animation|Keyframe Interpolation…':keyInterp,'animation|Time-Reverse Keyframes':timeReverseKeys,
     'window|Render Queue':()=>$('#btnExport').click(),'window|Preview':()=>togglePlay(),'window|Composition':()=>fitScreen(),
+    // ── menu-audit wave (each verified against a real function) ──
+    'file|File…':()=>doImport(),'file|Multiple Files…':()=>doImport(),   // Import ▸ File… / Multiple Files…
+    'layer|Layer Settings…':focusInspector,
+    'layer|Remove Mask':()=>{const s=selClip();if(!s||!s.clip||!clipMasks(s.clip).length)return toast('No mask to remove',1);deleteMask(s.clip,selMaskId||clipMasks(s.clip).slice(-1)[0].id);},
+    'layer|Position':focusInspector,'layer|Scale':focusInspector,'layer|Rotation':focusInspector,'layer|Opacity':focusInspector, // Transform ▸ … → reveal the inspector
+    'layer|Freeze On Last Frame':freezeLastSel,
+    'view|Zoom (Timeline)':()=>zoomTimeline(1),
   };
   // IP scrub — clean-room guarantee: nothing user-visible carries an Adobe / After Effects
   // trademark, whatever the generated menu data says. Applied at EVERY render choke-point.
