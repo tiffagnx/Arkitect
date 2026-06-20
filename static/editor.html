@@ -1739,10 +1739,11 @@ function drawOneClipMB(ctx,entry,f,W,H,srcOverride){
   if(!c.motionBlur||!hasMotion(c))return drawOneClip(ctx,entry,f,W,H,srcOverride); // only blur an actually-moving layer
   const [A,S]=_mbCanvases(W,H),ag=A.getContext('2d'),sg=S.getContext('2d');
   const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.filter='none';};
-  reset(ag);ag.clearRect(0,0,W,H);let j=0;
+  reset(ag);ag.clearRect(0,0,W,H);
   for(let i=0;i<MB_N;i++){const t=(i/(MB_N-1)-0.5)*MB_SHUTTER;
     reset(sg);sg.clearRect(0,0,W,H);
-    if(drawOneClip(sg,entry,f+t,W,H,srcOverride)){ag.globalAlpha=1/(j+1);ag.drawImage(S,0,0);j++;}}
+    // 'lighter' sums premultiplied contributions; 1/MB_N each → the true mean of RGB *and* alpha (correct soft edges)
+    if(drawOneClip(sg,entry,f+t,W,H,srcOverride)){ag.globalCompositeOperation='lighter';ag.globalAlpha=1/MB_N;ag.drawImage(S,0,0);}}
   reset(ag);ctx.drawImage(A,0,0);
 }
 function drawFrameInto(ctx,W,H,f,srcOverride){
@@ -2531,7 +2532,8 @@ function updateLiveFields(){const sc=selClip();if(!sc||!sc.clip)return;
 }
 function deleteSel(){const ids=selSet.size?[...selSet]:(sel?[sel.clipId]:[]);if(!ids.length)return;
   for(const t of project.tracks)t.clips=t.clips.filter(c=>!ids.includes(c.id));
-  for(const id of ids)if(vels[id]){vels[id].remove();delete vels[id];}
+  for(const id of ids){if(vels[id]){vels[id].remove();delete vels[id];}if(audioEls[id]){try{audioEls[id].pause();}catch(e){}delete audioEls[id];}}
+  for(const t of project.tracks)for(const c of t.clips)if(c.parentId&&ids.includes(c.parentId))c.parentId=null; // clear orphaned parent links
   deselect();renderTimeline();drawFrame();save(true);if(ids.length>1)toast(ids.length+' layers deleted');}
 // Ripple delete: remove the clip AND slide later clips on the same track left to close the gap.
 function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
@@ -2539,6 +2541,7 @@ function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
   track.clips=track.clips.filter(c=>c.id!==clip.id);
   for(const c of track.clips)if(c.start>=end)c.start-=gap;   // close the gap behind it
   if(vels[clip.id]){vels[clip.id].remove();delete vels[clip.id];}
+  for(const t of project.tracks)for(const c of t.clips)if(c.parentId===clip.id)c.parentId=null; // clear orphaned parent links
   deselect();renderTimeline();drawFrame();save(true);toast('Ripple deleted — gap closed');}
 
 // ── DROP MEDIA ONTO TIMELINE ───────────────────────────────────────────
