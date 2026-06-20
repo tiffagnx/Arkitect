@@ -413,6 +413,23 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .modal select.fld{cursor:pointer}
 .modal .actions{display:flex;gap:9px;margin-top:6px}
 .modal .actions .tbtn{flex:1;justify-content:center;padding:10px}
+.help-body{font-size:12.5px;color:var(--txt,#e9edf2);line-height:1.5;margin-bottom:16px}
+.help-lead{color:var(--dim);margin-bottom:12px}
+.help-list{list-style:none;display:flex;flex-direction:column;gap:7px;margin:0 0 4px;padding:0}
+.help-list li{padding-left:14px;position:relative}
+.help-list li::before{content:'›';position:absolute;left:0;color:var(--cy)}
+.help-foot{margin-top:14px;color:var(--dim2);font-size:11.5px}
+.help-kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
+.help-kv span{color:var(--dim);font:700 10px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.help-rel-h{font:800 13px var(--ui);color:var(--cy);margin-bottom:8px}
+.help-scroll{max-height:300px;overflow:auto;margin-top:4px}
+.help-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.help-tbl th{text-align:left;color:var(--dim);font:700 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.help-tbl td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
+.help-tbl .hr-p,.help-tbl .hc-n{color:var(--dim)}
+.help-tbl .hr-d{color:var(--cy);font-family:var(--mono)}
+.hc-ok{color:#67d39a;font:700 10px var(--mono)}
+.hc-warn{color:#f0a0a3;font:700 10px var(--mono)}
 .prog{height:8px;border-radius:5px;background:var(--surf3);overflow:hidden;margin:6px 0 4px}
 .prog>div{height:100%;width:0;background:linear-gradient(90deg,#3E9CB8,#5bc0db);transition:width .25s;border-radius:5px}
 .prog-txt{font:600 11px var(--mono);color:var(--dim);text-align:center;margin-bottom:12px}
@@ -2176,6 +2193,10 @@ function frameAtEvent(e){const rect=lanesWrap.getBoundingClientRect();
 // ── SELECTION + INSPECTOR ──────────────────────────────────────────────
 function findClipTrack(cid){for(const t of project.tracks)if(t.clips.some(c=>c.id===cid))return t.id;return null;}
 function selectedClips(){const out=[];for(const t of project.tracks)for(const c of t.clips)if(selSet.has(c.id))out.push({track:t,clip:c});return out;}
+function sequenceLayers(){const cl=selectedClips();if(cl.length<2)return toast('Select 2+ layers to sequence',1);
+  const ord=cl.slice().sort((a,b)=>(a.clip.start-b.clip.start)||String(a.clip.id).localeCompare(String(b.clip.id)));
+  let run=ord[0].clip.start;for(const s of ord){s.clip.start=run;run+=Math.max(1,s.clip.dur||0);} // butt clips end-to-end from the earliest start
+  renderTimeline();drawFrame();save();toast('Sequenced '+ord.length+' layers');}
 function select(tid,cid,additive){if(!sel||sel.clipId!==cid)selMaskId=null; // a different clip → drop the stale active mask
   if(penDraft&&penDraft.clipId!==cid)penDraft=null; // never finish a half-drawn path onto a different clip
   if(additive){
@@ -3277,7 +3298,7 @@ window.addEventListener('resize',fitScreen);
     const host=$('#aeTools');if(!host||!window.AE_TOOLS)return;host.innerHTML='';
     AE_TOOLS.forEach(t=>{const b=document.createElement('button');b.className='aetool';b.dataset.tool=t.name;
       b.innerHTML=TOOL_ICONS[t.name]||SVG('<circle cx="12" cy="12" r="3"/>',true);
-      const wired=/selection|type/i.test(t.name);
+      const wired=/selection|type|pen/i.test(t.name); // Pen is live (pen masks work) — stop dimming it
       if(!wired)b.classList.add('soon');
       if(t.flyout&&t.flyout.length)b.classList.add('has-fly');
       b.title=scrub(t.name+(t.shortcut?'  ('+t.shortcut+')':'')+(t.behavior?'\n'+t.behavior:''));
@@ -3286,6 +3307,66 @@ window.addEventListener('resize',fitScreen);
   }
 
   // ---- menu bar ----------------------------------------------------------
+  // ── HELP DIALOGS — reusable modal (reuses .scrim/.modal) + static content. All body text is clean-room (no third-party marks). ──
+  const LP_VERSION='1.2.0';
+  function helpDialog(title,bodyHtml){
+    document.getElementById('helpScrim')?.remove();
+    const sc=document.createElement('div');sc.className='scrim';sc.id='helpScrim';
+    const m=document.createElement('div');m.className='modal';m.style.width='560px';m.style.maxWidth='92vw';
+    m.innerHTML='<h2><span class="ic">?</span> '+scrub(title)+'</h2><div class="help-body">'+bodyHtml+'</div>'+
+      '<div class="actions"><button class="tbtn cta" id="helpClose" style="flex:1;justify-content:center">Close</button></div>';
+    sc.appendChild(m);document.body.appendChild(sc);
+    const close=()=>{sc.remove();document.removeEventListener('keydown',onKey,true);};
+    const onKey=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();close();}};
+    sc.addEventListener('mousedown',e=>{if(e.target===sc)close();});
+    m.querySelector('#helpClose').onclick=close;
+    document.addEventListener('keydown',onKey,true);
+    requestAnimationFrame(()=>sc.classList.add('open'));return sc;
+  }
+  function helpMain(){helpDialog('LePrince Help',
+    '<p class="help-lead">A clean-room motion-graphics compositor — four panes, one timeline.</p>'+
+    '<ul class="help-list">'+
+    '<li><b>Media bin</b> (top-left): imported clips, images and solids. Drag onto a track.</li>'+
+    '<li><b>Program monitor</b> (top-centre): the live composite at the playhead. Space to play.</li>'+
+    '<li><b>Inspector</b> (right): Transform + Effect Controls for the selected layer; ◷ keyframes a value.</li>'+
+    '<li><b>Timeline</b> (bottom): tracks, clips and keyframes. V = select, C = razor, ⌫ = delete.</li></ul>'+
+    '<p class="help-foot">Tip: Help ▸ Keyboard Shortcuts lists every binding.</p>');}
+  function helpWhatsNew(){helpDialog("What's New",
+    '<div class="help-rel-h">v'+LP_VERSION+'</div><ul class="help-list">'+
+    '<li>Effect Controls plugin-card panel — gradient sliders, swatches, keyframe stopwatches.</li>'+
+    '<li>36 working effects incl. Colour / Luma Key, Directional &amp; Radial blur, Warp, Curves.</li>'+
+    '<li>Adjustment Layers, Track Mattes, parenting &amp; Null Objects, sub-frame Motion Blur.</li>'+
+    '<li>Mask shape / feather / opacity keyframing, plus an in-app Help &amp; Effect Reference.</li></ul>');}
+  function helpEffectRef(){
+    const rows=FX_DEFS.map(d=>'<tr><td>'+scrub(d[1])+'</td><td class="hr-p">'+scrub(d[3])+'</td><td class="hr-d">'+d[2]+'</td></tr>').join('');
+    helpDialog('Effect Reference',
+      '<p class="help-lead">The '+FX_DEFS.length+' house effects. Apply from the Effect menu or the +Effect row; each exposes its main parameter (default shown) and is fully keyframable.</p>'+
+      '<div class="help-scroll"><table class="help-tbl"><thead><tr><th>Effect</th><th>Parameter</th><th>Default</th></tr></thead><tbody>'+rows+'</tbody></table></div>');}
+  function helpAbout(){
+    let gpu='';try{const gl=document.createElement('canvas').getContext('webgl');const dbg=gl&&gl.getExtension('WEBGL_debug_renderer_info');if(dbg)gpu=scrub(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)||'');}catch(e){}
+    helpDialog('About LePrince Visual Labs',
+      '<p class="help-lead">LePrince Visual Labs — a clean-room compositor.</p>'+
+      '<div class="help-kv"><span>Version</span><b>'+LP_VERSION+'</b></div>'+
+      '<div class="help-kv"><span>Default comp</span><b>1920×1080 @ 30 fps</b></div>'+
+      (gpu?'<div class="help-kv"><span>Renderer</span><b>'+gpu+'</b></div>':'')+
+      '<p class="help-foot">Built independently from published specifications. No third-party code, assets or trademarks are used; all effect and panel names are original.</p>');}
+  function helpCompat(){
+    const has=ok=>ok?'<span class="hc-ok">PASS</span>':'<span class="hc-warn">WARN</span>';
+    const row=(name,ok,note)=>'<tr><td>'+name+'</td><td>'+has(ok)+'</td><td class="hc-n">'+note+'</td></tr>';
+    const c2d=!!document.createElement('canvas').getContext('2d');
+    const rvfc=('requestVideoFrameCallback' in HTMLVideoElement.prototype);
+    const wa=!!(window.AudioContext||window.webkitAudioContext), rec=('MediaRecorder' in window), off=('OffscreenCanvas' in window);
+    const stor=!!(navigator.storage&&navigator.storage.estimate);
+    helpDialog('System Compatibility Report',
+      '<p class="help-lead">Feature-detects what the compositor relies on in this browser.</p>'+
+      '<table class="help-tbl"><tbody>'+
+      row('Canvas 2D (compositing)',c2d,'core renderer')+
+      row('Video frame callback',rvfc,'frame-accurate video scrub')+
+      row('Web Audio',wa,'audio playback &amp; metering')+
+      row('MediaRecorder (export)',rec,'in-browser render fallback')+
+      row('OffscreenCanvas',off,'faster background render')+
+      row('Storage estimate',stor,'project autosave headroom')+
+      '</tbody></table>');}
   const ACT={
     'file|New Project':()=>$('#btnNew').click(),
     'file|Open Project':()=>openPicker(),
@@ -3329,6 +3410,7 @@ window.addEventListener('resize',fitScreen);
     'layer|Position':focusInspector,'layer|Scale':focusInspector,'layer|Rotation':focusInspector,'layer|Opacity':focusInspector, // Transform ▸ … → reveal the inspector
     'layer|Freeze On Last Frame':freezeLastSel,
     'view|Zoom (Timeline)':()=>zoomTimeline(1),
+    'animation|Sequence Layers…':sequenceLayers,
   };
   // IP scrub — clean-room guarantee: nothing user-visible carries an Adobe / After Effects
   // trademark, whatever the generated menu data says. Applied at EVERY render choke-point.
@@ -3386,6 +3468,13 @@ window.addEventListener('resize',fitScreen);
     }
     if(menuId==='edit'&&/^Undo$/i.test(L)&&it.behavior&&/purge/i.test(it.behavior))return purgeUndoCache; // Edit▸Purge▸Undo (clears history) ≠ Edit▸Undo
     if(ACT[key])return ACT[key];
+    if(menuId==='help'){   // static help modals (labels matched raw, pre-scrub)
+      if(/^After Effects Help$|^LePrince Help$/i.test(L))return helpMain;
+      if(/^What.?s New$/i.test(L))return helpWhatsNew;
+      if(/^Effect Reference$/i.test(L))return helpEffectRef;
+      if(/^System Compatibility/i.test(L))return helpCompat;
+      if(/^About /i.test(L))return helpAbout;
+    }
     if(menuId==='layer'&&/^Text$/i.test(L))return ()=>$('#addText').click();
     if(menuId==='layer'&&/^Adjustment Layer$/i.test(L))
       return (it.behavior&&/\b(switch|toggle|behaves|currently selected|makes? the)\b/i.test(it.behavior))?toggleAdjustment:()=>newAdjustment();
