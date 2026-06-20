@@ -1727,6 +1727,24 @@ function drawMatted(ctx,bEntry,matteEntry,mode,f,W,H,srcOverride){
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation=bEntry.c.blend||'source-over';ctx.globalAlpha=1;ctx.filter='none';
   ctx.drawImage(B,0,0);ctx.restore();
 }
+// Motion blur — render N sub-samples across the shutter (½ frame) and average them (running-mean keeps alpha).
+const MB_N=9, MB_SHUTTER=0.5;
+let _mbA=null,_mbS=null;
+function _mbCanvases(W,H){if(!_mbA){_mbA=document.createElement('canvas');_mbS=document.createElement('canvas');}
+  if(_mbA.width!==W||_mbA.height!==H){_mbA.width=_mbS.width=W;_mbA.height=_mbS.height=H;}return [_mbA,_mbS];}
+function transformKeyed(c){for(const fld of ['posX','posY','scale','rotation','anchorX','anchorY'])if(isKeyed(c,fld))return true;return false;}
+function hasMotion(c){if(transformKeyed(c))return true;for(const anc of parentChainOf(c))if(transformKeyed(anc))return true;return false;}
+function drawOneClipMB(ctx,entry,f,W,H,srcOverride){
+  const c=entry.c;
+  if(!c.motionBlur||!hasMotion(c))return drawOneClip(ctx,entry,f,W,H,srcOverride); // only blur an actually-moving layer
+  const [A,S]=_mbCanvases(W,H),ag=A.getContext('2d'),sg=S.getContext('2d');
+  const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.filter='none';};
+  reset(ag);ag.clearRect(0,0,W,H);let j=0;
+  for(let i=0;i<MB_N;i++){const t=(i/(MB_N-1)-0.5)*MB_SHUTTER;
+    reset(sg);sg.clearRect(0,0,W,H);
+    if(drawOneClip(sg,entry,f+t,W,H,srcOverride)){ag.globalAlpha=1/(j+1);ag.drawImage(S,0,0);j++;}}
+  reset(ag);ctx.drawImage(A,0,0);
+}
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
@@ -1738,7 +1756,7 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
     if(c.trackMatte&&i+1<vis.length){const me=vis[i+1];consumed.add(i+1); // layer above = the matte
       if(me.c.guide&&srcOverride){drawOneClip(ctx,entry,f,W,H,srcOverride);continue;} // a guide matte is preview-only → ignore on export
       drawMatted(ctx,entry,me,c.trackMatte,f,W,H,srcOverride);continue;}
-    drawOneClip(ctx,entry,f,W,H,srcOverride);
+    drawOneClipMB(ctx,entry,f,W,H,srcOverride);
   }
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
   ctx.filter='none';
@@ -2176,6 +2194,7 @@ function refreshInspector(){
     ${numRow('Start (f)','cStart',clip.start)}${isSolid?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
     ${isAud?'':`<div class="row"><label>Track Matte</label><select class="fld" id="cTrkMat">${[['','None'],['alpha','Alpha'],['alphaInv','Alpha Inv'],['luma','Luma'],['lumaInv','Luma Inv']].map(([v,l])=>`<option value="${v}" ${(clip.trackMatte||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>`}
     ${isAud?'':`<div class="row"><label>Parent</label><select class="fld" id="cParent"><option value="">None</option>${project.tracks.flatMap(t=>t.clips).filter(o=>o.id!==clip.id).map(o=>`<option value="${o.id}" ${clip.parentId===o.id?'selected':''}>${esc(o.name||o.text||(MEDIA[o.mediaId]||{}).name||'Layer')}</option>`).join('')}</select></div>`}
+    ${isAud?'':`<div class="row"><label>Motion Blur</label><button class="chip ${clip.motionBlur?'on':''}" id="cMB">${clip.motionBlur?'On':'Off'}</button></div>`}
     </div>
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
       ${numRowK('Anchor X','anchorX',clip)}${numRowK('Anchor Y','anchorY',clip)}
@@ -2204,6 +2223,7 @@ function refreshInspector(){
     $('#cBlend').onchange=e=>{clip.blend=e.target.value;drawFrame();save(true);};
     {const tm=$('#cTrkMat');if(tm)tm.onchange=e=>{clip.trackMatte=e.target.value||null;renderTimeline();drawFrame();save(true);};}
     {const cp=$('#cParent');if(cp)cp.onchange=e=>setClipParent(clip,e.target.value||null);}
+    {const mb=$('#cMB');if(mb)mb.onclick=()=>{clip.motionBlur=!clip.motionBlur;refreshInspector();renderTimeline();drawFrame();save(true);};}
     if(!opaKeyed){
       bindNum('tIn',v=>{clip.transIn=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
       bindNum('tOut',v=>{clip.transOut=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
@@ -2693,6 +2713,7 @@ function projectNeedsFrameServer(p){
     if(c.trackMatte)return true; // track mattes are canvas-composited — frame-server only
     if(c.parentId)return true;   // a parented layer's transform is composed client-side
     if(c.nullObject)return true; // null objects (invisible) — frame-server skips them
+    if(c.motionBlur)return true; // motion blur is sub-frame-accumulated client-side
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
     if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
@@ -2940,6 +2961,10 @@ window.addEventListener('resize',fitScreen);
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.nullObject).length,0)+1;
     const c={id:uid(),kind:'solid',solid:true,nullObject:true,name:'Null '+n,color:'#8a8a8a',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Null Object added — parent layers to it to move them together');}
+  function toggleMotionBlur(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(clipKind(s.clip)==='audio')return toast('Motion blur is for visual layers',1);
+    s.clip.motionBlur=!s.clip.motionBlur;renderTimeline();refreshInspector();drawFrame();save();
+    toast(s.clip.motionBlur?('Motion blur on'+(hasMotion(s.clip)?'':' — animate the transform to see it')):'Motion blur off',s.clip.motionBlur&&!hasMotion(s.clip)?1:0);}
   function setTrackMatte(mode){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Track mattes are for visual layers',1);
     s.clip.trackMatte=mode;renderTimeline();refreshInspector();drawFrame();save();
@@ -3228,6 +3253,7 @@ window.addEventListener('resize',fitScreen);
       if(/Fit to Comp Height/i.test(L))return ()=>fitToComp('h');
       if(/^Fit to Comp(?:osition)?$/i.test(L))return ()=>fitToComp('both');
       if(/^Guide Layer$/i.test(L))return toggleGuideLayer;
+      if(/^Motion Blur$/i.test(L))return toggleMotionBlur;
       if(/^Effects( \(Enable\))?$/i.test(L))return toggleFxEnabled;
       if(/^No Track Matte/i.test(L))return ()=>setTrackMatte(null);
       if(/^Alpha Inverted Matte/i.test(L))return ()=>setTrackMatte('alphaInv');
@@ -3327,6 +3353,7 @@ window.addEventListener('resize',fitScreen);
     'layer|Effects':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
     'layer|Effects (Enable)':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
     'layer|Adjustment Layer':()=>{const s=sc();return !!(s&&s.clip&&s.clip.adjustment);},
+    'layer|Motion Blur':()=>{const s=sc();return !!(s&&s.clip&&s.clip.motionBlur);},
   };
   const DISABLE={'edit|Undo':()=>!canUndo(),'edit|Redo':()=>!canRedo(),'edit|Paste':()=>!CLIP};
 
