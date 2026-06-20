@@ -1110,7 +1110,29 @@ async function offlineProcess(def, buf, params, opts={}){
 // Wrap a DeMartin plugin as a DeMartin-Suite proc (renders it offline onto the selection/clip).
 function pluginProc(name, extra){ const def=TIFF_PLUGINS.byName(name); if(!def) return null;
   return Object.assign({ id:'plug:'+def.name, name:def.name, params:def.params, plugin:true,
-    run:(buf,p)=>offlineProcess(def, buf, p, extra||{}) }, extra||{}); }
+    run:(buf,p,o)=>offlineProcess(def, buf, p, Object.assign({}, extra||{}, o||{})) }, extra||{}); }
+// VARI-FI — tape slow-down / speed-up: a varispeed RAMP (pitch + time together, like tape).
+// 'down' decelerates from normal to a stop; 'up' accelerates from a stop to normal.
+function fxVariFi(buf, dir){
+  const sr=buf.sampleRate, ch=buf.numberOfChannels, inLen=buf.length;
+  const slow = dir!=='up';
+  const rateAt = slow ? (x)=> (1-x)*(1-x) : (x)=> x*x;   // input-samples per output-sample over output progress x∈[0,1]
+  const outLen = Math.max(1, Math.floor(inLen*3));       // mean rate of x² (and (1-x)²) over [0,1] = 1/3 → output ≈ 3× input
+  const oc=new OfflineAudioContext(ch, outLen, sr);
+  const out=oc.createBuffer(ch, outLen, sr);
+  for(let c=0;c<ch;c++){
+    const s=buf.getChannelData(c), d=out.getChannelData(c);
+    let pos=0;
+    for(let j=0;j<outLen;j++){
+      const i0=Math.floor(pos), frac=pos-i0;
+      const a=s[Math.min(i0,inLen-1)]||0, b=s[Math.min(i0+1,inLen-1)]||0;
+      d[j]=a+(b-a)*frac;
+      pos += Math.max(0.0001, rateAt(j/outLen));
+      if(pos>=inLen-1){ pos=inLen-1; }
+    }
+  }
+  return out;
+}
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
@@ -1369,6 +1391,7 @@ const AUDIOSUITE = [
   { id:'norm',    name:'Normalize',   params:[{id:'tgt',label:'PEAK dB',  min:-12,max:0,  step:0.5, value:-1, fmt:v=>v.toFixed(1)+'dB'}],                        run:(buf,p)=>fxNormalizeBuf(buf,p.tgt) },
   { id:'pitch',   name:'Pitch Shift', params:[{id:'st', label:'SEMITONES',min:-12,max:12, step:1,   value:0,  fmt:v=>(v>0?'+':'')+v}],                            run:(buf,p)=>fxPitchBuf(buf,p.st) },
   { id:'stretch', name:'Time Stretch',params:[{id:'rate',label:'LENGTH x',min:0.5,max:2,  step:0.01,value:1,  fmt:v=>v.toFixed(2)+'x'}],                          run:(buf,p)=>fxStretchBuf(buf,p.rate) },
+  { id:'varifi',  name:'Vari-Fi',     params:[{id:'dir', label:'MODE',  min:0, max:1, step:1, value:0, fmt:v=>v<0.5?'SLOW DOWN':'SPEED UP'}],                    run:(buf,p)=>fxVariFi(buf, p.dir<0.5?'down':'up') },
 ];
 let _asState = {};   // {procId, params:{}}
 function openAudioSuite(t){
@@ -1384,7 +1407,7 @@ function openAudioSuite(t){
     w.innerHTML = `<div class="pw-bar"><span class="vw-title">DEMARTIN SUITE</span><span class="pw-track">${t.name} · clip</span><button class="pw-x" title="close">✕</button></div>
       <div style="padding:13px 16px 4px"><select class="as-proc">${AUDIOSUITE.map(p=>`<option value="${p.id}"${p.id===_asState.procId?' selected':''}>${p.name}</option>`).join("")}</select></div>
       <div class="fx-knobs"></div>
-      <div style="padding:4px 16px 16px"><button class="as-render">⏏ Render onto clip</button></div>
+      <div style="padding:4px 16px 16px;display:flex;gap:8px;align-items:center"><button class="as-prev" title="Pre-listen — audition without committing (click again to stop)">🔊</button><span style="flex:1"></span>${proc.reverse?`<button class="as-rev" title="Reverse render — the tail swells INTO the hit, timed to your BPM (reverse reverb)">↺ Reverse</button>`:``}<button class="as-render">⏏ Render</button></div>
       <div class="fx-foot">offline · local · prints onto the selected clip (Ctrl+Z to undo)</div>`;
     const body=w.querySelector(".fx-knobs");
     proc.params.forEach(p=>{
@@ -1396,27 +1419,35 @@ function openAudioSuite(t){
     });
     w.querySelector(".pw-x").onclick=()=>w.remove();
     w.querySelector(".as-proc").onchange=e=>{ _asState.procId=e.target.value; _asState.params={}; draw(); };
-    w.querySelector(".as-render").onclick=()=>renderAudioSuite(t);
+    w.querySelector(".as-render").onclick=()=>renderAudioSuite(t, false);
+    w.querySelector(".as-rev")?.addEventListener("click", ()=>renderAudioSuite(t, true));
+    w.querySelector(".as-prev")?.addEventListener("click", ()=>asPreListen(t, proc.reverse));
     makeDraggable(w, w.querySelector(".pw-bar"));
   };
   draw();
   w.style.left="150px"; w.style.top="120px"; w.style.display="block"; bringFront(w);
 }
-function renderAudioSuite(t){
+function renderAudioSuite(t, reverse){
   const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
   if(!proc){ flash("Pick a processor"); return; }
+  ensureCtx();   // reverseBuffer + _renderRange need the live ctx — it's lazy (null until first playback)
   const r = _selRange(t);   // a highlighted time RANGE (⌶ Select tool) — else fall back to the whole clip
   let srcBuf, clRef=null;
   if(r){ srcBuf = _renderRange(t, r[0], r[1]); }      // flatten the range (any time past the clip is free silence for a tail to print into)
   else { clRef = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
          if(!clRef){ flash("Highlight a range (⌶) or pick a clip first"); return; }
          srcBuf = clRef.buffer; }
+  const tailSec = proc.tailBeats ? proc.tailBeats*(60/curTempo()) : (proc.tail||0);   // tempo-synced tail: beats → seconds at the project BPM
   const lane = document.getElementById("lane-"+t.id); lane?.classList.add("rendering");
-  const btn = document.querySelector("#audiosuite .as-render"); if(btn){ btn.disabled=true; btn.textContent="rendering…"; }
+  const btns = [...document.querySelectorAll("#audiosuite .as-render, #audiosuite .as-rev")]; btns.forEach(b=>b.disabled=true);
+  const rbtn = document.querySelector("#audiosuite .as-render"); if(rbtn) rbtn.textContent="rendering…";
   setTimeout(async ()=>{                            // let the "rendering…" paint before the DSP (plugin procs render async)
     try{
-      const out = await proc.run(srcBuf, _asState.params);
-      pushUndoClips(t, proc.name+" render");
+      let inBuf = reverse ? reverseBuffer(srcBuf) : srcBuf;
+      let out = await proc.run(inBuf, _asState.params, {tail: tailSec});
+      if(reverse) out = reverseBuffer(out);          // reverse → render → reverse: the tail SWELLS into the hit (reverse reverb)
+      pushUndoClips(t, (reverse?"Reverse ":"")+proc.name+" render");
+      const verb = (reverse?"Reverse ":"")+proc.name;
       if(r){
         const a=r[0], b=r[1];                        // overwrite the source region (PT consolidate) + drop a NEW rendered clip at a; its tail rings PAST b into space
         const sA=clipsOf(t).find(c=> c.start < a-0.001 && (c.start+c.buffer.duration) > a+0.001); if(sA) _splitAt(t,sA,a);
@@ -1425,13 +1456,31 @@ function renderAudioSuite(t){
         t.clips=clipsOf(t).filter(c=> !inside.includes(c));
         const nc={id:rid(), buffer:out, start:a}; t.clips.push(nc); t.clips.sort((x,y)=>x.start-y.start);
         syncPrimary(t); selClip={trackId:t.id,clipId:nc.id}; SEL=null; drawLane(t);
-        if(playing) restartPlayback(); flash(`${proc.name} rendered onto selection`);
+        if(playing) restartPlayback(); flash(`${verb} rendered onto selection`);
         if(selTrackId===t.id) renderChannel(t);
-      } else { clRef.buffer = out; afterClipFx(t, clRef, `${proc.name} rendered onto clip`); }
+      } else { clRef.buffer = out; afterClipFx(t, clRef, `${verb} rendered onto clip`); }
     }catch(e){ flash("Render failed: "+e.message); }
     lane?.classList.remove("rendering");
-    if(btn){ btn.disabled=false; btn.textContent="⏏ Render"; }
+    btns.forEach(b=>b.disabled=false); if(rbtn) rbtn.textContent="⏏ Render";
   }, 30);
+}
+// PRE-LISTEN — render offline + audition through the live ctx WITHOUT committing (toggle to stop).
+let _asPreviewSrc=null;
+async function asPreListen(t, reverse){
+  const proc = AUDIOSUITE.find(p=>p.id===_asState.procId); if(!proc) return;
+  ensureCtx();
+  if(_asPreviewSrc){ try{ _asPreviewSrc.stop(); }catch(e){} _asPreviewSrc=null; flash("Stopped"); return; }
+  const r=_selRange(t);
+  let srcBuf = r ? _renderRange(t,r[0],r[1])
+                 : (selClip && selClip.trackId===t.id ? (clipsOf(t).find(c=>c.id===selClip.clipId)||{}).buffer : null);
+  if(!srcBuf){ flash("Highlight a range (⌶) or pick a clip first"); return; }
+  const tailSec = proc.tailBeats ? proc.tailBeats*(60/curTempo()) : (proc.tail||0);
+  let inBuf = reverse ? reverseBuffer(srcBuf) : srcBuf;
+  let out = await proc.run(inBuf, _asState.params, {tail: tailSec});
+  if(reverse) out = reverseBuffer(out);
+  const s=ctx.createBufferSource(); s.buffer=out; s.connect(ctx.destination);
+  s.onended=()=>{ if(_asPreviewSrc===s) _asPreviewSrc=null; };
+  _asPreviewSrc=s; s.start(); flash(`Auditioning ${reverse?"reverse ":""}${proc.name}…`);
 }
 
 // right-click context menu on a waveform — Pro Tools style
@@ -6863,7 +6912,7 @@ function laneUiTake(t, placeAt) {
   if (_clipMenu) { const _ml = _clipMenu.items.find(it => /^Melodyne/i.test(it.label)); if (_ml) _ml.label = "DeMartin Tune"; }
   // Plugin-backed DeMartin Suite procs — the SAME plugins, rendered offline onto a clip (added here,
   // after the plugin registry is fully built, so both the menu and the suite's proc list include them).
-  [['DeMartin Reverb',{tail:2.5}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
+  [['DeMartin Reverb',{reverse:true, tailBeats:4, tail:2.5}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
     if(!AUDIOSUITE.some(p=>p.name===nm)){ const pp=pluginProc(nm,ex); if(pp) AUDIOSUITE.push(pp); }
   });
   // "AudioSuite" is an Avid term — the top menu is OUR "DeMartin Suite", listing OUR procs only
