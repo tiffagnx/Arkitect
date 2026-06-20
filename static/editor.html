@@ -1652,6 +1652,7 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   for(const {c,img,solid} of activeVideoClips(f)){
+    if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export (srcOverride present)
     if(solid){drawSolidClip(ctx,effClip(c),f,W,H);continue;}
     let src,sw,sh;
     if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))continue;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
@@ -1660,7 +1661,7 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
       if(!(v.readyState>=2&&v.videoWidth))continue;src=v;sw=v.videoWidth;sh=v.videoHeight;}
     drawClip(ctx,effClip(c),f,src,sw,sh,W,H);
   }
-  for(const c of activeTexts(f))drawTextClip(ctx,effClip(c),f,W,H);
+  for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
   ctx.filter='none';
 }
 function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);drawMaskOverlay(sctx,screen.width,screen.height);}
@@ -2199,10 +2200,13 @@ function blurMatte(M,W,H,rad){const r=Math.round(rad);if(r<1)return M;const win=
   return out;}
 // Per-effect bypass (the ◉ toggle): a render-time clone where bypassed fx fields fall back to KDEF defaults.
 function effClip(c){
-  if(!c._fxOff)return c;
-  let any=false;for(const k in c._fxOff){if(c._fxOff[k]){any=true;break;}}
+  const allOff=c.fxEnabled===false;   // Layer ▸ Switches ▸ Effects toggle
+  let any=allOff;
+  if(c._fxOff)for(const k in c._fxOff){if(c._fxOff[k]){any=true;break;}}
   if(!any)return c;
-  const cc=Object.assign({},c);for(const k in c._fxOff){if(c._fxOff[k]&&k in KDEF)cc[k]=KDEF[k];}
+  const cc=Object.assign({},c);
+  if(allOff)for(const d of FX_DEFS)cc[d[0]]=KDEF[d[0]];
+  if(c._fxOff)for(const k in c._fxOff){if(c._fxOff[k]&&k in KDEF)cc[k]=KDEF[k];}
   return cc;
 }
 // ── EFFECT CONTROLS PANEL — each active effect becomes a plugin card (slider/colour/keyframe) ──
@@ -2588,6 +2592,7 @@ function projectNeedsFrameServer(p){
     if((c.scaleX!=null&&c.scaleX!==1)||(c.scaleY!=null&&c.scaleY!==1))return true; // flip — native path has no hflip/vflip
     if((c.anchorX&&c.anchorX!==0)||(c.anchorY&&c.anchorY!==0))return true;
     if(clipKind(c)==='solid'||c.solid)return true; // solids aren't drawn by the native ffmpeg path
+    if(c.guide)return true; // guide layers must be skipped on export — only the frame-server path can
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
     if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
@@ -2917,6 +2922,10 @@ window.addEventListener('resize',fitScreen);
     Object.assign(s.clip,o);refreshInspector();renderTimeline();drawFrame();save();toast('Animation preset applied');}
   let LAST_FX=null;
   function lastEffect(){if(!LAST_FX)return toast('No effect applied yet',1);applyEffect(LAST_FX.field,LAST_FX.val,LAST_FX.label);}
+  function toggleFxEnabled(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    s.clip.fxEnabled=s.clip.fxEnabled===false;refreshInspector();renderTimeline();drawFrame();save();toast(s.clip.fxEnabled===false?'Effects disabled on this layer':'Effects enabled');}
+  function toggleGuideLayer(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    s.clip.guide=!s.clip.guide;renderTimeline();drawFrame();save();toast(s.clip.guide?'Guide layer — shows in preview, skipped on export':'Guide layer off');}
 
   // ---- workspaces --------------------------------------------------------
   function applyWorkspace(ws){
@@ -3090,6 +3099,8 @@ window.addEventListener('resize',fitScreen);
       if(/Fit to Comp Width/i.test(L))return ()=>fitToComp('w');
       if(/Fit to Comp Height/i.test(L))return ()=>fitToComp('h');
       if(/^Fit to Comp(?:osition)?$/i.test(L))return ()=>fitToComp('both');
+      if(/^Guide Layer$/i.test(L))return toggleGuideLayer;
+      if(/^Effects( \(Enable\))?$/i.test(L))return toggleFxEnabled;
     }
     if(menuId==='edit'&&/^All Memory & Disk Cache$/i.test(L))return purgeAllCache;
     if(menuId==='edit'&&/^(Image Cache Memory|All Image Memory|Image Caches?)$/i.test(L))return purgeImageCache;
@@ -3179,6 +3190,9 @@ window.addEventListener('resize',fitScreen);
     'view|Show Grid':()=>OV.grid,'view|Show Guides':()=>OV.guides,'view|Show Rulers':()=>OV.rulers,
     'view|Full':()=>(project.previewRes||1)===1,'view|Half':()=>Math.abs((project.previewRes||1)-0.5)<0.01,
     'view|Third':()=>Math.abs((project.previewRes||1)-1/3)<0.02,'view|Quarter':()=>Math.abs((project.previewRes||1)-0.25)<0.01,
+    'layer|Guide Layer':()=>{const s=sc();return !!(s&&s.clip&&s.clip.guide);},
+    'layer|Effects':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
+    'layer|Effects (Enable)':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
   };
   const DISABLE={'edit|Undo':()=>!canUndo(),'edit|Redo':()=>!canRedo(),'edit|Paste':()=>!CLIP};
 
