@@ -102,6 +102,81 @@ _SYNONYMS = {
     "free": ["local", "offline", "cost"],
     "slow": ["speed", "fast", "performance", "lag"],
     "stem": ["track", "audio", "file"],
+    # ── mixing craft & creative-FX vocabulary (the deep "how to mix" binder) ──
+    "compress": ["compression", "dynamics", "compressor"],
+    "compression": ["compressor", "dynamics", "compress"],
+    "punch": ["transient", "attack", "snap", "compression"],
+    "punchy": ["punch", "transient", "attack"],
+    "transient": ["attack", "punch", "shaper", "snap"],
+    "glue": ["bus", "cohesion", "compression", "master"],
+    "sidechain": ["duck", "ducking", "pump", "pumping"],
+    "duck": ["sidechain", "ducking", "pump"],
+    "pump": ["sidechain", "duck", "pumping"],
+    "parallel": ["newyork", "blend", "compression"],
+    "saturation": ["tape", "tube", "warmth", "drive", "distortion", "color", "harmonics"],
+    "saturate": ["saturation", "tape", "warmth", "drive"],
+    "warmth": ["saturation", "tape", "tube", "analog", "warm"],
+    "warm": ["warmth", "saturation", "tape"],
+    "distortion": ["saturation", "drive", "overdrive", "fuzz", "crunch"],
+    "lofi": ["bitcrush", "vintage", "telephone", "degrade", "tape"],
+    "bitcrush": ["lofi", "crush", "degrade"],
+    "exciter": ["air", "harmonics", "enhance", "sheen"],
+    "harsh": ["harshness", "sibilance", "bright", "deess", "fatiguing"],
+    "harshness": ["harsh", "sibilance", "bright"],
+    "sibilance": ["deess", "harsh", "ess", "sss"],
+    "deess": ["sibilance", "ess", "harsh"],
+    "mud": ["muddy", "boomy", "boxy", "cleanup"],
+    "muddy": ["mud", "boomy", "boxy"],
+    "boomy": ["mud", "muddy", "boom", "low"],
+    "boxy": ["mud", "boxy", "honky"],
+    "thin": ["weak", "small", "body"],
+    "dull": ["dark", "muffled", "bright", "air"],
+    "width": ["stereo", "wide", "widen", "image", "spread"],
+    "wide": ["width", "stereo", "spread"],
+    "stereo": ["width", "wide", "image", "midside"],
+    "midside": ["stereo", "width"],
+    "pan": ["panning", "balance", "lcr", "stereo"],
+    "panning": ["pan", "balance", "lcr"],
+    "depth": ["space", "distance", "3d", "front", "back"],
+    "reverse": ["backwards", "reversed", "swell"],
+    "stutter": ["glitch", "repeat", "chop", "beatrepeat", "gate"],
+    "glitch": ["stutter", "repeat", "beatrepeat"],
+    "riser": ["sweep", "uplifter", "buildup", "transition", "whoosh", "rise"],
+    "sweep": ["riser", "filter", "automation", "whoosh"],
+    "build": ["buildup", "riser", "tension", "breakdown"],
+    "transition": ["riser", "sweep", "fill", "whoosh"],
+    "throw": ["delay", "reverb", "send", "tail"],
+    "slapback": ["slap", "delay"],
+    "slap": ["slapback", "delay"],
+    "haas": ["width", "delay", "stereo"],
+    "chorus": ["modulation", "thicken", "double", "width", "ensemble"],
+    "flanger": ["modulation", "jet", "sweep"],
+    "phaser": ["modulation", "phase", "sweep"],
+    "modulation": ["chorus", "flanger", "phaser", "tremolo", "vibrato"],
+    "double": ["doubling", "stack", "thicken", "chorus"],
+    "stack": ["double", "layers", "thicken", "harmony"],
+    "harmony": ["harmonies", "stack", "double"],
+    "automation": ["ride", "rides", "automate", "envelope", "move"],
+    "ride": ["automation", "rides", "fader"],
+    "loudness": ["lufs", "loud", "master", "limiter", "level"],
+    "lufs": ["loudness", "loud", "level", "meter"],
+    "limiter": ["maximizer", "loudness", "ceiling", "master", "brickwall"],
+    "maximizer": ["limiter", "loudness", "ceiling"],
+    "headroom": ["gain", "staging", "level", "clipping"],
+    "clipping": ["overload", "distort", "hot", "red", "peak"],
+    "808": ["bass", "sub", "kick", "low"],
+    "sub": ["bass", "808", "low", "subbass"],
+    "kick": ["drum", "808", "low"],
+    "snare": ["drum", "clap"],
+    "drum": ["drums", "kick", "snare", "percussion", "beat"],
+    "telephone": ["radio", "lofi", "phone", "bandpass", "megaphone"],
+    "formant": ["pitch", "gender", "tune", "octave"],
+    "octave": ["pitch", "formant", "tune"],
+    "reference": ["referencing", "compare", "commercial"],
+    "masking": ["mask", "clash", "fighting", "space", "carve"],
+    "carve": ["masking", "space", "slot"],
+    "vocal": ["vocals", "voice", "lead", "singer"],
+    "vocals": ["vocal", "voice", "lead"],
 }
 
 # ── cache (rebuild only when a .md changes; startup/reads stay instant) ──
@@ -115,7 +190,7 @@ def _signature() -> float:
     if not KB_DIR.is_dir():
         return 0.0
     sig = 0.0
-    for p in KB_DIR.glob("*.md"):
+    for p in KB_DIR.rglob("*.md"):
         try:
             sig = max(sig, p.stat().st_mtime)
         except OSError:
@@ -157,10 +232,16 @@ def _load() -> list[dict]:
         return _cache
     chunks: list[dict] = []
     if KB_DIR.is_dir():
-        for p in sorted(KB_DIR.glob("*.md")):
-            room = p.stem.lower()
+        for p in sorted(KB_DIR.rglob("*.md")):
+            # Room = the file stem at top level (studio.md -> "studio"), OR the
+            # containing subfolder when nested (studio/eq.md -> "studio"). This lets
+            # ONE room's binder span many files under data/kit_kb/<room>/, so the
+            # knowledge base can grow huge (the deep "how to mix" binder) without one
+            # unwieldy file — each topic is its own .md and still scopes to its room.
+            rel = p.relative_to(KB_DIR)
+            room = (rel.parts[0] if len(rel.parts) > 1 else p.stem).lower()
             try:
-                chunks.extend(_split_chunks(p.read_text(encoding="utf-8"), room, p.name))
+                chunks.extend(_split_chunks(p.read_text(encoding="utf-8"), room, rel.as_posix()))
             except OSError:
                 pass
     _cache, _cache_sig = chunks, sig
@@ -186,11 +267,17 @@ def all_chunks() -> list[dict]:
     return list(_load())
 
 
-def retrieve(room: str, query: str, k: int = 4, budget: int = 2800) -> list[dict]:
+def retrieve(room: str, query: str, k: int = 4, budget: int = 2800, min_terms: int = 1) -> list[dict]:
     """Top-k knowledge chunks for `query`, scoped to `room` + the cross-room
     `architect` doc. Score = body-word overlap + 2x title overlap (a title hit is
     a strong signal). Capped at `budget` characters so the prompt never balloons —
-    no matter how big the binder grows, only ~k pages ride along."""
+    no matter how big the binder grows, only ~k pages ride along.
+
+    `min_terms` is the relevance FLOOR: a chunk must share at least this many distinct
+    query words (after synonym expansion) to qualify. Default 1 = the original
+    behaviour (Kit, in-room, where every question IS about the room). The main chat
+    (Tiff) passes 2 so a single coincidental word — e.g. a card that happens to quote
+    "In the Air Tonight" — can't pull craft knowledge into a casual conversation."""
     room = (room or "").strip().lower()
     chunks = _load()
     if not chunks:
@@ -201,7 +288,8 @@ def retrieve(room: str, query: str, k: int = 4, budget: int = 2800) -> list[dict
         return []
 
     # scope: this room + the always-on program-wide doc. Unknown room → search all
-    # (so Kit still helps in a room with no dedicated KB yet).
+    # (so Kit still helps in a room with no dedicated KB yet, and so the cross-room
+    # main chat can reach the whole binder).
     known = {c["room"] for c in chunks}
     if room in known:
         pool = [c for c in chunks if c["room"] in (room, GENERAL_ROOM)]
@@ -210,8 +298,12 @@ def retrieve(room: str, query: str, k: int = 4, budget: int = 2800) -> list[dict
 
     scored = []
     for c in pool:
-        body_hit = len(qx & _words(c["text"]))
-        title_hit = len(qx & _words(c["title"]))
+        cw_body = _words(c["text"])
+        cw_title = _words(c["title"])
+        if len(qx & (cw_body | cw_title)) < min_terms:
+            continue
+        body_hit = len(qx & cw_body)
+        title_hit = len(qx & cw_title)
         score = body_hit + 2 * title_hit
         if score:
             # prefer the room's own doc slightly over the general doc on ties

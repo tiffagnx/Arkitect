@@ -484,6 +484,29 @@ def memory_block(messages: list[dict]) -> str:
             "recite or mention that you 'have notes'):\n" + block)
 
 
+def craft_kb_block(messages: list[dict]) -> str:
+    """Relevant CRAFT knowledge for this turn — pulled from Kit's KB binder
+    (data/kit_kb/**.md: the deep mixing / production / editing how-to) and appended
+    to the LAST user message, same pattern as memory_block so the cacheable persona
+    prefix stays byte-identical. Tiff is the cross-room collaborator, so we search the
+    WHOLE binder (an unknown room makes kb.retrieve pool ALL chunks) and only inject
+    when the user's words actually hit a card — most casual turns add nothing, so
+    there's no per-turn cost unless the question is genuinely about craft."""
+    try:
+        tail = " ".join(_content_text(m.get("content")) for m in messages[-3:])
+        if not tail.strip():
+            return ""
+        hits = kb.retrieve("main", tail, k=3, budget=2200, min_terms=2)
+        if not hits:
+            return ""
+        block = "\n\n".join(f"[{c['title']}]\n{c['text']}" for c in hits)
+        return ("\n\n---\nCRAFT KNOWLEDGE (mixing / production / editing reference for this "
+                "question — use it to give concrete, correct technique in your own voice; "
+                "weave it in naturally, never recite it or say you 'have notes'):\n" + block)
+    except Exception:
+        return ""
+
+
 # ── version (single source of truth for the app-wide updater) ───────────────
 @app.get("/api/version")
 async def app_version():
@@ -716,6 +739,7 @@ async def chat(req: Request):
     # persona prefix stays byte-identical and LM Studio caches it instead of re-reading
     # ~4.8K tokens every turn (verified speed win, 2026-06-13).
     mem = memory_block(messages)
+    mem += craft_kb_block(messages)                   # Tiff also draws on Kit's craft binder (how-to-mix) when the question calls for it
     msgs = [dict(m) for m in messages[-12:]]          # cap history (was 24) + copy so we don't mutate
     msgs = [_clean_msg(m) for m in msgs]              # strip display-only fields, normalize content
     if mem:
