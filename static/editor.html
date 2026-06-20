@@ -830,7 +830,7 @@ function clipPropGroups(track,c){
          nodes.push({type:'maskprop',mask:m,prop:'shape',label:'Mask Path'});
          nodes.push({type:'maskprop',mask:m,prop:'feather',label:'Mask Feather'});
          nodes.push({type:'maskprop',mask:m,prop:'opacity',label:'Mask Opacity'});
-         nodes.push({type:'maskprop',mask:m,prop:'expansion',label:'Mask Expansion'});
+         if(!isPenMask(m))nodes.push({type:'maskprop',mask:m,prop:'expansion',label:'Mask Expansion'}); // expansion is a no-op on pen shapes (matches the inspector)
        }
      }
      nodes.push({type:'add',what:'mask',label:'+ Mask'});
@@ -968,9 +968,9 @@ function buildHeadProps(track,c){
       const val=document.createElement('span');val.className='tl-val';
       const fn=keyed?maskNow(c,m,n.prop):null;
       val.textContent = n.prop==='shape'?(isPenMask(m)?('Pen · '+m.points.length+' pts'+(m.smooth?' ∿':'')):(m.shape==='ellipse'?'Ellipse':'Rectangle'))
-        : n.prop==='feather'?(((keyed?fn:(m.feather||0))|0)+' px')
+        : n.prop==='feather'?(+(+(keyed?fn:(m.feather||0))).toFixed(1)+' px')
         : n.prop==='opacity'?(Math.round((keyed?fn:(m.opacity==null?1:m.opacity))*100)+'%')
-        : (((keyed?fn:(m.expansion||0))|0)+' px');
+        : (+(+(keyed?fn:(m.expansion||0))).toFixed(1)+' px');
       if(n.prop==='shape'&&!isPenMask(m)){val.style.cursor='pointer';val.title='Toggle shape';
         val.onclick=e=>{e.stopPropagation();m.shape=m.shape==='ellipse'?'rect':'ellipse';renderTimeline();drawFrame();save(true);};}
       row.append(nm,val);
@@ -1190,7 +1190,8 @@ function pval(c,field,fr,def){
   if(e==='ease')s=bez(u,.42,0,.58,1);else if(e==='in')s=bez(u,.42,0,1,1);else if(e==='out')s=bez(u,0,0,.58,1);
   return a.v+(b.v-a.v)*s;
 }
-function shiftKeys(c,df){for(const f of KEYABLE){const p=c[f];if(p&&p.k)for(const kf of p.k)kf.t+=df;}}
+function shiftKeys(c,df){for(const f of KEYABLE){const p=c[f];if(p&&p.k)for(const kf of p.k)kf.t+=df;}
+  for(const f in c){if(f.startsWith('mk.')){const p=c[f];if(p&&p.k)for(const kf of p.k)kf.t+=df;}}} // mask keyframes (mk.<id>.<prop>) are clip-relative too — re-base on trim/split
 function clipFilter(c,f,kpx){
   const fr=f-c.start,parts=[];
   const br=pval(c,'fxBright',fr,1);if(br!==1)parts.push(`brightness(${br})`);
@@ -2298,7 +2299,7 @@ function masksInspector(clip){
           <button class="chip ${m.shape!=='ellipse'?'on':''}" data-msh="${m.id}|rect">Rect</button>
           <button class="chip ${m.shape==='ellipse'?'on':''}" data-msh="${m.id}|ellipse">Ellipse</button></div></div>`;
     const boxRows = pen ? '' :
-      `${numRow('Expansion','me_'+m.id,maskNow(clip,m,'expansion')|0)}
+      `${numRow('Expansion','me_'+m.id,+maskNow(clip,m,'expansion').toFixed(1))}
        ${numRow('Box X','mx_'+m.id,Math.round(m.box.x))}${numRow('Box Y','my_'+m.id,Math.round(m.box.y))}
        ${numRow('Box W','mw_'+m.id,Math.round(m.box.w))}${numRow('Box H','mh_'+m.id,Math.round(m.box.h))}`;
     return `
@@ -2308,7 +2309,7 @@ function masksInspector(clip){
       <button class="chip ${(m.mode||'add')==='add'?'on':''}" data-mmd="${m.id}|add">Add</button>
       <button class="chip ${m.mode==='subtract'?'on':''}" data-mmd="${m.id}|subtract">Subtract</button>
       <button class="chip ${m.inverted?'on':''}" data-minv="${m.id}">Inverted</button></div></div>
-    ${numRow('Feather','mf_'+m.id,maskNow(clip,m,'feather')|0)}${numRow('Opacity %','mo_'+m.id,Math.round(maskNow(clip,m,'opacity')*100))}
+    ${numRow('Feather','mf_'+m.id,+maskNow(clip,m,'feather').toFixed(1))}${numRow('Opacity %','mo_'+m.id,Math.round(maskNow(clip,m,'opacity')*100))}
     ${boxRows}
     <button class="del-btn" data-mdel="${m.id}">Delete ${esc(m.name)}</button>`;}).join('');
   return `<div class="grp director-only"><div class="gt">Masks</div>
