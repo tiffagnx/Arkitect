@@ -8,6 +8,36 @@
 
 ---
 
+## ⏩⏩ HANDOFF — v1.3.0 (2026-06-20) — READ THIS FIRST
+
+**Where we are:** `static/editor.html` is now a genuinely capable AE-style compositor. The full spine is in and working, end to end (preview + export). App is at **v1.3.0** (canonical `APP_VERSION` in `app.py`; editor About `LP_VERSION` matches). Everything below is **committed + pushed to `tiffagnx/Arkitect` master** and **pixel/functionally verified in real Chrome on port 7788**.
+
+### What shipped (this multi-session run, ~30 commits)
+- **36 effects** — the 15→35 batch + **Curves** (#36). Marquee custom UIs: **Keylight-grade chroma key** (`fxKey`: Screen Colour/Balance/Gain, Clip B/W, Shrink-Grow+Softness, Despill, View Final/Matte/Status), **Levels** (LUT card), **Curves** (draggable spline editor → 256-LUT), Colour/Luma Key, Directional/Radial blur, Warp. All auto-flow into the +Effect picker / stem tree / inspector / export via `FX_DEFS`.
+- **Beautiful Effect Controls panel** — per-effect plugin cards (category accent, ◉ bypass / ⟲ reset / × remove, gradient sliders + keyframe stopwatches, hue track, swatches, Duotone gradient, segmented selectors). Add a control via `FX_EXTRA[field]` (kind `swatch|slider|seg|curve`).
+- **Compositor foundations (all DONE + adversarially reviewed):** **Adjustment Layers**, **Track Mattes** (alpha/luma ±inv), **Parenting + Null Objects**, **Motion Blur** (sub-frame accumulation, `lighter`/1-N true mean), **Multi-select**, **Mask keyframing — scalar (feather/opacity/expansion) AND path** (box + pen-vertex morph; `mk.<id>.path` object interpolator `pathInterp`; lane diamonds; edit upserts). Mask-path was designed via a map+design+critique workflow (6 load-bearing bugs caught before coding) and reviewed clean.
+- **Resizable panels**, **central hotkey dispatcher** (52 hotkeys, derived from the menu data), **real Purge**, **property column doubled** + **FX list open by default**.
+- **Menu/hotkey completion (fan-out → curate → batch):** a 10-worker per-menu audit → ~18 items wired + 5 hotkeys; a buildSmall design fan-out → integrated **Help dialogs** (5, incl. a 36-effect reference), **Sequence Layers**, **Add Footage to Comp**, **bin Find/filter**, **Panel Background Color**, **Info readout panel**, **Pen tool un-dimmed**. Honest greyed list documented (15 clusters that need real foundations).
+
+### Process / working model (owner-set, important)
+- **Fan out the THINKING (research/design/review) in parallel** (Workflow, 5–12 agents/phase). **BATCH the same-file edits** (many edits → ONE verify → ONE commit). **Never parallel-write `editor.html`** (one file → workers would overwrite). **Keep load-bearing render/export work solo + per-feature verified** — that per-feature check is the net that keeps catching real bugs.
+- **CURATE worker output, never blind-paste** — every batch this run caught a real bug (wrong fn signatures, a trademark leak in dialog text, Panel-BG painting the wrong surface, Info referencing `screen` before it existed). Verify each design's assumptions against the live code first.
+- Owner's words: **"if you have even an inkling doing it by itself is the right call, ALWAYS do that… I'm looking to do it fast but RIGHT."**
+
+### WHAT'S LEFT
+- **2 buildSmall items flagged for rework** (designed, NOT integrated): **Reveal Properties** (U-filter — the design's `applyReveal` has a dead `&& false` branch + must match real `clipPropGroups` node types: `group/prop/effect/maskprop/mask/add`), and the **Rotation tool (W)** drag (touches the `pointerdown`/`pointermove` hot path — integrate carefully so it can't break select/drag; the Pen `.soon` fix already shipped).
+- **Next big foundation: the Graph Editor** (draggable value/speed keyframe curves) — also makes the mask/scalar **lane diamonds draggable** (today they're ease-only; `attachKeyDrag` is hard-wired to KDEF) and pairs with Reveal Properties.
+- **Then:** Gradient-Map spline UI, Precompose/nested comps, Shape layers, a WebGL pass.
+- **Greyed-on-purpose (need real foundations, correctly NOT wired):** 3D/Camera/lights, expression engine, audio DSP, paint/Roto/Puppet, vector/path shape layers, color management, render-queue panel, tracker. See the menu-audit keep-greyed list.
+- **Known nuance:** mask lane diamonds are ease-editable but not draggable yet (Graph Editor fixes this). Many AE_TOOLS tooltips are stale (e.g. Pen says "no mask engine" though pen masks work) — cosmetic.
+
+### v1.3.0 RELEASE NOTES (what changed since 1.2.0)
+Curves effect (draggable curve editor) · Mask **scalar + path** keyframing (animate shape, feather, opacity, expansion; lane diamonds) · roomier timeline property column + FX list open by default · a full **Help menu** (Help / What's New / Effect Reference / About / Compatibility) · **Add Footage to Comp**, bin **Find** filter, **Sequence Layers**, **Panel Background Color**, an **Info** readout panel (frame/timecode/cursor/pixel) · ~18 menu items wired + correct hotkeys (52 bound) · Pen tool no longer rendered disabled · review fixes to Parenting/Motion-Blur/Multi-select.
+
+> **Release mechanics:** editor code ships via `static/` (read from disk by the launcher — desktop.py), so features apply to all installs. `ARKITECT.exe` is a stable launcher; a fresh exe (so the bundled `APP_VERSION` advances for `.exe`-run installs) comes from running `RELEASE.bat <ver>` on the owner's machine. The zip (`build_zip.py`) packages current disk state. NOTE: at handoff time the tree also carried the **parallel audio session's uncommitted WIP** (`static/index.html`, `kit-helper.js`, `join.html`) — those are NOT this session's and were left for that session to commit; a zip built from disk includes them. `static/studio.html` keeps its OWN `APP_VERSION` (the DAW session manages it).
+
+---
+
 ## ⏩ LATEST SESSION (2026-06-19) — read this first
 
 Owner B asked: "go through the effects list and make them ALL, make every plugin UI **beautiful**, and work in **real Chrome** so you can see it." He runs **parallel agents on AUDIO + another**; this session owns **VISUAL only (`static/editor.html`)**. Everything below is shipped + pixel-verified in real Chrome on **port 7788** and is **NOT committed** (the working tree carries a parallel session's WIP — leave git alone).
