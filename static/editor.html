@@ -204,6 +204,11 @@ body.ws-no-bin.ws-no-insp .mid{grid-template-columns:0 minmax(0,1fr) 0}
   max-width:calc(100% - 28px);max-height:calc(100% - 28px);
   background:#000;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 0 1px var(--line)}
 .stage .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim2);pointer-events:none;text-align:center}
+#infoStrip{display:none;position:absolute;left:14px;right:14px;bottom:8px;z-index:7;align-items:center;gap:14px;background:rgba(8,9,12,.82);border:1px solid var(--line);border-radius:7px;padding:4px 11px;font:600 11px var(--mono);color:var(--dim2);pointer-events:none;backdrop-filter:blur(3px)}
+body.show-info #infoStrip{display:flex}
+#infoStrip b{color:var(--cy);font-weight:700}
+#infoStrip .infg{display:flex;align-items:center;gap:6px}
+#infoStrip .sw{width:13px;height:13px;border-radius:3px;border:1px solid var(--line2);background:transparent}
 .stage .empty .ic{font-size:40px;opacity:.4;margin-bottom:8px}
 .transport{display:flex;align-items:center;gap:14px;justify-content:center;padding:9px 14px;border-top:1px solid var(--line);
   background:linear-gradient(180deg,#101116,#0d0e12)}
@@ -524,6 +529,12 @@ body.mode-simple .director-only{display:none!important}
       <div class="stage">
         <canvas id="screen" width="1280" height="720"></canvas>
         <div class="empty" id="monEmpty"><div><div class="ic">🎬</div>Drop a clip on the timeline to begin</div></div>
+        <div id="infoStrip">
+          <span class="infg">F <b id="infF">0</b></span>
+          <span class="infg"><b id="infT">00:00:00:00</b> · <span id="infFps">30fps</span></span>
+          <span class="infg">XY <b id="infPos">—</b></span>
+          <span class="infg"><span class="sw" id="infSw"></span> <b id="infRgb">—</b></span>
+        </div>
       </div>
       <div class="transport">
         <div class="tctrls">
@@ -1176,6 +1187,7 @@ function updatePlayhead(){
   const x=playhead*ppf;
   $('#playhead').style.left=x+'px';$('#phRuler').style.left=(x-lanesWrap.scrollLeft)+'px';
   $('#tcCur').textContent=tc(playhead);
+  if(typeof updateInfo==='function')updateInfo();   // keep the Info strip's frame/timecode live
 }
 function setPlayhead(f,scrollInto){
   playhead=clamp(Math.round(f),0,Math.max(0,timelineFrames()||tlWidthFrames()));
@@ -1629,6 +1641,25 @@ function imageFor(c){if(imgCache[c.mediaId])return imgCache[c.mediaId];
 
 // ── PREVIEW / RENDER (shared by preview + export) ──────────────────────
 const screen=$('#screen'),sctx=screen.getContext('2d');
+// ── INFO PANEL (window ▸ Info) — playhead frame/timecode + cursor x/y + sampled pixel colour ──
+let _infoXY=null;
+function updateInfo(){
+  if(!document.body.classList.contains('show-info'))return;
+  const strip=$('#infoStrip');if(!strip)return;
+  $('#infF').textContent=playhead;$('#infT').textContent=tc(playhead);$('#infFps').textContent=FPS()+'fps';
+  const sw=$('#infSw'),pos=$('#infPos'),rgb=$('#infRgb');
+  if(_infoXY){pos.textContent=_infoXY.x+', '+_infoXY.y;
+    let ok=false,r=0,g=0,b=0;try{const d=sctx.getImageData(_infoXY.x,_infoXY.y,1,1).data;r=d[0];g=d[1];b=d[2];ok=true;}catch(e){}
+    if(ok){sw.style.background='rgb('+r+', '+g+', '+b+')';rgb.textContent='R'+r+' G'+g+' B'+b;}
+    else{sw.style.background='transparent';rgb.textContent='—';}
+  }else{pos.textContent='—';rgb.textContent='—';sw.style.background='transparent';}
+}
+function _infoFromEvent(e){const rc=screen.getBoundingClientRect();
+  const x=Math.floor((e.clientX-rc.left)/rc.width*screen.width),y=Math.floor((e.clientY-rc.top)/rc.height*screen.height);
+  _infoXY=(x<0||y<0||x>=screen.width||y>=screen.height)?null:{x,y};updateInfo();}
+(function infoInit(){   // Info is opt-in — hidden by default via CSS (no body class), shown by window ▸ Info
+  screen.addEventListener('pointermove',_infoFromEvent);
+  screen.addEventListener('pointerleave',()=>{_infoXY=null;updateInfo();});})();
 const vels={};
 function videoFor(c){
   if(vels[c.id])return vels[c.id];
@@ -3438,6 +3469,7 @@ window.addEventListener('resize',fitScreen);
     'animation|Sequence Layers…':sequenceLayers,
     'file|Add Footage to Comp':addSelectedFootageToComp,'file|Find…':findMedia,
     'view|Default':()=>setPanelBg('default'),'view|Black':()=>setPanelBg('#000'),'view|White':()=>setPanelBg('#fff'),'view|Checkerboard':()=>setPanelBg('checker'),
+    'window|Info':()=>{togglePanel('show-info');updateInfo();},
   };
   // IP scrub — clean-room guarantee: nothing user-visible carries an Adobe / After Effects
   // trademark, whatever the generated menu data says. Applied at EVERY render choke-point.
@@ -3619,6 +3651,7 @@ window.addEventListener('resize',fitScreen);
   const CHECK={
     'window|Project':()=>!document.body.classList.contains('ws-no-bin'),
     'window|Properties':()=>!document.body.classList.contains('ws-no-insp'),
+    'window|Info':()=>document.body.classList.contains('show-info'),
     'window|Timeline':()=>!document.body.classList.contains('ws-no-tl'),
     'view|Show Grid':()=>OV.grid,'view|Show Guides':()=>OV.guides,'view|Show Rulers':()=>OV.rulers,
     'view|Full':()=>(project.previewRes||1)===1,'view|Half':()=>Math.abs((project.previewRes||1)-0.5)<0.01,
