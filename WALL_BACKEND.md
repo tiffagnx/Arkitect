@@ -30,10 +30,19 @@ it **global** — every user sees everyone's signatures — on Cloudflare's **fr
 - Add a per-install `userId` (random uuid in localStorage) + the chosen handle. **No login needed for v1.**
 - Poll `GET /wall/:n` every ~20–30s (or on focus) so new tags from other people appear.
 
+## Ownership & permanence (owner-confirmed rule, 2026-06-20)
+A tag belongs to whoever drew it. It is **permanent to everyone except its author + the admin**:
+- **Author** (matched by their `userId`) can delete their OWN tag — nobody else's.
+- **Other users CANNOT remove your tag.** The strongest a stranger can do is **report** it. No delete button shows on tags that aren't yours.
+- **Admin/owner** (you, via the secret `X-Wall-Key`) can wipe ANY tag — the only override, purely for moderation.
+- Enforced **server-side**: `DELETE /sig/:id` checks `body.userId === sig.userId` OR a valid admin key, else 403. The client can't be hacked to erase someone else's mark — the button just isn't authorized.
+- UI: the ✕ remove control renders ONLY on your own tags (your `userId` match); everyone else's tags show a small **Report** action instead.
+- (Local v1 today has no "other people," so the ✕ removes anything — that's fine because it's your own machine; the per-author rule activates with the shared backend.)
+
 ## Moderation (must exist day one of the shared version)
 A public freehand canvas WILL get something gross drawn on it — freehand can't be auto-filtered reliably, so:
-- **Report button** on every tag → `/report` → auto-hide past a threshold.
-- **Admin wipe** (your secret key) → instant remove. Kit could surface a review queue.
+- **Report button** on every tag you don't own → `/report` → auto-hide past a threshold.
+- **Admin wipe** (your secret key) → instant remove of any tag. Kit could surface a review queue.
 - Keep the `userId` on each sig so a bad actor's tags can be bulk-wiped + their id soft-banned.
 
 ## Rollout

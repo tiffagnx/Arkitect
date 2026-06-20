@@ -100,7 +100,7 @@
     background:
       radial-gradient(130% 80% at 50% -6%, rgba(255,250,238,.5) 0%, rgba(255,250,238,0) 42%),
       radial-gradient(120% 100% at 50% 0%, #d9d3c6 0%, #c7c1b4 46%, #aaa493 100%);}
-  #padCv{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+  #padCv{display:block;max-width:100%;max-height:52vh;width:auto;height:auto;margin:0 auto;cursor:crosshair;touch-action:none}
   .pad-tools{display:flex;align-items:center;gap:12px;padding:11px 15px 4px}
   .swatches{display:flex;gap:6px}
   .sw{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.18)}
@@ -169,8 +169,8 @@
 <script>
 const $ = s => document.getElementById(s);   // all call-sites use bare ids
 /* ───────── data (local v1; the shared/Cloudflare backend is a drop-in later — see WALL_BACKEND.md) ───────── */
-const KEY = "ark_wall_v1";
-const CELL_W = 232, CELL_H = 142, CAP = 48;          // each tag's max footprint + how many fit before a fresh wall
+const KEY = "ark_wall_v2";                              // v2 = variable-size, crop-to-ink, tight-pack
+const MAX_AREA = 26000, MAX_DIM = 340, MIN_DIM = 38;    // your space BUDGET: shape it any way (wide/tall/sideways), capped in area + reach; gaps can be small
 let DB = load(), curWall = DB.cur;
 function load(){
   try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && d.walls) return d; }catch(e){}
@@ -178,6 +178,7 @@ function load(){
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
 const wall = i => DB.walls[i];
+const coverage = i => { const W=$("wall"), A=Math.max(1,W.clientWidth*W.clientHeight); return wall(i).sigs.reduce((s,g)=>s+g.w*g.h,0)/A; };   // bbox fill ratio → "wall full"
 
 /* ───────── render ───────── */
 function render(){
@@ -185,14 +186,14 @@ function render(){
   layer.innerHTML = "";
   w.sigs.forEach(s => {
     const d = document.createElement("div");
-    d.className = "sig"; d.style.left = s.x+"px"; d.style.top = s.y+"px"; d.style.width = CELL_W+"px"; d.style.height = CELL_H+"px";
+    d.className = "sig"; d.style.left = s.x+"px"; d.style.top = s.y+"px"; d.style.width = s.w+"px"; d.style.height = s.h+"px";
     d.innerHTML = `<img src="${s.png}" alt="signature"><div class="tag">${s.handle?escapeHtml(s.handle):""}</div><button class="rm" title="remove this tag">✕</button>`;
     d.querySelector(".rm").onclick = e => { e.stopPropagation(); if(confirm("Remove this tag from the wall?")){ w.sigs = w.sigs.filter(x=>x.id!==s.id); save(); render(); } };
     layer.appendChild(d);
   });
   $("emptyCta").style.display = w.sigs.length ? "none" : "block";
   $("wLabel").textContent = "Wall " + (curWall+1);
-  $("wCount").textContent = w.sigs.length + " / " + CAP + " tags" + (DB.walls.length>1 ? "  ·  "+DB.walls.length+" walls" : "");
+  $("wCount").textContent = w.sigs.length + " tag" + (w.sigs.length===1?"":"s") + " · " + Math.round(coverage(curWall)*100) + "% full" + (DB.walls.length>1 ? "  ·  "+DB.walls.length+" walls" : "");
   $("wPrev").disabled = curWall<=0;
   $("wNext").disabled = curWall>=DB.walls.length-1;
   const live = curWall === DB.cur;                    // only the newest wall is signable
@@ -204,46 +205,53 @@ function toast(msg, ms){ const h=$("hint"); h.textContent=msg; h.classList.add("
 $("wPrev").onclick = ()=>{ if(curWall>0){ curWall--; cancelPlacing(); render(); } };
 $("wNext").onclick = ()=>{ if(curWall<DB.walls.length-1){ curWall++; cancelPlacing(); render(); } };
 
-/* ───────── placement ───────── */
-let placing = false;
-function overlaps(x,y){
-  if(x<6||y<6) return true;
-  const W=$("wall"); if(x+CELL_W>W.clientWidth-6 || y+CELL_H>W.clientHeight-6) return true;
-  return wall(curWall).sigs.some(s => !(x+CELL_W < s.x || x > s.x+CELL_W || y+CELL_H < s.y || y > s.y+CELL_H));
+/* ───────── placement — DRAG OUT your space (any shape, capped budget), pack tight, never overlap ───────── */
+let placing = false, dragging = false, region = null;
+function rectsOverlap(a, b){ return !(a.x+a.w <= b.x || a.x >= b.x+b.w || a.y+a.h <= b.y || a.y >= b.y+b.h); }   // touching edges = NOT overlapping (scrunch allowed)
+function fits(r){
+  const W=$("wall");
+  if(r.w<MIN_DIM || r.h<MIN_DIM) return {ok:false, why:"a little bigger…"};
+  if(r.w>MAX_DIM || r.h>MAX_DIM) return {ok:false, why:"too long that way"};
+  if(r.w*r.h > MAX_AREA+1) return {ok:false, why:"that's your whole space budget"};
+  if(r.x<4 || r.y<4 || r.x+r.w>W.clientWidth-4 || r.y+r.h>W.clientHeight-4) return {ok:false, why:"off the wall"};
+  if(wall(curWall).sigs.some(s => rectsOverlap(r, s))) return {ok:false, why:"over someone — scrunch up beside them"};
+  return {ok:true};
 }
 $("wSign").onclick = ()=>{
-  // newest wall full? roll a fresh one
-  if(wall(DB.cur).sigs.length >= CAP){ DB.walls.push({sigs:[]}); DB.cur = DB.walls.length-1; curWall = DB.cur; save(); toast("This wall filled up — fresh wall’s up. Sign it."); render(); }
+  if(coverage(DB.cur) > 0.66){ DB.walls.push({sigs:[]}); DB.cur = DB.walls.length-1; curWall = DB.cur; save(); toast("This wall’s packed — fresh wall’s up. Fill it."); render(); }
   if(curWall !== DB.cur){ curWall = DB.cur; render(); }
   placing = !placing;
   $("wSign").classList.toggle("arm", placing);
   $("wSign").textContent = placing ? "✕ Cancel" : "✍ Sign the Wall";
   $("wall").classList.toggle("placing", placing);
-  if(placing) toast("Move to an empty spot — green means it’s yours. Click to claim it.", 0);
-  else { $("ghost").style.display="none"; $("hint").classList.remove("on"); }
+  if(placing) toast("Drag out your space on an empty spot — wide, tall, sideways, however you want. Smaller = tucks into tighter gaps.", 0);
+  else endRegion();
 };
-function cancelPlacing(){ if(placing){ placing=false; $("wSign").classList.remove("arm"); $("wSign").textContent="✍ Sign the Wall"; $("wall").classList.remove("placing"); $("ghost").style.display="none"; $("hint").classList.remove("on"); } }
+function cancelPlacing(){ if(placing){ placing=false; $("wSign").classList.remove("arm"); $("wSign").textContent="✍ Sign the Wall"; $("wall").classList.remove("placing"); endRegion(); $("hint").classList.remove("on"); } }
+function endRegion(){ dragging=false; region=null; $("ghost").style.display="none"; }
+function wallXY(e){ const r=$("wall").getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
+$("wall").addEventListener("mousedown", e=>{ if(!placing) return; e.preventDefault(); const p=wallXY(e); region={ ax:p.x, ay:p.y, x:p.x, y:p.y, w:0, h:0, _ok:false }; dragging=true; });
 $("wall").addEventListener("mousemove", e=>{
-  if(!placing) return;
-  const r = $("wall").getBoundingClientRect();
-  let x = e.clientX - r.left - CELL_W/2, y = e.clientY - r.top - CELL_H/2;
-  x = Math.max(6, Math.min($("wall").clientWidth-CELL_W-6, x));
-  y = Math.max(6, Math.min($("wall").clientHeight-CELL_H-6, y));
-  const g = $("ghost"); g.style.display="block"; g.style.left=x+"px"; g.style.top=y+"px"; g.style.width=CELL_W+"px"; g.style.height=CELL_H+"px";
-  const bad = overlaps(x,y); g.classList.toggle("bad", bad);
-  g.querySelector(".gh-lbl").textContent = bad ? "taken — pick another spot" : "claim this spot";
-  g._x=x; g._y=y; g._bad=bad;
+  if(!placing || !dragging) return;
+  const p=wallXY(e); let w=p.x-region.ax, h=p.y-region.ay;
+  let aw=Math.min(Math.abs(w),MAX_DIM), ah=Math.min(Math.abs(h),MAX_DIM);
+  if(aw*ah>MAX_AREA){ if(aw>=ah) aw=MAX_AREA/ah; else ah=MAX_AREA/aw; }              // hold the area budget; YOU pick the shape
+  region.w=aw; region.h=ah;
+  region.x = w<0 ? region.ax-aw : region.ax; region.y = h<0 ? region.ay-ah : region.ay;
+  const f=fits(region), g=$("ghost");
+  g.style.display="block"; g.style.left=region.x+"px"; g.style.top=region.y+"px"; g.style.width=region.w+"px"; g.style.height=region.h+"px";
+  g.classList.toggle("bad", !f.ok);
+  g.querySelector(".gh-lbl").textContent = f.ok ? (Math.round(region.w)+"×"+Math.round(region.h)+" — let go to draw") : f.why;
+  region._ok=f.ok;
 });
-$("wall").addEventListener("click", e=>{
-  if(!placing) return;
-  const g=$("ghost"); if(g._bad || g.style.display==="none") return;
-  pendingPos = { x:g._x, y:g._y };
-  cancelPlacing();
-  openPad();
+window.addEventListener("mouseup", ()=>{
+  if(!placing || !dragging) return; dragging=false;
+  if(region && region._ok){ const r={x:region.x,y:region.y,w:region.w,h:region.h}; endRegion(); openPad(r); }
+  else { const bad=region&&!region._ok; endRegion(); if(bad) toast("Drag out a bigger empty space.", 1500); }
 });
 
-/* ───────── drawing pad ───────── */
-let pendingPos = null;
+/* ───────── drawing pad (sized to YOUR claimed space) ───────── */
+let curRegion = null;
 const cv = $("padCv"), pctx = cv.getContext("2d");
 const COLORS = ["#1c1a17","#ffffff","#E5565B","#E6C16A","#7BB6CD","#6fbf73","#9b7bd0"];
 let penColor = COLORS[0], penSize = 5, drawing=false, strokes=[], cur=null, dirty=false;
@@ -266,18 +274,35 @@ cv.addEventListener("touchstart",startDraw,{passive:false}); cv.addEventListener
 $("padUndo").onclick = ()=>{ strokes.pop(); dirty=strokes.length>0; $("padPlace").disabled=!dirty; redraw(); };
 $("padClear").onclick = ()=>{ strokes=[]; dirty=false; $("padPlace").disabled=true; redraw(); };
 
-function openPad(){ strokes=[]; dirty=false; $("padHandle").value=""; $("padPlace").disabled=true; redraw(); $("padOv").classList.add("on"); }
-function closePad(){ $("padOv").classList.remove("on"); pendingPos=null; }
+function inkBBox(){                                       // tight bounds of the ACTUAL ink (in pad px)
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9,any=false;
+  for(const st of strokes){ const r=st.w/2+1; for(const p of st.pts){ any=true; minX=Math.min(minX,p.x-r); minY=Math.min(minY,p.y-r); maxX=Math.max(maxX,p.x+r); maxY=Math.max(maxY,p.y+r); } }
+  if(!any) return null;
+  minX=Math.max(0,Math.floor(minX)); minY=Math.max(0,Math.floor(minY)); maxX=Math.min(cv.width,Math.ceil(maxX)); maxY=Math.min(cv.height,Math.ceil(maxY));
+  return { x:minX, y:minY, w:Math.max(1,maxX-minX), h:Math.max(1,maxY-minY) };
+}
+function openPad(r){
+  curRegion = r;
+  const disp = Math.min(3.4, Math.max(1.5, 470/Math.max(r.w, r.h)));   // upscale small claims so they're comfortable to draw in
+  cv.width = Math.round(r.w*disp); cv.height = Math.round(r.h*disp);
+  strokes=[]; dirty=false; $("padHandle").value=""; $("padPlace").disabled=true; redraw(); $("padOv").classList.add("on");
+}
+function closePad(){ $("padOv").classList.remove("on"); curRegion=null; }
 $("padX").onclick = closePad; $("padCancel").onclick = closePad;
 $("padOv").addEventListener("mousedown", e=>{ if(e.target===$("padOv")) closePad(); });
 $("padPlace").onclick = ()=>{
-  if(!dirty || !pendingPos) return;
-  const png = cv.toDataURL("image/png");                 // transparent — sits on the wall like ink
-  const handle = $("padHandle").value.trim().slice(0,24);
-  const w = wall(DB.cur);
-  w.sigs.push({ id:"s"+w.sigs.length+"_"+Math.floor(performance.now()), handle, png, x:pendingPos.x, y:pendingPos.y, ts:Date.now() });
+  if(!dirty || !curRegion) return;
+  const bb = inkBBox(); if(!bb) return;
+  const t=document.createElement("canvas"); t.width=bb.w; t.height=bb.h;          // CROP to the actual ink — unused space is freed for the next person
+  t.getContext("2d").drawImage(cv, bb.x,bb.y,bb.w,bb.h, 0,0,bb.w,bb.h);
+  const png = t.toDataURL("image/png");
+  const sx = curRegion.w/cv.width, sy = curRegion.h/cv.height;                     // pad-px → wall-px (uniform; the pad matches the region's aspect)
+  const sig = { id:"s"+Math.floor(performance.now())+"_"+wall(DB.cur).sigs.length,
+    handle: $("padHandle").value.trim().slice(0,24), png,
+    x: curRegion.x + bb.x*sx, y: curRegion.y + bb.y*sy, w: bb.w*sx, h: bb.h*sy, ts:Date.now() };
+  wall(DB.cur).sigs.push(sig);
   DB.cur = DB.walls.length-1; curWall = DB.cur; save(); closePad(); render();
-  toast(handle ? "Signed — "+handle+" is on the wall. 🖋️" : "Signed — you’re on the wall. 🖋️");
+  toast(sig.handle ? "Signed — "+sig.handle+" is on the wall. 🖋️" : "Signed — you’re on the wall. 🖋️");
 };
 window.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("padOv").classList.contains("on")) closePad(); else cancelPlacing(); } });
 
