@@ -790,6 +790,7 @@ const FX_DEFS=[
   ['fxPosterize','Posterize',0,'Levels',6],
   ['fxExposure','Exposure',0,'Stops',0.6],
   ['fxGamma','Gamma',1,'Gamma',1.6],
+  ['fxLevels','Levels',0,'Amount',1],
   ['fxTemp','Warmth',0,'Temp',30],
   ['fxVibrance','Vibrance',0,'Amount',0.6],
   ['fxThreshold','Threshold',0,'Level',0.5],
@@ -1147,6 +1148,7 @@ const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
   fxSharpen:0,fxEmboss:0,fxEdges:0,fxRGB:0,fxHalftone:0,fxLeak:0,fxScan:0,
   fxLumaKey:0,fxDirBlur:0,fxDirAngle:0,fxRadBlur:0,fxWarp:0,
   fxKey:0,fxKeyBalance:0.5,fxKeyGain:1,fxKeyClipB:0,fxKeyClipW:1,fxKeyGrow:0,fxKeySoftness:0,fxKeyDespill:1,
+  fxLevels:0,fxLevInB:0,fxLevInW:1,fxLevGamma:1,fxLevOutB:0,fxLevOutW:1,
   volume:1};
 const KEYABLE=Object.keys(KDEF);
 const BLENDS=[['Normal','source-over'],['Add','lighter'],['Screen','screen'],['Multiply','multiply'],
@@ -1238,7 +1240,7 @@ function hasOverlayFX(c,f){const fr=f-c.start;return pval(c,'fxVignette',fr,0)>0
 // pixel-level effects need the layer rendered in isolation (an offscreen buffer)
 function hasLayerBufferFX(c,f){const fr=f-c.start;
   return pval(c,'fxPixel',fr,0)>0||pval(c,'fxGlow',fr,0)>0||pval(c,'fxPosterize',fr,0)>=2
-    ||pval(c,'fxGamma',fr,1)!==1||pval(c,'fxTemp',fr,0)!==0||pval(c,'fxVibrance',fr,0)!==0
+    ||pval(c,'fxGamma',fr,1)!==1||pval(c,'fxTemp',fr,0)!==0||pval(c,'fxVibrance',fr,0)!==0||pval(c,'fxLevels',fr,0)>0
     ||pval(c,'fxThreshold',fr,0)>0||pval(c,'fxSolarize',fr,0)>0||pval(c,'fxDuotone',fr,0)>0
     ||pval(c,'fxSharpen',fr,0)>0||pval(c,'fxEmboss',fr,0)>0||pval(c,'fxEdges',fr,0)>0
     ||pval(c,'fxRGB',fr,0)!==0||pval(c,'fxHalftone',fr,0)>=2
@@ -1395,6 +1397,16 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
     }
     lg.putImageData(im,0,0);
   }
+  // Levels — input black/white + gamma → output black/white, via a precomputed 256-LUT (mixed by Amount)
+  const lv=clamp(pval(c,'fxLevels',fr,0),0,1);
+  if(lv>0){
+    const inB=clamp(pval(c,'fxLevInB',fr,0),0,1)*255,inW=clamp(pval(c,'fxLevInW',fr,1),0,1)*255;
+    const gm=Math.max(0.01,pval(c,'fxLevGamma',fr,1)),outB=clamp(pval(c,'fxLevOutB',fr,0),0,1)*255,outW=clamp(pval(c,'fxLevOutW',fr,1),0,1)*255;
+    const rng=Math.max(1e-3,inW-inB),ig=1/gm,LUT=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){let t=(v-inB)/rng;t=t<0?0:t>1?1:t;t=Math.pow(t,ig);LUT[v]=outB+t*(outW-outB);}
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(LUT[d[i]]-d[i])*lv;d[i+1]+=(LUT[d[i+1]]-d[i+1])*lv;d[i+2]+=(LUT[d[i+2]]-d[i+2])*lv;}
+    lg.putImageData(im,0,0);}
   // Sharpen — 3×3 cross kernel (centre 1+4a, neighbours −a)
   const sh=clamp(pval(c,'fxSharpen',fr,0),0,3);
   if(sh>0){const im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),a=sh,cen=1+4*a;
@@ -2198,7 +2210,7 @@ const FX_CAT={ // field → [category label, accent colour]
   fxBlur:['Blur','#5BA3C7'],fxSharpen:['Sharpen','#5BA3C7'],
   fxBright:['Colour','#C77FB0'],fxExposure:['Colour','#C77FB0'],fxContrast:['Colour','#C77FB0'],fxSat:['Colour','#C77FB0'],
   fxVibrance:['Colour','#C77FB0'],fxHue:['Colour','#C77FB0'],fxTemp:['Colour','#C77FB0'],fxGamma:['Colour','#C77FB0'],
-  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],
+  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],fxLevels:['Colour','#C77FB0'],
   fxThreshold:['Stylize','#D9A441'],fxSolarize:['Stylize','#D9A441'],fxPosterize:['Stylize','#D9A441'],fxShadow:['Stylize','#D9A441'],
   fxVignette:['Stylize','#D9A441'],fxGrain:['Stylize','#D9A441'],fxPixel:['Stylize','#D9A441'],fxGlow:['Stylize','#D9A441'],
   fxEmboss:['Stylize','#D9A441'],fxEdges:['Stylize','#D9A441'],fxHalftone:['Stylize','#D9A441'],fxLeak:['Stylize','#D9A441'],fxScan:['Stylize','#D9A441'],
@@ -2209,7 +2221,7 @@ const FX_CAT={ // field → [category label, accent colour]
 const FX_RANGE={ // field → [min,max,step] for the slider
   fxBlur:[0,40,.5],fxBright:[.2,2.5,.01],fxExposure:[-3,3,.05],fxContrast:[.2,3,.01],fxSat:[0,3,.01],fxVibrance:[-1,1.5,.01],
   fxHue:[-180,180,1],fxTemp:[-100,100,1],fxGamma:[.2,3,.01],fxGray:[0,1,.01],fxSepia:[0,1,.01],fxInvert:[0,1,.01],
-  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
+  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxLevels:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
   fxTint:[0,1,.01],fxGrain:[0,1,.01],fxPixel:[0,60,1],fxGlow:[0,1,.01],fxSharpen:[0,3,.05],fxEmboss:[0,1,.01],fxEdges:[0,1,.01],
   fxRGB:[-20,20,1],fxHalftone:[2,20,1],fxLeak:[0,1,.01],fxScan:[0,1,.01],
   fxKey:[0,1,.01],fxLumaKey:[0,1,.01],fxDirBlur:[0,60,1],fxRadBlur:[0,1,.01],fxWarp:[-1,1,.02],
@@ -2218,6 +2230,12 @@ function efxRange(f){return FX_RANGE[f]||[0,1,.01];}
 // Extra per-effect controls beyond the main slider — swatch / second slider / segmented selector
 const FX_EXTRA={
   fxTint:[{kind:'swatch',sub:'fxTintColor',def:'#ff5fa2',label:'Wash colour'}],
+  fxLevels:[
+    {kind:'slider',sub:'fxLevInB',label:'Input Black',min:0,max:1,step:.005},
+    {kind:'slider',sub:'fxLevInW',label:'Input White',min:0,max:1,step:.005},
+    {kind:'slider',sub:'fxLevGamma',label:'Gamma',min:0.1,max:4,step:.01},
+    {kind:'slider',sub:'fxLevOutB',label:'Output Black',min:0,max:1,step:.005},
+    {kind:'slider',sub:'fxLevOutW',label:'Output White',min:0,max:1,step:.005}],
   fxKey:[
     {kind:'seg',sub:'fxKeyView',label:'View',opts:['final','matte','status'],def:'final'},
     {kind:'swatch',sub:'fxKeyScreen',def:'#00b140',label:'Screen colour'},
@@ -3063,7 +3081,8 @@ window.addEventListener('resize',fitScreen);
         [/Threshold/i,'fxThreshold'],
         [/^Extract$/i,'fxThreshold'],
         [/Solarize/i,'fxSolarize'],
-        [/Levels|Curves|Gamma\b|Pedestal/i,'fxGamma'],
+        [/Levels|Curves/i,'fxLevels'],
+        [/Gamma\b|Pedestal/i,'fxGamma'],
         [/Color Balance|Temperature|White Balance|Photo Filter|Warm/i,'fxTemp'],
         [/Chromatic Aberration|RGB Split|Separate RGB/i,'fxRGB'],
         [/Halftone/i,'fxHalftone'],
