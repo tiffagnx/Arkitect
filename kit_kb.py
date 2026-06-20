@@ -3,7 +3,7 @@
 This is the RETRIEVAL layer for the in-room assistant "Kit". The whole idea
 (owner B's instinct, confirmed): Kit doesn't MEMORIZE the program — that's what
 "cracks" a small 4B model. Instead the program knowledge lives on disk as plain
-markdown (data/kit_kb/*.md), and for each question we pull ONLY the few most
+markdown (static/kit_kb/**/*.md, shipped with the app), and for each question we pull ONLY the few most
 relevant slices into the prompt. Context stays small, startup stays instant, it
 costs $0, and Kit answers from CURATED FACTS instead of guessing.
 
@@ -24,7 +24,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-KB_DIR = Path(__file__).resolve().parent / "data" / "kit_kb"
+_ROOT = Path(__file__).resolve().parent
+# Public craft knowledge SHIPS with the app, so it must live OUTSIDE data/ — data/ is
+# gitignored and excluded from the distributable zip because it holds the owner's API
+# keys + personal memory. The binder now lives in static/kit_kb/ (committed + shipped =
+# the brain every user gets). A SECOND, optional dir at data/kit_kb/ is loaded as a
+# LOCAL/PRIVATE overlay if it exists: the owner can drop personal craft notes there and
+# they load on his machine but NEVER ship. Both contribute chunks; empty/missing dirs
+# are simply skipped. (The public files live ONLY in static/, so there's no duplication.)
+KB_DIRS = [_ROOT / "static" / "kit_kb", _ROOT / "data" / "kit_kb"]
 
 # architect.md is the program-wide doc (what ARKITECT is, every room, Tiff vs Kit,
 # settings, privacy). It's CROSS-ROOM, so its chunks are candidates for EVERY room —
@@ -185,16 +193,17 @@ _cache_sig: float = -1.0
 
 
 def _signature() -> float:
-    """Max mtime across the KB dir — changes whenever the owner edits a doc, so
-    edits go live with NO restart and NO build step."""
-    if not KB_DIR.is_dir():
-        return 0.0
+    """Max mtime across every KB dir — changes whenever a doc is edited, so edits go
+    live with NO restart and NO build step."""
     sig = 0.0
-    for p in KB_DIR.rglob("*.md"):
-        try:
-            sig = max(sig, p.stat().st_mtime)
-        except OSError:
-            pass
+    for base in KB_DIRS:
+        if not base.is_dir():
+            continue
+        for p in base.rglob("*.md"):
+            try:
+                sig = max(sig, p.stat().st_mtime)
+            except OSError:
+                pass
     return sig
 
 
@@ -231,14 +240,16 @@ def _load() -> list[dict]:
     if sig == _cache_sig and _cache:
         return _cache
     chunks: list[dict] = []
-    if KB_DIR.is_dir():
-        for p in sorted(KB_DIR.rglob("*.md")):
+    for base in KB_DIRS:
+        if not base.is_dir():
+            continue
+        for p in sorted(base.rglob("*.md")):
             # Room = the file stem at top level (studio.md -> "studio"), OR the
             # containing subfolder when nested (studio/eq.md -> "studio"). This lets
-            # ONE room's binder span many files under data/kit_kb/<room>/, so the
+            # ONE room's binder span many files under <kb_dir>/<room>/, so the
             # knowledge base can grow huge (the deep "how to mix" binder) without one
             # unwieldy file — each topic is its own .md and still scopes to its room.
-            rel = p.relative_to(KB_DIR)
+            rel = p.relative_to(base)
             room = (rel.parts[0] if len(rel.parts) > 1 else p.stem).lower()
             try:
                 chunks.extend(_split_chunks(p.read_text(encoding="utf-8"), room, rel.as_posix()))

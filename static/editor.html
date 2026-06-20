@@ -320,7 +320,7 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .zoom{display:flex;align-items:center;gap:7px;margin-left:auto}
 .zoom input{width:120px}
 
-.tl-grid{flex:1;display:grid;grid-template-columns:118px 1fr;grid-template-rows:24px 1fr;min-height:0}
+.tl-grid{flex:1;display:grid;grid-template-columns:var(--heads-w,236px) 1fr;grid-template-rows:24px 1fr;min-height:0}
 .tl-corner{background:var(--bg2);border-right:1px solid var(--line);border-bottom:1px solid var(--line);z-index:5}
 .ruler-wrap{overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--line);position:relative}
 #ruler{height:24px;position:relative}
@@ -838,7 +838,7 @@ function clipPropGroups(track,c){
   if(!audio){
     // Effects — rows are DERIVED from which fx fields are active on this clip
     const anyFx=FX_DEFS.some(([f,,def])=>fxActive(c,f,def));
-    const open=twOpen(c,'effects',anyFx);
+    const open=twOpen(c,'effects',true); // FX list open by default so the +Effect affordance is always visible
     nodes.push({type:'group',key:'effects',label:'Effects',open});
     if(open){
       for(const [f,label,def,plabel] of FX_DEFS){

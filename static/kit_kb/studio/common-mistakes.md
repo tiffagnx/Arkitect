@@ -1,0 +1,49 @@
+# Top mixing mistakes and how to avoid them
+
+## Why does my mix sound worse the longer I work on it — tired ears and mixing too loud
+
+This is almost always ear fatigue plus creeping loudness, not the mix going bad. Your ears desensitize over 45-90 minutes, and loud playback makes everything sound bigger and more "finished" (the Fletcher-Munson effect boosts your perception of bass and treble), so you keep pushing brightness and level — and the next day it sounds harsh and bass-heavy. Mix at a moderate, FIXED monitor volume: set it once where a conversation is comfortable and leave it, so your reference for loud and quiet stays stable. Take a 5-10 minute break every hour and step out of the room to reset your ears. Check the mix loud occasionally to spot harshness, and very quiet to confirm the vocal still cuts through, but make the bulk of decisions at the moderate level. If you've been at it for hours, stop and decide tomorrow — trust morning ears over midnight ears.
+
+## Why does my mix sound muddy and washed out — too much reverb
+
+The most common beginner mistake is drowning everything in reverb so the mix loses focus and depth. Reverb pushes a source back and away; pile it on every track and nothing sits up front. Use ONE shared reverb on an Aux Input (send tracks to it) instead of an instance per track — it glues the mix and is easier to control. Start with a short plate or room around 1.0-1.8 s decay, then high-pass the reverb return below ~200-300 Hz and roll off above ~8 kHz so the tail doesn't muddy the low end or add fizz. Use a 10-30 ms pre-delay to keep the dry source clear in front of its own tail. Set the level by ear: pull the send up until you hear it, then back it off until it just disappears — you should feel it more than hear it.
+
+## Am I over-compressing — how do I know if I crushed the life out of it
+
+Over-compression flattens the dynamics until the track sounds lifeless, pumpy, or squashed, and the noise floor and room tone get sucked up between hits. On the Compressor, watch the gain-reduction meter: for gentle leveling aim for 2-4 dB of reduction on peaks; 6+ dB on a steady part is heavy and reserved for an effect or aggressive vocal. Start with a 3:1 ratio, medium attack (10-30 ms) so transients punch through, and release timed so the meter recovers between words or hits (40-150 ms is a good start). Always match makeup gain so bypassed and active are equally loud, then judge by tone, not loudness. If you need a lot of control, use two gentle compressors in series instead of one slamming hard. When in doubt, less reduction.
+
+## Should I boost or cut with EQ — when to use each
+
+Neither is a rule; boosting and cutting are both valid tools, and "always cut, never boost" is a myth. Cut to remove a problem — a boxy buildup, a resonant ring, mud — because subtractive moves clean up without adding energy or phase smear, and a narrow cut surgically kills a bad frequency. Boost to add a character that isn't there — air, warmth, presence — usually with a wider, gentler bend so it sounds musical. A practical workflow: fix problems with cuts first using the DeMartin EQ (sweep a narrow boost to FIND the ugly frequency, then cut there), then add flattering broad boosts last if the source still needs them. The honest test is bypass and level-match: if the change sounds better at equal loudness, keep it, whether it was a boost or a cut.
+
+## Should I high-pass everything — cleaning up low-end buildup
+
+Low rumble, mic stand thumps, plosives, and sub energy stack up across many tracks into mud that eats headroom even though no single track sounds bad alone. High-passing non-bass sources cleans this up fast. With the DeMartin EQ or EQ-6, roll off below roughly 80-120 Hz on vocals, 100-200 Hz on guitars/keys, and even higher on hats/overheads, adjusting by ear so you don't thin out the body. But do NOT high-pass blindly — protect the kick and bass, and on a lead vocal an over-aggressive HPF removes warmth and chest. Engage the filter, sweep its corner upward until the source starts losing weight, then back off a touch. The goal is removing what you don't need, not slicing every track at the same fixed frequency.
+
+## Why shouldn't I mix everything in solo
+
+Soloing is great for finding a problem on one track, but mixing IN solo is a trap — a sound that's perfect alone is often wrong in context, because balance, masking, and EQ carving only make sense against the other tracks. A vocal EQ'd to sound full in solo can turn muddy under a bass and guitar; a guitar that sounds thin alone may sit perfectly in the band. Use solo briefly to diagnose (catch a click, find a resonance, check a fade), then immediately un-solo and make the actual decision with everything playing. Carve frequencies so tracks make ROOM for each other, which you can only hear in the full mix. Trust the blend, not the isolated track.
+
+## Why are my levels all over the place — gain staging the mix
+
+Skipping gain staging means plugins get hit too hot or too weak and your faders end up at extreme positions fighting each other from the start. Before you touch a fader, get every track to a sane level so the mix sums cleanly with headroom to spare. Use clip gain or a trim/gain stage at the FRONT of each insert chain to land peaks around -18 to -12 dBFS, since compressors, saturators, and drive-style EQs react to how hard you feed them. Keep channel faders near unity (0 dB) early on so you have room to move both ways. Build a rough static balance with faders first, then add processing. Clean gain staging is invisible when done right and the cause of half of all "my mix sounds off" problems when skipped.
+
+## How loud should my master be — am I chasing loudness
+
+Chasing loudness — slamming the limiter to win a volume contest — kills dynamics, adds distortion, and triggers loudness normalization that turns you right back down on streaming anyway. Mix for balance and dynamics first; loudness is the last step and it's a trade-off, not a goal. Aim your full mix to peak around -6 dBFS into the Maximizer/limiter on the master so it has clean material, then set the output ceiling to about -1.0 dBTP (true-peak) to survive MP3/AAC encoding. Streaming platforms commonly normalize toward roughly -14 LUFS integrated, so brick-walling past that gains you nothing but damage; loud/club genres push louder and accept more limiting — that's taste and platform. Push the limiter only until transients start dulling and pumping, then back off.
+
+## Why does my mix fall apart in mono — checking mono compatibility
+
+Many listeners hear you in mono (phone speakers, club PAs, Bluetooth speakers, smart speakers), and a mix that's wide and lush in stereo can collapse in mono — vocals vanish, bass thins, hyped width disappears — usually from phase cancellation between left and right. This DAW has no one-click mono-sum button, so audition mono on an actual mono device: Bounce to Disk and play it back on a phone speaker, or temporarily pan every track to center and listen. Confirm the lead vocal, kick, and bass stay solid. Keep low frequencies (below ~120 Hz) centered with the pan control so the low end stays powerful on any system. Be cautious with hard-panned doubles and big stereo widths that sound huge in stereo but thin out folded down. If a doubled or panned part disappears, narrow the panning until it survives.
+
+## Why doesn't my mix translate — referencing against pro tracks
+
+Mixing in a vacuum is how mixes end up too bright, too dull, bass-light, or boomy — your room and your tired ears lie to you. Pull in 1-3 professionally mastered songs in the same genre and A/B against them constantly. Loudness-match the reference DOWN to your mix level first (the louder one always sounds better), then compare tonal balance, vocal level, low-end weight, and width. Use the reference to answer specific questions — is my vocal too loud, is my low end boomy, is my top end harsh — rather than chasing its exact sound. Check your mix on multiple systems too: monitors, headphones, earbuds, a phone speaker, the car. If it holds up everywhere and sits in the ballpark of your references, it'll translate.
+
+## Why won't more plugins fix my track — plugin overload
+
+Stacking ten plugins on a track usually means none of them is doing a clear job, the problems compound, and you've lost track of what each one is even for. More processing is not more "professional." Before reaching for a plugin, ask what specific problem you're solving; if you can't name it, don't add it. A clean vocal often needs only EQ, one compressor, de-essing, and a reverb send — which is exactly what Vocal Doctor builds in order (EQ-6 -> De-Ess -> Compressor -> Saturator -> slapback + reverb send), with safe macro sliders to taste. Bypass everything and re-add one at a time, level-matched, keeping only what clearly helps. If two plugins fight (an EQ boost feeding a compressor that squashes it back), simplify. The best engineers use fewer moves, placed well.
+
+## Can I fix a bad recording in the mix or should I re-record
+
+The biggest time sink in mixing is trying to rescue a recording that should be redone. No plugin rebuilds information that was never captured: digital clipping at 0 dBFS is permanent flat-topping, a noisy or roomy capture stays noisy, and bad pitch or timing fights you the whole mix. If re-recording is possible and the take is fundamentally flawed, re-track it — a clean source beats hours of repair every time. When you truly can't re-record, the DAW can mask, not cure: Cleanup (denoise) and Gate for noise, DeMartin Tune for pitch, the Compressor and editing for timing, and gentle DeMartin EQ plus Saturator to soften mild clipping. Treat these as damage control. The real fix lives at tracking: good gain staging, the right mic placement, and a quiet room.
