@@ -73,9 +73,20 @@
   .devlbl { font:600 9px 'Space Mono'; letter-spacing:.16em; color:var(--dim); text-transform:uppercase; margin-top:8px; }
   .dev-note { font:400 9px 'Space Mono'; color:var(--dim); line-height:1.5; margin-top:5px; }
   .lane.recording { border-color:rgba(255,90,110,.6); box-shadow:0 0 18px rgba(255,90,110,.18); }
-  .inmeter { height:7px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); margin-top:8px; }
-  .inmeter i { display:block; height:100%; width:0%; transition:width .04s linear;
-    background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 60%, var(--amber) 82%, #E5565B 95%); }
+  .inmeter { position:relative; height:9px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); margin-top:8px; }
+  .inmeter i { display:block; height:100%; width:0%; transition:width .04s linear; position:relative; z-index:1;
+    background:linear-gradient(90deg,var(--teal) 0%, #5fc9d8 50%, #9BE37B 76%, #9BE37B 89%, var(--amber) 93%, #E5565B 97%); }
+  .im-band { position:absolute; top:0; bottom:0; left:77.8%; width:11.1%; z-index:2; pointer-events:none;   /* the -12..-6 dBFS sweet spot */
+    background:rgba(123,227,155,.13); box-shadow:inset 1px 0 rgba(150,240,170,.55), inset -1px 0 rgba(150,240,170,.55); }
+  .im-hold { position:absolute; top:-1px; bottom:-1px; left:0; width:2px; z-index:3; pointer-events:none;   /* decaying peak-hold marker */
+    background:rgba(255,255,255,.9); box-shadow:0 0 4px rgba(255,255,255,.55); transition:left .08s linear; }
+  .coach-row { display:flex; align-items:center; gap:7px; margin-top:7px; }
+  .im-clip { width:9px; height:9px; border-radius:50%; flex:none; cursor:pointer; transition:.15s;
+    background:rgba(229,86,91,.16); border:1px solid rgba(229,86,91,.4); }
+  .im-clip.on { background:#E5565B; box-shadow:0 0 8px rgba(229,86,91,.85); }
+  .rec-coach { font:600 10.5px Inter; line-height:1.4; cursor:pointer; color:var(--dim); transition:color .2s; }
+  .rec-coach.c-green { color:#7FE39B; } .rec-coach.c-amber { color:var(--amber); }
+  .rec-coach.c-red { color:#FF6B72; } .rec-coach.c-neutral { color:var(--dim); }
 
   .body { display:flex; height:calc(100vh - 83px); }   /* 53px transport row + 30px menu bar */
   /* console rail: master + verb */
@@ -818,7 +829,8 @@
       <select class="devsel" id="inDev" style="margin-top:0;margin-bottom:8px"><option value="">Default input</option></select>
       <div class="krow"><label>Monitor</label><input type="range" id="monGain" min="0" max="1.2" step="0.01" value="0.7" /><output id="monGainO">0.70</output></div>
       <button class="ibtn" id="monBtn" style="margin-bottom:8px">🎧 Headphone monitor: OFF</button>
-      <div class="inmeter"><i id="inMeter"></i></div>
+      <div class="inmeter"><div class="im-band"></div><i id="inMeter"></i><div class="im-hold" id="inHold"></div></div>
+      <div class="coach-row"><span class="im-clip" id="inClip" title="clip detected — click to reset"></span><span class="rec-coach c-neutral" id="recCoach">🎤 Pick your mic to start.</span></div>
       <div class="tk">
         <div class="tk-row">
           <span class="tk-lbl">TEMPO</span>
@@ -5585,7 +5597,8 @@ function tickUi() {
       if (lm) lm.style.height = ((t.live && t.live.meter ? lvlOf(t.live.meter) : 0) * 100) + "%"; });
   }
   // input meter + runaway-feedback watch
-  if (REC.inAnalyser) { const il = lvlOf(REC.inAnalyser); $("inMeter").style.width = (il * 100) + "%"; feedbackWatch(il); }
+  if (REC.inAnalyser) feedbackWatch(lvlOf(REC.inAnalyser));   // runaway-feedback safety on the raw level
+  recCoachUpdate(performance.now());                           // level coach: drives the meter bar (dBFS) + the verdict line; handles no-input too
 }
 
 /* ── master + verb controls ── */
@@ -5652,6 +5665,7 @@ const QUOTES = [
   { text:"I don't want it to be perfect, because humans aren't perfect, so the music shouldn't be.", by:"Dr. Dre" },
   { text:"EQing before you've heard the source is like salting your food before you've tasted it.", by:"Bruce Swedien" },
   { text:"I always try to make their next record, not their last record.", by:"Nile Rodgers" },
+  { text:"Music is like therapy to me, and sometimes the music that I make isn't supposed to be heard by anyone's ears but mine.", by:"Bryan Koonce (B)" },
   { text:"The take you almost didn't keep is usually the one.", by:"DeMartin Audio Labs" },
   { text:"Mix it 'til it feels like you — not 'til it sounds like them.", by:"DeMartin Audio Labs" },
   { text:"The first recorded voice waited 148 years to be heard. Don't make yours wait.", by:"DeMartin Audio Labs" },
@@ -6329,8 +6343,9 @@ async function openInput() {
   REC.openDeviceId = s.deviceId || REC.deviceId;           // the device the live stream is actually on (so we only re-open on a real change)
 
   REC.srcNode = c.createMediaStreamSource(REC.stream);
-  REC.inAnalyser = c.createAnalyser(); REC.inAnalyser.fftSize = 512;
+  REC.inAnalyser = c.createAnalyser(); REC.inAnalyser.fftSize = 2048;   // fuller window for the level coach (also smooths the meter)
   REC.srcNode.connect(REC.inAnalyser);
+  resetCoach();                                                          // fresh level-coach read on each input open
 
   // MONITOR PATH — the SHORTEST possible route to the cans. Straight to
   // destination, bypassing master.gain → limiter (the limiter's lookahead adds
@@ -6432,6 +6447,63 @@ function feedbackWatch(level) {
   if (REC.monitorOn && level > 0.92) { if (++pinFrames > 15) { setMonitor(false); setWarn("⚠ Feedback detected — monitor killed. Use headphones.", true); pinFrames = 0; } }
   else pinFrames = 0;
 }
+
+/* ── RECORD-LEVEL COACH — measures the TRUE input in dBFS and tells you exactly how to set
+   your interface/preamp gain BEFORE you record. Sweet spot = peaks -12..-6 dBFS (target -12;
+   you do NOT track near 0 on 24-bit). Biased a hair quiet because clipping is the one thing
+   you can't undo. Reads getFloatTimeDomainData (the byte meter is too coarse for dBFS); the
+   verdict comes from the loudest SUSTAINED few seconds (95th-percentile of voiced peaks),
+   never one frame. Reuses REC.inAnalyser — no second graph. Direction precise / amount coarse,
+   and it always points at the ANALOG gain knob (a software fader can't un-clip or un-bury a take). */
+const _C_TARGET=-12, _C_LO=-12, _C_HI=-6, _C_MIN=-18, _C_RANGE=54;   // display meter spans -54..0 dBFS
+const _cPct = db => Math.max(0, Math.min(100, (db+_C_RANGE)/_C_RANGE*100));
+const _cBucket = d => { d=Math.abs(d); return d<=2?"a hair":d<=5?"a little":d<=10?"a few dB":d<=18?"a good bit":"a lot"; };
+const _cP95 = arr => { if(!arr.length) return -140; const s=arr.slice().sort((a,b)=>a-b); return s[Math.min(s.length-1, Math.floor(s.length*0.95))]; };
+function measureFloatBlock(an){
+  const n=an.fftSize; if(!REC._fbuf||REC._fbuf.length!==n) REC._fbuf=new Float32Array(n);
+  const x=REC._fbuf; an.getFloatTimeDomainData(x);
+  let peak=0, ms=0, run=0, ev=0;
+  for(let i=0;i<n;i++){ const a=x[i]<0?-x[i]:x[i]; if(a>peak)peak=a; ms+=x[i]*x[i]; if(a>=0.997){ if(++run===3) ev++; } else run=0; }   // clip = a RUN of >=3 samples at ceiling, not one
+  ms/=n;
+  return { peakDb:20*Math.log10(Math.max(peak,1e-7)), rmsDb:10*Math.log10(Math.max(ms,1e-14)), ms, clipEvents:ev };
+}
+function resetCoach(){ REC.coach = { ring:[], heldDb:-140, holdMs:0, dispDb:-140, clipEvents:0, clipLatched:false, voicedMs:0, runMs:0, msEMA:null, lastT:0, committed:"listen", pending:null, pendingMs:0, _lastMsg:"⏳ Listening… sing or talk your loudest part." }; }
+function recCoachUpdate(now){
+  const el=$("recCoach"); if(!el) return;
+  if(!REC.inAnalyser){ el.className="rec-coach c-neutral"; el.textContent="🎤 Pick your mic to start."; const b=$("inMeter"); if(b) b.style.width="0%"; return; }
+  if(!REC.coach) resetCoach();
+  const co=REC.coach;
+  const dt = co.lastT ? Math.max(1, Math.min(120, now-co.lastT)) : 16; co.lastT=now; co.runMs+=dt;
+  const m = measureFloatBlock(REC.inAnalyser);
+  co.dispDb = m.peakDb > co.dispDb ? m.peakDb : co.dispDb - 0.05*dt;   // fast attack / slow release on the DISPLAY only
+  const bar=$("inMeter"); if(bar) bar.style.width=_cPct(co.dispDb)+"%";
+  if(m.peakDb>co.heldDb){ co.heldDb=m.peakDb; co.holdMs=0; } else { co.holdMs+=dt; if(co.holdMs>1500) co.heldDb-=0.012*dt; }   // hold ~1.5s then bleed ~12 dB/s
+  const hold=$("inHold"); if(hold) hold.style.left=_cPct(co.heldDb)+"%";
+  if(m.clipEvents>0){ co.clipEvents+=m.clipEvents; co.clipLatched=true; }
+  const led=$("inClip"); if(led) led.classList.toggle("on", co.clipLatched);
+  if(m.rmsDb>-45){ co.voicedMs+=dt; co.ring.push(m.peakDb); if(co.ring.length>260) co.ring.shift(); co.msEMA = co.msEMA==null? m.ms : co.msEMA*0.94 + m.ms*0.06; }   // SILENCE GATE: breaths/room tone never count
+  let state, msg;
+  if(co.voicedMs<1800){   // need ~2s of real signal before any verdict — the core false-positive defense
+    if(co.runMs>3000 && co.ring.length===0){ state="silent"; msg="🎤 I can't hear you — get closer, or check the right input's picked."; }
+    else { state="listen"; msg="⏳ Listening… sing or talk your loudest part."; }
+  } else {
+    const Mp=_cP95(co.ring);   // robust sustained peak, not the raw max (a lone pop won't define it)
+    const rmsDb = co.msEMA!=null ? 10*Math.log10(Math.max(co.msEMA,1e-14)) : -100;
+    if(co.clipEvents>=2 || Mp>=-3){ state="clip"; msg="🔴 Too hot — you're clipping. Ease your input gain DOWN."; }
+    else if(Mp>_C_HI){ state="hot"; msg="🟡 A touch hot — bring the gain down "+_cBucket(Mp-_C_TARGET)+"."; }
+    else if(Mp>=_C_LO){ state="good"; msg=(rmsDb<-24)?"🟢 Good level — a little thin. Try getting closer to the mic.":"🟢 That's the pocket — hit record."; }
+    else if(Mp>=_C_MIN){ state="lowish"; msg="🟡 A little quiet — nudge the gain up "+_cBucket(_C_TARGET-Mp)+"."; }
+    else { state="low"; msg="🟡 Too quiet — turn your input gain up "+_cBucket(_C_TARGET-Mp)+"."; }
+    if(co.committed==="good" && ((state==="hot"&&Mp<=_C_HI+1)||(state==="lowish"&&Mp>=_C_LO-1))){ state="good"; msg="🟢 That's the pocket — hit record."; }   // 1 dB hysteresis: don't bounce out of the pocket
+  }
+  if(state===co.committed){ co.pending=null; co.pendingMs=0; co._lastMsg=msg; }                                   // live magnitude refresh
+  else { if(state===co.pending){ co.pendingMs+=dt; } else { co.pending=state; co.pendingMs=0; }
+         if(state==="clip" || co.pendingMs>=450){ co.committed=state; co._lastMsg=msg; } }                        // clip shows instantly; others debounce ~0.5s (no flicker)
+  el.textContent = co._lastMsg;
+  el.className = "rec-coach c-"+({clip:"red",hot:"amber",good:"green",lowish:"amber",low:"amber",listen:"neutral",silent:"amber"}[co.committed]||"neutral");
+}
+if($("recCoach")) $("recCoach").onclick = () => { if(!REC.inAnalyser) openInput(); };   // click the line to arm the mic (also fixes the old dead-meter gap)
+if($("inClip")) $("inClip").onclick = () => { if(REC.coach){ REC.coach.clipLatched=false; REC.coach.clipEvents=0; } };
 
 /* ── count-in / tempo ── */
 // ── TEMPO / KEY / COUNT-IN — typed BPM + TAP + AUTO, key detect, segmented count-in ──

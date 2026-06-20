@@ -1288,7 +1288,21 @@ function textBase(c,W,H,k){const ox=(W-project.width*k)/2,oy=(H-project.height*k
 // The clip's transform (position/rotation/scale/anchor) applied to a canvas ctx — shared by
 // drawClip/drawSolidClip AND the mask renderer so masks track the layer. Identity when the layer
 // is untransformed, so old projects are byte-identical. Text pivots about its base, others about comp centre.
+// Parenting: a clip inherits its parent chain's transforms. parentChainOf returns ancestors root-first.
+function clipParent(c){return (c&&c.parentId)?findClipById(c.parentId):null;}
+function parentChainOf(c){if(!c||!c.parentId)return EMPTY_CHAIN;const chain=[],seen=new Set([c.id]);
+  let p=clipParent(c);while(p&&!seen.has(p.id)){chain.unshift(p);seen.add(p.id);p=clipParent(p);}return chain;}
+const EMPTY_CHAIN=[];
+function setClipParent(c,pid){
+  if(pid===c.id)pid=null;
+  if(pid){let p=findClipById(pid),seen=new Set();while(p&&!seen.has(p.id)){if(p.id===c.id){toast('That would create a parenting loop',1);return;}seen.add(p.id);p=clipParent(p);}}
+  c.parentId=pid||null;renderTimeline();refreshInspector();drawFrame();save(true);toast(pid?'Parented to layer above':'Un-parented');
+}
 function applyClipTransform(g,c,f,W,H,k){
+  for(const anc of parentChainOf(c))applyLocalTransform(g,anc,f,W,H,k); // ancestors first (parenting)
+  applyLocalTransform(g,c,f,W,H,k);
+}
+function applyLocalTransform(g,c,f,W,H,k){
   const fr=f-c.start;
   if(clipKind(c)==='text'){
     const {bx,by}=textBase(c,W,H,k);
@@ -1306,8 +1320,14 @@ function applyClipTransform(g,c,f,W,H,k){
 }
 // Same transform as a DOMMatrix mapping COMP coords → canvas — for the on-monitor mask overlay/editing.
 function clipMatrix(c,f,W,H){
-  const k=stageK(W,H),fr=f-c.start,ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
+  const k=stageK(W,H),ox=(W-project.width*k)/2,oy=(H-project.height*k)/2;
   let m=new DOMMatrix();
+  for(const anc of parentChainOf(c))m=appendLocalMatrix(m,anc,f,W,H,k);
+  m=appendLocalMatrix(m,c,f,W,H,k);
+  return m.translate(ox,oy).scale(k);
+}
+function appendLocalMatrix(m,c,f,W,H,k){
+  const fr=f-c.start;
   if(clipKind(c)==='text'){
     const {bx,by}=textBase(c,W,H,k);
     m=m.translate(bx+pval(c,'posX',fr,0)*k, by+pval(c,'posY',fr,0)*k);
@@ -1322,7 +1342,7 @@ function clipMatrix(c,f,W,H){
     const ax=pval(c,'anchorX',fr,0),ay=pval(c,'anchorY',fr,0);
     m=m.translate(-(W/2+ax*k), -(H/2+ay*k));
   }
-  return m.translate(ox,oy).scale(k);
+  return m;
 }
 // A zero-scale layer makes clipMatrix singular; DOMMatrix.inverse() then returns NaNs.
 // Return null in that case so callers skip mask editing instead of writing NaN into the mask.
@@ -1671,6 +1691,7 @@ function drawAdjustmentClip(ctx,c,f,W,H){
 // Render ONE visual clip entry (adjustment/solid/image/video) onto ctx. Returns false if its source isn't ready.
 function drawOneClip(ctx,entry,f,W,H,srcOverride){
   const {c,img,solid}=entry;
+  if(c.nullObject)return true;   // null objects are invisible — they exist only to parent other layers
   if(c.adjustment){drawAdjustmentClip(ctx,effClip(c),f,W,H);return true;}
   if(solid){drawSolidClip(ctx,effClip(c),f,W,H);return true;}
   let src,sw,sh;
@@ -1722,7 +1743,20 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
   ctx.filter='none';
 }
-function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);drawMaskOverlay(sctx,screen.width,screen.height);}
+function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawNullMarkers(sctx,screen.width,screen.height);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);drawMaskOverlay(sctx,screen.width,screen.height);}
+// Null-object markers — a small amber crosshair so the invisible null is visible & grabbable (preview only, never exported)
+function drawNullMarkers(ctx,W,H){
+  const f=playhead;
+  for(const {c} of activeVideoClips(f)){
+    if(!c.nullObject)continue;
+    const p=clipMatrix(c,f,W,H).transformPoint(new DOMPoint(project.width/2,project.height/2));
+    ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.strokeStyle='rgba(255,200,80,.9)';ctx.fillStyle='rgba(255,200,80,.9)';ctx.lineWidth=1;
+    const s=11;ctx.strokeRect(p.x-s,p.y-s,2*s,2*s);
+    ctx.beginPath();ctx.moveTo(p.x-s-5,p.y);ctx.lineTo(p.x+s+5,p.y);ctx.moveTo(p.x,p.y-s-5);ctx.lineTo(p.x,p.y+s+5);ctx.stroke();
+    ctx.font='9px ui-monospace,monospace';ctx.fillText(c.name||'Null',p.x+s+6,p.y-s);
+    ctx.restore();
+  }
+}
 // Viewer overlays — AE's separate toggles, ALL OFF by default. Preview-only (never exported).
 function drawOverlays(ctx,W,H){
   if(!(OV.safe||OV.prop||OV.grid||OV.guides||OV.rulers))return;
@@ -2141,6 +2175,7 @@ function refreshInspector(){
     ${isSolid?`<div class="row"><label>Color</label><input type="color" id="cSolColor" value="${clip.color||'#6a6a6a'}"></div>`:''}
     ${numRow('Start (f)','cStart',clip.start)}${isSolid?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
     ${isAud?'':`<div class="row"><label>Track Matte</label><select class="fld" id="cTrkMat">${[['','None'],['alpha','Alpha'],['alphaInv','Alpha Inv'],['luma','Luma'],['lumaInv','Luma Inv']].map(([v,l])=>`<option value="${v}" ${(clip.trackMatte||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>`}
+    ${isAud?'':`<div class="row"><label>Parent</label><select class="fld" id="cParent"><option value="">None</option>${project.tracks.flatMap(t=>t.clips).filter(o=>o.id!==clip.id).map(o=>`<option value="${o.id}" ${clip.parentId===o.id?'selected':''}>${esc(o.name||o.text||(MEDIA[o.mediaId]||{}).name||'Layer')}</option>`).join('')}</select></div>`}
     </div>
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
       ${numRowK('Anchor X','anchorX',clip)}${numRowK('Anchor Y','anchorY',clip)}
@@ -2168,6 +2203,7 @@ function refreshInspector(){
     mountEffectControls(clip);
     $('#cBlend').onchange=e=>{clip.blend=e.target.value;drawFrame();save(true);};
     {const tm=$('#cTrkMat');if(tm)tm.onchange=e=>{clip.trackMatte=e.target.value||null;renderTimeline();drawFrame();save(true);};}
+    {const cp=$('#cParent');if(cp)cp.onchange=e=>setClipParent(clip,e.target.value||null);}
     if(!opaKeyed){
       bindNum('tIn',v=>{clip.transIn=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
       bindNum('tOut',v=>{clip.transOut=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
@@ -2655,6 +2691,8 @@ function projectNeedsFrameServer(p){
     if(c.guide)return true; // guide layers must be skipped on export — only the frame-server path can
     if(c.adjustment)return true; // adjustment layers grade the comp — frame-server only
     if(c.trackMatte)return true; // track mattes are canvas-composited — frame-server only
+    if(c.parentId)return true;   // a parented layer's transform is composed client-side
+    if(c.nullObject)return true; // null objects (invisible) — frame-server skips them
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
     if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
@@ -2896,6 +2934,12 @@ window.addEventListener('resize',fitScreen);
   function toggleAdjustment(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Adjustment is for visual layers',1);
     s.clip.adjustment=!s.clip.adjustment;renderTimeline();refreshInspector();drawFrame();save();toast(s.clip.adjustment?'Now an adjustment layer — grades everything beneath':'Adjustment layer off');}
+  function newNull(){
+    let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[project.tracks.length-1];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
+    const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.nullObject).length,0)+1;
+    const c={id:uid(),kind:'solid',solid:true,nullObject:true,name:'Null '+n,color:'#8a8a8a',start:playhead,dur:Math.round(5*FPS())};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Null Object added — parent layers to it to move them together');}
   function setTrackMatte(mode){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Track mattes are for visual layers',1);
     s.clip.trackMatte=mode;renderTimeline();refreshInspector();drawFrame();save();
@@ -3152,6 +3196,7 @@ window.addEventListener('resize',fitScreen);
     if(menuId==='newctx'){
       if(/^Text/i.test(L))return ()=>$('#addText').click();
       if(/^Adjustment Layer/i.test(L))return ()=>newAdjustment();
+      if(/^Null Object/i.test(L))return ()=>newNull();
       if(/^Solid/i.test(L))return ()=>newSolid();
       if(/^New Composition/i.test(L))return ()=>$('#btnNew').click();
       if(/^Composition Settings/i.test(L))return openCompSettings;
@@ -3162,6 +3207,7 @@ window.addEventListener('resize',fitScreen);
     if(menuId==='layer'&&/^Text$/i.test(L))return ()=>$('#addText').click();
     if(menuId==='layer'&&/^Adjustment Layer$/i.test(L))
       return (it.behavior&&/\b(switch|toggle|behaves|currently selected|makes? the)\b/i.test(it.behavior))?toggleAdjustment:()=>newAdjustment();
+    if(menuId==='layer'&&/^Null Object/i.test(L))return ()=>newNull();
     if(menuId==='layer'&&/^Solid/i.test(L))return ()=>newSolid();
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
     if(menuId==='layer'){
