@@ -657,7 +657,7 @@ let snap=true, tool='select';
 const OV={safe:false,prop:false,grid:false,guides:false,rulers:false}; // viewer overlays — all OFF by default
 let playhead=0;
 let playing=false, clockStart=0, rafId=0;
-let sel=null;
+let sel=null, selSet=new Set();   // sel = primary (drives inspector); selSet = all selected clip ids
 const LANE_H=46;   // a touch shorter than AE so a busy timeline saves vertical room
 document.documentElement.style.setProperty('--lane-h',LANE_H+'px');
 
@@ -1036,7 +1036,7 @@ function clipEl(track,c){
   el.className='clip '+t;el.dataset.cid=c.id;el.dataset.tid=track.id;
   el.style.left=(c.start*ppf)+'px';el.style.width=Math.max(6,c.dur*ppf)+'px';
   if(c.label){el.style.borderTopColor=c.label;el.style.boxShadow='inset 4px 0 0 '+c.label+', 0 1px 4px rgba(0,0,0,.35)';}
-  if(sel&&sel.clipId===c.id)el.classList.add('sel');
+  if(selSet.has(c.id))el.classList.add('sel');
   const m=MEDIA[c.mediaId];
   if(t==='v'&&c.solid){
     el.style.background=c.color||'#6a6a6a';
@@ -1869,6 +1869,10 @@ function pickLayerAt(x,y,W,H){
   for(const o of act){const q=clipQuad(o.c,W,H);if(q&&pointInQuad(x,y,q))return {clip:o.c,track:trackOf(o.c)};}return null;}
 function drawSelOverlay(ctx,W,H){
   if(tool!=='select')return;const sc=selClip();if(!sc||!sc.clip||clipKind(sc.clip)==='audio')return;
+  if(selSet.size>1){ctx.save();ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.lineWidth=1;ctx.strokeStyle='rgba(62,156,184,.45)';
+    for(const s of selectedClips()){if(s.clip.id===sc.clip.id||clipKind(s.clip)==='audio')continue;const q2=clipQuad(s.clip,W,H);if(!q2)continue;
+      ctx.beginPath();ctx.moveTo(q2[0].x,q2[0].y);for(let i=1;i<4;i++)ctx.lineTo(q2[i].x,q2[i].y);ctx.closePath();ctx.stroke();}
+    ctx.restore();}
   const q=clipQuad(sc.clip,W,H);if(!q)return;const {sx}=screenCSS();
   ctx.save();ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   ctx.lineWidth=1;ctx.strokeStyle='rgba(62,156,184,.95)';
@@ -2083,12 +2087,15 @@ function attachClipDrag(el,track,c){
   el.addEventListener('pointerdown',e=>{
     if(e.button!==0)return;
     if(tool==='razor'){doSplit(track,c,frameAtEvent(e));return;}
-    select(track.id,c.id);
+    const add=e.shiftKey||e.ctrlKey||e.metaKey;
+    select(track.id,c.id,add);
+    if(add){e.preventDefault();return;}   // modifier-click toggles selection, no drag
     const handle=e.target.classList.contains('handle')?(e.target.classList.contains('l')?'l':'r'):null;
     e.preventDefault();el.setPointerCapture(e.pointerId);
     const sx=e.clientX,start0=c.start,dur0=c.dur,in0=c.in||0;
     const ck=clipKind(c),hasSrc=(ck!=='text'&&ck!=='solid'&&!c.solid); // text/solid have no source media
     const m=MEDIA[c.mediaId];const maxSrc=(hasSrc&&m&&ck!=='image')?Math.round((m.dur||0)*FPS()):Infinity;
+    const multi=(!handle&&selSet.size>1)?selectedClips().map(s=>({c:s.clip,s0:s.clip.start})):null; // multi-drag: move all selected together
     const move=ev=>{
       let df=Math.round((ev.clientX-sx)/ppf);
       if(handle==='l'){
@@ -2097,6 +2104,8 @@ function attachClipDrag(el,track,c){
         c.start=ns;c.dur=dur0-delta;
       }else if(handle==='r'){
         let nd=clamp(dur0+df,1,hasSrc?((maxSrc-(c.in||0))||99999):99999);c.dur=nd;
+      }else if(multi){
+        for(const mm of multi){mm.c.start=Math.max(0,mm.s0+df);const mel=document.querySelector('.clip[data-cid="'+mm.c.id+'"]');if(mel)mel.style.left=(mm.c.start*ppf)+'px';}
       }else{
         c.start=Math.max(0,start0+df);
         if(snap)c.start=snapFrame(c.start,c);
@@ -2135,11 +2144,20 @@ function frameAtEvent(e){const rect=lanesWrap.getBoundingClientRect();
   return Math.max(0,Math.round((e.clientX-rect.left+lanesWrap.scrollLeft)/ppf));}
 
 // ── SELECTION + INSPECTOR ──────────────────────────────────────────────
-function select(tid,cid){if(!sel||sel.clipId!==cid)selMaskId=null; // a different clip → drop the stale active mask
+function findClipTrack(cid){for(const t of project.tracks)if(t.clips.some(c=>c.id===cid))return t.id;return null;}
+function selectedClips(){const out=[];for(const t of project.tracks)for(const c of t.clips)if(selSet.has(c.id))out.push({track:t,clip:c});return out;}
+function select(tid,cid,additive){if(!sel||sel.clipId!==cid)selMaskId=null; // a different clip → drop the stale active mask
   if(penDraft&&penDraft.clipId!==cid)penDraft=null; // never finish a half-drawn path onto a different clip
-  sel={trackId:tid,clipId:cid};
-  $$('.clip').forEach(e=>e.classList.toggle('sel',e.dataset.cid===cid));refreshInspector();drawFrame();}
-function deselect(){sel=null;selMaskId=null;$$('.clip').forEach(e=>e.classList.remove('sel'));refreshInspector();drawFrame();}
+  if(additive){
+    if(selSet.has(cid)){selSet.delete(cid);
+      if(sel&&sel.clipId===cid){const nx=[...selSet][selSet.size-1];sel=nx?{trackId:findClipTrack(nx),clipId:nx}:null;}}
+    else{selSet.add(cid);sel={trackId:tid,clipId:cid};}
+  }else{selSet=new Set([cid]);sel={trackId:tid,clipId:cid};}
+  $$('.clip').forEach(e=>e.classList.toggle('sel',selSet.has(e.dataset.cid)));refreshInspector();drawFrame();}
+function selectAll(){const all=[];for(const t of project.tracks)for(const c of t.clips)all.push(c.id);
+  if(!all.length)return;selSet=new Set(all);sel={trackId:findClipTrack(all[0]),clipId:all[0]};
+  $$('.clip').forEach(e=>e.classList.add('sel'));refreshInspector();drawFrame();toast(all.length+' layer'+(all.length>1?'s':'')+' selected');}
+function deselect(){sel=null;selSet=new Set();selMaskId=null;$$('.clip').forEach(e=>e.classList.remove('sel'));refreshInspector();drawFrame();}
 function selClip(){if(!sel)return null;const t=project.tracks.find(t=>t.id===sel.trackId);
   return t?{track:t,clip:t.clips.find(c=>c.id===sel.clipId)}:null;}
 function refreshInspector(){
@@ -2511,10 +2529,10 @@ function updateLiveFields(){const sc=selClip();if(!sc||!sc.clip)return;
     if(inp&&inp.classList.contains('kf-live')){inp.value=+pval(sc.clip,f,playhead-sc.clip.start,KDEF[f]).toFixed(3);
       const dot=document.querySelector(`[data-ktog="${f}"]`);if(dot)dot.classList.toggle('on',keyHere(sc.clip,f));}}
 }
-function deleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
-  sc.track.clips=sc.track.clips.filter(c=>c.id!==sc.clip.id);
-  if(vels[sc.clip.id]){vels[sc.clip.id].remove();delete vels[sc.clip.id];}
-  deselect();renderTimeline();drawFrame();save(true);}
+function deleteSel(){const ids=selSet.size?[...selSet]:(sel?[sel.clipId]:[]);if(!ids.length)return;
+  for(const t of project.tracks)t.clips=t.clips.filter(c=>!ids.includes(c.id));
+  for(const id of ids)if(vels[id]){vels[id].remove();delete vels[id];}
+  deselect();renderTimeline();drawFrame();save(true);if(ids.length>1)toast(ids.length+' layers deleted');}
 // Ripple delete: remove the clip AND slide later clips on the same track left to close the gap.
 function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
   const {track,clip}=sc, end=clip.start+clip.dur, gap=clip.dur;
@@ -2896,9 +2914,11 @@ window.addEventListener('resize',fitScreen);
     $('#projName').value=project.title;histInit();save();toast('Saved “'+project.title+'”');}
   function revertProj(){if(!confirm('Revert to the last saved version? Unsaved edits are lost.'))return;
     fetch('/api/editor/projects/'+project.id).then(r=>r.json()).then(p=>{if(p&&p.tracks){loadProject(p);toast('Reverted');}}).catch(()=>toast('Nothing saved yet',1));}
-  function duplicateSel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    const c=JSON.parse(JSON.stringify(s.clip));c.id=uid();c.start=s.clip.start+s.clip.dur;
-    s.track.clips.push(c);renderTimeline();select(s.track.id,c.id);save();toast('Duplicated');}
+  function duplicateSel(){const cl=selectedClips();if(!cl.length){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);cl.push(s);}
+    const made=[];for(const s of cl){const c=JSON.parse(JSON.stringify(s.clip));c.id=uid();c.start=s.clip.start+s.clip.dur;s.track.clips.push(c);made.push({tid:s.track.id,cid:c.id});}
+    renderTimeline();
+    if(made.length){selSet=new Set(made.map(m=>m.cid));sel={trackId:made[0].tid,clipId:made[0].cid};$$('.clip').forEach(e=>e.classList.toggle('sel',selSet.has(e.dataset.cid)));refreshInspector();drawFrame();}
+    save();toast(cl.length>1?(cl.length+' duplicated'):'Duplicated');}
   let CLIP=null;
   function copySel(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
     CLIP={kind:clipKind(s.clip),clip:JSON.parse(JSON.stringify(s.clip))};toast('Copied');}
@@ -2934,8 +2954,9 @@ window.addEventListener('resize',fitScreen);
   const LABEL_COLORS={None:null,Red:'#E0544E',Yellow:'#D9C04A',Aqua:'#62C5C9',Pink:'#E59AC0',Lavender:'#9A8FD0',
     Peach:'#E0A878','Sea Foam':'#7FC9A3',Blue:'#4F86C6',Green:'#5BB98C',Purple:'#9A6FC2',Orange:'#D98C46',
     Brown:'#9A6B4F',Fuchsia:'#C95FA0',Cyan:'#46B5C9',Sandstone:'#C2A878','Dark Green':'#3E7A55'};
-  function setLabel(name){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    s.clip.label=LABEL_COLORS[name]||null;renderTimeline();save();toast('Label: '+name);}
+  function setLabel(name){const cl=selectedClips();const s=sc();if(!cl.length&&!(s&&s.clip))return toast('Select a clip first',1);
+    const col=LABEL_COLORS[name]||null;if(cl.length)for(const x of cl)x.clip.label=col;else s.clip.label=col;
+    renderTimeline();save();toast('Label: '+name+(cl.length>1?(' ×'+cl.length):''));}
   function setResolution(name){
     const map={Full:1,Half:0.5,Third:1/3,Quarter:0.25};let v=map[name];
     if(/^Custom/.test(name)){const p=prompt('Resolution divisor (1 = Full, 2 = Half, 4 = Quarter):','1');if(p==null)return;const d=parseFloat(p);if(!(d>0))return toast('Bad value',1);v=1/d;name='1/'+d;}
@@ -3166,7 +3187,7 @@ window.addEventListener('resize',fitScreen);
     'view|Show Rulers':()=>{toggleOv('rulers');toast('Rulers '+(OV.rulers?'on':'off'));},
     'view|Go to Time…':gotoTimePrompt,
     'help|Keyboard Shortcuts':showShortcuts,'help|Keyboard Shortcuts…':showShortcuts,'help|Keyboard Shortcuts (web)':showShortcuts,
-    'edit|Deselect All':deselect,'edit|All Memory':purgeAllCache,
+    'edit|Select All':selectAll,'edit|Deselect All':deselect,'edit|All Memory':purgeAllCache,
     'file|Close':closeProj,'file|Close Project':closeProj,'file|Exit':exitEditor,
     'comp|Set Poster Time':setPosterTime,
     'animation|Save Animation Preset…':saveAnimPreset,'animation|Apply Animation Preset…':applyAnimPreset,
