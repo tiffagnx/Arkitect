@@ -1653,19 +1653,20 @@ let _adjC=null;
 function _adjSnap(W,H){if(!_adjC)_adjC=document.createElement('canvas');if(_adjC.width!==W||_adjC.height!==H){_adjC.width=W;_adjC.height=H;}return _adjC;}
 function drawAdjustmentClip(ctx,c,f,W,H){
   const a=clipAlpha(c,f);if(a<=0)return;
+  const ac=Object.assign({},c);ac.blend='source-over'; // adjustment recombines straight — a no-effect adjustment is a true no-op
   const snap=_adjSnap(W,H),sg=snap.getContext('2d');
   sg.setTransform(1,0,0,1,0,0);sg.globalAlpha=1;sg.globalCompositeOperation='source-over';sg.filter='none';
   sg.clearRect(0,0,W,H);sg.drawImage(ctx.canvas,0,0);   // capture the composite beneath this layer
-  const k=stageK(W,H),buf=needsLayerBuffer(c,f);
+  const k=stageK(W,H),fw=project.width*k,fh=project.height*k,ox=(W-fw)/2,oy=(H-fh)/2;
   const drawInner=g=>{
-    g.save();g.globalAlpha=a;g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over');
-    g.filter=clipFilter(c,f,k);
-    applyClipTransform(g,c,f,W,H,k);
+    g.save();g.globalAlpha=a;g.globalCompositeOperation='source-over';
+    g.filter=clipFilter(ac,f,k);
+    applyClipTransform(g,ac,f,W,H,k);
     g.drawImage(snap,0,0);                       // the "source" is the frame beneath
-    clipOverlayFX(g,c,f,{x:0,y:0,w:W,h:H});
+    clipOverlayFX(g,ac,f,{x:ox,y:oy,w:fw,h:fh});  // overlays clipped to the image rect, never the letterbox
     g.restore();
   };
-  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
+  withLayerFX(ctx,ac,f,W,H,drawInner);   // always buffered → clean transform + masks, no duplicate-original artefact
 }
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
@@ -2509,7 +2510,7 @@ $('#tNext').onclick=()=>{stop();setPlayhead(playhead+1);};
 
 // ── KEYBOARD ───────────────────────────────────────────────────────────
 window.addEventListener('keydown',e=>{
-  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||e.target.isContentEditable)return;
   if(penDraft&&e.key==='Escape'){e.preventDefault();cancelPenDraft();return;}
   if(penDraft&&e.key==='Enter'){e.preventDefault();finishPenMask();return;}
   if(penDraft&&(e.key==='Delete'||e.key==='Backspace')){e.preventDefault();penDraft.points.pop();penDraft.points.length?drawFrame():cancelPenDraft();return;} // undo last point, not the clip
@@ -2852,6 +2853,9 @@ window.addEventListener('resize',fitScreen);
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.adjustment).length,0)+1;
     const c={id:uid(),kind:'solid',solid:true,adjustment:true,name:'Adjustment '+n,color:'#1b1b22',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Adjustment Layer added — its effects grade everything beneath');}
+  function toggleAdjustment(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(clipKind(s.clip)==='audio')return toast('Adjustment is for visual layers',1);
+    s.clip.adjustment=!s.clip.adjustment;renderTimeline();refreshInspector();drawFrame();save();toast(s.clip.adjustment?'Now an adjustment layer — grades everything beneath':'Adjustment layer off');}
   function clipDisplayName(c){return c.name||(clipKind(c)==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
   function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     const cur=clipDisplayName(s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
@@ -3106,9 +3110,11 @@ window.addEventListener('resize',fitScreen);
       if(/^Composition Settings/i.test(L))return openCompSettings;
       return null;
     }
+    if(menuId==='edit'&&/^Undo$/i.test(L)&&it.behavior&&/purge/i.test(it.behavior))return purgeUndoCache; // Edit▸Purge▸Undo (clears history) ≠ Edit▸Undo
     if(ACT[key])return ACT[key];
     if(menuId==='layer'&&/^Text$/i.test(L))return ()=>$('#addText').click();
-    if(menuId==='layer'&&/^Adjustment Layer$/i.test(L))return ()=>newAdjustment();
+    if(menuId==='layer'&&/^Adjustment Layer$/i.test(L))
+      return (it.behavior&&/\b(switch|toggle|behaves|currently selected|makes? the)\b/i.test(it.behavior))?toggleAdjustment:()=>newAdjustment();
     if(menuId==='layer'&&/^Solid/i.test(L))return ()=>newSolid();
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
     if(menuId==='layer'){
@@ -3222,6 +3228,7 @@ window.addEventListener('resize',fitScreen);
     'layer|Guide Layer':()=>{const s=sc();return !!(s&&s.clip&&s.clip.guide);},
     'layer|Effects':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
     'layer|Effects (Enable)':()=>{const s=sc();return !(s&&s.clip&&s.clip.fxEnabled===false);},
+    'layer|Adjustment Layer':()=>{const s=sc();return !!(s&&s.clip&&s.clip.adjustment);},
   };
   const DISABLE={'edit|Undo':()=>!canUndo(),'edit|Redo':()=>!canRedo(),'edit|Paste':()=>!CLIP};
 
@@ -3351,8 +3358,10 @@ window.addEventListener('resize',fitScreen);
       else key=l;}
     if(!mods.size||!key)return null;
     return ['ctrl','alt','shift'].filter(m=>mods.has(m)).join('+')+'+'+key;}
+  const _SHFOLD={'+':'=','_':'-','!':'1','@':'2','#':'3','$':'4','%':'5','^':'6','&':'7','*':'8','(':'9',')':'0','{':'[','}':']',':':';','"':"'",'<':',','>':'.','?':'/','~':'`','|':'\\'};
   function eventCombo(e){const mods=new Set();if(e.ctrlKey||e.metaKey)mods.add('ctrl');if(e.altKey)mods.add('alt');if(e.shiftKey)mods.add('shift');
     if(!mods.size)return null;let key=(e.key||'').toLowerCase();if(key===' ')key='space';
+    if(e.shiftKey&&_SHFOLD[key])key=_SHFOLD[key];   // fold the shifted glyph back to the base key the menu labels use
     return ['ctrl','alt','shift'].filter(m=>mods.has(m)).join('+')+'+'+key;}
   function installShortcuts(){
     const KEYMAP={};
