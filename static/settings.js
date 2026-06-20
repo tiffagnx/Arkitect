@@ -197,6 +197,7 @@
   // ── APP-WIDE UPDATER — on every room (the gear is everywhere). Checks GitHub Releases for the
   //    WHOLE app; if a newer version is out, badges the gear + offers a one-click whole-app update. ──
   const UPD_REPO = "tiffagnx/Arkitect";
+  let _updInfo = null, _updBtn = null;   // chat's glowing Updates button + the changelog modal it opens
   function cmpVer(a, b) { const p = s => String(s || "").replace(/^v/i, "").split(/[.\-+]/).map(n => parseInt(n, 10) || 0); const A = p(a), B = p(b), n = Math.max(A.length, B.length); for (let i = 0; i < n; i++) { const d = (A[i] || 0) - (B[i] || 0); if (d) return d < 0 ? -1 : 1; } return 0; }
   async function checkAppUpdate() {
     const box = $("asUpd"), sec = $("asUpdSec"); if (!box) return;
@@ -208,6 +209,8 @@
       const zip = (rel.assets || []).find(a => /\.zip$/i.test(a.name || ""));
       const url = (zip && zip.browser_download_url) || rel.zipball_url || ("https://github.com/" + UPD_REPO + "/releases/latest");
       const ver = String(tag).replace(/^v/i, "");
+      _updInfo = { cur, ver, url, notes: (rel.body || "") };
+      ensureUpdBtn();   // glowing "Update" pill in the topbar → opens the slim changelog modal
       box.className = "as-upd avail";
       box.innerHTML = `<span>⬆ <b>Update available</b> — v${cur} → v${ver}. Updates the whole app (every room), keeps your sessions &amp; keys.</span><button class="as-upd-btn" id="asUpdGo">Install</button>`;
       gear.classList.add("upd");
@@ -217,6 +220,35 @@
       box.innerHTML = `<span>✓ ARKITECT <b>v${cur}</b> — you're on the latest.</span>`;
       gear.classList.remove("upd");
     }
+  }
+  function ensureUpdBtn() {
+    if (!_updInfo || _updBtn) return;
+    if (!document.getElementById("ark-upd-kf")) { const s = document.createElement("style"); s.id = "ark-upd-kf";
+      s.textContent = "@keyframes arkUpdPulse{0%,100%{box-shadow:0 0 0 1px rgba(217,164,65,.45),0 0 9px rgba(217,164,65,.4)}50%{box-shadow:0 0 0 1px rgba(217,164,65,.7),0 0 20px rgba(217,164,65,.8)}}"; document.head.appendChild(s); }
+    _updBtn = document.createElement("button"); _updBtn.id = "ark-upd-btn"; _updBtn.type = "button";
+    _updBtn.textContent = "⬆ Update"; _updBtn.title = "A new version is ready — see what's new";
+    _updBtn.style.cssText = "display:inline-flex;align-items:center;height:24px;padding:0 11px;margin-right:6px;border:none;border-radius:9px;cursor:pointer;font:600 11px Inter,system-ui,sans-serif;color:#14120a;background:linear-gradient(120deg,#E6C16A,#D9A441);animation:arkUpdPulse 1.6s ease-in-out infinite;";
+    if (host) host.insertBefore(_updBtn, gear);
+    else { _updBtn.style.position = "fixed"; _updBtn.style.top = "13px"; _updBtn.style.right = "118px"; _updBtn.style.zIndex = "99998"; document.body.appendChild(_updBtn); }
+    _updBtn.onclick = openUpdModal;
+  }
+  function openUpdModal() {
+    if (!_updInfo) return;
+    const old = document.getElementById("ark-upd-modal"); if (old) old.remove();
+    const E = s => String(s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const ov = document.createElement("div"); ov.id = "ark-upd-modal";
+    ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(6,7,10,.62);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;";
+    ov.innerHTML = `<div style="width:430px;max-width:92vw;background:linear-gradient(180deg,#1b1d24,#131419);border:1px solid rgba(217,164,65,.35);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 50px rgba(217,164,65,.12);overflow:hidden;font:400 13px Inter,system-ui,sans-serif;color:#dfe3ea">`+
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font:700 12px 'Space Mono',ui-monospace,monospace;letter-spacing:.18em;color:#E6C16A">UPDATE READY</span><button id="aum-x" style="background:none;border:none;color:rgba(206,210,218,.7);font-size:17px;cursor:pointer;line-height:1">✕</button></div>`+
+      `<div style="padding:15px 16px"><div style="font:600 15px Inter;margin-bottom:10px"><span style="color:rgba(206,210,218,.6)">v${E(_updInfo.cur)}</span> <span style="color:#E6C16A">→</span> <span style="color:#fff">v${E(_updInfo.ver)}</span></div>`+
+      `<div style="max-height:228px;overflow-y:auto;white-space:pre-wrap;font:400 12px Inter;line-height:1.65;color:rgba(214,219,228,.82);background:rgba(0,0,0,.22);border-radius:10px;padding:11px 13px">${E(_updInfo.notes).slice(0, 2200) || "A newer build is ready."}</div>`+
+      `<div style="font:400 10.5px Inter;color:rgba(160,166,178,.7);margin-top:9px">One click installs it — your sessions &amp; keys stay put.</div></div>`+
+      `<div style="display:flex;gap:9px;justify-content:flex-end;padding:0 16px 15px"><button id="aum-close" style="font:600 12px Inter;padding:8px 15px;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#dfe3ea">Later</button><button id="aum-go" style="font:600 12px Inter;padding:8px 16px;border-radius:9px;cursor:pointer;border:none;color:#14120a;background:linear-gradient(120deg,#E6C16A,#D9A441)">Install v${E(_updInfo.ver)}</button></div></div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector("#aum-x").onclick = close; ov.querySelector("#aum-close").onclick = close;
+    ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+    ov.querySelector("#aum-go").onclick = () => { close(); try { gear.click(); } catch (e) {} installAppUpdate(_updInfo.url, _updInfo.ver); };
   }
   async function installAppUpdate(url, ver) {
     const box = $("asUpd");

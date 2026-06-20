@@ -1648,11 +1648,31 @@ function drawSolidClip(ctx,c,f,W,H){
   };
   if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
 }
+// Adjustment layer — its effects + masks grade EVERYTHING composited beneath it.
+let _adjC=null;
+function _adjSnap(W,H){if(!_adjC)_adjC=document.createElement('canvas');if(_adjC.width!==W||_adjC.height!==H){_adjC.width=W;_adjC.height=H;}return _adjC;}
+function drawAdjustmentClip(ctx,c,f,W,H){
+  const a=clipAlpha(c,f);if(a<=0)return;
+  const snap=_adjSnap(W,H),sg=snap.getContext('2d');
+  sg.setTransform(1,0,0,1,0,0);sg.globalAlpha=1;sg.globalCompositeOperation='source-over';sg.filter='none';
+  sg.clearRect(0,0,W,H);sg.drawImage(ctx.canvas,0,0);   // capture the composite beneath this layer
+  const k=stageK(W,H),buf=needsLayerBuffer(c,f);
+  const drawInner=g=>{
+    g.save();g.globalAlpha=a;g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over');
+    g.filter=clipFilter(c,f,k);
+    applyClipTransform(g,c,f,W,H,k);
+    g.drawImage(snap,0,0);                       // the "source" is the frame beneath
+    clipOverlayFX(g,c,f,{x:0,y:0,w:W,h:H});
+    g.restore();
+  };
+  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
+}
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   for(const {c,img,solid} of activeVideoClips(f)){
     if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export (srcOverride present)
+    if(c.adjustment){drawAdjustmentClip(ctx,effClip(c),f,W,H);continue;}   // grades everything beneath
     if(solid){drawSolidClip(ctx,effClip(c),f,W,H);continue;}
     let src,sw,sh;
     if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))continue;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
@@ -2593,6 +2613,7 @@ function projectNeedsFrameServer(p){
     if((c.anchorX&&c.anchorX!==0)||(c.anchorY&&c.anchorY!==0))return true;
     if(clipKind(c)==='solid'||c.solid)return true; // solids aren't drawn by the native ffmpeg path
     if(c.guide)return true; // guide layers must be skipped on export — only the frame-server path can
+    if(c.adjustment)return true; // adjustment layers grade the comp — frame-server only
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
     if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
@@ -2825,6 +2846,12 @@ window.addEventListener('resize',fitScreen);
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.solid).length,0)+1;
     const c={id:uid(),kind:'solid',solid:true,name:'Solid '+n,color:'#6a6a6a',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Solid “'+c.name+'” added');}
+  function newAdjustment(){
+    let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[project.tracks.length-1];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
+    const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.adjustment).length,0)+1;
+    const c={id:uid(),kind:'solid',solid:true,adjustment:true,name:'Adjustment '+n,color:'#1b1b22',start:playhead,dur:Math.round(5*FPS())};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Adjustment Layer added — its effects grade everything beneath');}
   function clipDisplayName(c){return c.name||(clipKind(c)==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
   function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     const cur=clipDisplayName(s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
@@ -3073,6 +3100,7 @@ window.addEventListener('resize',fitScreen);
     const L=norm(it.label);const key=menuId+'|'+L;
     if(menuId==='newctx'){
       if(/^Text/i.test(L))return ()=>$('#addText').click();
+      if(/^Adjustment Layer/i.test(L))return ()=>newAdjustment();
       if(/^Solid/i.test(L))return ()=>newSolid();
       if(/^New Composition/i.test(L))return ()=>$('#btnNew').click();
       if(/^Composition Settings/i.test(L))return openCompSettings;
@@ -3080,6 +3108,7 @@ window.addEventListener('resize',fitScreen);
     }
     if(ACT[key])return ACT[key];
     if(menuId==='layer'&&/^Text$/i.test(L))return ()=>$('#addText').click();
+    if(menuId==='layer'&&/^Adjustment Layer$/i.test(L))return ()=>newAdjustment();
     if(menuId==='layer'&&/^Solid/i.test(L))return ()=>newSolid();
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
     if(menuId==='layer'){
