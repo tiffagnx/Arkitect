@@ -20,13 +20,6 @@
       "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7791"],
       "port": 7791,
       "autoPort": false
-    },
-    {
-      "name": "arkitect-intro",
-      "runtimeExecutable": "C:/Users/koonc/Desktop/Projects/pink-room/venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7796"],
-      "port": 7796,
-      "autoPort": false
     }
   ]
 }

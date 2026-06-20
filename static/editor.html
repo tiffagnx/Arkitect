@@ -880,7 +880,9 @@ function addMask(c){
   twSet(c,'masks',true);twSet(c,'mask:'+m.id,true);selMaskId=m.id;
   const tr=trackOf(c);if(tr)sel={trackId:tr.id,clipId:c.id};
   renderTimeline();refreshInspector();drawFrame();save(true);toast('Mask added — drag it on the monitor');return m;}
-function deleteMask(c,id){c.masks=(c.masks||[]).filter(m=>m.id!==id);if(selMaskId===id)selMaskId=null;
+function deleteMask(c,id){c.masks=(c.masks||[]).filter(m=>m.id!==id);
+  for(const p of ['feather','opacity','expansion'])delete c['mk.'+id+'.'+p]; // drop any keyframes for the removed mask
+  if(selMaskId===id)selMaskId=null;
   renderTimeline();refreshInspector();drawFrame();save(true);toast('Mask deleted');}
 let selMaskId=null;
 let penDraft=null;   // in-progress pen mask: {clipId, points:[{x,y}...]} in comp coords
@@ -958,17 +960,23 @@ function buildHeadProps(track,c){
       rm.onclick=e=>{e.stopPropagation();deleteMask(c,m.id);};
       row.append(tw,nm,mode,inv,rm);wrap.appendChild(row);
     }else if(n.type==='maskprop'){
-      const m=n.mask;
+      const m=n.mask, keyable=n.prop!=='shape', keyed=keyable&&maskKeyed(c,m,n.prop);
       const row=document.createElement('div');row.className='tl-prow d2';
+      if(keyable){const sw=document.createElement('button');sw.className='tl-chip'+(keyed?' on':'');sw.textContent='◷';sw.title=keyed?'Stop animating '+n.label:'Animate '+n.label;
+        sw.onclick=e=>{e.stopPropagation();toggleMaskAnim(c,m,n.prop);};row.appendChild(sw);}
       const nm=document.createElement('span');nm.className='tl-pn';nm.textContent=n.label;
       const val=document.createElement('span');val.className='tl-val';
+      const fn=keyed?maskNow(c,m,n.prop):null;
       val.textContent = n.prop==='shape'?(isPenMask(m)?('Pen · '+m.points.length+' pts'+(m.smooth?' ∿':'')):(m.shape==='ellipse'?'Ellipse':'Rectangle'))
-        : n.prop==='feather'?((m.feather||0)+' px')
-        : n.prop==='opacity'?(Math.round((m.opacity==null?1:m.opacity)*100)+'%')
-        : ((m.expansion||0)+' px');
+        : n.prop==='feather'?(((keyed?fn:(m.feather||0))|0)+' px')
+        : n.prop==='opacity'?(Math.round((keyed?fn:(m.opacity==null?1:m.opacity))*100)+'%')
+        : (((keyed?fn:(m.expansion||0))|0)+' px');
       if(n.prop==='shape'&&!isPenMask(m)){val.style.cursor='pointer';val.title='Toggle shape';
         val.onclick=e=>{e.stopPropagation();m.shape=m.shape==='ellipse'?'rect':'ellipse';renderTimeline();drawFrame();save(true);};}
-      row.append(nm,val);wrap.appendChild(row);
+      row.append(nm,val);
+      if(keyed){const kb=document.createElement('button');kb.className='tl-chip'+(keyHere(c,maskKeyField(m,n.prop))?' on':'');kb.textContent='◆';kb.title='Add / remove key at playhead';
+        kb.onclick=e=>{e.stopPropagation();toggleMaskKeyHere(c,m,n.prop);};row.appendChild(kb);}
+      wrap.appendChild(row);
     }else if(n.type==='add'){
       const row=document.createElement('div');row.className='tl-prow add';
       const b=document.createElement('button');b.className='tl-add';b.textContent=n.label;
@@ -1265,7 +1273,7 @@ function _mkCanvases(W,H){
   if(_mkL.width!==W||_mkL.height!==H){for(const cv of [_mkL,_mkM,_mkS]){cv.width=W;cv.height=H;}}
   return [_mkL,_mkM,_mkS];
 }
-function _maskShapePath(g,m,k,ox,oy){
+function _maskShapePath(g,m,k,ox,oy,expOv){
   if(isPenMask(m)){          // free-form pen path — straight segments, or a closed Catmull-Rom spline when smooth
     const P=m.points.map(p=>({x:ox+p.x*k,y:oy+p.y*k})),n=P.length;
     g.beginPath();
@@ -1280,7 +1288,7 @@ function _maskShapePath(g,m,k,ox,oy){
     }
     g.closePath();return;
   }
-  const e=m.expansion||0;
+  const e=(expOv!=null?expOv:(m.expansion||0));
   const x=ox+(m.box.x-e)*k, y=oy+(m.box.y-e)*k, w=(m.box.w+2*e)*k, h=(m.box.h+2*e)*k;
   g.beginPath();
   if(m.shape==='ellipse')g.ellipse(x+w/2,y+h/2,Math.max(0.5,w/2),Math.max(0.5,h/2),0,0,Math.PI*2);
@@ -1360,17 +1368,19 @@ function buildMaskAlpha(M,S,c,f,W,H){
   reset(mg);mg.clearRect(0,0,W,H);
   const masks=clipMasks(c);
   if(masks.length&&masks.every(m=>(m.mode||'add')==='subtract')){mg.fillStyle='#fff';mg.fillRect(0,0,W,H);} // only subtracts → start fully visible
+  const fr=f-c.start;
   for(const m of masks){
     const add=(m.mode||'add')==='add';
+    const feather=maskNum(c,m,'feather',fr),opacity=maskNum(c,m,'opacity',fr),exp=maskNum(c,m,'expansion',fr); // keyframe-aware
     reset(sg);sg.clearRect(0,0,W,H);
     sg.save();
-    sg.filter=(m.feather>0)?`blur(${(m.feather*k).toFixed(1)}px)`:'none';
+    sg.filter=(feather>0)?`blur(${(feather*k).toFixed(1)}px)`:'none';
     applyClipTransform(sg,c,f,W,H,k);   // mask tracks the layer's transform (text pivots about its base)
-    sg.fillStyle='#fff';_maskShapePath(sg,m,k,ox,oy);sg.fill();
+    sg.fillStyle='#fff';_maskShapePath(sg,m,k,ox,oy,exp);sg.fill();
     sg.restore();
     if(m.inverted){sg.filter='none';sg.globalCompositeOperation='xor';sg.fillStyle='#fff';sg.fillRect(0,0,W,H);} // white OUTSIDE the shape
     mg.globalCompositeOperation=add?'source-over':'destination-out';
-    mg.globalAlpha=add?clamp(m.opacity==null?1:m.opacity,0,1):1;
+    mg.globalAlpha=add?clamp(opacity==null?1:opacity,0,1):1;
     mg.drawImage(S,0,0);
   }
   reset(mg);
@@ -2288,7 +2298,7 @@ function masksInspector(clip){
           <button class="chip ${m.shape!=='ellipse'?'on':''}" data-msh="${m.id}|rect">Rect</button>
           <button class="chip ${m.shape==='ellipse'?'on':''}" data-msh="${m.id}|ellipse">Ellipse</button></div></div>`;
     const boxRows = pen ? '' :
-      `${numRow('Expansion','me_'+m.id,m.expansion||0)}
+      `${numRow('Expansion','me_'+m.id,maskNow(clip,m,'expansion')|0)}
        ${numRow('Box X','mx_'+m.id,Math.round(m.box.x))}${numRow('Box Y','my_'+m.id,Math.round(m.box.y))}
        ${numRow('Box W','mw_'+m.id,Math.round(m.box.w))}${numRow('Box H','mh_'+m.id,Math.round(m.box.h))}`;
     return `
@@ -2298,7 +2308,7 @@ function masksInspector(clip){
       <button class="chip ${(m.mode||'add')==='add'?'on':''}" data-mmd="${m.id}|add">Add</button>
       <button class="chip ${m.mode==='subtract'?'on':''}" data-mmd="${m.id}|subtract">Subtract</button>
       <button class="chip ${m.inverted?'on':''}" data-minv="${m.id}">Inverted</button></div></div>
-    ${numRow('Feather','mf_'+m.id,m.feather||0)}${numRow('Opacity %','mo_'+m.id,Math.round((m.opacity==null?1:m.opacity)*100))}
+    ${numRow('Feather','mf_'+m.id,maskNow(clip,m,'feather')|0)}${numRow('Opacity %','mo_'+m.id,Math.round(maskNow(clip,m,'opacity')*100))}
     ${boxRows}
     <button class="del-btn" data-mdel="${m.id}">Delete ${esc(m.name)}</button>`;}).join('');
   return `<div class="grp director-only"><div class="gt">Masks</div>
@@ -2315,9 +2325,9 @@ function bindMasksInspector(clip){
   $$('#inspBody [data-minv]').forEach(b=>b.onclick=()=>{const m=byId(b.dataset.minv);if(m){m.inverted=!m.inverted;refreshInspector();renderTimeline();drawFrame();save(true);}});
   $$('#inspBody [data-mdel]').forEach(b=>b.onclick=()=>deleteMask(clip,b.dataset.mdel));
   for(const m of (clip.masks||[])){
-    bindNum('mf_'+m.id,v=>{m.feather=Math.max(0,v);renderTimeline();drawFrame();save(true);});
-    bindNum('mo_'+m.id,v=>{m.opacity=clamp(v/100,0,1);renderTimeline();drawFrame();save(true);});
-    bindNum('me_'+m.id,v=>{m.expansion=v|0;renderTimeline();drawFrame();save(true);});
+    bindNum('mf_'+m.id,v=>writeMaskProp(clip,m,'feather',Math.max(0,v)));
+    bindNum('mo_'+m.id,v=>writeMaskProp(clip,m,'opacity',clamp(v/100,0,1)));
+    bindNum('me_'+m.id,v=>writeMaskProp(clip,m,'expansion',v|0));
     bindNum('mx_'+m.id,v=>{m.box.x=v|0;drawFrame();save(true);});
     bindNum('my_'+m.id,v=>{m.box.y=v|0;drawFrame();save(true);});
     bindNum('mw_'+m.id,v=>{m.box.w=Math.max(2,v|0);drawFrame();save(true);});
@@ -2570,6 +2580,26 @@ function toggleKeyHere(c,field){
   if(i>=0){if(k.length>1)k.splice(i,1);}else upsertKey(c,field,pval(c,field,fr,KDEF[field]));
   refreshInspector();renderTimeline();drawFrame();save(true);
 }
+// ── MASK KEYFRAMING — animate a mask's Feather / Opacity / Expansion over time.
+//    Keyed values live on the clip at 'mk.<maskId>.<prop>' so they reuse the whole
+//    keyframe engine (pval/isKeyed/upsertKey/gotoKey); the static m[prop] is the fallback default.
+function maskKeyField(m,prop){return 'mk.'+m.id+'.'+prop;}
+function maskStatic(m,prop){return prop==='opacity'?(m.opacity==null?1:m.opacity):prop==='feather'?(m.feather||0):(m.expansion||0);}
+function maskKeyed(c,m,prop){return isKeyed(c,maskKeyField(m,prop));}
+function maskNum(c,m,prop,fr){const f=maskKeyField(m,prop);return isKeyed(c,f)?pval(c,f,fr,maskStatic(m,prop)):maskStatic(m,prop);}
+function maskNow(c,m,prop){return maskNum(c,m,prop,playhead-c.start);}
+function setMaskStatic(m,prop,v){if(prop==='opacity')m.opacity=clamp(v,0,1);else if(prop==='feather')m.feather=Math.max(0,v);else m.expansion=v|0;}
+function toggleMaskAnim(c,m,prop){const f=maskKeyField(m,prop),fr=clamp(playhead-c.start,0,Math.max(0,c.dur-1));
+  if(isKeyed(c,f)){setMaskStatic(m,prop,+pval(c,f,playhead-c.start,maskStatic(m,prop)).toFixed(4));delete c[f];}
+  else{c[f]={k:[{t:fr,v:maskStatic(m,prop),e:'ease'}]};}
+  refreshInspector();renderTimeline();drawFrame();save(true);}
+function writeMaskProp(c,m,prop,v){const f=maskKeyField(m,prop);
+  if(isKeyed(c,f))upsertKey(c,f,v);else setMaskStatic(m,prop,v);
+  renderTimeline();drawFrame();save(true);}
+function toggleMaskKeyHere(c,m,prop){const f=maskKeyField(m,prop);if(!isKeyed(c,f))return;
+  const fr=clamp(playhead-c.start,0,Math.max(0,c.dur-1)),k=c[f].k,i=k.findIndex(x=>x.t===fr);
+  if(i>=0){if(k.length>1)k.splice(i,1);}else upsertKey(c,f,pval(c,f,fr,maskStatic(m,prop)));
+  refreshInspector();renderTimeline();drawFrame();save(true);}
 function gotoKey(c,field,dir){if(!isKeyed(c,field))return;const fr=playhead-c.start;
   const ts=c[field].k.map(x=>x.t).sort((a,b)=>a-b);
   const tg=dir>0?ts.find(t=>t>fr):[...ts].reverse().find(t=>t<fr);
