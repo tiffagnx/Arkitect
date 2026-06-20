@@ -303,6 +303,8 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .efx-seg button{padding:4px 8px;border-radius:6px;background:var(--surf);border:1px solid var(--line);font:600 10px var(--ui);color:var(--dim);transition:.1s}
 .efx-seg button:hover{color:var(--txt)}
 .efx-seg button.on{background:var(--cy-soft);color:#bfe6f1;border-color:var(--cy-line)}
+.efx-curve{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;display:block;cursor:crosshair;touch-action:none;background:#0b0c10}
+.efx-curvehint{font-size:9px;color:var(--dim2);text-align:center;margin-top:-2px}
 
 /* ── TIMELINE ────────────────────────────────────────────────────────── */
 .tl{display:flex;flex-direction:column;min-height:0;background:var(--bg1)}
@@ -791,6 +793,7 @@ const FX_DEFS=[
   ['fxExposure','Exposure',0,'Stops',0.6],
   ['fxGamma','Gamma',1,'Gamma',1.6],
   ['fxLevels','Levels',0,'Amount',1],
+  ['fxCurve','Curves',0,'Amount',1],
   ['fxTemp','Warmth',0,'Temp',30],
   ['fxVibrance','Vibrance',0,'Amount',0.6],
   ['fxThreshold','Threshold',0,'Level',0.5],
@@ -1149,6 +1152,7 @@ const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
   fxLumaKey:0,fxDirBlur:0,fxDirAngle:0,fxRadBlur:0,fxWarp:0,
   fxKey:0,fxKeyBalance:0.5,fxKeyGain:1,fxKeyClipB:0,fxKeyClipW:1,fxKeyGrow:0,fxKeySoftness:0,fxKeyDespill:1,
   fxLevels:0,fxLevInB:0,fxLevInW:1,fxLevGamma:1,fxLevOutB:0,fxLevOutW:1,
+  fxCurve:0,
   volume:1};
 const KEYABLE=Object.keys(KDEF);
 const BLENDS=[['Normal','source-over'],['Add','lighter'],['Screen','screen'],['Multiply','multiply'],
@@ -1240,7 +1244,7 @@ function hasOverlayFX(c,f){const fr=f-c.start;return pval(c,'fxVignette',fr,0)>0
 // pixel-level effects need the layer rendered in isolation (an offscreen buffer)
 function hasLayerBufferFX(c,f){const fr=f-c.start;
   return pval(c,'fxPixel',fr,0)>0||pval(c,'fxGlow',fr,0)>0||pval(c,'fxPosterize',fr,0)>=2
-    ||pval(c,'fxGamma',fr,1)!==1||pval(c,'fxTemp',fr,0)!==0||pval(c,'fxVibrance',fr,0)!==0||pval(c,'fxLevels',fr,0)>0
+    ||pval(c,'fxGamma',fr,1)!==1||pval(c,'fxTemp',fr,0)!==0||pval(c,'fxVibrance',fr,0)!==0||pval(c,'fxLevels',fr,0)>0||pval(c,'fxCurve',fr,0)>0
     ||pval(c,'fxThreshold',fr,0)>0||pval(c,'fxSolarize',fr,0)>0||pval(c,'fxDuotone',fr,0)>0
     ||pval(c,'fxSharpen',fr,0)>0||pval(c,'fxEmboss',fr,0)>0||pval(c,'fxEdges',fr,0)>0
     ||pval(c,'fxRGB',fr,0)!==0||pval(c,'fxHalftone',fr,0)>=2
@@ -1426,6 +1430,11 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
     for(let v=0;v<256;v++){let t=(v-inB)/rng;t=t<0?0:t>1?1:t;t=Math.pow(t,ig);LUT[v]=outB+t*(outW-outB);}
     const im=lg.getImageData(0,0,W,H),d=im.data;
     for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(LUT[d[i]]-d[i])*lv;d[i+1]+=(LUT[d[i+1]]-d[i+1])*lv;d[i+2]+=(LUT[d[i+2]]-d[i+2])*lv;}
+    lg.putImageData(im,0,0);}
+  // Curves — master LUT from the draggable control points, mixed by Amount
+  const cv=clamp(pval(c,'fxCurve',fr,0),0,1);
+  if(cv>0){const LUT2=curveLUT(curvePts(c)),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(LUT2[d[i]]-d[i])*cv;d[i+1]+=(LUT2[d[i+1]]-d[i+1])*cv;d[i+2]+=(LUT2[d[i+2]]-d[i+2])*cv;}
     lg.putImageData(im,0,0);}
   // Sharpen — 3×3 cross kernel (centre 1+4a, neighbours −a)
   const sh=clamp(pval(c,'fxSharpen',fr,0),0,3);
@@ -2319,6 +2328,16 @@ function bindMasksInspector(clip){
 function valAt(c,field){const fr=playhead-c.start;return isKeyed(c,field)?pval(c,field,fr,KDEF[field]):(c[field]==null?KDEF[field]:c[field]);}
 function fmtNum(v){const n=+(+v).toFixed(3);return Number.isFinite(n)?String(n):'0';}
 function hex2rgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h||'000000',16)||0;return [(n>>16)&255,(n>>8)&255,n&255];}
+// Curves — a 256-LUT from piecewise-linear control points (x,y in 0..1, x=input/y=output)
+function curvePts(c){return (c.fxCurvePts&&c.fxCurvePts.length>=2)?c.fxCurvePts:[{x:0,y:0},{x:1,y:1}];}
+function curveLUT(pts){const P=[...pts].sort((a,b)=>a.x-b.x),LUT=new Uint8ClampedArray(256);
+  for(let i=0;i<256;i++){const x=i/255;
+    if(x<=P[0].x){LUT[i]=P[0].y*255;continue;}
+    if(x>=P[P.length-1].x){LUT[i]=P[P.length-1].y*255;continue;}
+    let a=P[0],b=P[P.length-1];
+    for(let j=0;j<P.length-1;j++){if(x>=P[j].x&&x<=P[j+1].x){a=P[j];b=P[j+1];break;}}
+    const t=(x-a.x)/((b.x-a.x)||1);LUT[i]=clamp(a.y+(b.y-a.y)*t,0,1)*255;}
+  return LUT;}
 // Matte morphology (shrink/grow) — separable min/max; t>0 grows (dilate), t<0 chokes (erode)
 function morphMatte(M,W,H,t){const r=Math.round(Math.abs(t));if(r<1)return M;const dil=t>0;
   const tmp=new Float32Array(M.length),out=new Float32Array(M.length);
@@ -2349,7 +2368,7 @@ const FX_CAT={ // field → [category label, accent colour]
   fxBlur:['Blur','#5BA3C7'],fxSharpen:['Sharpen','#5BA3C7'],
   fxBright:['Colour','#C77FB0'],fxExposure:['Colour','#C77FB0'],fxContrast:['Colour','#C77FB0'],fxSat:['Colour','#C77FB0'],
   fxVibrance:['Colour','#C77FB0'],fxHue:['Colour','#C77FB0'],fxTemp:['Colour','#C77FB0'],fxGamma:['Colour','#C77FB0'],
-  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],fxLevels:['Colour','#C77FB0'],
+  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],fxLevels:['Colour','#C77FB0'],fxCurve:['Colour','#C77FB0'],
   fxThreshold:['Stylize','#D9A441'],fxSolarize:['Stylize','#D9A441'],fxPosterize:['Stylize','#D9A441'],fxShadow:['Stylize','#D9A441'],
   fxVignette:['Stylize','#D9A441'],fxGrain:['Stylize','#D9A441'],fxPixel:['Stylize','#D9A441'],fxGlow:['Stylize','#D9A441'],
   fxEmboss:['Stylize','#D9A441'],fxEdges:['Stylize','#D9A441'],fxHalftone:['Stylize','#D9A441'],fxLeak:['Stylize','#D9A441'],fxScan:['Stylize','#D9A441'],
@@ -2360,7 +2379,7 @@ const FX_CAT={ // field → [category label, accent colour]
 const FX_RANGE={ // field → [min,max,step] for the slider
   fxBlur:[0,40,.5],fxBright:[.2,2.5,.01],fxExposure:[-3,3,.05],fxContrast:[.2,3,.01],fxSat:[0,3,.01],fxVibrance:[-1,1.5,.01],
   fxHue:[-180,180,1],fxTemp:[-100,100,1],fxGamma:[.2,3,.01],fxGray:[0,1,.01],fxSepia:[0,1,.01],fxInvert:[0,1,.01],
-  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxLevels:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
+  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxLevels:[0,1,.01],fxCurve:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
   fxTint:[0,1,.01],fxGrain:[0,1,.01],fxPixel:[0,60,1],fxGlow:[0,1,.01],fxSharpen:[0,3,.05],fxEmboss:[0,1,.01],fxEdges:[0,1,.01],
   fxRGB:[-20,20,1],fxHalftone:[2,20,1],fxLeak:[0,1,.01],fxScan:[0,1,.01],
   fxKey:[0,1,.01],fxLumaKey:[0,1,.01],fxDirBlur:[0,60,1],fxRadBlur:[0,1,.01],fxWarp:[-1,1,.02],
@@ -2375,6 +2394,7 @@ const FX_EXTRA={
     {kind:'slider',sub:'fxLevGamma',label:'Gamma',min:0.1,max:4,step:.01},
     {kind:'slider',sub:'fxLevOutB',label:'Output Black',min:0,max:1,step:.005},
     {kind:'slider',sub:'fxLevOutW',label:'Output White',min:0,max:1,step:.005}],
+  fxCurve:[{kind:'curve'}],
   fxKey:[
     {kind:'seg',sub:'fxKeyView',label:'View',opts:['final','matte','status'],def:'final'},
     {kind:'swatch',sub:'fxKeyScreen',def:'#00b140',label:'Screen colour'},
@@ -2429,7 +2449,37 @@ function efxExtra(c,ex){
   if(ex.kind==='swatch')return efxColorRow(ex.label,()=>c[ex.sub]||ex.def,v=>{c[ex.sub]=v;});
   if(ex.kind==='slider')return efxSlider(c,ex.sub,ex.label,ex.min,ex.max,ex.step,false);
   if(ex.kind==='seg')return efxSeg(c,ex);
+  if(ex.kind==='curve')return efxCurveEditor(c);
   return document.createElement('div');
+}
+function efxCurveEditor(c){
+  const wrap=document.createElement('div');wrap.className='efx-ctrl';
+  const cv=document.createElement('canvas');cv.className='efx-curve';cv.width=232;cv.height=140;wrap.appendChild(cv);
+  const hint=document.createElement('div');hint.className='efx-curvehint';hint.textContent='drag a point · click to add · double-click to remove';wrap.appendChild(hint);
+  const g=cv.getContext('2d'),W=cv.width,H=cv.height,pad=9;
+  const X=x=>pad+x*(W-2*pad),Y=y=>H-pad-y*(H-2*pad),iX=px=>clamp((px-pad)/(W-2*pad),0,1),iY=py=>clamp((H-pad-py)/(H-2*pad),0,1);
+  const P=()=>curvePts(c), set=p=>{c.fxCurvePts=p;drawFrame();draw();};
+  function draw(){
+    g.clearRect(0,0,W,H);g.fillStyle='#0b0c10';g.fillRect(0,0,W,H);
+    g.strokeStyle='rgba(255,255,255,.06)';g.lineWidth=1;
+    for(let i=1;i<4;i++){const gx=X(i/4);g.beginPath();g.moveTo(gx,pad);g.lineTo(gx,H-pad);g.stroke();const gy=Y(i/4);g.beginPath();g.moveTo(pad,gy);g.lineTo(W-pad,gy);g.stroke();}
+    g.strokeStyle='rgba(255,255,255,.12)';g.beginPath();g.moveTo(X(0),Y(0));g.lineTo(X(1),Y(1));g.stroke();
+    const S=[...P()].sort((a,b)=>a.x-b.x);
+    g.strokeStyle='#C77FB0';g.lineWidth=2;g.beginPath();g.moveTo(X(0),Y(S[0].y));for(const p of S)g.lineTo(X(p.x),Y(p.y));g.lineTo(X(1),Y(S[S.length-1].y));g.stroke();
+    for(const p of S){g.beginPath();g.arc(X(p.x),Y(p.y),4,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#C77FB0';g.lineWidth=1.5;g.stroke();}
+  }
+  let drag=-1;
+  const nearIdx=(px,py)=>{const p=P();let bi=-1,bd=12;for(let i=0;i<p.length;i++){const dd=Math.hypot(X(p[i].x)-px,Y(p[i].y)-py);if(dd<bd){bd=dd;bi=i;}}return bi;};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();try{cv.setPointerCapture(e.pointerId);}catch(_){}
+    const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;let i=nearIdx(px,py);
+    if(i<0){const arr=[...P(),{x:iX(px),y:iY(py)}];c.fxCurvePts=arr;i=arr.length-1;draw();}
+    drag=i;});
+  cv.addEventListener('pointermove',e=>{if(drag<0)return;const r=cv.getBoundingClientRect();
+    const arr=[...P()];arr[drag]={x:iX(e.clientX-r.left),y:iY(e.clientY-r.top)};set(arr);});
+  cv.addEventListener('pointerup',()=>{if(drag>=0){drag=-1;save(true);}});
+  cv.addEventListener('dblclick',e=>{const r=cv.getBoundingClientRect();const i=nearIdx(e.clientX-r.left,e.clientY-r.top);const arr=P();
+    if(i>=0&&arr.length>2){c.fxCurvePts=arr.filter((_,j)=>j!==i);drawFrame();draw();save(true);}});
+  draw();return wrap;
 }
 function efxSeg(c,ex){
   const row=document.createElement('div');row.className='efx-ctrl';
@@ -3317,7 +3367,8 @@ window.addEventListener('resize',fitScreen);
         [/Threshold/i,'fxThreshold'],
         [/^Extract$/i,'fxThreshold'],
         [/Solarize/i,'fxSolarize'],
-        [/Levels|Curves/i,'fxLevels'],
+        [/^Levels/i,'fxLevels'],
+        [/Curves/i,'fxCurve'],
         [/Gamma\b|Pedestal/i,'fxGamma'],
         [/Color Balance|Temperature|White Balance|Photo Filter|Warm/i,'fxTemp'],
         [/Chromatic Aberration|RGB Split|Separate RGB/i,'fxRGB'],

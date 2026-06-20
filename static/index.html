@@ -250,25 +250,26 @@
   ::-webkit-scrollbar { width: 9px; } ::-webkit-scrollbar-thumb { background: rgba(62,156,184,.25); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(62,156,184,.45); }
   @media (max-width: 760px) { .side { display: none; } .bubble { max-width: 88%; } }
-  /* ── Start-screen intro: Tiff + Kit walk in (transparent video), then the UI drops in ── */
-  .ark-intro { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
-               pointer-events: none; background: transparent; opacity: 1; transition: opacity .7s ease; }
-  .ark-intro.is-out { opacity: 0; }
-  .ark-intro.is-done { display: none; }                 /* hard-remove after the fade so it never eats clicks */
-  .ark-intro__vid { width: auto; height: auto; max-width: min(82vw, 1040px); max-height: 84vh;
-                    object-fit: contain; background: transparent; }
-  /* While the intro is arming (set pre-paint), the whole UI starts hidden + clipped shut. */
-  html.ark-intro-armed .app { opacity: 0; }
-  /* The reveal: a curtain hem descending — the UI is uncovered from the top down. */
-  .app.ark-reveal { animation: arkCurtain .95s cubic-bezier(.22,.61,.36,1) forwards; will-change: opacity, clip-path; }
-  @keyframes arkCurtain {
-    from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  /* ── Start-screen intro: Tiff + Kit walk in from the edges; the hero drops in to meet them ── */
+  /* Everything else stays put — only the centre hero is held back, then "comes down". */
+  .ark-cast { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+  .ark-cast.is-done { display: none; }
+  .ark-walker { position: absolute; bottom: 11%; height: 22vh; width: auto; background: transparent;
+                opacity: 1; will-change: transform, opacity; }
+  .ark-cast.bow .ark-walker { opacity: 0; transition: opacity .55s ease; }
+  /* The hero is held up + clipped until the cast nearly meets, then it drops in from above. */
+  html.ark-intro-armed #hello { opacity: 0; transform: translateY(-44px); clip-path: inset(0 0 100% 0); }
+  #hello.ark-drop { animation: arkDrop 1.15s cubic-bezier(.22,.61,.36,1) forwards;
+                    will-change: opacity, transform, clip-path; }
+  @keyframes arkDrop {
+    from { opacity: 0; transform: translateY(-44px); clip-path: inset(0 0 100% 0); }
     55%  { opacity: 1; }
-    to   { opacity: 1; clip-path: inset(0 0 0 0); }
+    to   { opacity: 1; transform: translateY(0);     clip-path: inset(0 0 0 0); }
   }
-  @media (prefers-reduced-motion: reduce) {           /* no flash, no motion — just show the UI */
-    html.ark-intro-armed .app { opacity: 1; }
-    .app.ark-reveal { animation: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html.ark-intro-armed #hello { opacity: 1; transform: none; clip-path: none; }
+    #hello.ark-drop { animation: none; }
+    .ark-cast { display: none; }
   }
 </style>
 <script>
@@ -287,12 +288,12 @@
 <div class="aura"><div class="a1"></div><div class="a2"></div><div class="a3"></div></div>
 <div class="grain"></div>
 
-<!-- Intro: Tiff + Kit walk in (transparent VP9-alpha video, footstep audio), freeze, then the UI drops in. Once per launch. -->
-<div id="arkIntro" class="ark-intro" aria-hidden="true">
-  <video id="arkIntroVid" class="ark-intro__vid" playsinline preload="auto" src="/static/tiff-kit-intro.webm"></video>
-</div>
-
 <div class="app">
+  <!-- Intro cast: Tiff walks in from behind the sidebar, Kit from the right edge; they meet centre and the hero drops in. Once per launch. -->
+  <div id="arkCast" class="ark-cast" aria-hidden="true">
+    <video id="arkWTiff" class="ark-walker" playsinline preload="auto" src="/static/intro-tiff.webm"></video>
+    <video id="arkWKit"  class="ark-walker" playsinline preload="auto" muted src="/static/intro-kit.webm"></video>
+  </div>
   <aside class="side">
     <div class="brand"><img class="brandlogo" src="/static/arkitect-logo.png" alt="ARKITECT" draggable="false" /><small>local · private · yours</small></div>
     <button class="newchat" id="newChat">+ New chat</button>
@@ -890,44 +891,64 @@ function startArkTips() {
 startArkTips();
 </script>
 <script>
-/* ARKITECT intro controller — play the Tiff+Kit walk-in once, hold the last frame, then
-   crossfade the video out while the UI drops in like a curtain from above. */
+/* ARKITECT intro — Tiff walks in from behind the sidebar, Kit from the right edge; they meet in
+   the centre while the hero drops in from above. Plays once per app launch. */
 (function(){
   function run(){
     var html  = document.documentElement;
-    var intro = document.getElementById('arkIntro');
-    var vid   = document.getElementById('arkIntroVid');
-    var app   = document.querySelector('.app');
+    var cast  = document.getElementById('arkCast');
+    var tiff  = document.getElementById('arkWTiff');
+    var kit   = document.getElementById('arkWKit');
+    var hello = document.getElementById('hello');
     var armed = html.classList.contains('ark-intro-armed');
 
-    // Not armed (already seen this launch / reduced-motion / missing pieces): show the UI now.
-    if(!armed || !intro || !vid){
-      if(intro) intro.classList.add('is-done');
+    // Not armed (already seen this launch / reduced-motion / missing pieces): just show the UI.
+    if(!armed || !cast || !tiff || !kit){
+      if(cast) cast.classList.add('is-done');
       html.classList.remove('ark-intro-armed');
       return;
     }
-    // Mark seen immediately, so a mid-intro New-Chat rebuild or a refresh won't replay it.
-    try{ sessionStorage.setItem('arkIntroSeen','1'); }catch(e){}
+    try{ sessionStorage.setItem('arkIntroSeen','1'); }catch(e){}   // never replay within a launch
 
-    var FREEZE_MS = 2500, done = false;
-    function reveal(){
+    // Geometry — meet just past the centre of the content area (right of the sidebar).
+    var W = window.innerWidth, H = window.innerHeight;
+    var side  = document.querySelector('.side');
+    var sideW = (side && getComputedStyle(side).display !== 'none') ? side.getBoundingClientRect().width : 0;
+    var wTiff = 0.22 * H * (336/600);                  // on-screen walker widths (height = 22vh)
+    var wKit  = 0.22 * H * (442/600);
+    var center = sideW + (W - sideW) / 2;
+    var tiffRest = Math.round(center - wTiff + 18);    // slight overlap so they stand together
+    var kitRest  = Math.round(center - 18);
+    var tiffStart = Math.round((sideW * 0.42) - tiffRest);  // start tucked behind the sidebar
+    var kitStart  = Math.round((W + 40) - kitRest);         // start off the right edge
+
+    tiff.style.left = tiffRest + 'px';  tiff.style.transform = 'translateX(' + tiffStart + 'px)';
+    kit.style.left  = kitRest + 'px';   kit.style.transform  = 'translateX(' + kitStart + 'px)';
+    void cast.offsetHeight;                            // commit start positions before transitioning
+
+    // Play both clips; try WITH sound (Tiff carries the footsteps), fall back to muted.
+    function gop(v){ var p = v.play(); if(p && p.catch) p.catch(function(){ v.muted = true; v.play().catch(function(){}); }); }
+    tiff.muted = false; gop(tiff); gop(kit);
+
+    // Walk them in (matches the ~2.4s in-clip walk, then they stand).
+    requestAnimationFrame(function(){
+      tiff.style.transition = kit.style.transition = 'transform 2.4s cubic-bezier(.34,.08,.24,1)';
+      tiff.style.transform  = kit.style.transform  = 'translateX(0)';
+    });
+
+    var done = false;
+    function finish(){
       if(done) return; done = true;
-      intro.classList.add('is-out');               // crossfade the video out
-      if(app) app.classList.add('ark-reveal');     // drop the UI in — curtain from above
-      setTimeout(function(){
-        intro.classList.add('is-done');
-        html.classList.remove('ark-intro-armed');
-        try{ vid.pause(); vid.removeAttribute('src'); vid.load(); }catch(e){}  // free the alpha decoder
-      }, 950);
+      cast.classList.add('is-done');
+      html.classList.remove('ark-intro-armed');
+      try{ [tiff,kit].forEach(function(v){ v.pause(); v.removeAttribute('src'); v.load(); }); }catch(e){}
     }
-    vid.addEventListener('ended', function(){ setTimeout(reveal, FREEZE_MS); }, {once:true});
-    vid.addEventListener('error', reveal, {once:true});       // missing/corrupt file -> just show the UI
-    setTimeout(function(){ if(!done) reveal(); }, 13000);      // hard safety cap
-
-    // Try WITH sound (works when the WebView2 autoplay flag is set); fall back to muted so it ALWAYS plays.
-    vid.muted = false; vid.volume = 1.0;
-    var p = vid.play();
-    if(p && p.catch){ p.catch(function(){ vid.muted = true; vid.play().catch(reveal); }); }
+    setTimeout(function(){ if(hello) hello.classList.add('ark-drop'); }, 1200);  // hero comes down as they converge
+    setTimeout(function(){ cast.classList.add('bow'); }, 3050);                  // they stand a beat, then fade out
+    setTimeout(finish, 3750);
+    // Safety: never leave the hero clipped shut if the clips error or stall.
+    tiff.addEventListener('error', function(){ if(hello) hello.classList.add('ark-drop'); finish(); }, {once:true});
+    setTimeout(function(){ if(!done){ if(hello) hello.classList.add('ark-drop'); finish(); } }, 9000);
   }
   if(document.readyState !== 'loading') run();
   else document.addEventListener('DOMContentLoaded', run);
