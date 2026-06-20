@@ -1828,6 +1828,28 @@ TIFF_PLUGINS.list.push(
       merge.connect(o);
       return { input: i, output: o, set(id, v) { dly.delayTime.value = v * 0.025; } };
     } },
+  /* ── DeMartin Delay — feedback delay w/ tape-darkened repeats (live insert; reverse-render in the
+       DeMartin Suite = REVERSE DELAY, the repeats swell INTO the hit). ── */
+  { name: "DeMartin Delay",
+    params: [
+      { id:"time", label:"TIME ms",  min:20, max:1200, value:375,  fmt:v=>Math.round(v)+"ms" },
+      { id:"fb",   label:"FEEDBACK", min:0,  max:0.92, value:0.42, fmt:v=>Math.round(v*100)+"%" },
+      { id:"mix",  label:"MIX",      min:0,  max:1,    value:0.4,  fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dl = c.createDelay(2.0); dl.delayTime.value = 0.375;
+      const fb = c.createGain(); fb.gain.value = 0.42;
+      const wet = c.createGain(); wet.gain.value = 0.4;
+      const dry = c.createGain(); dry.gain.value = 1;
+      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 4500;   // tape-ish darkening on each repeat
+      i.connect(dry); dry.connect(o);
+      i.connect(dl); dl.connect(damp); damp.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(o);
+      const ramp = (p,v) => p.setTargetAtTime(v, c.currentTime, 0.01);
+      return { input: i, output: o,
+        set(id,v){ ({ time:()=>ramp(dl.delayTime, v/1000), fb:()=>ramp(fb.gain, v), mix:()=>ramp(wet.gain, v) })[id]?.(); },
+        dispose(){ try{ i.disconnect(); o.disconnect(); dl.disconnect(); fb.disconnect(); wet.disconnect(); dry.disconnect(); damp.disconnect(); }catch(e){} } };
+    } },
   /* ── EQ-6 — full parametric (native biquad chain), surgical EQ per track ── */
   { name: "EQ-6", params: [
       { id:"hpf", label:"HP Hz", min:20, max:400, value:35 },
@@ -6974,7 +6996,7 @@ function laneUiTake(t, placeAt) {
   if (_clipMenu) { const _ml = _clipMenu.items.find(it => /^Melodyne/i.test(it.label)); if (_ml) _ml.label = "DeMartin Tune"; }
   // Plugin-backed DeMartin Suite procs — the SAME plugins, rendered offline onto a clip (added here,
   // after the plugin registry is fully built, so both the menu and the suite's proc list include them).
-  [['DeMartin Reverb',{reverse:true, tailBeats:4, tail:2.5}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
+  [['DeMartin Reverb',{reverse:true, tailBeats:4, tail:2.5}],['DeMartin Delay',{reverse:true, tailBeats:4, tail:2.0}],['Saturator',{}],['De-Ess',{}]].forEach(([nm,ex])=>{
     if(!AUDIOSUITE.some(p=>p.name===nm)){ const pp=pluginProc(nm,ex); if(pp) AUDIOSUITE.push(pp); }
   });
   // "AudioSuite" is an Avid term — the top menu is OUR "DeMartin Suite", listing OUR procs only

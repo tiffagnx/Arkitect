@@ -1668,19 +1668,51 @@ function drawAdjustmentClip(ctx,c,f,W,H){
   };
   withLayerFX(ctx,ac,f,W,H,drawInner);   // always buffered → clean transform + masks, no duplicate-original artefact
 }
+// Render ONE visual clip entry (adjustment/solid/image/video) onto ctx. Returns false if its source isn't ready.
+function drawOneClip(ctx,entry,f,W,H,srcOverride){
+  const {c,img,solid}=entry;
+  if(c.adjustment){drawAdjustmentClip(ctx,effClip(c),f,W,H);return true;}
+  if(solid){drawSolidClip(ctx,effClip(c),f,W,H);return true;}
+  let src,sw,sh;
+  if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))return false;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
+  else{const v=(srcOverride&&srcOverride[c.id])||videoFor(c);
+    if(!srcOverride&&!playing){const want=clipSrcFrame(c,f)/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
+    if(!(v.readyState>=2&&v.videoWidth))return false;src=v;sw=v.videoWidth;sh=v.videoHeight;}
+  drawClip(ctx,effClip(c),f,src,sw,sh,W,H);return true;
+}
+// Track matte — the layer ABOVE (matteEntry) becomes the matted layer's (bEntry) alpha/luma matte.
+let _tmB=null,_tmM=null;
+function _tmCanvases(W,H){if(!_tmB){_tmB=document.createElement('canvas');_tmM=document.createElement('canvas');}
+  if(_tmB.width!==W||_tmB.height!==H){_tmB.width=_tmM.width=W;_tmB.height=_tmM.height=H;}return [_tmB,_tmM];}
+function drawMatted(ctx,bEntry,matteEntry,mode,f,W,H,srcOverride){
+  const [B,Mt]=_tmCanvases(W,H),bg=B.getContext('2d'),mg=Mt.getContext('2d');
+  const reset=g=>{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.filter='none';};
+  reset(bg);bg.clearRect(0,0,W,H);
+  if(!drawOneClip(bg,bEntry,f,W,H,srcOverride))return;        // matted layer not ready → draw nothing (matte stays consumed)
+  reset(mg);mg.clearRect(0,0,W,H);
+  if(drawOneClip(mg,matteEntry,f,W,H,srcOverride)){
+    const luma=/luma/i.test(mode),inv=/inv/i.test(mode);
+    if(luma||inv){const im=mg.getImageData(0,0,W,H),d=im.data;
+      for(let i=0;i<d.length;i+=4){let al=d[i+3];
+        if(luma)al=Math.round((0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])*(al/255));
+        if(inv)al=255-al;
+        d[i+3]=al;}
+      mg.putImageData(im,0,0);}
+    reset(bg);bg.globalCompositeOperation='destination-in';bg.drawImage(Mt,0,0);reset(bg);  // matted.alpha *= matte alpha
+  }
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation=bEntry.c.blend||'source-over';ctx.globalAlpha=1;ctx.filter='none';
+  ctx.drawImage(B,0,0);ctx.restore();
+}
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-  for(const {c,img,solid} of activeVideoClips(f)){
-    if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export (srcOverride present)
-    if(c.adjustment){drawAdjustmentClip(ctx,effClip(c),f,W,H);continue;}   // grades everything beneath
-    if(solid){drawSolidClip(ctx,effClip(c),f,W,H);continue;}
-    let src,sw,sh;
-    if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))continue;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
-    else{const v=(srcOverride&&srcOverride[c.id])||videoFor(c);
-      if(!srcOverride&&!playing){const want=clipSrcFrame(c,f)/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
-      if(!(v.readyState>=2&&v.videoWidth))continue;src=v;sw=v.videoWidth;sh=v.videoHeight;}
-    drawClip(ctx,effClip(c),f,src,sw,sh,W,H);
+  const vis=activeVideoClips(f),consumed=new Set();
+  for(let i=0;i<vis.length;i++){
+    if(consumed.has(i))continue;
+    const entry=vis[i],c=entry.c;
+    if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export
+    if(c.trackMatte&&i+1<vis.length){consumed.add(i+1);drawMatted(ctx,entry,vis[i+1],c.trackMatte,f,W,H,srcOverride);continue;} // layer above = the matte
+    drawOneClip(ctx,entry,f,W,H,srcOverride);
   }
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
   ctx.filter='none';
@@ -2103,6 +2135,7 @@ function refreshInspector(){
     <div class="hint" style="margin-bottom:2px">${esc(isSolid?(clip.name||''):(m.name||''))}</div>
     ${isSolid?`<div class="row"><label>Color</label><input type="color" id="cSolColor" value="${clip.color||'#6a6a6a'}"></div>`:''}
     ${numRow('Start (f)','cStart',clip.start)}${isSolid?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
+    ${isAud?'':`<div class="row"><label>Track Matte</label><select class="fld" id="cTrkMat">${[['','None'],['alpha','Alpha'],['alphaInv','Alpha Inv'],['luma','Luma'],['lumaInv','Luma Inv']].map(([v,l])=>`<option value="${v}" ${(clip.trackMatte||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>`}
     </div>
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
       ${numRowK('Anchor X','anchorX',clip)}${numRowK('Anchor Y','anchorY',clip)}
@@ -2129,6 +2162,7 @@ function refreshInspector(){
     bindNum('cScaleY',v=>{clip.scaleY=v;drawFrame();save(true);});
     mountEffectControls(clip);
     $('#cBlend').onchange=e=>{clip.blend=e.target.value;drawFrame();save(true);};
+    {const tm=$('#cTrkMat');if(tm)tm.onchange=e=>{clip.trackMatte=e.target.value||null;renderTimeline();drawFrame();save(true);};}
     if(!opaKeyed){
       bindNum('tIn',v=>{clip.transIn=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
       bindNum('tOut',v=>{clip.transOut=Math.max(0,Math.min(v|0,clip.dur));renderTimeline();save(true);});
@@ -2615,6 +2649,7 @@ function projectNeedsFrameServer(p){
     if(clipKind(c)==='solid'||c.solid)return true; // solids aren't drawn by the native ffmpeg path
     if(c.guide)return true; // guide layers must be skipped on export — only the frame-server path can
     if(c.adjustment)return true; // adjustment layers grade the comp — frame-server only
+    if(c.trackMatte)return true; // track mattes are canvas-composited — frame-server only
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
     if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
@@ -2856,6 +2891,10 @@ window.addEventListener('resize',fitScreen);
   function toggleAdjustment(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Adjustment is for visual layers',1);
     s.clip.adjustment=!s.clip.adjustment;renderTimeline();refreshInspector();drawFrame();save();toast(s.clip.adjustment?'Now an adjustment layer — grades everything beneath':'Adjustment layer off');}
+  function setTrackMatte(mode){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    if(clipKind(s.clip)==='audio')return toast('Track mattes are for visual layers',1);
+    s.clip.trackMatte=mode;renderTimeline();refreshInspector();drawFrame();save();
+    toast(mode?('Track matte: '+mode+' — uses the layer above as the matte'):'Track matte off');}
   function clipDisplayName(c){return c.name||(clipKind(c)==='text'?c.text:(MEDIA[c.mediaId]||{}).name)||'Layer';}
   function renameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     const cur=clipDisplayName(s.clip);const n=prompt('Rename layer:',cur);if(n==null)return;
@@ -3136,6 +3175,11 @@ window.addEventListener('resize',fitScreen);
       if(/^Fit to Comp(?:osition)?$/i.test(L))return ()=>fitToComp('both');
       if(/^Guide Layer$/i.test(L))return toggleGuideLayer;
       if(/^Effects( \(Enable\))?$/i.test(L))return toggleFxEnabled;
+      if(/^No Track Matte/i.test(L))return ()=>setTrackMatte(null);
+      if(/^Alpha Inverted Matte/i.test(L))return ()=>setTrackMatte('alphaInv');
+      if(/^Alpha Matte/i.test(L))return ()=>setTrackMatte('alpha');
+      if(/^Luma Inverted Matte/i.test(L))return ()=>setTrackMatte('lumaInv');
+      if(/^Luma Matte/i.test(L))return ()=>setTrackMatte('luma');
     }
     if(menuId==='edit'&&/^All Memory & Disk Cache$/i.test(L))return purgeAllCache;
     if(menuId==='edit'&&/^(Image Cache Memory|All Image Memory|Image Caches?)$/i.test(L))return purgeImageCache;
