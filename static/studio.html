@@ -5269,13 +5269,20 @@ function bindMiniPan(t, knob){ if(!knob) return; const ind=knob.querySelector('.
     document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
   knob.ondblclick=()=>{ t.pan=0; draw(); applyTrack(t); };
 }
-function bindMixFader(slot, dbEl, getV, setV, min, max, dflt, fmt){ if(!slot) return; const cap=slot.querySelector('.ms-cap');
+function bindMixFader(slot, dbEl, getV, setV, min, max, dflt, fmt, taper){ if(!slot) return; const cap=slot.querySelector('.ms-cap');
   fmt = fmt || (v=>v.toFixed(2));
   const H=()=>Math.max(1, slot.clientHeight-cap.clientHeight);
-  const draw=()=>{ const v=getV(); cap.style.bottom=(((v-min)/(max-min))*H())+'px'; if(dbEl) dbEl.textContent=fmt(v); };
+  // dB-TAPERED THROW (Pro-Tools feel): unity sits ~80% up, the quiet range gets most of the travel,
+  // and the few dB above unity are compressed into the top. Linear throw is the fallback (taper!=='db').
+  const isDb=(taper==='db'), FL=-60, TOP=20*Math.log10(max||1.4), UF=0.8;
+  const pos2val=(f)=>{ if(!isDb) return min+f*(max-min); if(f<=0) return 0;
+    const db = f<=UF ? FL+(f/UF)*(0-FL) : (f-UF)/(1-UF)*TOP; return Math.min(max, Math.max(0, Math.pow(10, db/20))); };
+  const val2pos=(v)=>{ if(!isDb) return (v-min)/(max-min); if(v<=0) return 0;
+    const db=20*Math.log10(v); return db<=0 ? UF*(db-FL)/(0-FL) : UF+(1-UF)*Math.min(1, db/(TOP||1)); };
+  const draw=()=>{ const v=getV(); cap.style.bottom=(Math.max(0,Math.min(1,val2pos(v)))*H())+'px'; if(dbEl) dbEl.textContent=fmt(v); };
   draw(); slot._draw=draw;
   const grab=(e)=>{ e.preventDefault(); const r=slot.getBoundingClientRect();
-    const move=(ev)=>{ let f=1-(ev.clientY-r.top-cap.clientHeight/2)/H(); f=Math.max(0,Math.min(1,f)); setV(Math.round((min+f*(max-min))*100)/100); draw(); };
+    const move=(ev)=>{ let f=1-(ev.clientY-r.top-cap.clientHeight/2)/H(); f=Math.max(0,Math.min(1,f)); setV(Math.round(pos2val(f)*1000)/1000); draw(); };
     move(e); const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); };
     document.addEventListener('mousemove',move); document.addEventListener('mouseup',up); };
   cap.onmousedown=grab; slot.onmousedown=grab;
@@ -5508,7 +5515,7 @@ function buildStrip(t, auxes){
   bindMiniPan(t, el.querySelector(`#msp-${t.id}`));
   el.querySelectorAll(".ms-mscol .msbtn").forEach(b=>{ b.onclick=()=>{ if(b.dataset.a==='m'){ t.muted=!t.muted; el.classList.toggle("muted",t.muted); document.getElementById("lane-"+t.id)?.classList.toggle("muted",t.muted);} else t.solo=!t.solo; b.classList.toggle("on"); applyMix(); }; });
   const nm=el.querySelector(".ms-nm"); nm.ondblclick=()=>renameTrack(t,nm);
-  bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 1.0, gdbStr);
+  bindMixFader(el.querySelector(`#msf-${t.id}`), el.querySelector(`#msdb-${t.id}`), ()=>t.gain, v=>{ t.gain=v; applyTrack(t); }, 0, 1.4, 1.0, gdbStr, 'db');
   el.querySelectorAll('.ms-eq .ms-eqk').forEach(w=>{ const kn=w.querySelector('.cknob'), o=w.querySelector('output'), k=kn.dataset.k; const [min,max]=KRANGE[k];
     bindStripKnob(kn,o,min,max,KSTEP[k],()=>trackVal(t,k),v=>{ setTrackVal(t,k,v); applyTrack(t); },v=>fmtK(k,v),0); });
   const _au=el.querySelector('.ms-auto'); if(_au) _au.onclick=async(e)=>{ e.stopPropagation(); await runAutoMix(t,e.currentTarget); renderMixWindow(); const _ln=$("lane-"+t.id), _b=_ln&&_ln.querySelector('.ai-summary-body'); if(_b) showFloatingSummary(_b.textContent); };
@@ -5541,7 +5548,7 @@ function buildMasterStrip(){
   const ck=el.querySelector("#msmCeil"), co=ck.parentElement.querySelector("output");
   bindStripKnob(ck, co, -12, 0, 0.1, ()=>parseFloat($("mLim").value)||-1, v=>{ $("mLim").value=v.toFixed(1); if(master) master.limiter.threshold.value=v; }, v=>v.toFixed(1), -1);
   bindMixFader(el.querySelector("#msf-master"), el.querySelector("#msdb-master"),
-    ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9, gdbStr);
+    ()=>+$("mGain").value, v=>{ $("mGain").value=v; $("mGain").dispatchEvent(new Event('input')); $("mGain").dispatchEvent(new Event('change')); }, 0, 1.4, 0.9, gdbStr, 'db');
   return el;
 }
 
