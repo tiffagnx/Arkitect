@@ -28,16 +28,29 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-# Frozen-aware: in the PyInstaller exe, __file__ points into the temp _MEIPASS extract
-# (where static/ and data/ are NOT shipped). Use the exe's own folder so static/ + data/
-# resolve to the real install dir next to the launcher. Plain runs use __file__ as before.
-ROOT = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-DATA = ROOT / "data"
+# Frozen-aware ROOT. Windows: the onefile .exe ships static/ + data/ NEXT TO it, so use the
+# exe's own folder. macOS: the .app BUNDLES static/ + app.py (they ride in _MEIPASS), and the
+# exe lives in Contents/MacOS/ which has NO static/ — so resolve to the unpack dir. Plain runs
+# use __file__ as before.
+_FROZEN = getattr(sys, "frozen", False)
+if _FROZEN and sys.platform == "darwin":
+    ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+elif _FROZEN:
+    ROOT = Path(sys.executable).parent
+else:
+    ROOT = Path(__file__).parent
+# Writable data/ can't live inside a read-only .app bundle → Application Support on macOS.
+DATA = (Path.home() / "Library" / "Application Support" / "DeMartinville") if (_FROZEN and sys.platform == "darwin") else ROOT / "data"
+
+# Windows-only "no console flash" flag for subprocess. On POSIX a non-zero creationflags
+# RAISES ValueError, so it MUST be 0 there. Every subprocess creationflags= routes through this
+# guarded constant (NO_WINDOW / _NOWIN below alias it) so the Mac build never throws.
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "1.3.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "1.4.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -58,13 +71,6 @@ def _fire(coro):                # create_task with no ref can be GC'd before it 
 _mem_lock = asyncio.Lock()      # serialize memory.json read-modify-write (no clobber)
 _brain_lock = asyncio.Lock()    # only one LM Studio boot attempt at a time (no double-launch → OOM)
 _engine_lock = asyncio.Lock()   # only one ComfyUI boot attempt at a time
-_voice_lock = asyncio.Lock()    # only one XTTS voice-server boot at a time
-
-# ── LOCAL VOICE — XTTS-v2 cloned from B's clip, served on :8123 (CPU, never
-# touches the 8GB GPU). Self-booted on demand, mirroring ensure_engine. ──────
-VOICE_PY = Path(os.environ.get("TIFF_VOICE_PY", r"D:\tiff-voice\xtts-venv\Scripts\python.exe"))
-VOICE_SERVER = Path(os.environ.get("TIFF_VOICE_SERVER", r"D:\tiff-voice\tts_server.py"))
-VOICE_URL = "http://127.0.0.1:8123"
 
 DATA.mkdir(exist_ok=True)
 SESS_DIR.mkdir(exist_ok=True)
@@ -543,10 +549,15 @@ async def models(req: Request):
             ids = [i for i in all_ids if not any(h in i.lower() for h in CHAT_HIDE)]
             return {"models": ids or all_ids, "cloud": cloud}   # never hand back an empty picker — fall back to all
     except Exception as e:
-        # LM Studio isn't up. Only a LOCAL-only user (no cloud models) needs it — warm it
-        # in the background so it's ready shortly. Cloud users never trigger a boot.
+        # LM Studio isn't reachable. ALWAYS flip its server on in the background (cheap, no
+        # model load) so a user's already-loaded local models reappear in the picker on the
+        # next refresh — even cloud users, who used to skip this entirely and lose their
+        # local list whenever LM Studio's server toggle was off. A LOCAL-only user (no cloud)
+        # additionally needs a model warmed, so give them the full boot.
         if not cloud:
             _fire(ensure_brain())
+        else:
+            _fire(_start_server_only())
         return JSONResponse({"models": [], "cloud": cloud,
                              "error": (None if cloud else f"LM Studio isn't reachable — open it and hit Start Server. ({e})")})
 
@@ -569,7 +580,7 @@ async def _unload_brain():
         # VRAM before FLUX loads, or the 8GB card thrashes. timeout so a hung lms can't
         # wedge the render path.
         r = subprocess.run([str(LMS_CLI), "unload", "--all"],
-                           creationflags=0x08000000,  # CREATE_NO_WINDOW
+                           creationflags=CREATE_NO_WINDOW,  # no console flash (0 on mac/linux)
                            capture_output=True, text=True, timeout=10)
         if r.returncode != 0:
             print(f"[_unload_brain] lms unload failed (rc={r.returncode}): {(r.stderr or '').strip()[:200]}")
@@ -600,9 +611,25 @@ async def ensure_brain() -> bool:
         return await _boot_brain()
 
 
+async def _start_server_only():
+    """Just flip LM Studio's local server ON — no model load. Cheap + idempotent
+    (`lms server start` returns fast if already up). This is what makes a user's
+    ALREADY-loaded local models show up in the picker even when they also have a
+    cloud key: the old path skipped booting entirely for cloud users, so if LM
+    Studio's server toggle was off (it doesn't always auto-start on app launch)
+    the local models silently vanished from the dropdown."""
+    if not LMS_CLI.exists():
+        return
+    import subprocess
+    try:
+        subprocess.Popen([str(LMS_CLI), "server", "start"], creationflags=CREATE_NO_WINDOW)
+    except Exception as e:
+        print(f"[_start_server_only] couldn't start LM Studio server: {e}")
+
+
 async def _boot_brain() -> bool:
     import subprocess
-    NO_WINDOW = 0x08000000
+    NO_WINDOW = CREATE_NO_WINDOW
     # 1. server (idempotent — returns fast if already up)
     try:
         subprocess.Popen([str(LMS_CLI), "server", "start"], creationflags=NO_WINDOW)
@@ -678,7 +705,7 @@ async def _reload_ctx(model: str):
     if not model or not LMS_CLI.exists():
         return
     import subprocess
-    NO_WINDOW = 0x08000000
+    NO_WINDOW = CREATE_NO_WINDOW
     try:
         subprocess.run([str(LMS_CLI), "unload", "--all"], creationflags=NO_WINDOW, timeout=25)
         subprocess.Popen([str(LMS_CLI), "load", model, "-c", DEFAULT_CTX, "--gpu", "max", "-y"],
@@ -1872,67 +1899,6 @@ async def health():
     return {"brain": await brain_up(), "engine": await _engine_up()}
 
 
-async def _voice_up() -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=3) as cx:
-            await cx.get(f"{VOICE_URL}/health")
-        return True
-    except Exception:
-        return False
-
-
-async def ensure_voice() -> bool:
-    """Boot the XTTS voice server on demand (mirrors ensure_engine). First boot
-    loads the model (~10-30s)."""
-    if await _voice_up():
-        return True
-    if not (VOICE_PY.exists() and VOICE_SERVER.exists()):
-        return False
-    async with _voice_lock:
-        if await _voice_up():
-            return True
-        import subprocess
-        try:
-            subprocess.Popen([str(VOICE_PY), str(VOICE_SERVER)],
-                             cwd=str(VOICE_SERVER.parent), creationflags=0x08000000)
-        except Exception:
-            return False
-        for _ in range(60):   # model load can take ~10-30s cold
-            await asyncio.sleep(2)
-            if await _voice_up():
-                return True
-    return False
-
-
-@app.post("/api/tts")
-async def tts(req: Request):
-    """Tiff's local cloned voice — text in, WAV out. talk.html falls back to the
-    browser voice if this 503s (engine not installed)."""
-    body = await req.json()
-    text = (body.get("text") or "").strip()
-    if not text:
-        return JSONResponse({"error": "no text"}, status_code=400)
-    if not await ensure_voice():
-        return JSONResponse({"error": "local voice engine not installed/booting"}, status_code=503)
-    try:
-        async with httpx.AsyncClient(timeout=180) as cx:
-            r = await cx.post(f"{VOICE_URL}/tts", json={"text": text[:800]})
-        if r.status_code != 200:
-            return JSONResponse({"error": f"voice synth failed ({r.status_code})"}, status_code=502)
-        return Response(content=r.content, media_type="audio/wav")
-    except Exception as e:
-        return JSONResponse({"error": f"voice engine error: {e}"}, status_code=502)
-
-
-@app.get("/api/tts/warm")
-async def tts_warm():
-    """Pre-boot the XTTS voice server (no synth) so the FIRST spoken line uses her
-    real cloned voice instead of the browser fallback. talk.html fires this on load
-    while B reads the greeting — by the time he sends, her voice is ready."""
-    ok = await ensure_voice()
-    return {"ready": ok}
-
-
 # ── IMAGES — FLUX on B's own GPU via ComfyUI (D:\tiff-images, port 8188) ───
 # Free, unlimited, local. ARKITECT is the pretty face; ComfyUI is the
 # engine room. If the engine isn't running, we say so plainly.
@@ -2027,7 +1993,7 @@ async def ensure_engine() -> bool:
             _engine_proc = subprocess.Popen(
                 [str(COMFY_DIR / "python_embeded" / "python.exe"), "-s", "ComfyUI\\main.py",
                  "--windows-standalone-build", "--listen", "127.0.0.1", "--port", "8188", "--lowvram"],
-                cwd=str(COMFY_DIR), creationflags=0x08000000,  # CREATE_NO_WINDOW
+                cwd=str(COMFY_DIR), creationflags=CREATE_NO_WINDOW,  # no console flash
             )
         except Exception:
             _engine_proc = None
@@ -2689,7 +2655,7 @@ def _ffmpeg_missing() -> bool:
     """True if ffmpeg/ffprobe aren't resolvable on PATH — editor endpoints return a
     clear 'ffmpeg not found' error instead of an opaque FileNotFoundError mid-render."""
     return _shutil.which("ffmpeg") is None or _shutil.which("ffprobe") is None
-_NOWIN = 0x08000000  # CREATE_NO_WINDOW — no console flash on subprocess calls
+_NOWIN = CREATE_NO_WINDOW  # no console flash on Windows; 0 (safe) on macOS/Linux
 
 _NVENC_OK = None  # cached: can h264_nvenc actually encode on THIS machine?
 def _has_nvenc() -> bool:
@@ -3334,7 +3300,23 @@ def _esc_dt(s: str) -> str:
     return s
 
 
-_DEFAULT_FONT = "C\\:/Windows/Fonts/arialbd.ttf"
+def _pick_default_font() -> str:
+    """First bold system font that actually EXISTS on this OS, formatted for ffmpeg drawtext
+    (forward slashes, escaped colon). Windows had a hardcoded Arial path; on macOS/Linux that
+    file is absent and drawtext (editor title text) would fail — so probe per-platform."""
+    for c in ("C:/Windows/Fonts/arialbd.ttf",                            # Windows
+              "/System/Library/Fonts/Supplemental/Arial Bold.ttf",       # macOS (Arial)
+              "/System/Library/Fonts/Helvetica.ttc",                     # macOS (always present)
+              "/System/Library/Fonts/SFNS.ttf",                          # macOS (San Francisco)
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):   # Linux
+        try:
+            if Path(c).is_file():
+                return c.replace(":", "\\:")
+        except Exception:
+            pass
+    return "C\\:/Windows/Fonts/arialbd.ttf"   # last-resort original
+
+_DEFAULT_FONT = _pick_default_font()
 _FONT_DIRS = (Path("C:/Windows/Fonts"), Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts",
               Path("/usr/share/fonts"), Path("/Library/Fonts"), Path.home() / ".fonts")
 
@@ -3850,6 +3832,16 @@ ROOM_HELP = {
 - Empty session shows a hero with quick-start buttons (Add stems / New track / Record a take / Open a session). Spacebar = play/stop; Delete removes a selected clip; the bottom zoom bar (Fit + horizontal slider) shows the whole song, the vertical slider grows every lane.
 - Click a clip in a lane to edit it: reverse, fades, chop to 1/16, BPM delay, print VERB, or "Tune" (the pitch editor / Melodyne).
 - Top toolbar: Play / Stop / Loop / Record, an EDIT-vs-MIX view toggle, edit tools (grab / trim / select / smart), zoom, grid snap, Setup (audio device), and "Export WAV" on the right to bounce the mix down.""",
+  "beats": """DeMartin Beat Lab — a pro beat maker (think FL Studio / a drum machine) right in the browser. This is where you PRODUCE a beat; DeMartin Audio Labs (the other audio room) is where you mix/edit a finished recording.
+- THE CHANNEL RACK (the main view) is a step sequencer. Each row is one instrument; the grid of 16 squares is one bar. Click a square to place a hit; click it again (or right-click) to clear it. Hits on a row loop when you press Play. The squares are grouped in 4s so you can see the beats.
+- Each row's strip (left side) has: a color dot, the instrument name (click it to open that instrument's editor), two mini-knobs (Volume + Pan), M (mute) and S (solo). Melodic rows also get a 🎹 piano-roll button.
+- THE VELOCITY GRAPH at the bottom belongs to the SELECTED row (click a row to select it) — drag the bars up/down to make some hits hit harder/softer. That plus Swing is what turns a stiff loop into a groove.
+- TRANSPORT (top-left): ▶ play/stop (or hit Spacebar), ■ stop, ● record, 🔔 metronome. TEMPO has BPM and SWING (drag the numbers up/down). MASTER is the overall volume; the meter next to it shows the level.
+- INSTRUMENTS: "+ Add instrument" gives drums (Kick, Snare, Clap, Hat, Open Hat, Tom, Rim, Cowbell) and melodic ones (808, Reese Bass, Soft Keys, FM Bell), plus a Sampler. You can also DRAG an audio file anywhere onto the room to load it as a sampler channel.
+- THE 808 is the trap bass — it's melodic, so play it in the piano roll (the 🎹 button) for slides/melodies; Drive makes it hit on phone speakers, Glide is the slide between notes.
+- EVERY INSTRUMENT HAS AN AI BRAIN: open an instrument and tap the 🧠 button — you can TALK to it ("make it knock harder", "darker", "more slide") and it actually turns its own knobs for you, safely. This is the room's signature feature.
+- PATTERNS: the "◆ Pattern 1" button up top makes/switches/duplicates patterns — Pattern 1 can be your verse, Pattern 2 the hook, etc. The STEPS number sets how long a pattern is.
+- Top-right: ⬇ Export bounces the beat to a .wav, 💾 saves the project. Views along the top: Channel Rack, Piano Roll, Mixer, Playlist.""",
   "build": """Blueprint Builds — you vibe-code single-file web apps and tools here just by describing them.
 - Type what you want in the box, hit Build, and a working single-file app shows up in the live preview.
 - Keep talking to stack changes ("make the button bigger", "add dark mode"). It auto-fixes its own runtime errors.
@@ -3891,7 +3883,28 @@ async def kit_help(req: Request):
     msg = (body.get("message") or "").strip()
     if not msg:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
-    system = KIT_SYSTEM + ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
+    # the brain BECOMES that character (identity + voice from persona) while keeping every bit of
+    # the real room grounding below so it still gives accurate, feature-true help. Absent/empty =>
+    # byte-for-byte the original Kit path (purely additive).
+    persona = (body.get("persona") or "").strip()
+    room_help = ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    if persona:
+        char_name = (body.get("charName") or "").strip() or "your assistant"
+        char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
+        room_labels = {"studio": "DeMartin Audio Labs", "beats": "DeMartin Beat Lab", "editor": "LePrince Visual Labs",
+                       "images": "Imagination Station", "build": "Blueprint Builds", "bit16": "Bit1Six"}
+        room_label = room_labels.get(room, "DeMartinville")
+        system = (
+            f"You are {char_name}, a {char_craft} working inside DeMartinville {room_label}. {persona}\n\n"
+            "Stay honest and grounded: only help with what this room can actually do — never invent "
+            "features that don't exist. Here's the ground truth on this room:\n" + room_help
+        )
+        knowledge = (body.get("knowledge") or "").strip()
+        if knowledge:
+            system += ("\n\nYOUR OWN NOTES / HOW YOU WORK (use when relevant):\n" + knowledge[:1500])
+    else:
+        system = KIT_SYSTEM + room_help
     # Kit's brain: pull the few most relevant knowledge slices for THIS question
     # (scoped to the room + the program-wide doc) and ground his answer in them.
     # Best-effort — retrieval must never break a reply.
@@ -3919,6 +3932,153 @@ async def kit_help(req: Request):
     except Exception:
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
     return {"reply": text or "Hm, I blanked on that — ask me again?"}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════
+#  /api/beatbrain — the AI brain that lives INSIDE every plugin in DeMartin Beat Lab.
+#  Generalizes studio.html's Vocal-Doctor pattern: one shared LLM brain + a per-plugin
+#  knowledge card + the plugin's flat param schema. The user talks to the plugin in plain
+#  language ("make my 808 hit harder", "darker keys", "more slide") and the brain replies
+#  AND can move the knobs — every value is CLAMPED to the param's range server-side so the
+#  AI literally can't push a knob into a broken setting. Purely additive endpoint.
+# ════════════════════════════════════════════════════════════════════════════════════════
+BEATBRAIN_SYSTEM = """You are the AI brain living INSIDE a single audio plugin in DeMartin Beat Lab, a beat-making studio. You are a sharp, friendly producer / sound-designer who knows THIS exact plugin cold. Replies are SHORT (1-3 sentences), practical, a little hype when it fits — talk like a producer, never like a manual.
+
+You can actually MOVE this plugin's knobs. When the user wants a sound change (harder, darker, more slide, warmer, brighter, cleaner, boomier, tighter, etc.), pick the new knob values and output them as a fenced block EXACTLY like:
+```set
+{"paramId": value, "paramId2": value}
+```
+Rules: only include knobs you actually want to change; every value MUST stay inside the [min,max] range you're given; never invent a knob that isn't listed. If they're only asking a question, just answer it — no set block. Always add one plain-English line about what you changed and why."""
+
+@app.post("/api/beatbrain")
+async def beat_brain(req: Request):
+    body = await req.json()
+    name  = (body.get("plugin") or "this plugin").strip()
+    kind  = (body.get("kind") or "plugin").strip()
+    blurb = (body.get("knowledge") or "").strip()
+    msg   = (body.get("message") or "").strip()
+    schema = body.get("schema") or []
+    params = body.get("params") or {}
+    if not msg:
+        return {"reply": "Tell me the vibe and I'll dial it in.", "set": {}}
+    lines = []
+    for p in schema:
+        pid = p.get("id")
+        if not pid:
+            continue
+        unit = (" " + p.get("unit")) if p.get("unit") else ""
+        lines.append(f"- {pid} ({p.get('label', pid)}): {p.get('min')}..{p.get('max')}{unit}, now={params.get(pid)}")
+    system = (BEATBRAIN_SYSTEM +
+              f"\n\nTHE PLUGIN: {name} — a {kind}. {blurb}\n\nITS KNOBS (id, range, current value):\n" +
+              "\n".join(lines))
+    slots = _enabled_slots()
+    try:
+        if slots:
+            text, _prov = await _call_with_fallback(slots, system, msg, 360, 0.5)
+        else:
+            text = await _kit_local(system, msg)
+    except Exception:
+        text = "I glitched for a sec — try me again. (Tip: a free cloud key in Settings makes me think a lot faster.)"
+    # parse the ```set {json}``` action, clamp every value to its range, strip it from the reply
+    setvals = {}
+    m = re.search(r"```(?:set)?\s*(\{.*?\})\s*```", text or "", re.S)
+    if m:
+        try:
+            raw = json.loads(m.group(1))
+            ranges = {p.get("id"): p for p in schema if p.get("id")}
+            for k, v in (raw.items() if isinstance(raw, dict) else []):
+                if k in ranges and isinstance(v, (int, float)):
+                    lo, hi = ranges[k].get("min"), ranges[k].get("max")
+                    v = float(v)
+                    if lo is not None: v = max(float(lo), v)
+                    if hi is not None: v = min(float(hi), v)
+                    setvals[k] = v
+        except Exception:
+            pass
+        text = (text[:m.start()] + text[m.end():]).strip()
+    if not text:
+        text = "Done — tweaked it." if setvals else "Say that again?"
+    return {"reply": text, "set": setvals}
+
+
+# ── CHARACTER AVATAR PROMPT — a vision model LOOKS at the user's uploaded photo and writes a
+#    16-bit-pixel-character prompt that looks like THEM, ready to paste into Google Gemini (the
+#    user generates the image free on their own account; we never pay for gen). Local-first. ──
+CHARACTER_PROMPT_SYSTEM = (
+    "You write ONE image prompt for a 16-bit pixel-art character maker. You are shown a PHOTO of a person. "
+    "Look at them and write a prompt that turns THIS person into a 16-bit pixel character that looks like them. "
+    "Output ONLY the finished prompt — one flowing line, no preamble, no quotes, no labels, no notes.\n"
+    "Describe what you see (skin tone, hair colour + style, facial hair, build, clothes), then the look.\n"
+    "Example output: A brown-skinned man with a short afro and a thin goatee, wearing a black hoodie and jeans, as a "
+    "16-bit pixel art character sprite, full body, front-facing, thick clean outlines, limited retro palette, crisp "
+    "SNES-era sprite, centered standing pose, solid flat chroma-green #00B140 background, no text, no border."
+)
+
+# Text-only fallback (when NO vision model is loaded). Gemini itself sees the photo, so the
+# prompt just tells Gemini to use the attached photo as the person — likeness still happens there.
+CHARACTER_PROMPT_SYSTEM_TEXT = (
+    "You write ONE image prompt for a 16-bit pixel-art character maker. The user will paste this prompt INTO Google "
+    "Gemini ALONGSIDE a photo of themselves. Write a prompt that tells Gemini to turn the person in the ATTACHED "
+    "PHOTO into a 16-bit pixel character that looks like them. Output ONLY the finished prompt — one flowing line, no "
+    "preamble, no quotes, no labels, no notes.\n"
+    "Example output: Turn the person in the attached photo into a 16-bit pixel art character sprite that looks like "
+    "them — full body, front-facing, thick clean outlines, limited retro palette, crisp SNES-era sprite, centered "
+    "standing pose, solid flat chroma-green #00B140 background, no text, no border."
+)
+
+@app.post("/api/character/prompt")
+async def character_prompt(req: Request):
+    """Vision-write a 16-bit-character Gemini prompt from the user's uploaded photo. Additive,
+    local-first; mirrors the chat's image_url vision convention. Best with a vision model loaded."""
+    body = await req.json()
+    image = (body.get("image") or "").strip()
+    want = (body.get("want") or "").strip()
+    if not image.startswith("data:image"):
+        return JSONResponse({"error": "Upload a photo first, then I'll write the prompt."}, status_code=400)
+    if not await brain_up():
+        if not await ensure_brain():
+            return JSONResponse({"error": "Your local model (LM Studio) isn't running — open it once, then try again. (A vision-capable model writes the best prompt.)"})
+    loaded = await _loaded_models()
+    model = next((m for m in loaded if "embed" not in m.lower()), DEFAULT_MODEL)
+    base = ((f"They also want to look like this: {want[:300]}. " if want else "")
+            + "Write the 16-bit character prompt.")
+
+    async def _ask(messages):
+        try:
+            async with httpx.AsyncClient(timeout=180) as cx:
+                r = await cx.post(f"{LM}/chat/completions", json={
+                    "model": model, "messages": messages,
+                    "temperature": 0.5, "max_tokens": 400, "reasoning_effort": "low",
+                })
+            ch = (r.json().get("choices") or [])
+            if not ch:
+                return ""                       # model errored / no vision support -> caller falls back
+            m = ch[0].get("message", {})
+            return (m.get("content") or m.get("reasoning_content") or "").strip()
+        except Exception:
+            return ""
+
+    # 1) VISION: the model LOOKS at the photo (best, when a vision model is loaded)
+    prompt = await _ask([
+        {"role": "system", "content": CHARACTER_PROMPT_SYSTEM},
+        {"role": "user", "content": [
+            {"type": "text", "text": base + " Describe the person in this photo."},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]},
+    ])
+    used_vision = len(prompt) >= 20
+    # 2) TEXT-ONLY fallback: no vision needed -- Gemini itself sees the attached photo
+    if not used_vision:
+        prompt = await _ask([
+            {"role": "system", "content": CHARACTER_PROMPT_SYSTEM_TEXT},
+            {"role": "user", "content": base},
+        ])
+    prompt = re.sub(r"```[a-zA-Z]*", "", prompt).strip("` \n")
+    prompt = re.sub(r"(?is)^\s*(here'?s[^:]*:|final prompt:|prompt:)\s*", "", prompt).strip().strip('"').strip()
+    if len(prompt) < 20:
+        return JSONResponse({"error": "Your model didn't write one — open LM Studio (a vision model works best) and try again."})
+    return {"ok": True, "prompt": prompt, "vision": used_vision}
+
 
 # check_dir=False so a missing static/ can never RuntimeError at import (it 404s instead);
 # mkdir keeps the dir present. Together these stop a bad ROOT from killing the whole app at boot.
