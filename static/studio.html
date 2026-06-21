@@ -3609,7 +3609,10 @@ function ensureRuler(){
     ov.style.height = ovH + 'px';                            // restore the saved overview height
     ov.querySelector('.ov-grip').addEventListener('mousedown', (e)=>{   // PT Universe: drag the bottom edge to grow/shrink — it pushes the whole session below it down
       e.preventDefault(); e.stopPropagation(); const sy=e.clientY, sh=ovH;
-      const mv=(ev)=>{ ovH=Math.max(6, Math.min(300, sh + (ev.clientY-sy))); ov.style.height=ovH+'px'; drawOverview(); };
+      const mv=(ev)=>{ ovH=Math.max(6, Math.min(300, sh + (ev.clientY-sy))); ov.style.height=ovH+'px';
+        const _rl=document.getElementById('ruler'); if(_rl) _rl.style.top=ovH+'px';
+        const _hd=document.getElementById('colHeader'); if(_hd) _hd.style.top=(ovH+34)+'px';   // keep the sticky stack glued together while resizing
+        drawOverview(); };
       const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); try{ localStorage.setItem('ark_ovH', String(ovH)); }catch(_){} };
       document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
     });
@@ -3629,7 +3632,9 @@ function ensureRuler(){
   }
   const showOv = tracks.length>0 && viewMode!=='mix';
   ov.style.display = showOv ? 'flex' : 'none';
-  r.style.top = showOv ? '44px' : '0';                       // ruler sticks just below the overview
+  const _oh = showOv ? ovH : 0;                              // the overview's CURRENT (resizable) height
+  r.style.top = _oh + 'px';                                  // ruler sticks just below the overview, whatever height it is
+  const _hdr0 = document.getElementById('colHeader'); if(_hdr0) _hdr0.style.top = (_oh + 34) + 'px';   // column header sticks below the ruler (34px tall)
   r.style.display = tracks.length ? 'flex' : 'none';
   drawRuler(); drawOverview();
 }
