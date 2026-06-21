@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<link rel="icon" href="/static/kit.ico" />
+<title>Profile — DeMartinville</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --violet:#7C8AA5; --amber:#D9A441;
+          --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.52); }
+  * { box-sizing:border-box; margin:0; }
+  html { scroll-behavior:smooth; }
+  body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text); line-height:1.55;
+         background: radial-gradient(1100px 600px at 50% -18%, #1C1E24 0%, var(--bg1) 55%, var(--bg0) 100%);
+         background-attachment:fixed; }
+  a { color:inherit; }
+  ::selection { background:rgba(62,156,184,.32); }
+
+  /* ── brand wordmark lockup (CODED — never font-rendered as plain text) ── */
+  .dmv { display:inline-flex; align-items:baseline; line-height:1; white-space:nowrap; }
+  .dmv .b { font-family:Oswald,sans-serif; font-weight:700; font-size:1em; letter-spacing:.005em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .dmv .s { font-family:Allura,cursive; font-size:1.35em; margin-left:-.02em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  /* ── topbar ── */
+  .topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px;
+            padding:13px 22px; background:rgba(12,13,16,.72); backdrop-filter:blur(14px);
+            border-bottom:1px solid var(--hairline); }
+  .pr-back { display:inline-flex; align-items:center; text-decoration:none; color:#9AA0AC;
+             padding:7px 12px; border:1px solid rgba(255,255,255,.08); border-radius:10px;
+             background:rgba(255,255,255,.03); transition:.14s; }
+  .pr-back:hover { color:#EAEDF2; border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.10); }
+  .pr-back .pr-ar { color:rgba(220,224,230,.95); font:700 15px Oxanium,sans-serif; line-height:1; }
+  .brandwrap { display:flex; align-items:center; gap:11px; }
+  .brand-dmv { font-size:22px; }
+  .etch { font:600 10px 'Space Mono',monospace; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
+  .topbar .spacer { margin-left:auto; }
+  .market-tag { font:600 10px 'Space Mono',monospace; letter-spacing:.18em; text-transform:uppercase;
+                color:#9BD8C9; padding:6px 11px; border:1px solid rgba(0,209,196,.28);
+                border-radius:99px; background:rgba(0,209,196,.07); }
+
+  .wrap { max-width:980px; margin:0 auto; padding:34px 22px 90px; }
+
+  /* ── hero ── */
+  .hero { display:grid; grid-template-columns:168px 1fr; gap:28px; align-items:center;
+          padding:30px; border:1px solid var(--hairline); border-radius:22px;
+          background:linear-gradient(165deg, rgba(30,32,40,.7), rgba(18,19,24,.82));
+          box-shadow:0 24px 70px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04); }
+  .avatar { width:168px; height:168px; border-radius:20px; position:relative; overflow:hidden;
+            border:1px solid rgba(120,182,205,.32);
+            background:radial-gradient(120px 120px at 50% 30%, #20242C, #0E0F14);
+            display:flex; align-items:center; justify-content:center; }
+  .avatar img { width:100%; height:100%; object-fit:cover; display:none; }
+  .avatar .ph { text-align:center; }
+  .avatar .ph .ico { font-size:40px; opacity:.5; }
+  .avatar .ph .lbl { margin-top:6px; font:600 9px 'Space Mono',monospace; letter-spacing:.16em;
+                     text-transform:uppercase; color:var(--dim); }
+  .avatar::after { content:""; position:absolute; inset:0; border-radius:20px; pointer-events:none;
+                   box-shadow:inset 0 0 36px rgba(62,156,184,.12); }
+
+  .h-eyebrow { font:600 11px 'Space Mono',monospace; letter-spacing:.16em; text-transform:uppercase;
+               color:var(--pink); margin-bottom:10px; }
+  .h-name { font-family:Oxanium,sans-serif; font-weight:800; font-size:clamp(30px,5vw,46px); line-height:1.02;
+            letter-spacing:.01em;
+            background:linear-gradient(100deg,#EAF4F8,#A9C7D2 55%,var(--violet));
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .h-name.placeholder { background:none; -webkit-text-fill-color:initial; color:rgba(233,234,237,.34);
+            border-bottom:2px dashed rgba(120,182,205,.4); padding-bottom:2px; display:inline-block;
+            font-size:clamp(26px,4.4vw,40px); }
+  .h-sub { margin-top:9px; color:#C6CBD3; font-size:15px; max-width:46ch; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .chip { font:600 11px Inter; padding:6px 12px; border-radius:99px; border:1px solid var(--hairline);
+          background:rgba(255,255,255,.04); color:#D4DAE2; }
+  .chip.verified { border-color:rgba(217,164,65,.45); background:rgba(217,164,65,.10); color:#F0CE8C;
+                   display:inline-flex; align-items:center; gap:6px; }
+  .chip.verified b { color:#F6DDA6; font-weight:700; }
+
+  .cta-row { display:flex; flex-wrap:wrap; gap:11px; margin-top:22px; align-items:center; }
+  .btn { font:700 13px Inter; padding:12px 20px; border-radius:12px; cursor:pointer; text-decoration:none;
+         display:inline-flex; align-items:center; gap:8px; border:1px solid var(--hairline); transition:.15s; }
+  .btn.primary { background:linear-gradient(120deg,#5FB4CE,var(--pink)); color:#08161B; border-color:transparent;
+                 box-shadow:0 4px 18px rgba(62,156,184,.34); }
+  .btn.primary:hover { transform:translateY(-1px); box-shadow:0 8px 26px rgba(62,156,184,.46); }
+  .btn.ghost { background:rgba(255,255,255,.035); color:#D4DAE2; }
+  .btn.ghost:hover { border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.10); }
+  .price { font:600 12px 'Space Mono',monospace; letter-spacing:.04em; color:#9BD8C9; padding:9px 13px;
+           border:1px dashed rgba(0,209,196,.4); border-radius:11px; background:rgba(0,209,196,.05); }
+  .price b { color:#CFF3EC; }
+
+  /* ── sections ── */
+  section { margin-top:40px; }
+  .sec-h { display:flex; align-items:baseline; gap:12px; margin-bottom:16px; }
+  .sec-h h2 { font-family:Oxanium,sans-serif; font-weight:700; font-size:15px; letter-spacing:.14em;
+              text-transform:uppercase; color:#E9EAED; }
+  .sec-h .note { font:400 12px Inter; color:var(--dim); }
+  .rule { height:1px; background:linear-gradient(90deg,rgba(62,156,184,.4),rgba(255,255,255,.02)); flex:1; align-self:center; }
+
+  /* receipts band */
+  .receipts { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .rcard { padding:18px; border:1px solid var(--hairline); border-radius:16px;
+           background:var(--panel); position:relative; }
+  .rcard .big { font-family:Oxanium,sans-serif; font-weight:800; font-size:26px; color:#EAF4F8; line-height:1; }
+  .rcard .cap { margin-top:7px; font:600 10.5px 'Space Mono',monospace; letter-spacing:.08em;
+                text-transform:uppercase; color:var(--dim); }
+  .rcard.award { border-color:rgba(217,164,65,.34); background:linear-gradient(165deg,rgba(217,164,65,.08),var(--panel)); }
+  .rcard.award .big { font-size:18px; color:#F0CE8C; }
+  .rcard .src { display:inline-block; margin-top:9px; font:600 10px 'Space Mono',monospace; letter-spacing:.04em;
+                color:#8FC9DA; text-decoration:none; border-bottom:1px solid rgba(143,201,218,.3); }
+  .rcard .src:hover { color:#BFE6F2; }
+  .vbadge { position:absolute; top:13px; right:13px; font:700 9px 'Space Mono',monospace; letter-spacing:.1em;
+            color:#0C0D10; background:#D9A441; padding:3px 7px; border-radius:6px; }
+
+  /* work / audio */
+  .tracks { display:flex; flex-direction:column; gap:10px; }
+  .track { display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:13px;
+           border:1px solid var(--hairline); background:var(--panel); }
+  .track.empty { border-style:dashed; border-color:rgba(120,182,205,.3); background:rgba(62,156,184,.03); }
+  .play { width:40px; height:40px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+          border:1px solid rgba(120,182,205,.4); background:rgba(255,255,255,.04); color:#BFE6F2; font-size:14px; }
+  .track .meta { flex:1; min-width:0; }
+  .track .meta .t { font:600 14px Inter; color:#E9EAED; }
+  .track .meta .d { font:400 12px Inter; color:var(--dim); }
+  .track.empty .meta .t { color:rgba(198,201,208,.6); }
+  .track .wave { flex:1; max-width:240px; height:26px;
+                 background:repeating-linear-gradient(90deg, rgba(120,182,205,.22) 0 2px, transparent 2px 5px);
+                 mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent); border-radius:4px; opacity:.5; }
+
+  /* wall gallery */
+  .wallcopy { color:#C6CBD3; font-size:14.5px; max-width:62ch; margin-bottom:16px; }
+  .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .gtile { aspect-ratio:1/1; border-radius:14px; border:1px dashed rgba(120,182,205,.32);
+           background:repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 9px, rgba(0,0,0,.05) 9px 18px), #14161B;
+           display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px;
+           color:var(--dim); position:relative; overflow:hidden; }
+  .gtile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+  .gtile .ico { font-size:24px; opacity:.55; }
+  .gtile .lbl { font:600 9px 'Space Mono',monospace; letter-spacing:.12em; text-transform:uppercase; }
+
+  /* credits */
+  .credcols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .credcard { padding:20px; border:1px solid var(--hairline); border-radius:16px; background:var(--panel); }
+  .credcard h3 { font:600 11px 'Space Mono',monospace; letter-spacing:.14em; text-transform:uppercase;
+                 color:var(--pink); margin-bottom:13px; }
+  .namelist { display:flex; flex-wrap:wrap; gap:8px; }
+  .nm { font:600 13px Inter; padding:7px 13px; border-radius:99px; border:1px solid var(--hairline);
+        background:rgba(255,255,255,.035); color:#DDE3EA; }
+  .honest { margin-top:14px; font:400 12.5px Inter; color:var(--dim); font-style:italic; }
+
+  /* the run */
+  .run { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
+  .city { font:600 12.5px Inter; color:#D4DAE2; padding:7px 13px; border-radius:10px;
+          border:1px solid var(--hairline); background:rgba(255,255,255,.03); }
+  .city.home { border-color:rgba(62,156,184,.5); color:#BFE6F2; background:rgba(62,156,184,.08); }
+  .arrow { color:var(--dim); font-size:13px; }
+
+  .footer { margin-top:54px; padding-top:26px; border-top:1px solid var(--hairline); text-align:center; }
+  .footer .ftcta { display:inline-flex; }
+  .footer .ln { margin-top:16px; font:400 12px Inter; color:var(--dim); }
+
+  .ph-note { margin-top:10px; font:400 12px Inter; color:rgba(217,164,65,.8); }
+
+  @media (max-width:640px){
+    .hero{ grid-template-columns:1fr; text-align:center; justify-items:center; }
+    .receipts{ grid-template-columns:1fr; }
+    .credcols{ grid-template-columns:1fr; }
+    .cta-row{ justify-content:center; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">&larr;</span></a>
+    <div class="brandwrap">
+      <span class="dmv brand-dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span>
+    </div>
+    <span class="etch">Skill Profile</span>
+    <span class="spacer"></span>
+    <span class="market-tag">Marketplace</span>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ════ HERO ════ -->
+    <div class="hero">
+      <div class="avatar" id="avatar">
+        <img id="avatarImg" alt="" />
+        <div class="ph"><div class="ico">🎚️</div><div class="lbl">Your photo</div></div>
+      </div>
+      <div class="hbody">
+        <div class="h-eyebrow">Vocal Mixing Engineer · San Antonio, TX</div>
+        <div class="h-name placeholder" id="hName">your name here</div>
+        <div class="h-sub">25 years putting vocals in the pocket. The skill mixes a vocal the way I'd mix it — sits it, tunes it, makes it hit.</div>
+        <div class="chips">
+          <span class="chip">Vocal Mixing</span>
+          <span class="chip">Recording</span>
+          <span class="chip">Mix &amp; Master</span>
+          <span class="chip verified" title="San Antonio Music Awards, San Antonio Current, 2015">✓ <b>SAMA ’15</b> — Best Recording Engineer (2nd)</span>
+        </div>
+        <div class="cta-row">
+          <a class="btn primary" href="/static/studio.html">▶ Deploy this skill in the Studio</a>
+          <a class="btn ghost" href="#work">Hear the work ↓</a>
+          <span class="price">Rent the skill · <b>$—</b></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ RECEIPTS ════ -->
+    <section>
+      <div class="sec-h"><h2>The Receipts</h2><span class="rule"></span></div>
+      <div class="receipts">
+        <div class="rcard award">
+          <span class="vbadge">VERIFIED</span>
+          <div class="big">Best Recording Engineer</div>
+          <div class="cap">2nd Place · SA Music Awards · 2015</div>
+          <a class="src" href="https://www.sacurrent.com/san-antonio-guides/the-san-antonio-music-awards-2015-winners-list-2472177/" target="_blank" rel="noopener">San Antonio Current ↗</a>
+        </div>
+        <div class="rcard">
+          <div class="big">200+</div>
+          <div class="cap">Signatures on the wall</div>
+          <a class="src" href="#wall">See the wall ↓</a>
+        </div>
+        <div class="rcard">
+          <div class="big">25 yrs</div>
+          <div class="cap">Behind the board · Texas-wide</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ WORK ════ -->
+    <section id="work">
+      <div class="sec-h"><h2>Hear the Work</h2><span class="note">the mix is the receipt.</span><span class="rule"></span></div>
+      <div class="tracks" id="tracks">
+        <div class="track empty">
+          <span class="play">▶</span>
+          <div class="meta"><div class="t">Your best mix #1</div><div class="d">drop a vocal mix you’re proud of</div></div>
+          <div class="wave"></div>
+        </div>
+        <div class="track empty">
+          <span class="play">▶</span>
+          <div class="meta"><div class="t">Your best mix #2</div><div class="d">before/after hits hardest</div></div>
+          <div class="wave"></div>
+        </div>
+        <div class="track empty">
+          <span class="play">▶</span>
+          <div class="meta"><div class="t">Your best mix #3</div><div class="d">your call — this is what people hear</div></div>
+          <div class="wave"></div>
+        </div>
+      </div>
+      <div class="ph-note">↑ Send me 2–4 mixes and I’ll drop them in as real players.</div>
+    </section>
+
+    <!-- ════ THE WALL ════ -->
+    <section id="wall">
+      <div class="sec-h"><h2>The Wall</h2><span class="note">the scene signed off.</span><span class="rule"></span></div>
+      <p class="wallcopy">Over <b>200 signatures</b> from the artists who came through — every name a person who sat in the chair and got their vocals mixed right. You can’t fake a wall. The whole scene already knows.</p>
+      <div class="gallery" id="gallery">
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+        <div class="gtile"><img alt="" /><span class="ico">✍️</span><span class="lbl">Wall photo</span></div>
+      </div>
+      <div class="ph-note">↑ Snap your wall (wide shots + a few tight close-ups of names) and drop the photos in — I’ll build the gallery for real.</div>
+    </section>
+
+    <!-- ════ TRACK RECORD ════ -->
+    <section>
+      <div class="sec-h"><h2>Track Record</h2><span class="rule"></span></div>
+      <div class="credcols">
+        <div class="credcard">
+          <h3>Mixed / Worked With</h3>
+          <div class="namelist">
+            <span class="nm">Lil’ Flip</span>
+            <span class="nm">Tum Tum</span>
+            <span class="nm">MO3</span>
+            <span class="nm">Brian Angel</span>
+            <span class="nm">Big Sid</span>
+          </div>
+        </div>
+        <div class="credcard">
+          <h3>Shared the Stage / Opened For</h3>
+          <div class="namelist">
+            <span class="nm">Paul Wall</span>
+            <span class="nm">Chamillionaire</span>
+            <span class="nm">Rick Ross</span>
+            <span class="nm">Juvenile</span>
+          </div>
+        </div>
+      </div>
+      <p class="honest">A 25-year career that mostly predates the internet — these are stated credits from the Texas scene. The wall and the work are the proof.</p>
+    </section>
+
+    <!-- ════ THE RUN ════ -->
+    <section>
+      <div class="sec-h"><h2>The Run</h2><span class="note">toured all over Texas.</span><span class="rule"></span></div>
+      <div class="run">
+        <span class="city home">San Antonio</span><span class="arrow">→</span>
+        <span class="city">San Angelo</span><span class="arrow">→</span>
+        <span class="city">Fort Worth</span><span class="arrow">→</span>
+        <span class="city">Longview</span><span class="arrow">→</span>
+        <span class="city">Texarkana</span><span class="arrow">→</span>
+        <span class="city">Corpus Christi</span><span class="arrow">→</span>
+        <span class="city">South Padre</span>
+      </div>
+    </section>
+
+    <div class="footer">
+      <a class="btn primary ftcta" href="/static/studio.html">▶ Deploy this skill in the Studio</a>
+      <div class="ln">A skill, trained on a real engineer’s ear — same lane as everyone here.</div>
+    </div>
+
+  </div>
+
+  <script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

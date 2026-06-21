@@ -790,6 +790,9 @@
   <div class="tgroup"><span class="tg-l">FX</span>
     <button class="tb" id="throwToggle" onclick="toggleThrowBar()" title="FX Throw — print a tempo-synced delay/reverb throw onto the selected clip" style="width:auto;padding:0 10px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">⟿ THROW</button>
   </div>
+  <div class="tgroup"><span class="tg-l">BEAT LAB</span>
+    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open DeMartin Beat Lab as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 BEAT LAB</button>
+  </div>
   <div class="tgroup"><span class="tg-l">ZOOM · GRID</span>
     <div class="zoomctl">
       <button class="zb" id="zoomOut" title="zoom out (time)">−</button><span id="zoomLbl">100%</span><button class="zb" id="zoomIn" title="zoom in time (or Ctrl+wheel)">+</button>
@@ -3977,6 +3980,82 @@ function makeDraggable(win, handle){
     document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
   };
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BEAT LAB AS A PLUGIN  —  load DeMartin Beat Lab in a floating window (a
+   same-origin <iframe>) and "Send to Studio" bounces the current beat onto a
+   new track. This is 100% Studio-side: it reaches into the embedded Beat Lab's
+   OWN renderPatternWav()/wavBase64() across the same-origin frame boundary, so
+   beats.html is never modified. The embedded instance is also blocked from
+   overwriting the shared `dmv_beats_auto` autosave slot, so it can't disturb
+   anyone working in the standalone Beat Lab room.
+   ════════════════════════════════════════════════════════════════════════════ */
+function openBeatLab(){
+  let w = document.getElementById('beatlab-win');
+  if(w){ w.style.display='flex'; bringFront(w); return; }
+  ensureCtx();
+  const col = '#ff4f9a', bpm = curTempo();
+  w = document.createElement('div'); w.className='plugwin'; w.id='beatlab-win';
+  w.style.maxWidth='none'; w.style.width='min(1180px,95vw)'; w.style.height='min(82vh,800px)';
+  w.style.left='2.5vw'; w.style.top='60px'; w.style.display='flex'; w.style.flexDirection='column';
+  w.style.borderColor=hexA(col,.42);
+  w.style.boxShadow=`0 24px 70px rgba(0,0,0,.64), 0 0 0 1px ${hexA(col,.16)}, 0 0 52px ${hexA(col,.12)}`;
+  w.innerHTML =
+    `<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}">`+
+      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 BEAT LAB</span>`+
+      `<span class="pw-track" style="max-width:none">plugin · cook a beat, then send it to a track</span>`+
+      `<button class="bl-send" onmousedown="event.stopPropagation()" title="Bounce the current beat onto a new Studio track" `+
+        `style="background:${hexA(col,.18)};border:1px solid ${hexA(col,.5)};color:${col};font:800 10px 'Space Mono',monospace;letter-spacing:.04em;padding:5px 11px;border-radius:7px;cursor:pointer">⤓ Send to Studio</button>`+
+      `<button class="pw-x" title="close">✕</button>`+
+    `</div>`+
+    `<div class="bl-wrap" style="flex:1;min-height:0;background:#0c0e13;overflow:hidden">`+
+      `<iframe class="bl-frame" src="/static/beats.html?host=studio&bpm=${encodeURIComponent(bpm)}" allow="autoplay" `+
+        `style="border:0;display:block;width:100%;height:100%"></iframe>`+
+    `</div>`;
+  document.body.appendChild(w);
+  const frame = w.querySelector('.bl-frame');
+  // protect whoever's in the standalone Beat Lab: stop THIS embedded instance from
+  // ever writing the shared autosave key (best-effort, same-origin realm patch).
+  frame.addEventListener('load', ()=>{
+    try{
+      const bw = frame.contentWindow, SP = bw.Storage && bw.Storage.prototype;
+      if(SP && !SP.__blGuard){
+        const orig = SP.setItem;
+        SP.setItem = function(k,v){ if(k==='dmv_beats_auto') return; return orig.call(this,k,v); };
+        SP.__blGuard = true;
+      }
+    }catch(e){ /* cross-instance guard is best-effort */ }
+  });
+  w.querySelector('.pw-x').onclick = ()=> w.remove();
+  w.querySelector('.bl-send').onclick = (e)=> beatlabSend(frame, e.currentTarget);
+  makeDraggable(w, w.querySelector('.pw-bar'));
+  bringFront(w);
+}
+
+async function beatlabSend(frame, btn){
+  const bw = frame && frame.contentWindow;
+  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("Beat Lab's still warming up — give it a second"); return; }
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='Bouncing…'; }
+  try{
+    if(typeof bw.stopPlay === 'function'){ try{ bw.stopPlay(); }catch(e){} }   // freeze playback before the offline render
+    const buf = await bw.renderPatternWav(4);              // Beat Lab's own offline bounce — 4 bars, bit-identical to playback
+    if(!buf) throw new Error('empty render');
+    const b64 = await bw.wavBase64(buf);                   // AudioBuffer -> base64 WAV
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+    const name = 'Beat Lab ' + (tracks.filter(t=>/^Beat Lab/.test(t.name||'')).length + 1);
+    const file = new File([u], name + '.wav', {type:'audio/wav'});
+    await addFiles([file]);                                // reuse the proven import path → new track + lane
+    flash('Beat dropped onto “' + name + '” ✦');
+  }catch(err){
+    console.error('[BeatLab→Studio] send failed', err);
+    flash("Couldn't bounce that beat — hit Play in Beat Lab first, then send");
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent = label || '⤓ Send to Studio'; }
+  }
+}
+
 // bind a rotary knob to a plugin param (drag up/down, double-click = default)
 function bindFxKnob(knobEl, outEl, p, getV, setV){
   const ind=knobEl.querySelector('.vknob-ind'), min=p.min, max=p.max, range=(max-min)||1, step=p.step||_step(p), fmt=p.fmt||_fmt;
@@ -7734,7 +7813,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "1.4.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "1.5.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;
