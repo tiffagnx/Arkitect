@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0C0D10" />
 <link rel="icon" href="/static/kit.ico" />
 <link rel="manifest" href="/static/manifest.json?v=3" />
-<title>ARKITECT</title>
+<title>DeMartinville</title>
 <script>
 /* "Install as app" — turns ARKITECT into a real installed Windows program:
    its own Tec taskbar icon + graphite title bar + clean window (no Edge frame). */
@@ -18,15 +18,17 @@
   window.addEventListener('DOMContentLoaded', () => {
     const b = document.createElement('button');
     b.textContent = '⤓ Install as app';
-    b.title = 'Make ARKITECT a real installed program — its own Tec icon + clean window';
-    b.style.cssText = 'position:fixed;top:13px;right:15px;z-index:99999;display:'+((ip&&!inApp)?'flex':'none')+';align-items:center;gap:6px;padding:8px 13px;border-radius:10px;cursor:pointer;font:600 12px Inter,sans-serif;color:#08171c;background:linear-gradient(180deg,#7FD0E4,#3E9CB8);border:none;box-shadow:0 3px 12px rgba(62,156,184,.45);';
+    b.title = 'Make DeMartinville a real installed program — its own Tec icon + clean window';
+    b.style.cssText = 'display:'+((ip&&!inApp)?'inline-flex':'none')+';align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:9px;cursor:pointer;font:600 11.5px Inter,sans-serif;color:#08171c;background:linear-gradient(180deg,#7FD0E4,#3E9CB8);border:none;box-shadow:0 2px 8px rgba(62,156,184,.35);flex:none;';
     b.onclick = async () => { if(!ip) return; ip.prompt(); try{ await ip.userChoice; }catch(e){} ip = null; b.style.display='none'; };
-    window.__arkInstallBtn = b; document.body.appendChild(b);
+    window.__arkInstallBtn = b;
+    const _tb = document.querySelector('.topbar');   // flow it INTO the top bar (next to the gear) instead of a fixed overlay that lands on top of it
+    if (_tb) _tb.appendChild(b); else { b.style.position='fixed'; b.style.top='13px'; b.style.right='180px'; b.style.zIndex='99999'; document.body.appendChild(b); }
   });
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
   :root {
     /* ARKITECT — ported from The Studio: professional graphite + steel, no pink.
@@ -61,6 +63,14 @@
     border-right: 1px solid var(--hairline);
   }
   .brand { padding: 20px 18px 14px; text-align: center; }
+  .dmv{display:inline-flex;align-items:center;justify-content:center;gap:.42em;line-height:1}
+  .dmv .r{height:1px;width:1.05em;background:#5b6470;flex:none}
+  .dmv .w{white-space:nowrap;line-height:1}
+  .dmv .b{font-family:Oswald,sans-serif;font-weight:700;font-size:1em;letter-spacing:.005em}
+  .dmv .s{font-family:Allura,cursive;font-size:1.35em;margin-left:-.02em}
+  .dmv .b,.dmv .s{background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .brand-dmv{display:flex;justify-content:center;font-size:25px;margin:2px 0 9px}
+  .arkhero .hero-dmv{font-size:clamp(30px,4.6vw,44px);margin-bottom:18px;filter:drop-shadow(0 4px 16px rgba(62,156,184,.28))}
   .brand .brandlogo { display: block; width: 200px; max-width: 100%; height: auto; margin: 2px auto 8px;
     filter: drop-shadow(0 0 16px rgba(62,156,184,.30)); user-select: none; }
   .brand small { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
@@ -128,6 +138,16 @@
   .steps { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 4px 40px; }
   .step { font: 400 12px 'Space Mono'; color: var(--dim); display: flex; gap: 8px; align-items: center; animation: rise .2s ease-out; }
   .step .dotline { width: 14px; height: 1px; background: rgba(62,156,184,.5); }
+  /* collapsed reasoning — push the ▸ to peek at what she's thinking */
+  .thinkbox { margin: 0 0 9px; border-left: 2px solid rgba(62,156,184,.35); }
+  .thinkbox > summary { font: 500 11.5px 'Space Mono'; color: var(--dim); cursor: pointer;
+    list-style: none; padding: 2px 0 2px 10px; user-select: none; opacity: .85; }
+  .thinkbox > summary::-webkit-details-marker { display: none; }
+  .thinkbox > summary::before { content: "▸ "; color: rgba(62,156,184,.8); }
+  .thinkbox[open] > summary::before { content: "▾ "; }
+  .thinkbox > summary:hover { opacity: 1; }
+  .thinkbox .think-body { font: 400 12.5px Inter; color: var(--dim); line-height: 1.5;
+    padding: 6px 0 4px 12px; white-space: pre-wrap; opacity: .8; }
   .sources { margin: 4px 0 0 40px; display: flex; flex-wrap: wrap; gap: 6px; }
   .sources a { font: 500 11px Inter; color: #9BD9FF; text-decoration: none; padding: 4px 10px; border-radius: 99px;
     background: rgba(255,255,255,.04); border: 1px solid var(--hairline); }
@@ -258,7 +278,7 @@
 
 <div class="app">
   <aside class="side">
-    <div class="brand"><img class="brandlogo" src="/static/arkitect-logo.png" alt="ARKITECT" draggable="false" /><small>local · private · yours</small></div>
+    <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><small>local · private · yours</small></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
     <div class="raillabel">Memory</div>
@@ -270,15 +290,19 @@
     <div class="roomrail">
       <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
+      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>DeMartin Beat Lab</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
       <a class="roomlink" href="/static/bit16.html"><span class="ri">👾</span><span>Bit1Six</span></a>
+      <a class="roomlink" href="/static/character.html"><span class="ri">🧬</span><span>Characters</span></a>
       <a class="roomlink" href="/static/wall.html"><span class="ri">🧱</span><span>The Wall</span></a>
+      <a class="roomlink" href="/static/join.html"><span class="ri">🎭</span><span>For Creators</span></a>
     </div>
     <div class="sidefoot">
       <div id="prStatus" style="display:flex; gap:16px; justify-content:center; padding:2px 0 8px; font:600 10px Inter; letter-spacing:.06em; color:var(--dim);">
         <span><span id="sBrain" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#555; margin-right:5px; vertical-align:middle;"></span>brain</span>
         <span><span id="sEngine" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#555; margin-right:5px; vertical-align:middle;"></span>engine</span>
+        <span id="ark-ver-badge" title="DeMartinville version — the whole app" style="opacity:.8;">v…</span>
       </div>
     </div>
   </aside>
@@ -288,13 +312,13 @@
       <div class="avatar" id="avatar"></div>
       <div class="who">TIFF<small id="status">ready</small></div>
       <select class="model" id="model"></select>
-      <button class="model-refresh" id="modelRefresh" title="Refresh ARKITECT — reload the app to pick up the latest (no exit + restart)">⟳</button>
+      <button class="model-refresh" id="modelRefresh" title="Refresh DeMartinville — reload the app to pick up the latest (no exit + restart)">⟳</button>
     </div>
 
     <div class="scroll" id="scroll"><div class="col" id="col">
       <div class="hello" id="hello">
         <div class="arkhero">
-          <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
+          <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
@@ -304,7 +328,7 @@
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
-          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make ARKITECT smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
+          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
       </div>
     </div></div>
@@ -444,6 +468,17 @@ function msgAtts(m) {
   return out;
 }
 function addSteps() { const s = document.createElement("div"); s.className = "steps"; $("col").appendChild(s); return s; }
+// Reasoning models stream <think>…</think> before the real answer. Split it out so the
+// thinking lives in a collapsed dropdown and only the answer fills the bubble. Handles the
+// mid-stream case where </think> hasn't arrived yet (think still open).
+function splitThink(raw) {
+  const open = raw.indexOf("<think>");
+  if (open === -1) return { think: "", answer: raw };
+  const close = raw.indexOf("</think>");
+  if (close === -1) return { think: raw.slice(open + 7), answer: raw.slice(0, open) };
+  return { think: raw.slice(open + 7, close).trim(),
+           answer: (raw.slice(0, open) + raw.slice(close + 8)).trim() };
+}
 function scrollDown() { const sc = $("scroll"); sc.scrollTop = sc.scrollHeight; }
 
 /* ── send ── */
@@ -482,6 +517,7 @@ async function send() {
   const bubble = addMsg("assistant", "…");
   let acc = "";
   let stepsEl = null;
+  let thinkEl = null, ansEl = null;
   abortCtl = new AbortController();
 
   try {
@@ -504,7 +540,24 @@ async function send() {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         let ev; try { ev = JSON.parse(line.slice(6)); } catch (err) { console.warn("bad SSE line:", line, err); continue; }
-        if (ev.type === "delta") { acc += ev.text; bubble.innerHTML = md(acc); scrollDown(); }
+        if (ev.type === "delta") {
+          acc += ev.text;
+          const { think, answer } = splitThink(acc);
+          if (think && !thinkEl) {   // first sign of reasoning — build the dropdown once
+            thinkEl = document.createElement("details");
+            thinkEl.className = "thinkbox";
+            thinkEl.innerHTML = `<summary>💭 thinking</summary><div class="think-body"></div>`;
+            ansEl = document.createElement("div"); ansEl.className = "ans";
+            bubble.innerHTML = ""; bubble.appendChild(thinkEl); bubble.appendChild(ansEl);
+          }
+          if (thinkEl) {
+            thinkEl.querySelector(".think-body").innerHTML = md(think);
+            ansEl.innerHTML = md(answer) || "…";
+          } else {
+            bubble.innerHTML = md(acc);
+          }
+          scrollDown();
+        }
         if (ev.type === "step") {
           if (!stepsEl) { stepsEl = addSteps(); $("col").insertBefore(stepsEl, bubble.parentElement); }
           const st = document.createElement("div"); st.className = "step";
@@ -524,8 +577,10 @@ async function send() {
     if (e.name !== "AbortError") { acc += `\n⚠ ${e.message}`; bubble.innerHTML = md(acc); }
   }
 
-  if (!acc.trim()) bubble.textContent = "…nothing came back. Is LM Studio's server on?";
-  messages.push({ role: "assistant", content: acc });
+  // strip her private reasoning from what we keep — only the answer goes into history
+  const finalAnswer = splitThink(acc).answer || acc;
+  if (!finalAnswer.trim() && !thinkEl) bubble.textContent = "…nothing came back. Is LM Studio's server on?";
+  messages.push({ role: "assistant", content: finalAnswer });
   streaming = false;
   $("send").classList.remove("stop"); $("send").textContent = "➤";
   $("avatar").classList.remove("live");
@@ -578,7 +633,7 @@ function newChat() {
   $("col").innerHTML =
     `<div class="hello" id="hello">
         <div class="arkhero">
-          <img class="ark-logo" src="/static/arkitect-logo.png" alt="ARKITECT" />
+          <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
@@ -588,7 +643,7 @@ function newChat() {
             <div class="crew"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>the build-bot — he makes what you dream up</small></span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
-          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make ARKITECT smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
+          <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
       </div>`;
   clearAtts();
@@ -808,6 +863,9 @@ $("input").addEventListener("paste", (e) => {
   function setDot(id, on){ const d=document.getElementById(id); if(d){ d.style.background = on ? '#36e27b' : '#555'; d.style.boxShadow = on ? '0 0 8px rgba(54,226,123,.7)' : 'none'; } }
   async function pollHealth(){ try{ const h=await fetch('/api/health').then(r=>r.json()); setDot('sBrain',!!h.brain); setDot('sEngine',!!h.engine); }catch{ setDot('sBrain',false); setDot('sEngine',false); } }
   pollHealth(); setInterval(pollHealth, 12000);
+  // app version, shown in the status bar next to brain/engine (same dim style). Having #ark-ver-badge
+  // live here id-guards settings.js out of adding its top-bar pill on the chat.
+  fetch('/api/version').then(r=>r.json()).then(d=>{ const v=document.getElementById('ark-ver-badge'); if(v) v.textContent='v'+(d.version||'?'); }).catch(()=>{});
 })();
 
 /* ── rotating welcome line: the studio intro, then real per-room tips ──
@@ -822,6 +880,7 @@ const ARK_TIPS = [
   { room: "Attach",      t: "Drag images, PDFs, or docs straight into the chat — Tiff sees the images and reads the rest before she answers." },
   { room: "Voice",       t: "Tap 🎙 to talk to Tiff out loud — pause as long as you need, tap again when you're done, then hit send." },
   { room: "DeMartin Audio Labs", t: "DeMartin is a full DAW — record, edit, mix, and bounce. Hit the 🩺 Vocal Doctor on a vocal track for an instant pro chain." },
+  { room: "DeMartin Beat Lab", t: "Beat Lab is where you make the beat — step-sequence drums, play 808s, and every instrument has an AI brain you can talk to that turns its own knobs." },
   { room: "LePrince Visual Labs", t: "LePrince cuts video on a real timeline — drop clips, layer text, render it out. No subscription, all on your machine." },
   { room: "Imagination Station",  t: "Imagination Station makes images locally with FLUX — just describe what you want; the engine spins itself up on the first ask." },
   { room: "Blueprint Builds",     t: "Blueprint Builds is where Kit turns your idea into a working app — describe the thing and watch him build it." },

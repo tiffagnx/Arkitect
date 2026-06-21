@@ -23,7 +23,7 @@
   - `editor.html` — **LePrince Visual Labs** (video)
   - `images.html` — **Imagination Station** (local FLUX image gen)
   - `bit16.html` — **Bit1Six** (16-bit game)
-  - `swarm.html` (research keys), `talk.html` (voice toy)
+  - `swarm.html` (research keys)
   - Shared injectors: **`pinkroom-nav.js`** (exit pill + favicon + theme-color + URL-hover strip + loads kit-helper.js), **`tec-mascot.js`** (Kit on the home send button), **`kit-helper.js`** (the "Ask Kit" in-room window).
 - **`data/`** — **GITIGNORED, personal, never commit**: `memory.json`, `owner.md` (owner profile), sessions, builds, `swarm_keys.json` (API keys), voice refs. The app recreates these dirs on boot.
 

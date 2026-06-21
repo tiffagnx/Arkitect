@@ -94,18 +94,8 @@
   if (host) host.appendChild(gear);
   else { gear.style.position = "fixed"; gear.style.top = "12px"; gear.style.right = "14px"; gear.style.zIndex = "99998"; document.body.appendChild(gear); }
 
-  // ── version badge — ONE number for the WHOLE app, shown in EVERY room so it's watchable as it grows.
-  //    id-guarded ("ark-ver-badge") so pinkroom-nav.js (the universal fallback) never double-adds it. ──
-  if (!document.getElementById("ark-ver-badge")) {
-    const ver = document.createElement("span");
-    ver.id = "ark-ver-badge";
-    ver.title = "ARKITECT version — the whole app";
-    ver.textContent = "v…";
-    ver.style.cssText = "display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:8px;font:600 10.5px ui-monospace,'Space Mono',monospace;letter-spacing:.04em;color:rgba(156,211,228,.72);background:rgba(62,156,184,.10);border:1px solid rgba(95,180,206,.28);";
-    if (host) { ver.style.marginRight = "4px"; host.insertBefore(ver, gear); }
-    else { ver.style.position = "fixed"; ver.style.top = "17px"; ver.style.right = "56px"; ver.style.zIndex = "99998"; document.body.appendChild(ver); }
-    fetch("/api/version").then(r => r.json()).then(d => { ver.textContent = "v" + (d.version || "?"); }).catch(() => { ver.remove(); });
-  }
+  // version badge intentionally REMOVED from every room — it lives ONLY on the front page (the chat,
+  // next to brain/engine). Owner's call: one version readout, one place. (Was here next to the gear.)
 
   // ── modal ──
   const ov = document.createElement("div"); ov.className = "as-overlay";
