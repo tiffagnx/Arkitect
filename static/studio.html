@@ -6169,6 +6169,72 @@ async function offerRecover(){
 }
 setTimeout(offerRecover, 900);                                 // after boot, if the board's empty + a backup with takes exists
 
+/* ── FIRST-SONG GUIDE — a tiny, SKIPPABLE, state-driven checklist (NOT a cinematic intro). It lights
+   the next REAL step and ticks itself off from live state; the whole thing vanishes for good once
+   skipped/finished, so an experienced user never sees clutter. ── */
+const GUIDE_STEPS = [
+  { k:'track', label:'Add a track', hint:'Your vocal needs a lane to land on.', actLabel:'+ Add track',
+    act:()=>{ if(typeof createTracks==='function') createTracks(1,'mono','audio'); }, done:()=>tracks.some(t=>t.type!=='aux'&&t.type!=='master') },
+  { k:'mic', label:'Pick your mic', hint:'Choose your input — wear headphones so the beat doesn’t bleed into the take.', actLabel:'Choose input',
+    act:()=>{ if(typeof openInput==='function') openInput(); }, done:()=>!!(typeof REC==='object'&&REC.stream) },
+  { k:'cal', label:'Calibrate timing', opt:true, hint:'One loopback click measures your real round-trip so takes land ON the beat.', actLabel:'⟳ Calibrate',
+    act:()=>{ const b=$("calibBtn"); if(b) b.click(); }, done:()=>(typeof REC==='object'&&REC.calibrated!=null) },
+  { k:'arm', label:'Arm a track', hint:'Record-enable the lane (the ● on the track strip) so your take records there.', actLabel:'● Arm first track',
+    act:()=>{ const t=tracks.find(x=>x.type!=='aux'&&x.type!=='master'); if(t&&typeof setArm==='function') setArm(t,true); }, done:()=>tracks.some(t=>t.armed) },
+  { k:'rec', label:'Record — hit Space', hint:'Press Space (or ●) to roll. Perform your take; Space again to stop.', actLabel:null, act:null,
+    done:()=>tracks.some(t=>t.type!=='aux'&&t.type!=='master'&&clipsOf(t).length>0) },
+  { k:'doc', label:'Polish with Vocal Doctor', hint:'In MIX, hit 🩺 on your vocal strip — it builds a pro chain you can shape safely.', actLabel:'Open MIX',
+    act:()=>{ if(typeof setView==='function') setView('mix'); }, done:()=>tracks.some(t=>(t.inserts||[]).some(i=>i&&i.params&&i.params.__doc)) },
+];
+let _guideTimer=null;
+function _guideDone(s){ try{ return !!s.done(); }catch(e){ return false; } }
+function _guideAllDone(){ return GUIDE_STEPS.filter(s=>!s.opt).every(_guideDone); }
+function renderGuide(){
+  const panel=document.getElementById('songGuide'); if(!panel) return;
+  const body=panel.querySelector('.sg-body'); body.innerHTML='';
+  let curIdx=-1;                                                // first incomplete step; skip an optional one only once the user has moved past it
+  for(let i=0;i<GUIDE_STEPS.length;i++){ const s=GUIDE_STEPS[i]; if(_guideDone(s)) continue;
+    if(s.opt && GUIDE_STEPS.slice(i+1).some(_guideDone)) continue; curIdx=i; break; }
+  GUIDE_STEPS.forEach((s,i)=>{ const d=_guideDone(s), cur=(i===curIdx);
+    const row=document.createElement('div');
+    row.style.cssText="padding:7px 9px;border-radius:9px;margin:3px 0;"+(cur?"background:rgba(217,164,65,.12);border:1px solid rgba(217,164,65,.35);":"border:1px solid transparent;");
+    row.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font:600 12.5px Inter,sans-serif;color:${d?'#7fd0a0':(cur?'#f0d49a':'#cfd6dd')}"><span style="font-size:13px;width:13px;text-align:center">${d?'✓':(cur?'▸':'○')}</span><span>${s.label}${s.opt?' <span style="opacity:.55;font-weight:500">(optional)</span>':''}</span></div>`;
+    if(cur){ const h=document.createElement('div'); h.style.cssText="margin:5px 0 2px 21px;font:500 11.5px Inter,sans-serif;color:#aeb6bf;line-height:1.45"; h.textContent=s.hint; row.appendChild(h);
+      if(s.act){ const b=document.createElement('button'); b.textContent=s.actLabel; b.style.cssText="margin:6px 0 1px 21px;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font:700 11.5px Inter;color:#08171c;background:linear-gradient(180deg,#7FD0E4,#3E9CB8)"; b.onclick=()=>{ try{s.act();}catch(e){} setTimeout(renderGuide,140); }; row.appendChild(b); } }
+    body.appendChild(row);
+  });
+  const f=panel.querySelector('.sg-foot'); if(f) f.textContent=_guideAllDone()?'Nice — that’s a song on the board. 🎧':'Each step ticks itself off as you go.';
+}
+function openSongGuide(){
+  if(document.getElementById('songGuide')) return;
+  const panel=document.createElement('div'); panel.id='songGuide';
+  panel.style.cssText="position:fixed;right:18px;bottom:18px;width:290px;z-index:99998;border-radius:14px;background:linear-gradient(180deg,#1b2430,#121822);border:1px solid rgba(120,182,205,.4);box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden";
+  panel.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07)"><span style="font:800 12px 'Space Mono',monospace;letter-spacing:.04em;color:#E7EEF2">🎤 FIRST SONG</span><button class="sg-skip" title="hide — reopen with the 🎤 Guide button" style="border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:4px 9px;cursor:pointer;font:600 11px Inter;color:#cfd6dd;background:rgba(255,255,255,.05)">Skip</button></div><div class="sg-body" style="padding:7px 9px 2px"></div><div class="sg-foot" style="padding:8px 13px 11px;font:500 11px Inter,sans-serif;color:#8a929b"></div>`;
+  document.body.appendChild(panel);
+  panel.querySelector('.sg-skip').onclick=()=>{ try{localStorage.setItem('ark_guide_done','1');}catch(e){} closeSongGuide(); };
+  renderGuide();
+  if(_guideTimer) clearInterval(_guideTimer);
+  _guideTimer=setInterval(renderGuide, 800);
+  _ensureGuideFab();
+}
+function closeSongGuide(){ const p=document.getElementById('songGuide'); if(p) p.remove(); if(_guideTimer){ clearInterval(_guideTimer); _guideTimer=null; } _ensureGuideFab(); }
+function _ensureGuideFab(){
+  let done=false; try{ done=localStorage.getItem('ark_guide_done')==='1'; }catch(e){}
+  let fab=document.getElementById('guideFab');
+  if(done){ if(fab) fab.remove(); return; }                    // experienced user → no FAB, no clutter
+  if(!fab){ fab=document.createElement('button'); fab.id='guideFab'; fab.title='First-song guide';
+    fab.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99997;border:1px solid rgba(120,182,205,.4);border-radius:11px;padding:8px 12px;cursor:pointer;font:700 11.5px Inter,sans-serif;color:#cfe6ee;background:linear-gradient(180deg,#1b2430,#121822);box-shadow:0 8px 24px rgba(0,0,0,.5)";
+    fab.textContent='🎤 Guide'; fab.onclick=()=>openSongGuide(); document.body.appendChild(fab); }
+  fab.style.display = document.getElementById('songGuide') ? 'none' : '';   // hide the FAB while the panel is open
+}
+function maybeShowGuide(){
+  let done=false; try{ done=localStorage.getItem('ark_guide_done')==='1'; }catch(e){}
+  if(done) return;                                              // skipped/finished before → never again
+  _ensureGuideFab();
+  if(!tracks.length && !document.getElementById('recoverBar')) openSongGuide();   // first-timer on an empty board; recover banner wins if present
+}
+setTimeout(maybeShowGuide, 1400);                              // after the 900ms recover check, so recover wins if both apply
+
 /* ── SAVE TO A FOLDER ON YOUR OWN DISK — a real Pro-Tools-style session folder
    (<chosen>/<Name>/<Name>.ark + Audio Files/ Bounced Files/ Session File Backups/).
    Pick the destination once; after that, Save (Ctrl+S) and auto-backup write there too.
