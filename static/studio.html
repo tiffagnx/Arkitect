@@ -107,7 +107,8 @@
     background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 55%, var(--amber) 75%, #E5565B 92%); transition:width .05s linear; }
 
   /* tracks */
-  .tracks { flex:1; overflow-y:auto; padding:8px 14px 32px; display:flex; flex-direction:column; gap:1px; }
+  .tracks { flex:1; overflow-y:auto; padding:8px 14px 32px; display:flex; flex-direction:column; gap:1px;
+    border:1px solid rgba(62,156,184,.22); border-radius:7px; margin:6px 8px; }   /* PT: a frame around the edit area so the session feels bounded ("it ends") */
   /* first-run hero — fills the canvas + invites you in (no more empty black void) */
   .drop { flex:1; min-height:340px; display:flex; flex-direction:column; align-items:center; justify-content:center;
     border:2px dashed rgba(62,156,184,.30); border-radius:18px; text-align:center; color:var(--dim);
@@ -1820,9 +1821,13 @@ function showTrackMenu(t, e){
   const m=ctxMenuEl(); m.innerHTML="";
   const add=(label,fn,enabled=true)=>{ const el=document.createElement("div"); el.className="mi"+(enabled?"":" dis"); el.textContent=label; if(enabled) el.onclick=()=>{ hideMenu(); fn(); }; m.appendChild(el); };
   const sep=()=>{ const s=document.createElement("div"); s.className="sep"; m.appendChild(s); };
+  const subItem=(label,opener)=>{ const el=document.createElement("div"); el.className="mi"; el.innerHTML=label+'<span style="float:right;opacity:.5">▸</span>'; el.onclick=(ev)=>{ ev.stopPropagation(); opener(); }; m.appendChild(el); };
   add("✛  New track…", ()=>openNewTracksDialog());
   add("✎  Rename…", ()=>{ const nm=document.querySelector('#lane-'+t.id+' .ts-name'); renameTrack(t, nm); });
   add("⧉  Duplicate", ()=>duplicateTrack(t));
+  sep();
+  subItem("👁  Track view", ()=>showLaneViewMenu(t, e));        // PT track-view selector → Waveform / Volume / Pan
+  subItem("⥤  Flex · time-stretch", ()=>showFlexMenu(t, e));   // PT elastic-audio mode (renamed) → Polyphonic / Rhythmic / …
   sep();
   add("✨  Auto-mix", ()=>runAutoMix(t, null), !!t.buffer);   // Auto-mix lived in the (removed) right panel — keep it reachable here
   sep();
@@ -1838,6 +1843,25 @@ function showTrackMenu(t, e){
   m.style.top  = Math.min(e.clientY, window.innerHeight-200)+"px";
   m.classList.add("on");
 }
+// ── PT track-view selector + Flex (elastic-audio) mode — opened from the track right-click menu.
+//    View REUSES the proven automation overlay (Waveform / Volume / Pan). Flex stores the time-stretch
+//    mode per track (the stretch DSP itself is a follow-up). Names are ours, not Avid's. ──
+const LANE_VIEWS = [['off','Waveform'],['vol','Volume'],['pan','Pan']];
+function setLaneView(t, mode){ t.autoView=mode; const d=document.getElementById('lane-'+t.id);
+  if(d){ const ab=d.querySelector('.ts-btn.a'); if(ab){ ab.textContent={off:'A',vol:'V',pan:'P'}[mode]||'A'; ab.classList.toggle('on', mode!=='off'); } }
+  drawLane(t); flash('Track view: '+((LANE_VIEWS.find(v=>v[0]===mode)||[,'Waveform'])[1])); }
+function showLaneViewMenu(t, e){ const m=ctxMenuEl(); m.innerHTML="";
+  LANE_VIEWS.forEach(([mode,label])=>{ const el=document.createElement('div'); el.className='mi';
+    el.innerHTML='<span style="display:inline-block;width:15px">'+((t.autoView||'off')===mode?'✓':'')+'</span>'+label;
+    el.onclick=(ev)=>{ ev.stopPropagation(); setLaneView(t,mode); hideMenu(); }; m.appendChild(el); });
+  m.style.left=Math.min(e.clientX, window.innerWidth-200)+"px"; m.style.top=Math.min(e.clientY, window.innerHeight-160)+"px"; m.classList.add("on"); }
+const FLEX_MODES = ['Off','Polyphonic','Rhythmic','Monophonic','Varispeed'];
+function showFlexMenu(t, e){ const m=ctxMenuEl(); m.innerHTML="";
+  const hdr=document.createElement('div'); hdr.className='mi dis'; hdr.textContent='Flex · time-stretch'; m.appendChild(hdr);
+  FLEX_MODES.forEach(mode=>{ const el=document.createElement('div'); el.className='mi';
+    el.innerHTML='<span style="display:inline-block;width:15px">'+((t.flexMode||'Off')===mode?'✓':'')+'</span>'+mode;
+    el.onclick=(ev)=>{ ev.stopPropagation(); t.flexMode=mode; flash('Flex mode: '+mode+(mode!=='Off'?' — set (clip time-stretch coming)':'')); hideMenu(); }; m.appendChild(el); });
+  m.style.left=Math.min(e.clientX, window.innerWidth-220)+"px"; m.style.top=Math.min(e.clientY, window.innerHeight-200)+"px"; m.classList.add("on"); }
 document.addEventListener("click", hideMenu);
 document.addEventListener("scroll", hideMenu, true);
 let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
