@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>LePrince Visual Labs — ARKITECT</title>
+<title>LePrince Visual Labs — DeMartinville</title>
 <style>
 /* ─────────────────────────────────────────────────────────────────────────
    THE EDITOR — bespoke pro NLE. Palette matches the Studio (graphite + steel-
@@ -483,7 +483,7 @@ body.mode-simple .director-only{display:none!important}
 
   <!-- MENU BAR (motion-graphics style) -->
   <div class="menubar">
-    <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
+    <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">←</span></a>
     <nav class="mbar" id="aeMenubar"></nav>
     <span class="kit-mount"></span>
     <div class="spacer"></div>
@@ -2043,6 +2043,11 @@ screen.addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
   const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),sc=selClip();
   if(tool==='pen'){penClick(x,y,W,H);return;}
+  if(tool==='rotate'){ // Rotation tool (W): drag a layer in the monitor to spin it about its anchor
+    let c=(sc&&sc.clip&&clipKind(sc.clip)!=='audio')?sc.clip:null;
+    if(!c){const hit=pickLayerAt(x,y,W,H);if(hit&&clipKind(hit.clip)!=='audio'){select(hit.track.id,hit.clip.id);c=hit.clip;}}
+    if(c)startRotate(e,c,{x,y},W,H);return;
+  }
   if(tool!=='select')return;
   // a selected mask takes priority — drag its box/handles (or a pen vertex) to reshape it.
   // editing happens through the layer matrix so it lines up on a transformed layer.
@@ -2068,6 +2073,9 @@ function startVertexDrag(e,c,m,vi,Minv,shp){screen.setPointerCapture(e.pointerId
   vdrag={mode:'vertexdrag',c,m,vi,Minv,pts0:shp.points.map(p=>({x:p.x,y:p.y}))};} // snapshot interpolated points so other vertices stay put while dragging at a non-key frame
 function startMove(e,sc,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start,{k}=stageBox(W,H);
   vdrag={mode:'move',c,p0,posX0:pval(c,'posX',fr,0),posY0:pval(c,'posY',fr,0),k};}
+function startRotate(e,c,p0,W,H){screen.setPointerCapture(e.pointerId);const fr=playhead-c.start;
+  const pivot=layerCenter(c,W,H);
+  vdrag={mode:'rotate',c,pivot,rot0:pval(c,'rotation',fr,0),ang0:Math.atan2(p0.y-pivot.y,p0.x-pivot.x)};}
 function startScale(e,sc,handle,p0,W,H){screen.setPointerCapture(e.pointerId);const c=sc.clip,fr=playhead-c.start;
   const pivot=layerCenter(c,W,H);
   vdrag={mode:'scale',c,handle,pivot,p0,d0:Math.hypot(p0.x-pivot.x,p0.y-pivot.y)||1,scale0:pval(c,'scale',fr,1),
@@ -2099,6 +2107,10 @@ screen.addEventListener('pointermove',e=>{
   if(vdrag.mode==='move'){const k=vdrag.k;let nx=vdrag.posX0+(x-vdrag.p0.x)/k,ny=vdrag.posY0+(y-vdrag.p0.y)/k;
     if(e.shiftKey){if(Math.abs(x-vdrag.p0.x)>Math.abs(y-vdrag.p0.y))ny=vdrag.posY0;else nx=vdrag.posX0;}
     writeProp(c,'posX',Math.round(nx));writeProp(c,'posY',Math.round(ny));}
+  else if(vdrag.mode==='rotate'){const ang=Math.atan2(y-vdrag.pivot.y,x-vdrag.pivot.x);
+    let deg=vdrag.rot0+(ang-vdrag.ang0)*180/Math.PI;
+    if(e.shiftKey)deg=Math.round(deg/45)*45; // Shift constrains to 45° steps (AE)
+    writeProp(c,'rotation',+deg.toFixed(1));}
   else{const h=vdrag.handle;
     if(h==='e'||h==='w'){const f=Math.abs(x-vdrag.pivot.x)/vdrag.dx0;writeProp(c,'scaleX',Math.max(0.01,+(vdrag.scaleX0*f).toFixed(3)));}
     else if(h==='n'||h==='s'){const f=Math.abs(y-vdrag.pivot.y)/vdrag.dy0;writeProp(c,'scaleY',Math.max(0.01,+(vdrag.scaleY0*f).toFixed(3)));}
@@ -2253,6 +2265,35 @@ function sequenceLayers(){const cl=selectedClips();if(cl.length<2)return toast('
   const ord=cl.slice().sort((a,b)=>(a.clip.start-b.clip.start)||String(a.clip.id).localeCompare(String(b.clip.id)));
   let run=ord[0].clip.start;for(const s of ord){s.clip.start=run;run+=Math.max(1,s.clip.dur||0);} // butt clips end-to-end from the earliest start
   renderTimeline();drawFrame();save();toast('Sequenced '+ord.length+' layers');}
+// ── REVEAL PROPERTIES (AE: U twirls open ANIMATED props; UU = all MODIFIED) ──
+// Twirls each selected clip's stem open to exactly the groups that qualify and
+// collapses the rest — matches AE, and only ever touches the per-clip _tw state.
+function _revAnim(c,f){return isKeyed(c,f);}
+function _revMod(c,f){return isKeyed(c,f)||(c[f]!=null&&c[f]!==KDEF[f]);}
+function applyReveal(mode){ // mode: 'animated' | 'modified'
+  const cl=selectedClips();if(!cl.length){toast('Select a layer first',1);return;}
+  const test=mode==='modified'?_revMod:_revAnim;
+  const XF=['anchorX','anchorY','posX','posY','scale','scaleX','scaleY','rotation','opacity'];
+  let shown=0;
+  for(const {clip:c} of cl){
+    c._open=true;
+    const xf=XF.some(f=>test(c,f));twSet(c,'transform',xf);
+    const fx=FX_DEFS.some(([f,,def])=>mode==='modified'?(isKeyed(c,f)||(c[f]!=null&&c[f]!==def)):isKeyed(c,f));
+    twSet(c,'effects',fx);
+    const masks=clipMasks(c);let mAny=false;
+    for(const m of masks){
+      const on=mode==='modified'?true:(pathKeyed(c,m)||['feather','opacity','expansion'].some(p=>maskKeyed(c,m,p)));
+      twSet(c,'mask:'+m.id,on);if(on)mAny=true;
+    }
+    twSet(c,'masks',mAny&&masks.length>0);
+    const au=test(c,'volume');twSet(c,'audio',au);
+    if(xf||fx||mAny||au)shown++;
+  }
+  renderTimeline();refreshInspector();drawFrame();save(true);
+  toast(shown?(mode==='modified'?'Revealed modified properties':'Revealed animated properties')
+             :('No '+(mode==='modified'?'modified':'animated')+' properties'));
+}
+let _revealLastU=0;
 function select(tid,cid,additive){if(!sel||sel.clipId!==cid)selMaskId=null; // a different clip → drop the stale active mask
   if(penDraft&&penDraft.clipId!==cid)penDraft=null; // never finish a half-drawn path onto a different clip
   if(additive){
@@ -2772,8 +2813,8 @@ $('#binImport').onclick=doImport;$('#importZone').onclick=doImport;
 $('#toolSelect').onclick=()=>setTool('select');$('#toolRazor').onclick=()=>setTool('razor');
 function setTool(t){if(t!=='pen'&&penDraft)cancelPenDraft();tool=t;$('#toolSelect').classList.toggle('on',t==='select');
   $('#toolRazor').classList.toggle('on',t==='razor');lanes.style.cursor=t==='razor'?'crosshair':'';
-  screen.style.cursor=t==='pen'?'crosshair':'';
-  if(window.aeSetActiveTool){const key={select:'selection',pen:'pen'}[t];   // keep the AE rail highlight in sync
+  screen.style.cursor=t==='pen'?'crosshair':(t==='rotate'?'grab':'');
+  if(window.aeSetActiveTool){const key={select:'selection',pen:'pen',rotate:'rotation'}[t];   // keep the AE rail highlight in sync
     const btn=key&&[...document.querySelectorAll('#aeTools .aetool')].find(b=>(b.dataset.tool||'').toLowerCase().includes(key));
     window.aeSetActiveTool(btn?btn.dataset.tool:'');}
 }
@@ -2837,6 +2878,7 @@ window.addEventListener('keydown',e=>{
   if(e.code==='Space'){e.preventDefault();togglePlay();}
   else if((e.key==='v'||e.key==='V')&&!mod)setTool('select');
   else if((e.key==='c'||e.key==='C')&&!mod)setTool('razor');
+  else if((e.key==='w'||e.key==='W')&&!mod)setTool('rotate');
   else if(e.key==='ArrowLeft'){stop();setPlayhead(playhead-(e.shiftKey?FPS():1));}
   else if(e.key==='ArrowRight'){stop();setPlayhead(playhead+(e.shiftKey?FPS():1));}
   else if(e.key==='Home'){stop();setPlayhead(0,true);}
@@ -2850,6 +2892,10 @@ window.addEventListener('keydown',e=>{
   else if(e.key===';'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleOv('guides');toast('Guides '+(OV.guides?'on':'off'));}
   else if((e.key==='='||e.key==='+')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf*1.3,1,120);applyPpf(playhead);}
   else if((e.key==='-'||e.key==='_')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf/1.3,1,120);applyPpf(playhead);}
+  else if((e.key==='u'||e.key==='U')&&!mod){e.preventDefault(); // U = reveal animated; UU (double-tap) = reveal all modified
+    const now=performance.now();
+    if(now-_revealLastU<450){applyReveal('modified');_revealLastU=0;}
+    else{applyReveal('animated');_revealLastU=now;}}
 });
 
 // ── PURGE — free the preview caches (the real ones we actually keep) ──────
@@ -3328,6 +3374,7 @@ window.addEventListener('resize',fitScreen);
     if(/pen/.test(n))return ()=>{const s=selClip();if(!s||!s.clip||clipKind(s.clip)==='audio'){toast('Select a visual layer first',1);setActiveTool('Selection');return;}
       setTool('pen');setActiveTool(t.name);toast('Pen — click to drop points, click the first point to close (Esc cancels)');};
     if(/type/.test(n))return ()=>{$('#addText').click();};
+    if(/rotation/.test(n))return ()=>{setTool('rotate');setActiveTool(t.name);toast('Rotation — drag a layer in the monitor to rotate (Shift = 45° steps)');};
     if(/hand|pan behind|anchor/.test(n))return ()=>toast(t.name+' — panning the monitor is coming soon');
     if(/zoom/.test(n))return ()=>toast('Use the timeline Zoom slider for now');
     return ()=>toast(t.name+' — not in this build yet');
@@ -3354,7 +3401,7 @@ window.addEventListener('resize',fitScreen);
     const host=$('#aeTools');if(!host||!window.AE_TOOLS)return;host.innerHTML='';
     AE_TOOLS.forEach(t=>{const b=document.createElement('button');b.className='aetool';b.dataset.tool=t.name;
       b.innerHTML=TOOL_ICONS[t.name]||SVG('<circle cx="12" cy="12" r="3"/>',true);
-      const wired=/selection|type|pen/i.test(t.name); // Pen is live (pen masks work) — stop dimming it
+      const wired=/selection|type|pen|rotation/i.test(t.name); // Pen + Rotation are live — stop dimming them
       if(!wired)b.classList.add('soon');
       if(t.flyout&&t.flyout.length)b.classList.add('has-fly');
       b.title=scrub(t.name+(t.shortcut?'  ('+t.shortcut+')':'')+(t.behavior?'\n'+t.behavior:''));
@@ -3516,6 +3563,8 @@ window.addEventListener('resize',fitScreen);
     if(it._recent)return ()=>loadRecent(it._recent);
     if(it._none)return null;
     const L=norm(it.label);const key=menuId+'|'+L;
+    if(/^Reveal All Modified Properties/i.test(L))return ()=>applyReveal('modified');
+    if(/^Reveal Propert(?:y|ies) with (?:Keyframes|Animation)/i.test(L))return ()=>applyReveal('animated');
     if(menuId==='newctx'){
       if(/^Text/i.test(L))return ()=>$('#addText').click();
       if(/^Adjustment Layer/i.test(L))return ()=>newAdjustment();
