@@ -925,7 +925,9 @@
     <span class="zb-pct" id="hzoomPct">100%</span>
     <input type="range" id="hscroll" class="zoom-pan" min="0" max="1" step="0.001" value="0" style="display:none" title="scroll the timeline" />
     <span class="zb-lbl vsep">V</span>
-    <input type="range" id="vzoomSlider" class="zoom-slider zoom-vz" min="44" max="260" step="1" value="104" title="Vertical zoom — all lane heights together" />
+    <button class="zb zb-mini" id="vhOut" title="shorter tracks (all lanes)">−</button>
+    <input type="range" id="vzoomSlider" class="zoom-slider zoom-vz" min="44" max="260" step="1" value="104" title="Vertical zoom — all lane heights together ( − / + to step )" />
+    <button class="zb zb-mini" id="vhIn" title="taller tracks (all lanes)">+</button>
   </div>
 </div>
 
@@ -5743,6 +5745,8 @@ $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>d
 // whole-view zoom bar (task #1): horizontal log-mapped zoom, vertical lane-height zoom, fit-session
 $("hzoomSlider").oninput = (e) => setZoom(sliderToZoom(parseFloat(e.target.value)));
 $("vzoomSlider").oninput = (e) => setVZoom(parseInt(e.target.value,10));
+$("vhIn").onclick  = () => setVZoom(laneH + 22);   // +  = taller tracks (all lanes together, PT-style vertical zoom)
+$("vhOut").onclick = () => setVZoom(laneH - 22);   // −  = shorter tracks
 $("zFit").onclick = () => fitContent();   // ⤢ frames your material; zoom out (H −) to see the whole empty session
 $("setupBtn").onclick = (e) => { e.stopPropagation(); $("rail").classList.toggle("open"); $("setupBtn").classList.toggle("on", $("rail").classList.contains("open")); };
 document.addEventListener("mousedown", (e) => { const r=$("rail"); if(r.classList.contains("open") && !e.target.closest("#rail,#setupBtn")){ r.classList.remove("open"); $("setupBtn").classList.remove("on"); } });
