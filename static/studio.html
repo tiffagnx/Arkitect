@@ -856,7 +856,8 @@
           <input type="hidden" id="countBars" value="1" />
         </div>
       </div>
-      <button class="ibtn" id="punchBtn" style="margin:8px 0">⊏⊐ Punch-in: OFF</button>
+      <!-- Punch-in hidden until it's REAL: REC.punchOn was toggled but read nowhere (it lied "records from playhead"). Un-hide + wire when real punch/auto-drop is built. -->
+      <button class="ibtn" id="punchBtn" style="margin:8px 0;display:none">⊏⊐ Punch-in: OFF</button>
       <div style="font:700 9px 'Space Mono';letter-spacing:.18em;color:var(--dim);margin:6px 0 4px">LATENCY COMP</div>
       <div class="lat-grid" id="latGrid">
         <span class="lbl">output</span><span class="v" id="latOut">—</span>
@@ -959,6 +960,11 @@ function _snapClips(t){ return clipsOf(t).map(c=>({...c})); }   // shallow-copy 
 function pushUndoClips(t, label){ UNDO.push({ trackId:t.id, label:label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
 function undoLast(){
   const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
+  if(u.multi){                                   // a cross-track move snapshots BOTH lanes — restore them together
+    REDO.push({ multi: u.multi.map(m=>{ const tt=tracks.find(x=>x.id===m.trackId); return { trackId:m.trackId, clips: tt?_snapClips(tt):[] }; }), label:u.label||"" });
+    u.multi.forEach(m=>{ const tt=tracks.find(x=>x.id===m.trackId); if(tt){ tt.clips=m.clips.map(c=>({...c})); if(!tt.clips.length){ tt.buffer=null; tt.offset=0; } syncPrimary(tt); drawLane(tt); if(selTrackId===tt.id) renderChannel(tt); } });
+    selClip=null; if(playing) restartPlayback(); flash(u.label?"Undo: "+u.label:"Undid the last edit"); return;
+  }
   const t = tracks.find(x=>x.id===u.trackId); if(!t){ flash("Nothing to undo"); return; }
   REDO.push({ trackId:t.id, label:u.label||"", clips:_snapClips(t) });   // remember current state so Redo can re-apply it
   t.clips = u.clips.map(c=>({...c}));
@@ -968,6 +974,11 @@ function undoLast(){
 }
 function redoLast(){
   const r = REDO.pop(); if(!r){ flash("Nothing to redo"); return; }
+  if(r.multi){
+    UNDO.push({ multi: r.multi.map(m=>{ const tt=tracks.find(x=>x.id===m.trackId); return { trackId:m.trackId, clips: tt?_snapClips(tt):[] }; }), label:r.label||"" }); if(UNDO.length>80) UNDO.shift();
+    r.multi.forEach(m=>{ const tt=tracks.find(x=>x.id===m.trackId); if(tt){ tt.clips=m.clips.map(c=>({...c})); if(!tt.clips.length){ tt.buffer=null; tt.offset=0; } syncPrimary(tt); drawLane(tt); if(selTrackId===tt.id) renderChannel(tt); } });
+    selClip=null; if(playing) restartPlayback(); flash(r.label?"Redo: "+r.label:"Redid the edit"); return;
+  }
   const t = tracks.find(x=>x.id===r.trackId); if(!t){ flash("Nothing to redo"); return; }
   UNDO.push({ trackId:t.id, label:r.label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift();
   t.clips = r.clips.map(c=>({...c}));
@@ -1499,6 +1510,12 @@ async function asPreListen(t, reverse){
 function ctxMenuEl(){ let m=document.getElementById("ctxmenu"); if(!m){ m=document.createElement("div"); m.id="ctxmenu"; m.className="ctxmenu"; document.body.appendChild(m); } return m; }
 function hideMenu(){ const m=document.getElementById("ctxmenu"); if(m) m.classList.remove("on"); }
 function clipAt(t, atTime){ return clipsOf(t).find(c => atTime>=c.start && atTime<=c.start+c.buffer.duration) || null; }
+function laneTrackAtY(clientY){                          // which track's lane row sits under this screen-Y (for cross-track clip drag)
+  for(const tt of tracks){ if(tt.type==='aux'||tt.type==='master') continue;
+    const el=document.getElementById('lane-'+tt.id); if(!el) continue;
+    const rr=el.getBoundingClientRect(); if(clientY>=rr.top && clientY<=rr.bottom) return tt; }
+  return null;
+}
 /* ── Fade commands (Edit/Clip ▸ Fades menu) — operate on the selected clip, reuse the per-clip fade engine.
    Create = a quick top & tail; Fade to Start/End use the cursor; shapes set lin/pow/scv. All undoable. ── */
 function _selFadeClip(){ if(!selClip) return null; const t=tracks.find(x=>x.id===selClip.trackId); const cl=t&&clipsOf(t).find(c=>c.id===selClip.clipId); return (cl&&cl.buffer)?{t,cl}:null; }
@@ -1731,6 +1748,7 @@ function showWaveMenu(t, wv, e){
     sep();
   }
   if(cl){
+    add(cl.muted ? "🔈  Un-mute clip" : "🔇  Mute clip", ()=>{ pushUndoClips(t, cl.muted?"Unmute clip":"Mute clip"); cl.muted=!cl.muted; drawLane(t); if(playing) restartPlayback(); if(selTrackId===t.id) renderChannel(t); flash(cl.muted?"Muted — un-mute to comp":"Un-muted clip"); });
     add("◁  Reverse", ()=>clipFx_reverse(t,cl));
     add("🌀  Reverse reverb", ()=>clipFx_revReverb(t,cl));
     add("🌀  Print DeMartin Reverb", ()=>clipFx_verb(t,cl));
@@ -3745,7 +3763,7 @@ function laneUi(t) {
     // auto-scrolls under it, so you can drag a stem all the way to the start (bar 1) in ONE
     // motion — no more drag-scroll-drag-scroll. Tracks the absolute time UNDER the cursor so
     // the clip keeps following correctly even as the view scrolls.
-    const grabOff = atTime - cl.start; let moved = false; const wasPlaying = playing; let lastX = e.clientX, raf = null;
+    const grabOff = atTime - cl.start; let moved = false; const wasPlaying = playing; let lastX = e.clientX, lastY = e.clientY, raf = null;
     const placeAt = (cx) => { const mt = scrollT + (cx - r.left)/r.width * viewDur(); cl.start = snapTime(Math.max(0, mt - grabOff)); };
     const edgeScroll = () => {
       const EDGE = 42, room = Math.max(0, maxDur()-viewDur()); let dir = 0;
@@ -3754,12 +3772,29 @@ function laneUi(t) {
         if (scrollT !== b) { placeAt(lastX); relayoutAll(); } }
       raf = requestAnimationFrame(edgeScroll);
     };
-    const mv = (ev) => { lastX = ev.clientX;
+    const mv = (ev) => { lastX = ev.clientX; lastY = ev.clientY;
       if (!moved && Math.abs(ev.clientX - sx) > 3) { moved = true; pushUndoClips(t); raf = requestAnimationFrame(edgeScroll); }
       if (moved) { placeAt(ev.clientX); drawLane(t); } };
     const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
       if (raf) cancelAnimationFrame(raf);
-      if (!moved) seek(atTime); else { resolveOverlaps(t, cl); syncPrimary(t); drawLane(t); if (wasPlaying) restartPlayback(); flash("Moved clip"); } };
+      if (!moved) { seek(atTime); return; }
+      // CROSS-TRACK MOVE — released over a DIFFERENT lane? carry the clip to that track (Pro-Tools-style).
+      const destT = laneTrackAtY(lastY);
+      if (destT && destT.id !== t.id && destT.type !== 'aux' && destT.type !== 'master') {
+        // atomic two-lane undo: reuse the source snapshot already pushed at first-move, pair it with the dest's pre-state
+        const srcSnap = (UNDO.length && !UNDO[UNDO.length-1].multi && UNDO[UNDO.length-1].trackId === t.id) ? UNDO.pop().clips : _snapClips(t);
+        UNDO.push({ multi:[ { trackId:t.id, clips:srcSnap }, { trackId:destT.id, clips:_snapClips(destT) } ], label:"Move to "+(destT.name||'track') }); if(UNDO.length>80) UNDO.shift(); REDO.length=0;
+        const src = clipsOf(t); const i = src.indexOf(cl); if(i>=0) src.splice(i,1);
+        if(!src.length){ t.buffer = null; t.offset = 0; }       // don't let clipsOf() resurrect the moved clip from a stale primary buffer
+        clipsOf(destT).push(cl); resolveOverlaps(destT, cl);
+        syncPrimary(t); syncPrimary(destT);
+        selClip = { trackId:destT.id, clipId:cl.id }; selectTrack(destT);
+        drawLane(t); drawLane(destT); if (wasPlaying) restartPlayback();
+        flash("Moved to “"+(destT.name||'track')+"”");
+        return;
+      }
+      resolveOverlaps(t, cl); syncPrimary(t); drawLane(t); if (wasPlaying) restartPlayback(); flash("Moved clip");
+    };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
   };
   wv.onmousemove = (e) => {   // cursor reflects the active tool
@@ -5493,6 +5528,7 @@ document.addEventListener("keydown", (e) => {
   if(e.key==="Home"){ e.preventDefault(); seek(0); scrollT=0; relayoutAll(); }
   else if(e.key==="End"){ e.preventDefault(); seek(contentDur()); }
   else if(e.key==="Enter"){ if(!tracks.length) return; e.preventDefault(); addMarker(); }
+  else if(e.key==="b" || e.key==="B"){ e.preventDefault(); splitAtPlayhead(); }   // PT 'B' = Separate at the edit cursor / playhead
   else if(e.key==="," || e.key===".") {                  // NUDGE the selected clip by one grid step (tighten a comp)
     if(!selClip) return; const t=tracks.find(x=>x.id===selClip.trackId); const cl=t&&clipsOf(t).find(c=>c.id===selClip.clipId);
     if(!t||!cl) return; e.preventDefault();
@@ -5534,6 +5570,15 @@ function separateAtSelection(t){
 }
 function clearSelection(){ SEL=null; tracks.forEach(t=>drawLane(t)); }
 function deleteSelection(t){ const iso=separateAtSelection(t); if(iso){ deleteClip(t,iso); flash("Deleted selection"); } }
+// PT 'B' — split the clip under the edit cursor / playhead on the selected track (no range needed).
+function splitAtPlayhead(){
+  const t = tracks.find(x=>x.id===selTrackId) || (selClip && tracks.find(x=>x.id===selClip.trackId)) || tracks.find(x=>x.type!=='aux'&&x.type!=='master');
+  if(!t){ flash("Select a track, then press B to split at the cursor"); return; }
+  const at = pos();
+  const cl = clipAt(t, at);
+  if(!cl){ flash("Put the cursor over a clip, then press B to split"); return; }
+  separateClip(t, cl, at);   // already pushes undo, guards the clip edges, redraws + re-anchors playback
+}
 $("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>drawLane(t)); };
 $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
 // whole-view zoom bar (task #1): horizontal log-mapped zoom, vertical lane-height zoom, fit-session
@@ -6019,6 +6064,24 @@ async function autosave(reason){
 }
 setInterval(() => autosave("timer"), 5 * 60 * 1000);          // every 5 minutes (owner's ask)
 
+/* ── AUTO-RESTORE — the autosave above was always safe on the server; THIS is the load call that was
+   missing, the reason a crash LOOKED like lost work. On launch, if a backup with real takes exists and
+   the board is empty, OFFER to bring it back (non-blocking banner). ── */
+async function offerRecover(){
+  if (tracks.length || document.getElementById('recoverBar')) return;
+  let proj = null;
+  try { const r = await fetch("/api/studio/projects/autosave", { cache:"no-store" }); if (r.ok) proj = await r.json(); } catch(e){ return; }
+  if (!proj || !Array.isArray(proj.tracks) || !proj.tracks.some(t => t.clips && t.clips.length)) return;   // nothing worth recovering
+  const n = proj.tracks.length, when = (proj.title && proj.title !== 'autosave') ? `“${proj.title}”` : 'your last session';
+  const bar = document.createElement('div'); bar.id = 'recoverBar';
+  bar.style.cssText = "position:fixed;top:42px;left:50%;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:13px;padding:12px 16px;border-radius:13px;background:linear-gradient(180deg,#1d2733,#141b24);border:1px solid rgba(120,182,205,.45);box-shadow:0 14px 44px rgba(0,0,0,.6);font:600 13px Inter,sans-serif;color:#E7EEF2";
+  bar.innerHTML = `<span>↩ Recover ${when}? <b style="color:#8FC7D9">${n} track${n>1?'s':''}</b> backed up.</span><button id="recYes" style="border:none;border-radius:9px;padding:8px 14px;cursor:pointer;font:700 12px Inter;color:#08171c;background:linear-gradient(180deg,#7FD0E4,#3E9CB8)">Recover</button><button id="recNo" style="border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:8px 12px;cursor:pointer;font:600 12px Inter;color:#cfd6dd;background:rgba(255,255,255,.05)">Start fresh</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector('#recYes').onclick = () => { bar.remove(); loadProject("autosave"); };
+  bar.querySelector('#recNo').onclick = () => bar.remove();
+}
+setTimeout(offerRecover, 900);                                 // after boot, if the board's empty + a backup with takes exists
+
 /* ── SAVE TO A FOLDER ON YOUR OWN DISK — a real Pro-Tools-style session folder
    (<chosen>/<Name>/<Name>.ark + Audio Files/ Bounced Files/ Session File Backups/).
    Pick the destination once; after that, Save (Ctrl+S) and auto-backup write there too.
@@ -6328,7 +6391,9 @@ async function openInput() {
   // both colors the take AND fights our latency math. A recording wants RAW.
   const constraints = { audio: {
     echoCancellation: false, noiseSuppression: false, autoGainControl: false,
-    channelCount: 1, ...(REC.deviceId ? { deviceId: { exact: REC.deviceId } } : {}),
+    // HONEST CHANNELS: ask for stereo so a 2-in interface delivers real L/R; a mono mic
+    // still grants 1 channel. The ACTUAL granted count (read below) is what we record.
+    channelCount: { ideal: 2 }, ...(REC.deviceId ? { deviceId: { exact: REC.deviceId } } : {}),
   } };
   try {
     if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
@@ -6341,6 +6406,8 @@ async function openInput() {
   if (s.latency) REC.inputLatencyEst = s.latency;          // seconds, when present
   REC.deviceId = s.deviceId || REC.deviceId;
   REC.openDeviceId = s.deviceId || REC.deviceId;           // the device the live stream is actually on (so we only re-open on a real change)
+  // HONEST CAPTURE WIDTH — record exactly what the device delivers (1 or 2 ch), never a faked stereo.
+  REC.capChannels = Math.max(1, Math.min(2, (s.channelCount | 0) || 1));
 
   REC.srcNode = c.createMediaStreamSource(REC.stream);
   REC.inAnalyser = c.createAnalyser(); REC.inAnalyser.fftSize = 2048;   // fuller window for the level coach (also smooths the meter)
@@ -6358,6 +6425,12 @@ async function openInput() {
   $("inputBtn").classList.add("on");
   $("inputBtn").textContent = "🎤 " + (tr.label ? tr.label.slice(0, 22) : "input ready");
   setWarn(headphoneAdvice(), false);
+  // FIRST-RUN FUNNEL: the audit's #5 — a newbie picks a mic, records dry + off-beat, never finds Calibrate
+  // or Vocal Doctor, and quits. One-time nudge to BOTH (deferred so it wins over populateDevices' status).
+  try { if (!localStorage.getItem("ark_first_rec_tip")) { localStorage.setItem("ark_first_rec_tip","1");
+    setTimeout(() => { setWarn("🎧 Use headphones (kills feedback). 🎙 First time recording? Tap ⟳ Calibrate ONCE for tight timing — then after your take, 🩺 Vocal Doctor on the MIX strip makes it sound pro. Arm a track and roll.", false);
+      const cb = $("calibBtn"); if (cb) { cb.style.boxShadow = "0 0 0 2px rgba(217,164,65,.75), 0 0 14px rgba(217,164,65,.5)"; setTimeout(() => { if (cb) cb.style.boxShadow = ""; }, 7000); } }, 350);
+  } } catch (e) {}
   await populateDevices();                         // permission granted → real labels now show
   if (REC.deviceId && $("inDev")) { if ([...$("inDev").options].some(o => o.value === REC.deviceId)) $("inDev").value = REC.deviceId; }
   return true;
@@ -6890,11 +6963,12 @@ function showCountin(beats, t0, beat) {
    FIRST block, which is what the latency math hangs on. ── */
 function beginCapture() {
   const c = ctx;
-  REC.chunks = []; REC.capRate = c.sampleRate; REC.capturing = true;
+  const nch = Math.max(1, Math.min(2, REC.capChannels || 1)); REC.capChannels = nch;
+  REC.chunks = Array.from({ length: nch }, () => []); REC.capRate = c.sampleRate; REC.capturing = true;
   REC.captureFirstCtxTime = null;
   REC.liveTrack = tracks.find(x => x.armed && x.type!=='aux' && x.type!=='master') || null;   // LIVE record-waveform preview state
   REC.liveStart = REC.capTransportStart || 0; REC.livePeaks = []; REC.liveSamples = 0;
-  const proc = c.createScriptProcessor(2048, 1, 1);
+  const proc = c.createScriptProcessor(2048, nch, nch);
   REC.recProc = proc;
   proc.onaudioprocess = (e) => {
     if (!REC.capturing) return;
@@ -6904,9 +6978,9 @@ function beginCapture() {
     if (REC.captureFirstCtxTime == null) {
       REC.captureFirstCtxTime = c.currentTime - (2048 / c.sampleRate);
     }
+    for (let k = 0; k < REC.chunks.length; k++) REC.chunks[k].push(new Float32Array(e.inputBuffer.getChannelData(k)));
     const blk = e.inputBuffer.getChannelData(0);
-    REC.chunks.push(new Float32Array(blk));
-    if (REC.liveTrack) { let pk=0; for (let i=0;i<blk.length;i+=4){ const a=blk[i]<0?-blk[i]:blk[i]; if(a>pk)pk=a; } REC.livePeaks.push(pk); REC.liveSamples += blk.length; }   // feed the live waveform
+    if (REC.liveTrack) { let pk=0; for (let i=0;i<blk.length;i+=4){ const a=blk[i]<0?-blk[i]:blk[i]; if(a>pk)pk=a; } REC.livePeaks.push(pk); REC.liveSamples += blk.length; }   // feed the live waveform (channel 0)
   };
   // ScriptProcessor must be pulled by the graph to fire; route through a muted
   // gain to destination so it ticks WITHOUT adding the mic to the output (that
@@ -6917,6 +6991,21 @@ function beginCapture() {
   REC.capturing = true;
   $("rec").classList.remove("armed", "tarm"); $("rec").classList.add("live");
   $("rec").textContent = "■";
+}
+
+/* assemble captured per-channel chunk arrays into ONE AudioBuffer, dropping `dropSamples`
+   leading samples from EVERY channel for latency comp. The mono (1-ch) path is byte-identical
+   to the old single-channel code; a 2-ch interface yields a true L/R buffer. */
+function _assembleTake(chunksPerCh, total, rate, dropSamples){
+  const nch = Math.max(1, chunksPerCh.length);
+  const drop = Math.max(0, Math.min(total - 1, dropSamples | 0));
+  const buf = ctx.createBuffer(nch, total - drop, rate);
+  for (let k = 0; k < nch; k++){
+    const f = new Float32Array(total); let o = 0;
+    for (const c of (chunksPerCh[k] || [])) { f.set(c, o); o += c.length; }
+    buf.copyToChannel(drop ? f.subarray(drop) : f, k);
+  }
+  return buf;
 }
 
 function stopRecording() {
@@ -6930,11 +7019,9 @@ function stopRecording() {
   $("countin").textContent = "";
   pauseAll();                                    // stop the beat/transport when the take ends (it used to roll forever)
 
-  // assemble
-  const total = REC.chunks.reduce((n, c) => n + c.length, 0);
+  // assemble — channel-aware: mono device → 1 channel, true stereo interface → real L/R
+  const total = (REC.chunks[0] || []).reduce((n, c) => n + c.length, 0);
   if (total < REC.capRate * 0.1) { setWarn("Take too short — nothing captured.", true); return; }
-  const flat = new Float32Array(total);
-  let o = 0; for (const ch of REC.chunks) { flat.set(ch, o); o += ch.length; }
 
   // ── LATENCY COMPENSATION ──────────────────────────────────────────────────
   // arrival-time of first captured sample, in transport coordinates:
@@ -6947,20 +7034,11 @@ function stopRecording() {
   const compensated = transportPosAtArrival - roundTrip();
   let placeAt = compensated;
 
-  // trim/pad so the buffer's sample 0 corresponds to placeAt >= 0
+  // trim/pad so the buffer's sample 0 corresponds to placeAt >= 0 (same drop on EVERY channel → L/R stay aligned)
   const rate = REC.capRate;
-  let buf;
-  if (placeAt < 0) {
-    // the comp pushed us before t=0: drop the leading samples instead of
-    // negative-offsetting (which the engine can't do).
-    const drop = Math.min(flat.length - 1, Math.round(-placeAt * rate));
-    buf = ctx.createBuffer(1, flat.length - drop, rate);
-    buf.copyToChannel(flat.subarray(drop), 0);
-    placeAt = 0;
-  } else {
-    buf = ctx.createBuffer(1, flat.length, rate);
-    buf.copyToChannel(flat, 0);
-  }
+  let dropSamples = 0;
+  if (placeAt < 0) { dropSamples = Math.round(-placeAt * rate); placeAt = 0; }   // comp pushed before t=0 → drop leading samples (engine can't negative-offset)
+  const buf = _assembleTake(REC.chunks, total, rate, dropSamples);
 
   // If a track is record-ARMED, the take lands there as a new clip (overdub / comp); otherwise it spawns its own TAKE lane.
   const armed = tracks.find(x => x.armed && x.type !== 'aux' && x.type !== 'master');
@@ -6969,17 +7047,21 @@ function stopRecording() {
     // recordings sit side-by-side on the lane, visible (no take menu to dig through).
     if (typeof pushUndoClips === 'function') pushUndoClips(armed, "Record");
     const cl = { id: rid(), buffer: buf, start: placeAt, name: (armed.name || "Audio") + " " + (clipsOf(armed).length + 1) };
+    // COMPING: a fresh take over the same bars must NOT play on top of the old one. Auto-mute any existing
+    // take on this lane that overlaps the new take — KEPT, not deleted, so you can un-mute any of them to comp by ear.
+    const _nEnd = placeAt + buf.duration; let _muted = 0;
+    for (const oc of clipsOf(armed)) { if (oc.muted) continue; const _oEnd = oc.start + (oc.buffer ? oc.buffer.duration : 0); if (placeAt < _oEnd && _nEnd > oc.start) { oc.muted = true; _muted++; } }
     clipsOf(armed).push(cl);
     if (!armed.buffer) armed.buffer = buf;
     if (typeof syncPrimary === 'function') syncPrimary(armed);
     drawLane(armed);
     if (playing) restartPlayback();
     $("drop").style.display = "none";
-    setWarn(`Recorded on “${armed.name}” at ${placeAt.toFixed(3)}s (${(roundTrip() * 1000).toFixed(1)}ms comp).`, false);
+    setWarn(`Recorded on “${armed.name}” at ${placeAt.toFixed(3)}s` + (buf.numberOfChannels>1?` · stereo`:``) + (_muted ? ` — ${_muted} overlapping take${_muted>1?'s':''} muted (un-mute to comp)` : ``) + ` (${(roundTrip() * 1000).toFixed(1)}ms comp).`, false);
     autosave("take");                                    // back up the moment a performance lands
     return;
   }
-  // make it a stereo-friendly track buffer (mono → both channels handled by panner)
+  // spawn its own TAKE lane from the captured buffer (mono or true stereo, per the input device)
   const t = {
     id: Math.random().toString(36).slice(2),
     name: "TAKE " + (tracks.filter(x => x.isTake).length + 1) + ` (+${(roundTrip() * 1000).toFixed(0)}ms comp)`,
