@@ -920,6 +920,7 @@ function openClipIn(t){if(!sel||sel.trackId!==t.id)return null;const c=t.clips.f
 function trackHeight(t){const c=openClipIn(t);return LANE_H+(c?clipRowCount(t,c)*PROP_H:0);}
 function removeEffect(c,field){c[field]=KDEF[field];if(c._tw)delete c._tw['fx:'+field];if(c._fxOff)delete c._fxOff[field];
   for(const ex of (FX_EXTRA[field]||[])){if(ex.sub){if(ex.sub in KDEF)c[ex.sub]=KDEF[ex.sub];else delete c[ex.sub];if(c._tw)delete c._tw['fx:'+ex.sub];}} // clear sub-params + bypass so a re-add starts clean
+  for(const cs of (FX_COLOR_SUBS[field]||[]))delete c[cs]; // off-KDEF colour props (gradmap/duotone) → re-add starts from default colours
   renderTimeline();refreshInspector();drawFrame();save(true);toast('Effect removed');}
 function addMask(c){
   c.masks=c.masks||[];const m=newMask('Mask '+(c.masks.length+1));c.masks.push(m);
@@ -2590,6 +2591,9 @@ const FX_EXTRA={
   fxGradMap:[{kind:'gradmap'}],
   fxNoise:[{kind:'slider',sub:'fxNoiseScale',label:'Scale',min:4,max:400,step:1}],
 };
+// Colour props that live OFF KDEF (the generic FX_EXTRA `sub` clear can't reach them, since gradmap has no sub
+// and duotone has no FX_EXTRA entry). Wiped on effect remove/clear so a re-added effect starts from default colours.
+const FX_COLOR_SUBS={fxGradMap:['fxGMShadow','fxGMMid','fxGMHi'],fxDuotone:['fxDuoA','fxDuoB']};
 function mountEffectControls(c){
   const host=document.getElementById('efxMount');if(!host||!c)return;
   host.innerHTML='';
@@ -3255,7 +3259,7 @@ window.addEventListener('resize',fitScreen);
     if(s.clip._tw){s.clip._tw.effects=true;s.clip._tw['fx:'+field]=true;} // reveal it in the stem tree
     refreshInspector();renderTimeline();drawFrame();save();toast(label+' applied — tune it in the stem ▸ Effects');}
   function clearEffects(){const s=sc();if(!s||!s.clip)return toast('Select a clip first',1);
-    for(const [f,,def] of FX_DEFS){s.clip[f]=def;for(const ex of (FX_EXTRA[f]||[]))if(ex.sub){if(ex.sub in KDEF)s.clip[ex.sub]=KDEF[ex.sub];else delete s.clip[ex.sub];}}
+    for(const [f,,def] of FX_DEFS){s.clip[f]=def;for(const ex of (FX_EXTRA[f]||[]))if(ex.sub){if(ex.sub in KDEF)s.clip[ex.sub]=KDEF[ex.sub];else delete s.clip[ex.sub];}for(const cs of (FX_COLOR_SUBS[f]||[]))delete s.clip[cs];}
     if(s.clip._tw)for(const k of Object.keys(s.clip._tw))if(k.startsWith('fx:'))delete s.clip._tw[k];
     if(s.clip._fxOff)s.clip._fxOff={};
     renderTimeline();refreshInspector();drawFrame();save();toast('Effects removed');}
