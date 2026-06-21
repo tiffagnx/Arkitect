@@ -1,5 +1,33 @@
 # DeMartinville — Changelog
 
+## v1.5.0 — Beat Lab goes pro: sampling, swing & every DAW's best trick
+
+Beat Lab grew up. We pulled the one thing each major DAW does better than anyone — its "moat" — and built them all in.
+
+### 🌀 The Warp Sampler (Ableton's superpower)
+Drop **any** audio — a loop, a vocal, a sample — and it **auto-detects the BPM and key and locks it to your project's tempo**, looping in time. No chopping required.
+- **Re-Pitch** (pitch rides the tempo, like vinyl) and **Keep-Pitch** (stretches to tempo but **holds the key** — for melodies & vocals).
+- **🔪 Chop to slices** — slice a sample at its hits into a Slicer you can re-sequence and replay like an MPC.
+- **Reverse**, plus it tells you the sample's **key**.
+
+### 🥁 The groove (MPC's swing)
+A real **MPC-style swing** — 50% straight, push toward 75% for the boom-bap pocket. Only the off-beats move, and **every instrument has its own swing** so the hats can swing harder than the kick.
+
+### 🎛 Everyone else's best trick
+- **Serato** — auto-detects the **key** and a **Play-in-Key** lock so you can't hit a wrong note.
+- **Maschine** — **Smart Pads**: a 4×4 pad grid where every pad is in key (play with mouse or keyboard), plus one-pad chords.
+- **Logic** — an **AI Session Drummer**: drag an X/Y vibe pad, pick a genre, hit Generate, and it writes a groove you can edit.
+- **Reason** — a **Patch** window: wire an LFO to anything (Master volume for a pump, a channel's pan for auto-pan).
+- **FL** — **chord stamps** in the piano roll (Single / Triad / 7th, all in key).
+
+### 🎹 A bigger, better sound
+- **18 instruments** with upgraded synthesis (punchier kicks, real metallic hats, phone-ready 808s) + **5 new ones** (Shaker, Crash, Pluck, Supersaw Lead, Warm Pad).
+- An **Instrument Browser** with **80+ named instruments** — guitars (real string modeling), pianos, organs, brass, bells, leads, pads — search and click to add.
+- **Preset sound banks** on every instrument, and a 🧠 **AI brain in every plugin** you can talk to.
+- The whole room is an **FL-style floating-window workspace** — drag, resize, and stack the panels however you like.
+
+*Everything bounces to .wav and saves with your project.*
+
 ## v1.4.0 — The Beat Lab update
 
 The big one: a whole new room for **making beats**, plus your own AI characters.
