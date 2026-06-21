@@ -175,6 +175,12 @@
   .lc { flex:none; border-right:1px solid var(--hairline); padding:5px 5px; display:flex; flex-direction:column; gap:3px; overflow:hidden; background:rgba(255,255,255,.012); }
   .lc-insAE, .lc-insFJ { width:72px; }
   .lc-sndAE, .lc-sndFJ { width:74px; }
+  /* Pro-Tools VIEW toggles — hide a track-row column AND its header in lockstep (stays aligned) */
+  body.hide-insAE .lc-insAE, body.hide-insAE .chh-insAE { display:none; }
+  body.hide-insFJ .lc-insFJ, body.hide-insFJ .chh-insFJ { display:none; }
+  body.hide-sndAE .lc-sndAE, body.hide-sndAE .chh-sndAE { display:none; }
+  body.hide-sndFJ .lc-sndFJ, body.hide-sndFJ .chh-sndFJ { display:none; }
+  body.hide-io    .lc-io,    body.hide-io    .chh-io    { display:none; }
   .lc-io { width:104px; gap:4px; }
   .lc-cell { display:flex; align-items:center; gap:5px; min-height:18px; border-radius:4px; padding:2px 5px; font:600 9px Inter; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.05); color:var(--dim); }
   .lc-cell.empty { background:rgba(0,0,0,.16); cursor:pointer; }                            /* clean recessed empty slot (PT) — no junk text */
@@ -3517,6 +3523,33 @@ function renderSendCol(t, host, letters){
     host.appendChild(cell);
   });
 }
+// ── Pro-Tools VIEW: which track-row columns are shown. Toggle from the View menu OR by
+//    right-clicking the column header (PT does both). Hides the column across ALL tracks +
+//    its header at once via a <body> class, and persists across reloads. ─────────────────
+const COLVIEW = (()=>{ const d={insAE:true,insFJ:true,sndAE:true,sndFJ:true,io:true};
+  try{ return Object.assign(d, JSON.parse(localStorage.getItem('ark_colview')||'{}')); }catch(e){ return d; } })();
+const COLVIEW_ROWS = [['insAE','Inserts A-E'],['insFJ','Inserts F-J'],['sndAE','Sends A-E'],['sndFJ','Sends F-J'],['io','I/O']];
+function applyColView(){
+  const b=document.body; COLVIEW_ROWS.forEach(([k])=>b.classList.toggle('hide-'+k, !COLVIEW[k]));
+  try{ localStorage.setItem('ark_colview', JSON.stringify(COLVIEW)); }catch(e){}
+}
+function toggleColView(key){ COLVIEW[key]=!COLVIEW[key]; applyColView();
+  flash((COLVIEW[key]?'Showing ':'Hiding ')+(COLVIEW_ROWS.find(r=>r[0]===key)||[,key])[1]); }
+function showColViewMenu(e){           // PT: right-click the column header → check/uncheck columns
+  e.preventDefault(); e.stopPropagation();
+  const m=ctxMenuEl();
+  const build=()=>{ m.innerHTML="";
+    COLVIEW_ROWS.forEach(([key,label])=>{ const el=document.createElement('div'); el.className='mi';
+      el.innerHTML='<span style="display:inline-block;width:15px">'+(COLVIEW[key]?'✓':'')+'</span>'+label;
+      el.onclick=(ev)=>{ ev.stopPropagation(); COLVIEW[key]=!COLVIEW[key]; applyColView(); build(); }; m.appendChild(el); });
+    const sep=document.createElement('div'); sep.className='sep'; m.appendChild(sep);
+    [['All',true],['Minimal',false]].forEach(([lbl,on])=>{ const el=document.createElement('div'); el.className='mi'; el.textContent=lbl;
+      el.onclick=(ev)=>{ ev.stopPropagation(); COLVIEW_ROWS.forEach(([k])=>COLVIEW[k]=on); applyColView(); build(); }; m.appendChild(el); });
+  };
+  build();
+  m.style.left=Math.min(e.clientX, window.innerWidth-200)+"px";
+  m.style.top =Math.min(e.clientY, window.innerHeight-230)+"px"; m.classList.add("on");
+}
 function renderLaneCols(t){
   const d=document.getElementById('lane-'+t.id); if(!d) return;
   renderInsertCol(t, d.querySelector('.lc-insAE'), 0);
@@ -3530,10 +3563,13 @@ function ensureColHeader(){
   const tr=$("tracks"); if(!tr) return;
   let h=document.getElementById('colHeader');
   if(!h){ h=document.createElement('div'); h.id='colHeader'; h.className='col-header';
-    h.innerHTML=`<div class="chh" style="width:112px;border-right:none"></div><div class="chh" style="width:72px">INSERTS A-E</div><div class="chh" style="width:72px">INSERTS F-J</div><div class="chh" style="width:74px">SENDS A-E</div><div class="chh" style="width:74px">SENDS F-J</div><div class="chh" style="width:104px;border-right:none">I/O</div>`;
+    h.innerHTML=`<div class="chh" style="width:112px;border-right:none"></div><div class="chh chh-insAE" style="width:72px">INSERTS A-E</div><div class="chh chh-insFJ" style="width:72px">INSERTS F-J</div><div class="chh chh-sndAE" style="width:74px">SENDS A-E</div><div class="chh chh-sndFJ" style="width:74px">SENDS F-J</div><div class="chh chh-io" style="width:104px;border-right:none">I/O</div>`;
+    h.oncontextmenu = showColViewMenu;   // PT: right-click the column header → toggle which columns show
+    h.title = "right-click → show / hide columns";
     tr.insertBefore(h, tr.firstChild);
   }
   h.style.display = tracks.length ? 'flex' : 'none';
+  applyColView();
   ensureRuler();
 }
 /* ── TIME RULER — the primary navigation surface. Bars|Beats on top, Min:Secs on the
@@ -7475,6 +7511,13 @@ function laneUiTake(t, placeAt) {
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
     if (menuId === "help"        && /Update/i.test(L))         return () => { if (window.__updateInfo) openUpdatesDialog(); else checkForUpdates(true); };
     if (menuId === "help"        && /^About/.test(L))          return () => flash("DeMartinville v" + (window.APP_VERSION||"?") + " — DeMartin Audio Labs · in-browser DAW");
+    if (menuId === "view") {   // VIEW → show/hide the track-row columns (same flags as the right-click header menu)
+      if (/^Inserts A-?E/i.test(L)) return () => toggleColView('insAE');
+      if (/^Inserts F-?J/i.test(L)) return () => toggleColView('insFJ');
+      if (/^Sends A-?E/i.test(L))   return () => toggleColView('sndAE');
+      if (/^Sends F-?J/i.test(L))   return () => toggleColView('sndFJ');
+      if (/^I\s*\/?\s*O$/i.test(L)) return () => toggleColView('io');
+    }
     if (menuId === "audiosuite") { const _p = AUDIOSUITE.find(p => p.name === L); if (_p) return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track first"); _asState.procId = _p.id; openAudioSuite(t); }; }
     if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
     return null;
