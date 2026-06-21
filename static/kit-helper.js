@@ -13,7 +13,7 @@
   if (window.__kit) return;
   const path = location.pathname.toLowerCase();
   const ROOMS = {
-    studio: "DeMartin Audio Labs", build: "Blueprint Builds",
+    studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
     editor: "LePrince Visual Labs", images: "Imagination Station", bit16: "Bit1Six",
   };
   let room = null;
@@ -21,17 +21,14 @@
   if (!room) return;                 // chat / non-room → no roster
   window.__kit = true;
 
-  // ── the cast. Kit is the default/built-in; the rest are PREVIEW personas that show the
-  //    mechanic (real trained characters + their own brains arrive with the marketplace). ──
+  // ── the two built-in helpers, and the ONLY pre-made characters: Kit (the in-room build-bot)
+  //    and Tiff (the creative partner). Everyone else in the roster is a REAL character a human
+  //    builds for themselves — we never ship invented people. ──
   const CHARACTERS_BUILTIN = [
-    { id: "kit",    name: "Kit",    tag: "your build-bot",        color: "#7BB6CD", sprite: true,
+    { id: "kit",  name: "Kit",  tag: "your build-bot",        color: "#7BB6CD", sprite: true,
       intro: r => `Yo — I'm Kit. I know my way around ${r}. Stuck on anything? Ask me and I'll walk you through it.` },
-    { id: "boogie", name: "Boogie", tag: "mix engineer · 30 yrs", color: "#E6C16A", preview: true,
-      intro: () => `Boogie here — three decades on the board. Drag me in and we'll get your record sounding like it belongs on the radio.\n\n**Preview character** — my real brain (trained on how I actually mix) comes with the marketplace. For now I answer through the room's helper.` },
-    { id: "vex",    name: "Vex",    tag: "video editor",          color: "#6FbF9B", preview: true,
-      intro: () => `Vex. I cut for pace and punch — every frame earns its place. Drag me into the video room and let's make it move.\n\n**Preview character** — full brain coming with the marketplace.` },
-    { id: "quill",  name: "Quill",  tag: "songwriter",            color: "#C98BD0", preview: true,
-      intro: () => `Quill. Words are my thing — hooks, structure, the line that sticks. Drag me in and let's write.\n\n**Preview character** — full brain coming with the marketplace.` },
+    { id: "tiff", name: "Tiff", tag: "your creative partner",  color: "#E58FB5",
+      intro: r => `Hey — it's Tiff. I usually live up in the main chat, but I'm here in ${r} too. Talk to me about the song, the vision, the words — the creative side of what you're making.` },
   ];
   let CHARACTERS = CHARACTERS_BUILTIN.slice();   // merged cast (built-in + user-made); rebuilt on load/refresh
   let active = CHARACTERS[0];
@@ -47,7 +44,7 @@
     } catch (_) { arr = []; }
     return arr.filter(c => c && c.id && c.mine).map(c => ({
       id: c.id, name: c.name || "Character", tag: c.tagline || c.craftLabel || "",
-      color: c.color || "#7BB6CD", glyph: c.glyph || "", mine: true,
+      color: c.color || "#7BB6CD", avatar: c.avatar || "", avatarType: c.avatarType || "color", mine: true,
       persona: c.persona || "", knowledge: c.knowledge || "",
       craft: c.craft || "", craftLabel: c.craftLabel || "",
       readiness: typeof c.readiness === "number" ? c.readiness : 0,
@@ -76,6 +73,8 @@
     border-bottom:1px solid rgba(255,255,255,.07); background:linear-gradient(180deg,rgba(255,255,255,.05),transparent); }
   .kit-bar canvas { width:34px; height:34px; display:block; flex:none; }
   .kit-av { width:34px; height:34px; border-radius:50%; flex:none; display:grid; place-items:center; font:800 15px Oxanium; color:#10131a; }
+  img.kit-av, img.cav { object-fit:cover; display:block; }
+  .kit-av.px, .cav.px { image-rendering:pixelated; }
   .kit-t { font:700 14px Oxanium; letter-spacing:.1em; color:#E4F1F5; line-height:1; }
   .kit-s { font:500 8.5px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:rgba(198,201,208,.5); display:block; margin-top:3px; }
   .kit-x { margin-left:auto; background:rgba(0,0,0,.28); border:none; color:#9FCFDD; width:22px; height:22px; border-radius:6px; cursor:pointer; font-size:12px; }
@@ -91,6 +90,10 @@
   .kit-chip .cav { width:20px; height:20px; border-radius:50%; flex:none; display:grid; place-items:center; font:800 9.5px Oxanium; color:#10131a; }
   .kit-chip .cn { font:700 10.5px Oxanium; letter-spacing:.04em; color:#DCE6EA; white-space:nowrap; }
   .kit-chip .cp { font:700 7px 'Space Mono'; letter-spacing:.1em; color:#E6C16A; margin-left:2px; }
+  .kit-chip.mine .cp { color:#7FD3B0; }
+  .kit-chip-build { cursor:pointer; border-style:dashed; border-color:rgba(120,182,205,.4); padding:4px 11px; }
+  .kit-chip-build:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.12); }
+  .kit-chip-build .cn { color:#9FCFDD; }
   .kit-hint { font:500 8.5px 'Space Mono'; letter-spacing:.08em; color:rgba(170,180,190,.45); padding:0 11px 7px; background:rgba(0,0,0,.18); }
   .room-drop { outline:2px dashed rgba(120,182,205,.0); transition:outline-color .15s; }
   .room-drop.armed { outline:2px dashed rgba(120,182,205,.8); outline-offset:-10px; }
@@ -149,10 +152,16 @@
     return { cv, setSpeed: (f) => { speed = f; } };
   }
   function avatar(ch, size) {
+    // user characters can carry a real face image (pixel/upload) — render it; else color circle + initial
+    if (ch.avatar && ch.avatarType && ch.avatarType !== "color") {
+      const im = document.createElement("img");
+      im.src = ch.avatar; im.alt = ch.name || "";
+      im.className = (size === "chip" ? "cav" : "kit-av") + (ch.avatarType === "pixel" ? " px" : "");
+      return im;
+    }
     const d = document.createElement("div"); d.className = size === "chip" ? "cav" : "kit-av";
     d.style.background = `radial-gradient(circle at 35% 30%, ${ch.color}, ${ch.color}99)`;
-    // user characters can carry a glyph; fall back to the name initial (same as built-in cast)
-    d.textContent = (ch.glyph && ch.glyph.trim()) ? ch.glyph : (ch.name[0] || "?").toUpperCase();
+    d.textContent = ((ch.name && ch.name[0]) || "?").toUpperCase();
     return d;
   }
 
@@ -183,7 +192,8 @@
     if (active.sprite) hostSlot.appendChild(winSpr.cv);
     else hostSlot.appendChild(avatar(active, "host"));
     titleEl.textContent = active.name.toUpperCase();
-    subEl.textContent = active.preview ? "PREVIEW · " + ROOMS[room] : ROOMS[room];
+    subEl.textContent = active.mine ? Math.round(active.readiness || 0) + "% · " + ROOMS[room]
+                       : active.preview ? "PREVIEW · " + ROOMS[room] : ROOMS[room];
     fab && fabLabel && (fabLabel.textContent = active.name === "Kit" ? "Yo, Kit" : active.name);
   }
   function setActive(ch, announce) {
@@ -204,6 +214,7 @@
       chip.appendChild(avatar(ch, "chip"));
       const nm = document.createElement("span"); nm.className = "cn"; nm.textContent = ch.name; chip.appendChild(nm);
       if (ch.mine) {
+        chip.classList.add("mine");
         const p = document.createElement("span"); p.className = "cp"; p.textContent = Math.round(ch.readiness || 0) + "%"; chip.appendChild(p);
         chip.title = (ch.tag || ch.name) + " — your character (" + Math.round(ch.readiness || 0) + "% ready)";
       } else if (ch.preview) {
@@ -253,7 +264,33 @@
   fab.onclick = () => { win.classList.toggle("open"); if (win.classList.contains("open")) input.focus(); };
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
 
-  setActive(CHARACTERS[0], true);   // default: Kit, room-aware
+  // ── merge in user-made characters, paint the roster, then default to Kit ──
+  function refreshRoster(reactivate) {
+    const prevId = active && active.id;
+    CHARACTERS = rebuildCharacters();
+    // keep the currently-active character if it still exists; pull its fresh data in
+    const still = CHARACTERS.find(c => c.id === prevId);
+    if (still) active = still;
+    buildRoster();
+    if (reactivate) paintHost();   // refresh header label/avatar in case readiness/name changed
+  }
+  refreshRoster(false);
+  setActive(active, true);   // default: Kit, room-aware
+
+  // deep-link: /static/<room>.html?char=ID → open the helper + activate that stored character
+  try {
+    const cid = new URLSearchParams(location.search).get("char");
+    if (cid) {
+      const target = CHARACTERS.find(c => c.id === cid && c.mine);
+      if (target) { win.classList.add("open"); setActive(target, true); }
+    }
+  } catch (_) {}
+
+  // live refresh when a character is saved/edited/deleted (same tab via CustomEvent,
+  // other tabs via storage). Best-effort — never disrupts an in-progress chat.
+  function onMineChanged() { refreshRoster(true); }
+  window.addEventListener("dmv-characters-changed", onMineChanged);
+  window.addEventListener("storage", e => { if (!e || e.key === "dmv_characters" || e.key === null) onMineChanged(); });
 
   // ── ask the active character (carries `character`; backend may route per-character later) ──
   let busy = false;
@@ -263,10 +300,19 @@
     addMsg("you", q); input.value = ""; input.style.height = "auto";
     const think = addMsg("kit", active.name + "'s on it…"); think.classList.add("think"); winSpr.setSpeed(9);
     try {
-      const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ room, message: q, character: active.id }) });
+      // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
+      // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
+      const payload = { room, message: q, character: active.id };
+      if (active.mine) {
+        payload.persona = active.persona || "";
+        payload.knowledge = active.knowledge || "";
+        payload.charName = active.name || "";
+        payload.charCraft = active.craftLabel || active.craft || "";
+      }
+      const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json(); think.remove();
       let reply = j.reply || "Hm, I blanked — ask me again?";
-      if (active.preview) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
+      if (active.preview && !active.mine) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
       addMsg("kit", reply);
     } catch (e) { think.remove(); addMsg("kit", "Connection hiccup — try me again."); }
     finally { busy = false; go.disabled = false; winSpr.setSpeed(3); input.focus(); }

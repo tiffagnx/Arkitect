@@ -58,6 +58,22 @@ After Effects / FabFilter / Avid / Premiere across `static/`.
 **This is the owner's stated next priority and the engagement hook.** Vision groundwork: `character-roster-vision` +
 `kit-assistant-brain-vision`.
 
+> ✅ **FIRST SLICE BUILT + VERIFIED 2026-06-21** (owner watching live in Chrome). The "build a character and play"
+> creator is real and works end-to-end. NEW `static/character.html` (game-style creator: name → craft → look → voice →
+> feed-what-you-know, with a live character card + a readiness bar that **hard-caps at 80%**, the final 20% shown LOCKED
+> with honest "they level up as you actually work with them" copy). Saves to localStorage `dmv_characters`; a YOUR-ROSTER
+> grid does edit/delete/take-into-room. `kit-helper.js` merges user characters into the in-room roster (chip shows the
+> readiness %, not "PREVIEW"), reads `?char=ID` deep-links to auto-activate, and sends `persona+knowledge+charName+charCraft`
+> to `/api/kit`. `app.py kit_help()` got a **purely additive** persona branch (no-persona path byte-for-byte unchanged → no
+> Kit regression). `index.html` rail got a 🧬 Characters link. **Verified:** made "Boogie" → readiness capped 80 → saved
+> → deep-linked into the Audio room → auto-activated → answered **in-persona using the exact fed notes** (HPF 80Hz, carve
+> 250–400Hz, pull 2–4 dB), grounded in the real EQ-6 plugin, `/api/kit` 200 OK. Built via workflow `tools/character-workflow.js`
+> (design 3 lenses → lock spec → build 1 agent/file → adversarial verify, all PASS). **NOT committed** (parallel Mac-port
+> session on the tree — safe on disk, don't `git add -A` sweep). STILL THE ROAD (honest): real training-by-watching (the
+> locked 20%), the gated marketplace + payments, the white-label rebrand-to-creator onboarding, the book-the-human funnel.
+
+> 🧊 **ICY REDESIGN DONE (2026-06-21, overnight).** Owner rejected the first character page as "cheesy/1998" — it's the SELLING POINT, must feel fire. Rebuilt `static/character.html` to a premium **"Liquid Chrome"** look (machined steel, cold ice-cyan, no emojis, no fake people). NEW avatar model per owner: **a real human builds from their OWN face** — 3 ways: **Pixel Me** (recommended; we hand them a Gemini/Nano-Banana prompt, they make the 16-bit art free + bring it back, a client-side green-screen keyer cleans it) · **Upload your own** · **Color circle**. Craft = a clean **dropdown** (Visual Artist killed); the room shows as the **real /static/shots screenshot** (producer/mix/beatmaker→Audio, writer→Chat, video editor→Visual Labs, builder→Blueprint). **Removed the invented Boogie/Vex/Quill** from the in-room roster — only **Tiff + Kit** ship; everyone else is a real character a human builds. `kit-helper.js` updated to render real face images in-room. Verified working in Chrome (0 errors, correct schema, readiness still caps 80, brand-correct). **NOT pushed** (owner's call) — files on disk: `static/character.html`, `static/kit-helper.js`. Follow-ups: swap Tiff's placeholder circle for her real 16-bit sprite (in his `tiff-studio-access`); decide on the "Boogie" example still in `join.html`. Full detail in memory `character-roster-vision`.
+
 **The mental model (validated by the producer's GTA comment): a game character creator.** A user shows up, **builds their
 character** (names it, picks/avatars it, says what their craft is), and **starts "playing"** — using it / training it by
 working. The fun of creation + the dopamine of a thing that's *theirs* is what pulls people in BEFORE the marketplace

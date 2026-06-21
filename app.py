@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "1.3.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "1.4.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -3832,6 +3832,16 @@ ROOM_HELP = {
 - Empty session shows a hero with quick-start buttons (Add stems / New track / Record a take / Open a session). Spacebar = play/stop; Delete removes a selected clip; the bottom zoom bar (Fit + horizontal slider) shows the whole song, the vertical slider grows every lane.
 - Click a clip in a lane to edit it: reverse, fades, chop to 1/16, BPM delay, print VERB, or "Tune" (the pitch editor / Melodyne).
 - Top toolbar: Play / Stop / Loop / Record, an EDIT-vs-MIX view toggle, edit tools (grab / trim / select / smart), zoom, grid snap, Setup (audio device), and "Export WAV" on the right to bounce the mix down.""",
+  "beats": """DeMartin Beat Lab — a pro beat maker (think FL Studio / a drum machine) right in the browser. This is where you PRODUCE a beat; DeMartin Audio Labs (the other audio room) is where you mix/edit a finished recording.
+- THE CHANNEL RACK (the main view) is a step sequencer. Each row is one instrument; the grid of 16 squares is one bar. Click a square to place a hit; click it again (or right-click) to clear it. Hits on a row loop when you press Play. The squares are grouped in 4s so you can see the beats.
+- Each row's strip (left side) has: a color dot, the instrument name (click it to open that instrument's editor), two mini-knobs (Volume + Pan), M (mute) and S (solo). Melodic rows also get a 🎹 piano-roll button.
+- THE VELOCITY GRAPH at the bottom belongs to the SELECTED row (click a row to select it) — drag the bars up/down to make some hits hit harder/softer. That plus Swing is what turns a stiff loop into a groove.
+- TRANSPORT (top-left): ▶ play/stop (or hit Spacebar), ■ stop, ● record, 🔔 metronome. TEMPO has BPM and SWING (drag the numbers up/down). MASTER is the overall volume; the meter next to it shows the level.
+- INSTRUMENTS: "+ Add instrument" gives drums (Kick, Snare, Clap, Hat, Open Hat, Tom, Rim, Cowbell) and melodic ones (808, Reese Bass, Soft Keys, FM Bell), plus a Sampler. You can also DRAG an audio file anywhere onto the room to load it as a sampler channel.
+- THE 808 is the trap bass — it's melodic, so play it in the piano roll (the 🎹 button) for slides/melodies; Drive makes it hit on phone speakers, Glide is the slide between notes.
+- EVERY INSTRUMENT HAS AN AI BRAIN: open an instrument and tap the 🧠 button — you can TALK to it ("make it knock harder", "darker", "more slide") and it actually turns its own knobs for you, safely. This is the room's signature feature.
+- PATTERNS: the "◆ Pattern 1" button up top makes/switches/duplicates patterns — Pattern 1 can be your verse, Pattern 2 the hook, etc. The STEPS number sets how long a pattern is.
+- Top-right: ⬇ Export bounces the beat to a .wav, 💾 saves the project. Views along the top: Channel Rack, Piano Roll, Mixer, Playlist.""",
   "build": """Blueprint Builds — you vibe-code single-file web apps and tools here just by describing them.
 - Type what you want in the box, hit Build, and a working single-file app shows up in the live preview.
 - Keep talking to stack changes ("make the button bigger", "add dark mode"). It auto-fixes its own runtime errors.
@@ -3882,7 +3892,7 @@ async def kit_help(req: Request):
     if persona:
         char_name = (body.get("charName") or "").strip() or "your assistant"
         char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
-        room_labels = {"studio": "DeMartin Audio Labs", "editor": "LePrince Visual Labs",
+        room_labels = {"studio": "DeMartin Audio Labs", "beats": "DeMartin Beat Lab", "editor": "LePrince Visual Labs",
                        "images": "Imagination Station", "build": "Blueprint Builds", "bit16": "Bit1Six"}
         room_label = room_labels.get(room, "DeMartinville")
         system = (
@@ -3922,6 +3932,153 @@ async def kit_help(req: Request):
     except Exception:
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
     return {"reply": text or "Hm, I blanked on that — ask me again?"}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════
+#  /api/beatbrain — the AI brain that lives INSIDE every plugin in DeMartin Beat Lab.
+#  Generalizes studio.html's Vocal-Doctor pattern: one shared LLM brain + a per-plugin
+#  knowledge card + the plugin's flat param schema. The user talks to the plugin in plain
+#  language ("make my 808 hit harder", "darker keys", "more slide") and the brain replies
+#  AND can move the knobs — every value is CLAMPED to the param's range server-side so the
+#  AI literally can't push a knob into a broken setting. Purely additive endpoint.
+# ════════════════════════════════════════════════════════════════════════════════════════
+BEATBRAIN_SYSTEM = """You are the AI brain living INSIDE a single audio plugin in DeMartin Beat Lab, a beat-making studio. You are a sharp, friendly producer / sound-designer who knows THIS exact plugin cold. Replies are SHORT (1-3 sentences), practical, a little hype when it fits — talk like a producer, never like a manual.
+
+You can actually MOVE this plugin's knobs. When the user wants a sound change (harder, darker, more slide, warmer, brighter, cleaner, boomier, tighter, etc.), pick the new knob values and output them as a fenced block EXACTLY like:
+```set
+{"paramId": value, "paramId2": value}
+```
+Rules: only include knobs you actually want to change; every value MUST stay inside the [min,max] range you're given; never invent a knob that isn't listed. If they're only asking a question, just answer it — no set block. Always add one plain-English line about what you changed and why."""
+
+@app.post("/api/beatbrain")
+async def beat_brain(req: Request):
+    body = await req.json()
+    name  = (body.get("plugin") or "this plugin").strip()
+    kind  = (body.get("kind") or "plugin").strip()
+    blurb = (body.get("knowledge") or "").strip()
+    msg   = (body.get("message") or "").strip()
+    schema = body.get("schema") or []
+    params = body.get("params") or {}
+    if not msg:
+        return {"reply": "Tell me the vibe and I'll dial it in.", "set": {}}
+    lines = []
+    for p in schema:
+        pid = p.get("id")
+        if not pid:
+            continue
+        unit = (" " + p.get("unit")) if p.get("unit") else ""
+        lines.append(f"- {pid} ({p.get('label', pid)}): {p.get('min')}..{p.get('max')}{unit}, now={params.get(pid)}")
+    system = (BEATBRAIN_SYSTEM +
+              f"\n\nTHE PLUGIN: {name} — a {kind}. {blurb}\n\nITS KNOBS (id, range, current value):\n" +
+              "\n".join(lines))
+    slots = _enabled_slots()
+    try:
+        if slots:
+            text, _prov = await _call_with_fallback(slots, system, msg, 360, 0.5)
+        else:
+            text = await _kit_local(system, msg)
+    except Exception:
+        text = "I glitched for a sec — try me again. (Tip: a free cloud key in Settings makes me think a lot faster.)"
+    # parse the ```set {json}``` action, clamp every value to its range, strip it from the reply
+    setvals = {}
+    m = re.search(r"```(?:set)?\s*(\{.*?\})\s*```", text or "", re.S)
+    if m:
+        try:
+            raw = json.loads(m.group(1))
+            ranges = {p.get("id"): p for p in schema if p.get("id")}
+            for k, v in (raw.items() if isinstance(raw, dict) else []):
+                if k in ranges and isinstance(v, (int, float)):
+                    lo, hi = ranges[k].get("min"), ranges[k].get("max")
+                    v = float(v)
+                    if lo is not None: v = max(float(lo), v)
+                    if hi is not None: v = min(float(hi), v)
+                    setvals[k] = v
+        except Exception:
+            pass
+        text = (text[:m.start()] + text[m.end():]).strip()
+    if not text:
+        text = "Done — tweaked it." if setvals else "Say that again?"
+    return {"reply": text, "set": setvals}
+
+
+# ── CHARACTER AVATAR PROMPT — a vision model LOOKS at the user's uploaded photo and writes a
+#    16-bit-pixel-character prompt that looks like THEM, ready to paste into Google Gemini (the
+#    user generates the image free on their own account; we never pay for gen). Local-first. ──
+CHARACTER_PROMPT_SYSTEM = (
+    "You write ONE image prompt for a 16-bit pixel-art character maker. You are shown a PHOTO of a person. "
+    "Look at them and write a prompt that turns THIS person into a 16-bit pixel character that looks like them. "
+    "Output ONLY the finished prompt — one flowing line, no preamble, no quotes, no labels, no notes.\n"
+    "Describe what you see (skin tone, hair colour + style, facial hair, build, clothes), then the look.\n"
+    "Example output: A brown-skinned man with a short afro and a thin goatee, wearing a black hoodie and jeans, as a "
+    "16-bit pixel art character sprite, full body, front-facing, thick clean outlines, limited retro palette, crisp "
+    "SNES-era sprite, centered standing pose, solid flat chroma-green #00B140 background, no text, no border."
+)
+
+# Text-only fallback (when NO vision model is loaded). Gemini itself sees the photo, so the
+# prompt just tells Gemini to use the attached photo as the person — likeness still happens there.
+CHARACTER_PROMPT_SYSTEM_TEXT = (
+    "You write ONE image prompt for a 16-bit pixel-art character maker. The user will paste this prompt INTO Google "
+    "Gemini ALONGSIDE a photo of themselves. Write a prompt that tells Gemini to turn the person in the ATTACHED "
+    "PHOTO into a 16-bit pixel character that looks like them. Output ONLY the finished prompt — one flowing line, no "
+    "preamble, no quotes, no labels, no notes.\n"
+    "Example output: Turn the person in the attached photo into a 16-bit pixel art character sprite that looks like "
+    "them — full body, front-facing, thick clean outlines, limited retro palette, crisp SNES-era sprite, centered "
+    "standing pose, solid flat chroma-green #00B140 background, no text, no border."
+)
+
+@app.post("/api/character/prompt")
+async def character_prompt(req: Request):
+    """Vision-write a 16-bit-character Gemini prompt from the user's uploaded photo. Additive,
+    local-first; mirrors the chat's image_url vision convention. Best with a vision model loaded."""
+    body = await req.json()
+    image = (body.get("image") or "").strip()
+    want = (body.get("want") or "").strip()
+    if not image.startswith("data:image"):
+        return JSONResponse({"error": "Upload a photo first, then I'll write the prompt."}, status_code=400)
+    if not await brain_up():
+        if not await ensure_brain():
+            return JSONResponse({"error": "Your local model (LM Studio) isn't running — open it once, then try again. (A vision-capable model writes the best prompt.)"})
+    loaded = await _loaded_models()
+    model = next((m for m in loaded if "embed" not in m.lower()), DEFAULT_MODEL)
+    base = ((f"They also want to look like this: {want[:300]}. " if want else "")
+            + "Write the 16-bit character prompt.")
+
+    async def _ask(messages):
+        try:
+            async with httpx.AsyncClient(timeout=180) as cx:
+                r = await cx.post(f"{LM}/chat/completions", json={
+                    "model": model, "messages": messages,
+                    "temperature": 0.5, "max_tokens": 400, "reasoning_effort": "low",
+                })
+            ch = (r.json().get("choices") or [])
+            if not ch:
+                return ""                       # model errored / no vision support -> caller falls back
+            m = ch[0].get("message", {})
+            return (m.get("content") or m.get("reasoning_content") or "").strip()
+        except Exception:
+            return ""
+
+    # 1) VISION: the model LOOKS at the photo (best, when a vision model is loaded)
+    prompt = await _ask([
+        {"role": "system", "content": CHARACTER_PROMPT_SYSTEM},
+        {"role": "user", "content": [
+            {"type": "text", "text": base + " Describe the person in this photo."},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]},
+    ])
+    used_vision = len(prompt) >= 20
+    # 2) TEXT-ONLY fallback: no vision needed -- Gemini itself sees the attached photo
+    if not used_vision:
+        prompt = await _ask([
+            {"role": "system", "content": CHARACTER_PROMPT_SYSTEM_TEXT},
+            {"role": "user", "content": base},
+        ])
+    prompt = re.sub(r"```[a-zA-Z]*", "", prompt).strip("` \n")
+    prompt = re.sub(r"(?is)^\s*(here'?s[^:]*:|final prompt:|prompt:)\s*", "", prompt).strip().strip('"').strip()
+    if len(prompt) < 20:
+        return JSONResponse({"error": "Your model didn't write one — open LM Studio (a vision model works best) and try again."})
+    return {"ok": True, "prompt": prompt, "vision": used_vision}
+
 
 # check_dir=False so a missing static/ can never RuntimeError at import (it 404s instead);
 # mkdir keeps the dir present. Together these stop a bad ROOT from killing the whole app at boot.
