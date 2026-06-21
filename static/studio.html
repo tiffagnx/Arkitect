@@ -202,11 +202,15 @@
   .ruler-side .rs-secs { color:rgba(160,168,182,.42); }
   .ruler-cv { flex:1; min-width:0; height:34px; display:block; cursor:text; }
   /* UNIVERSE / OVERVIEW mini-map — the whole session at a glance; drag the box to navigate */
-  .overview { position:sticky; top:0; z-index:9; display:flex; align-items:stretch; height:44px; background:rgba(8,9,13,.97); border-bottom:1px solid var(--hairline); }
+  .overview { position:sticky; top:0; z-index:9; display:flex; align-items:stretch; height:44px; overflow:hidden; background:rgba(8,9,13,.97); border-bottom:1px solid var(--hairline); }
   .overview-side { width:508px; flex:none; border-right:1px solid var(--hairline); display:flex; flex-direction:column; justify-content:center; padding:0 9px; gap:2px; background:rgba(255,255,255,.012); }
   .overview-side .ov-l { font:700 7.5px 'Space Mono'; letter-spacing:.14em; color:rgba(160,168,182,.72); }
   .overview-side .ov-h { font:500 8px Inter; color:rgba(160,168,182,.4); line-height:1.2; }
-  .overview-cv { flex:1; min-width:0; height:44px; display:block; cursor:pointer; }
+  .overview-cv { flex:1; min-width:0; height:100%; display:block; cursor:pointer; }
+  /* PT "Universe" — drag the bottom edge of the SESSION overview to resize it (down = taller, up = collapse) */
+  .ov-grip { position:absolute; left:0; right:0; bottom:0; height:6px; cursor:ns-resize; z-index:11; }
+  .ov-grip::after { content:''; position:absolute; left:50%; bottom:1px; width:46px; height:3px; margin-left:-23px; border-radius:2px; background:rgba(160,168,182,.28); transition:background .12s; }
+  .ov-grip:hover::after { background:var(--teal); height:4px; }
   .col-header { position:sticky; top:34px; z-index:6; display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--hairline); height:18px; margin-bottom:5px; }
   .col-header .chh { font:700 8px 'Space Mono'; letter-spacing:.02em; color:var(--dim); text-align:center; border-right:1px solid var(--hairline); white-space:nowrap; overflow:hidden; line-height:17px; flex:none; }
   .lane.masterlane { border-color:rgba(200,146,74,.35); background:linear-gradient(180deg, rgba(200,146,74,.07), rgba(255,255,255,.02)); cursor:pointer; }
@@ -3582,6 +3586,8 @@ function _fmtRulerTime(t, step){
   if(step>=0.1) return m+":"+s.toFixed(1).padStart(4,'0');
   return s.toFixed(3)+"s";                                 // sub-100ms → seconds.millis
 }
+// SESSION overview height — resizable via its bottom-edge grip (PT Universe); persists across reloads.
+let ovH = (()=>{ const v=parseInt(localStorage.getItem('ark_ovH'),10); return (v>=6 && v<=300) ? v : 44; })();
 function ensureRuler(){
   const tr=$("tracks"); if(!tr) return;
   let r=document.getElementById('ruler');
@@ -3598,8 +3604,15 @@ function ensureRuler(){
   let ov=document.getElementById('overview');
   if(!ov){
     ov=document.createElement('div'); ov.id='overview'; ov.className='overview';
-    ov.innerHTML=`<div class="overview-side"><span class="ov-l">SESSION</span><span class="ov-h">drag the box · click to jump</span></div><canvas class="overview-cv" id="overviewCv" height="44"></canvas>`;
+    ov.innerHTML=`<div class="overview-side"><span class="ov-l">SESSION</span><span class="ov-h">drag the box · click to jump · drag the bottom edge to resize</span></div><canvas class="overview-cv" id="overviewCv" height="44"></canvas><div class="ov-grip" title="drag to resize the session overview — drag up to collapse it"></div>`;
     tr.insertBefore(ov, r);                                  // overview above the ruler
+    ov.style.height = ovH + 'px';                            // restore the saved overview height
+    ov.querySelector('.ov-grip').addEventListener('mousedown', (e)=>{   // PT Universe: drag the bottom edge to grow/shrink — it pushes the whole session below it down
+      e.preventDefault(); e.stopPropagation(); const sy=e.clientY, sh=ovH;
+      const mv=(ev)=>{ ovH=Math.max(6, Math.min(300, sh + (ev.clientY-sy))); ov.style.height=ovH+'px'; drawOverview(); };
+      const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); try{ localStorage.setItem('ark_ovH', String(ovH)); }catch(_){} };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
     const ocv=ov.querySelector('#overviewCv');
     const clampS=(v)=> Math.max(0, Math.min(Math.max(0, maxDur()-viewDur()), v));
     ocv.addEventListener('mousedown', (e)=>{
