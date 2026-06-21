@@ -855,6 +855,8 @@ const FX_DEFS=[
   ['fxDirBlur','Directional Blur',0,'Length',16],
   ['fxRadBlur','Radial Blur',0,'Amount',0.4],
   ['fxWarp','Warp',0,'Strength',0.5],
+  ['fxGradMap','Gradient Map',0,'Amount',1],
+  ['fxNoise','Fractal Noise',0,'Amount',0.5],
 ];
 function fxActive(c,f,def){return isKeyed(c,f)||(c[f]!=null&&c[f]!==def);}
 function twOpen(c,key,def){if(!c._tw)return def;return c._tw[key]==null?def:c._tw[key];}
@@ -1206,6 +1208,7 @@ const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
   fxLumaKey:0,fxDirBlur:0,fxDirAngle:0,fxRadBlur:0,fxWarp:0,
   fxKey:0,fxKeyBalance:0.5,fxKeyGain:1,fxKeyClipB:0,fxKeyClipW:1,fxKeyGrow:0,fxKeySoftness:0,fxKeyDespill:1,
   fxLevels:0,fxLevInB:0,fxLevInW:1,fxLevGamma:1,fxLevOutB:0,fxLevOutW:1,
+  fxGradMap:0,fxNoise:0,fxNoiseScale:80,
   fxCurve:0,
   volume:1};
 const KEYABLE=Object.keys(KDEF);
@@ -1304,7 +1307,8 @@ function hasLayerBufferFX(c,f){const fr=f-c.start;
     ||pval(c,'fxSharpen',fr,0)>0||pval(c,'fxEmboss',fr,0)>0||pval(c,'fxEdges',fr,0)>0
     ||pval(c,'fxRGB',fr,0)!==0||pval(c,'fxHalftone',fr,0)>=2
     ||pval(c,'fxKey',fr,0)>0||pval(c,'fxLumaKey',fr,0)>0||pval(c,'fxDirBlur',fr,0)>0
-    ||pval(c,'fxRadBlur',fr,0)>0||pval(c,'fxWarp',fr,0)!==0;}
+    ||pval(c,'fxRadBlur',fr,0)>0||pval(c,'fxWarp',fr,0)!==0
+    ||pval(c,'fxGradMap',fr,0)>0||pval(c,'fxNoise',fr,0)>0;}
 function needsLayerBuffer(c,f){return clipMasks(c).length>0||hasLayerBufferFX(c,f);}
 
 // ── MASKS (per-clip vector mattes) ───────────────────────────────────────
@@ -1493,6 +1497,24 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
   const cv=clamp(pval(c,'fxCurve',fr,0),0,1);
   if(cv>0){const LUT2=curveLUT(curvePts(c)),im=lg.getImageData(0,0,W,H),d=im.data;
     for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(LUT2[d[i]]-d[i])*cv;d[i+1]+=(LUT2[d[i+1]]-d[i+1])*cv;d[i+2]+=(LUT2[d[i+2]]-d[i+2])*cv;}
+    lg.putImageData(im,0,0);}
+  // Gradient Map — remap luminance through a 3-stop colour ramp (Shadows→Mid→Highlights), mixed by Amount
+  const gmA=clamp(pval(c,'fxGradMap',fr,0),0,1);
+  if(gmA>0){const cs=hex2rgb(c.fxGMShadow||'#000000'),cm=hex2rgb(c.fxGMMid||'#808080'),ch=hex2rgb(c.fxGMHi||'#ffffff');
+    const RR=new Uint8ClampedArray(256),GG=new Uint8ClampedArray(256),BB=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){const Ln=v/255;let a,b,t;if(Ln<0.5){a=cs;b=cm;t=Ln*2;}else{a=cm;b=ch;t=(Ln-0.5)*2;}
+      RR[v]=a[0]+(b[0]-a[0])*t;GG[v]=a[1]+(b[1]-a[1])*t;BB[v]=a[2]+(b[2]-a[2])*t;}
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lv=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])|0;
+      d[i]+=(RR[Lv]-d[i])*gmA;d[i+1]+=(GG[Lv]-d[i+1])*gmA;d[i+2]+=(BB[Lv]-d[i+2])*gmA;}
+    lg.putImageData(im,0,0);}
+  // Fractal Noise — multi-octave value noise, overlay-blended over the layer (texture generator; deterministic per-frame, hash-seeded)
+  const nzA=clamp(pval(c,'fxNoise',fr,0),0,1);
+  if(nzA>0){const cell=Math.max(2,pval(c,'fxNoiseScale',fr,80)*k),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;
+      const n=_fbm(x/cell,y/cell); // 0..1 grayscale
+      for(let ch2=0;ch2<3;ch2++){const base=d[i+ch2]/255,o=base<0.5?2*base*n:1-2*(1-base)*(1-n);
+        d[i+ch2]=clamp((base+(o-base)*nzA)*255,0,255);}}
     lg.putImageData(im,0,0);}
   // Sharpen — 3×3 cross kernel (centre 1+4a, neighbours −a)
   const sh=clamp(pval(c,'fxSharpen',fr,0),0,3);
@@ -2467,6 +2489,13 @@ function bindMasksInspector(clip){
 function valAt(c,field){const fr=playhead-c.start;return isKeyed(c,field)?pval(c,field,fr,KDEF[field]):(c[field]==null?KDEF[field]:c[field]);}
 function fmtNum(v){const n=+(+v).toFixed(3);return Number.isFinite(n)?String(n):'0';}
 function hex2rgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h||'000000',16)||0;return [(n>>16)&255,(n>>8)&255,n&255];}
+// ── Value-noise / fBm (hash-seeded, deterministic — no Math.random so it doesn't shimmer per frame) ──
+function _vnHash(x,y){let h=(x|0)*374761393+(y|0)*668265263;h=(h^(h>>>13))*1274126177;return ((h^(h>>>16))>>>0)/4294967295;}
+function _vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const tl=_vnHash(xi,yi),tr=_vnHash(xi+1,yi),bl=_vnHash(xi,yi+1),br=_vnHash(xi+1,yi+1);
+  const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  return (tl*(1-u)+tr*u)*(1-v)+(bl*(1-u)+br*u)*v;}
+function _fbm(x,y){let a=0.5,f=1,sum=0,norm=0;for(let o=0;o<4;o++){sum+=a*_vnoise(x*f,y*f);norm+=a;a*=0.5;f*=2;}return norm?sum/norm:0;}
 // Curves — a 256-LUT from piecewise-linear control points (x,y in 0..1, x=input/y=output)
 function curvePts(c){return (c.fxCurvePts&&c.fxCurvePts.length>=2)?c.fxCurvePts:[{x:0,y:0},{x:1,y:1}];}
 function curveLUT(pts){const P=[...pts].sort((a,b)=>a.x-b.x),LUT=new Uint8ClampedArray(256);
@@ -2507,8 +2536,8 @@ const FX_CAT={ // field → [category label, accent colour]
   fxBlur:['Blur','#5BA3C7'],fxSharpen:['Sharpen','#5BA3C7'],
   fxBright:['Colour','#C77FB0'],fxExposure:['Colour','#C77FB0'],fxContrast:['Colour','#C77FB0'],fxSat:['Colour','#C77FB0'],
   fxVibrance:['Colour','#C77FB0'],fxHue:['Colour','#C77FB0'],fxTemp:['Colour','#C77FB0'],fxGamma:['Colour','#C77FB0'],
-  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],fxLevels:['Colour','#C77FB0'],fxCurve:['Colour','#C77FB0'],
-  fxThreshold:['Stylize','#D9A441'],fxSolarize:['Stylize','#D9A441'],fxPosterize:['Stylize','#D9A441'],fxShadow:['Stylize','#D9A441'],
+  fxGray:['Colour','#C77FB0'],fxSepia:['Colour','#C77FB0'],fxInvert:['Colour','#C77FB0'],fxTint:['Colour','#C77FB0'],fxDuotone:['Colour','#C77FB0'],fxLevels:['Colour','#C77FB0'],fxCurve:['Colour','#C77FB0'],fxGradMap:['Colour','#C77FB0'],
+  fxThreshold:['Stylize','#D9A441'],fxSolarize:['Stylize','#D9A441'],fxPosterize:['Stylize','#D9A441'],fxShadow:['Stylize','#D9A441'],fxNoise:['Stylize','#D9A441'],
   fxVignette:['Stylize','#D9A441'],fxGrain:['Stylize','#D9A441'],fxPixel:['Stylize','#D9A441'],fxGlow:['Stylize','#D9A441'],
   fxEmboss:['Stylize','#D9A441'],fxEdges:['Stylize','#D9A441'],fxHalftone:['Stylize','#D9A441'],fxLeak:['Stylize','#D9A441'],fxScan:['Stylize','#D9A441'],
   fxRGB:['Distort','#8B7FD0'],fxWarp:['Distort','#8B7FD0'],
@@ -2518,7 +2547,7 @@ const FX_CAT={ // field → [category label, accent colour]
 const FX_RANGE={ // field → [min,max,step] for the slider
   fxBlur:[0,40,.5],fxBright:[.2,2.5,.01],fxExposure:[-3,3,.05],fxContrast:[.2,3,.01],fxSat:[0,3,.01],fxVibrance:[-1,1.5,.01],
   fxHue:[-180,180,1],fxTemp:[-100,100,1],fxGamma:[.2,3,.01],fxGray:[0,1,.01],fxSepia:[0,1,.01],fxInvert:[0,1,.01],
-  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxLevels:[0,1,.01],fxCurve:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
+  fxThreshold:[0,1,.01],fxSolarize:[0,1,.01],fxPosterize:[2,16,1],fxDuotone:[0,1,.01],fxLevels:[0,1,.01],fxCurve:[0,1,.01],fxGradMap:[0,1,.01],fxNoise:[0,1,.01],fxShadow:[0,30,.5],fxVignette:[0,1,.01],
   fxTint:[0,1,.01],fxGrain:[0,1,.01],fxPixel:[0,60,1],fxGlow:[0,1,.01],fxSharpen:[0,3,.05],fxEmboss:[0,1,.01],fxEdges:[0,1,.01],
   fxRGB:[-20,20,1],fxHalftone:[2,20,1],fxLeak:[0,1,.01],fxScan:[0,1,.01],
   fxKey:[0,1,.01],fxLumaKey:[0,1,.01],fxDirBlur:[0,60,1],fxRadBlur:[0,1,.01],fxWarp:[-1,1,.02],
@@ -2547,6 +2576,8 @@ const FX_EXTRA={
   fxDirBlur:[{kind:'slider',sub:'fxDirAngle',label:'Angle°',min:0,max:360,step:1}],
   fxRadBlur:[{kind:'seg',sub:'fxRadType',label:'Mode',opts:['zoom','spin'],def:'zoom'}],
   fxWarp:[{kind:'seg',sub:'fxWarpType',label:'Type',opts:['twirl','bulge','spherize','wave'],def:'twirl'}],
+  fxGradMap:[{kind:'gradmap'}],
+  fxNoise:[{kind:'slider',sub:'fxNoiseScale',label:'Scale',min:4,max:400,step:1}],
 };
 function mountEffectControls(c){
   const host=document.getElementById('efxMount');if(!host||!c)return;
@@ -2589,7 +2620,21 @@ function efxExtra(c,ex){
   if(ex.kind==='slider')return efxSlider(c,ex.sub,ex.label,ex.min,ex.max,ex.step,false);
   if(ex.kind==='seg')return efxSeg(c,ex);
   if(ex.kind==='curve')return efxCurveEditor(c);
+  if(ex.kind==='gradmap')return efxGradMapRow(c);
   return document.createElement('div');
+}
+function efxGradMapRow(c){
+  const row=document.createElement('div');row.className='efx-rowflex';
+  const sa=document.createElement('input');sa.type='color';sa.className='efx-swatch';sa.value=c.fxGMShadow||'#000000';sa.title='Shadows colour';
+  const grad=document.createElement('div');grad.className='efx-grad';
+  const sm=document.createElement('input');sm.type='color';sm.className='efx-swatch';sm.value=c.fxGMMid||'#808080';sm.title='Midtones colour';
+  const sh=document.createElement('input');sh.type='color';sh.className='efx-swatch';sh.value=c.fxGMHi||'#ffffff';sh.title='Highlights colour';
+  const paint=()=>grad.style.background=`linear-gradient(90deg,${c.fxGMShadow||'#000000'},${c.fxGMMid||'#808080'},${c.fxGMHi||'#ffffff'})`;
+  paint();
+  sa.oninput=e=>{c.fxGMShadow=e.target.value;paint();drawFrame();save(true);};
+  sm.oninput=e=>{c.fxGMMid=e.target.value;paint();drawFrame();save(true);};
+  sh.oninput=e=>{c.fxGMHi=e.target.value;paint();drawFrame();save(true);};
+  row.append(sa,grad,sm,sh);return row;
 }
 function efxCurveEditor(c){
   const wrap=document.createElement('div');wrap.className='efx-ctrl';
@@ -3637,10 +3682,12 @@ window.addEventListener('resize',fitScreen);
         [/Drop Shadow/i,'fxShadow'],
         [/Vignette/i,'fxVignette'],
         [/Color Overlay|^Fill$|Solid Composite/i,'fxTint'],
-        [/Add Grain|^Noise$|Match Grain|Remove Grain|Median/i,'fxGrain'],
+        [/Fractal Noise|Turbulent Noise|Cell Pattern/i,'fxNoise'],
+        [/Add Grain|^Noise$|Noise HLS|Match Grain|Remove Grain|Median/i,'fxGrain'],
         [/Mosaic/i,'fxPixel'],
         [/Glow\b/i,'fxGlow'],
-        [/Gradient Map|Tritone|Duotone/i,'fxDuotone'],
+        [/Gradient Map|Tritone/i,'fxGradMap'],
+        [/Duotone/i,'fxDuotone'],
         [/Sharpen|Unsharp Mask/i,'fxSharpen'],
         [/Emboss|Bevel/i,'fxEmboss'],
         [/Find Edges|Edge Detect|Cartoon/i,'fxEdges'],
