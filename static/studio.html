@@ -1430,7 +1430,10 @@ const AUDIOSUITE = [
 let _asState = {};   // {procId, params:{}}
 function openAudioSuite(t){
   const cl = selClip && selClip.trackId===t.id ? clipsOf(t).find(c=>c.id===selClip.clipId) : null;
-  if(!cl && !_selRange(t)){ flash("Highlight a range (⌶ Select tool) or pick a clip first"); return; }
+  // PT AudioSuite opens the plugin window the MOMENT you pick it — you dial the controls, THEN
+  // select a clip/range and hit Render. Do NOT gate OPENING on a selection: that left the window
+  // refusing to appear (you'd just see a flash at the bottom, no window). The Render itself checks
+  // for a target and guides you if there isn't one (see renderAudioSuite / asPreListen).
   let w = document.getElementById("audiosuite");
   if(!w){ w=document.createElement("div"); w.className="plugwin fxface"; w.id="audiosuite"; document.body.appendChild(w); }
   if(!_asState.procId) _asState.procId='gain';
@@ -1438,7 +1441,8 @@ function openAudioSuite(t){
     const proc = AUDIOSUITE.find(p=>p.id===_asState.procId);
     _asState.params = _asState.params || {};
     proc.params.forEach(p=>{ if(_asState.params[p.id]==null) _asState.params[p.id]=p.value; });
-    w.innerHTML = `<div class="pw-bar"><span class="vw-title">DEMARTIN SUITE</span><span class="pw-track">${t.name} · clip</span><button class="pw-x" title="close">✕</button></div>
+    const _tgt = (selClip && selClip.trackId===t.id && clipsOf(t).find(c=>c.id===selClip.clipId)) ? 'clip' : (_selRange(t) ? 'range' : 'select a clip / range');
+    w.innerHTML = `<div class="pw-bar"><span class="pw-title">DEMARTIN SUITE</span><span class="pw-track">${t.name} · ${_tgt}</span><button class="pw-x" title="close">✕</button></div>
       <div style="padding:13px 16px 4px"><select class="as-proc">${AUDIOSUITE.map(p=>`<option value="${p.id}"${p.id===_asState.procId?' selected':''}>${p.name}</option>`).join("")}</select></div>
       <div class="fx-knobs"></div>
       <div style="padding:4px 16px 16px;display:flex;gap:8px;align-items:center"><button class="as-prev" title="Pre-listen — audition without committing (click again to stop)">🔊</button><span style="flex:1"></span>${proc.reverse?`<button class="as-rev" title="Reverse render — the tail swells INTO the hit, timed to your BPM (reverse reverb)">↺ Reverse</button>`:``}<button class="as-render">⏏ Render</button></div>
