@@ -107,7 +107,7 @@
     background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 55%, var(--amber) 75%, #E5565B 92%); transition:width .05s linear; }
 
   /* tracks */
-  .tracks { flex:1; overflow-y:auto; padding:12px 14px 32px; display:flex; flex-direction:column; gap:10px; }
+  .tracks { flex:1; overflow-y:auto; padding:8px 14px 32px; display:flex; flex-direction:column; gap:1px; }
   /* first-run hero — fills the canvas + invites you in (no more empty black void) */
   .drop { flex:1; min-height:340px; display:flex; flex-direction:column; align-items:center; justify-content:center;
     border:2px dashed rgba(62,156,184,.30); border-radius:18px; text-align:center; color:var(--dim);
@@ -127,8 +127,8 @@
   .drop-btn.ghost { color:var(--dim); }
   .drop-tip { font:400 11px 'Space Mono'; color:rgba(198,201,208,.42); margin-top:8px; }
   .drop-tip b { color:var(--teal); }
-  .lane { display:flex; align-items:stretch; border:1px solid var(--hairline); border-radius:12px; background:var(--panel);
-    backdrop-filter:blur(18px); overflow:hidden; margin-bottom:8px; animation:rise .25s ease-out; }
+  .lane { display:flex; align-items:stretch; border:1px solid var(--hairline); border-radius:3px; background:var(--panel);
+    backdrop-filter:blur(18px); overflow:hidden; margin-bottom:0; animation:rise .25s ease-out; }
   @keyframes rise { from { opacity:0; transform:translateY(8px); } }
   .lane.muted { opacity:.45; }
   /* per-track control strip (Pro Tools edit-window: Track-Color strip + controls LEFT of the waveform) */
@@ -5615,7 +5615,7 @@ function buildMasterStrip(){
 
 /* ── transport ── */
 function contentDur() { let m=0; for(const t of tracks){ for(const cl of clipsOf(t)) m=Math.max(m, cl.start+cl.buffer.duration); } return m; }   // true end of recorded material
-function maxDur() { return Math.max(contentDur(), 1200); }   // TIMELINE length: a real ~20-minute session by default — tons of empty space past the material to record into (grows if content runs longer)
+function maxDur() { return Math.max(contentDur(), 360); }   // TIMELINE length: a ~6-minute session by default (a real song + a little room past it) — owner: 20 min felt endless; grows automatically if the material runs longer
 function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
 let playGen = 0;   // re-entrancy guard: playAll is async (awaits the worklet module);
                    // a 2nd call (fast double-seek / loop-wrap) must cancel the 1st.
