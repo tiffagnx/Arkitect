@@ -1039,8 +1039,8 @@ function buildLaneProps(track,c){
     const pl=document.createElement('div');pl.className='tl-plane';
     const fields=n.type==='effect'?[n.field]:n.fields;
     if(fields){const times=new Set();for(const f of fields)if(c[f]&&c[f].k)for(const kf of c[f].k)times.add(kf.t);
-      const isMaskF=fields.some(f=>typeof f==='string'&&f.startsWith('mk.')); // mask keys live off-KDEF; attachKeyDrag only moves KEYABLE keys, so make mask diamonds ease-only (no rubber-band)
-      for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';if(!isMaskF)attachKeyDrag(d,c,tt);attachKeyEase(d,c,tt,fields);pl.appendChild(d);}}
+      // drag the diamonds for THESE fields (works for KDEF props AND mask mk.* keys — incl. mask path); positioned absolute in the lane
+      for(const tt of times){const d=document.createElement('div');d.className='kdia';d.style.left=((c.start+tt)*ppf)+'px';attachLaneKeyDrag(d,c,tt,fields);attachKeyEase(d,c,tt,fields);pl.appendChild(d);}}
     wrap.appendChild(pl);
   }
   return wrap;
@@ -1157,6 +1157,17 @@ function attachKeyDrag(d,c,t0){
       cur=nt;d.style.left=(nt*ppf)+'px';updateLiveFields();drawFrame();};
     const up=()=>{d.releasePointerCapture(e.pointerId);d.removeEventListener('pointermove',move);
       d.removeEventListener('pointerup',up);renderTimeline();save(true);};
+    d.addEventListener('pointermove',move);d.addEventListener('pointerup',up);});}
+// Lane diamond drag for an EXPLICIT field list — moves only those fields' keys (KDEF or mk.* mask keys,
+// incl. the mask-path object key). Positioned absolute in the lane (carries c.start, unlike the clip-body keyLane).
+function attachLaneKeyDrag(d,c,t0,fields){
+  d.addEventListener('pointerdown',e=>{e.stopPropagation();try{d.setPointerCapture(e.pointerId);}catch(_){}
+    const sx=e.clientX;let cur=t0;
+    const move=ev=>{const nt=Math.max(0,t0+Math.round((ev.clientX-sx)/ppf));if(nt===cur)return;
+      if(fields.some(f=>{const p=c[f];return p&&p.k&&p.k.some(kf=>kf.t===nt&&kf.t!==cur);}))return; // don't stack onto another key of these same fields
+      for(const f of fields){const p=c[f];if(p&&p.k){for(const kf of p.k)if(kf.t===cur)kf.t=nt;p.k.sort((a,b)=>a.t-b.t);}}
+      cur=nt;d.style.left=((c.start+nt)*ppf)+'px';updateLiveFields&&updateLiveFields();drawFrame();};
+    const up=()=>{try{d.releasePointerCapture(e.pointerId);}catch(_){}d.removeEventListener('pointermove',move);d.removeEventListener('pointerup',up);renderTimeline();save(true);};
     d.addEventListener('pointermove',move);d.addEventListener('pointerup',up);});}
 async function drawClipWave(el,c){
   const m=MEDIA[c.mediaId];if(!m||!(m.cache&&m.cache.peaks))return;
