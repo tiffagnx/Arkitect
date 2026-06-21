@@ -28,11 +28,24 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-# Frozen-aware: in the PyInstaller exe, __file__ points into the temp _MEIPASS extract
-# (where static/ and data/ are NOT shipped). Use the exe's own folder so static/ + data/
-# resolve to the real install dir next to the launcher. Plain runs use __file__ as before.
-ROOT = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-DATA = ROOT / "data"
+# Frozen-aware ROOT. Windows: the onefile .exe ships static/ + data/ NEXT TO it, so use the
+# exe's own folder. macOS: the .app BUNDLES static/ + app.py (they ride in _MEIPASS), and the
+# exe lives in Contents/MacOS/ which has NO static/ — so resolve to the unpack dir. Plain runs
+# use __file__ as before.
+_FROZEN = getattr(sys, "frozen", False)
+if _FROZEN and sys.platform == "darwin":
+    ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+elif _FROZEN:
+    ROOT = Path(sys.executable).parent
+else:
+    ROOT = Path(__file__).parent
+# Writable data/ can't live inside a read-only .app bundle → Application Support on macOS.
+DATA = (Path.home() / "Library" / "Application Support" / "DeMartinville") if (_FROZEN and sys.platform == "darwin") else ROOT / "data"
+
+# Windows-only "no console flash" flag for subprocess. On POSIX a non-zero creationflags
+# RAISES ValueError, so it MUST be 0 there. Every subprocess creationflags= routes through this
+# guarded constant (NO_WINDOW / _NOWIN below alias it) so the Mac build never throws.
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
@@ -58,13 +71,6 @@ def _fire(coro):                # create_task with no ref can be GC'd before it 
 _mem_lock = asyncio.Lock()      # serialize memory.json read-modify-write (no clobber)
 _brain_lock = asyncio.Lock()    # only one LM Studio boot attempt at a time (no double-launch → OOM)
 _engine_lock = asyncio.Lock()   # only one ComfyUI boot attempt at a time
-_voice_lock = asyncio.Lock()    # only one XTTS voice-server boot at a time
-
-# ── LOCAL VOICE — XTTS-v2 cloned from B's clip, served on :8123 (CPU, never
-# touches the 8GB GPU). Self-booted on demand, mirroring ensure_engine. ──────
-VOICE_PY = Path(os.environ.get("TIFF_VOICE_PY", r"D:\tiff-voice\xtts-venv\Scripts\python.exe"))
-VOICE_SERVER = Path(os.environ.get("TIFF_VOICE_SERVER", r"D:\tiff-voice\tts_server.py"))
-VOICE_URL = "http://127.0.0.1:8123"
 
 DATA.mkdir(exist_ok=True)
 SESS_DIR.mkdir(exist_ok=True)
@@ -543,10 +549,15 @@ async def models(req: Request):
             ids = [i for i in all_ids if not any(h in i.lower() for h in CHAT_HIDE)]
             return {"models": ids or all_ids, "cloud": cloud}   # never hand back an empty picker — fall back to all
     except Exception as e:
-        # LM Studio isn't up. Only a LOCAL-only user (no cloud models) needs it — warm it
-        # in the background so it's ready shortly. Cloud users never trigger a boot.
+        # LM Studio isn't reachable. ALWAYS flip its server on in the background (cheap, no
+        # model load) so a user's already-loaded local models reappear in the picker on the
+        # next refresh — even cloud users, who used to skip this entirely and lose their
+        # local list whenever LM Studio's server toggle was off. A LOCAL-only user (no cloud)
+        # additionally needs a model warmed, so give them the full boot.
         if not cloud:
             _fire(ensure_brain())
+        else:
+            _fire(_start_server_only())
         return JSONResponse({"models": [], "cloud": cloud,
                              "error": (None if cloud else f"LM Studio isn't reachable — open it and hit Start Server. ({e})")})
 
@@ -569,7 +580,7 @@ async def _unload_brain():
         # VRAM before FLUX loads, or the 8GB card thrashes. timeout so a hung lms can't
         # wedge the render path.
         r = subprocess.run([str(LMS_CLI), "unload", "--all"],
-                           creationflags=0x08000000,  # CREATE_NO_WINDOW
+                           creationflags=CREATE_NO_WINDOW,  # no console flash (0 on mac/linux)
                            capture_output=True, text=True, timeout=10)
         if r.returncode != 0:
             print(f"[_unload_brain] lms unload failed (rc={r.returncode}): {(r.stderr or '').strip()[:200]}")
@@ -600,9 +611,25 @@ async def ensure_brain() -> bool:
         return await _boot_brain()
 
 
+async def _start_server_only():
+    """Just flip LM Studio's local server ON — no model load. Cheap + idempotent
+    (`lms server start` returns fast if already up). This is what makes a user's
+    ALREADY-loaded local models show up in the picker even when they also have a
+    cloud key: the old path skipped booting entirely for cloud users, so if LM
+    Studio's server toggle was off (it doesn't always auto-start on app launch)
+    the local models silently vanished from the dropdown."""
+    if not LMS_CLI.exists():
+        return
+    import subprocess
+    try:
+        subprocess.Popen([str(LMS_CLI), "server", "start"], creationflags=CREATE_NO_WINDOW)
+    except Exception as e:
+        print(f"[_start_server_only] couldn't start LM Studio server: {e}")
+
+
 async def _boot_brain() -> bool:
     import subprocess
-    NO_WINDOW = 0x08000000
+    NO_WINDOW = CREATE_NO_WINDOW
     # 1. server (idempotent — returns fast if already up)
     try:
         subprocess.Popen([str(LMS_CLI), "server", "start"], creationflags=NO_WINDOW)
@@ -678,7 +705,7 @@ async def _reload_ctx(model: str):
     if not model or not LMS_CLI.exists():
         return
     import subprocess
-    NO_WINDOW = 0x08000000
+    NO_WINDOW = CREATE_NO_WINDOW
     try:
         subprocess.run([str(LMS_CLI), "unload", "--all"], creationflags=NO_WINDOW, timeout=25)
         subprocess.Popen([str(LMS_CLI), "load", model, "-c", DEFAULT_CTX, "--gpu", "max", "-y"],
@@ -1872,67 +1899,6 @@ async def health():
     return {"brain": await brain_up(), "engine": await _engine_up()}
 
 
-async def _voice_up() -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=3) as cx:
-            await cx.get(f"{VOICE_URL}/health")
-        return True
-    except Exception:
-        return False
-
-
-async def ensure_voice() -> bool:
-    """Boot the XTTS voice server on demand (mirrors ensure_engine). First boot
-    loads the model (~10-30s)."""
-    if await _voice_up():
-        return True
-    if not (VOICE_PY.exists() and VOICE_SERVER.exists()):
-        return False
-    async with _voice_lock:
-        if await _voice_up():
-            return True
-        import subprocess
-        try:
-            subprocess.Popen([str(VOICE_PY), str(VOICE_SERVER)],
-                             cwd=str(VOICE_SERVER.parent), creationflags=0x08000000)
-        except Exception:
-            return False
-        for _ in range(60):   # model load can take ~10-30s cold
-            await asyncio.sleep(2)
-            if await _voice_up():
-                return True
-    return False
-
-
-@app.post("/api/tts")
-async def tts(req: Request):
-    """Tiff's local cloned voice — text in, WAV out. talk.html falls back to the
-    browser voice if this 503s (engine not installed)."""
-    body = await req.json()
-    text = (body.get("text") or "").strip()
-    if not text:
-        return JSONResponse({"error": "no text"}, status_code=400)
-    if not await ensure_voice():
-        return JSONResponse({"error": "local voice engine not installed/booting"}, status_code=503)
-    try:
-        async with httpx.AsyncClient(timeout=180) as cx:
-            r = await cx.post(f"{VOICE_URL}/tts", json={"text": text[:800]})
-        if r.status_code != 200:
-            return JSONResponse({"error": f"voice synth failed ({r.status_code})"}, status_code=502)
-        return Response(content=r.content, media_type="audio/wav")
-    except Exception as e:
-        return JSONResponse({"error": f"voice engine error: {e}"}, status_code=502)
-
-
-@app.get("/api/tts/warm")
-async def tts_warm():
-    """Pre-boot the XTTS voice server (no synth) so the FIRST spoken line uses her
-    real cloned voice instead of the browser fallback. talk.html fires this on load
-    while B reads the greeting — by the time he sends, her voice is ready."""
-    ok = await ensure_voice()
-    return {"ready": ok}
-
-
 # ── IMAGES — FLUX on B's own GPU via ComfyUI (D:\tiff-images, port 8188) ───
 # Free, unlimited, local. ARKITECT is the pretty face; ComfyUI is the
 # engine room. If the engine isn't running, we say so plainly.
@@ -2027,7 +1993,7 @@ async def ensure_engine() -> bool:
             _engine_proc = subprocess.Popen(
                 [str(COMFY_DIR / "python_embeded" / "python.exe"), "-s", "ComfyUI\\main.py",
                  "--windows-standalone-build", "--listen", "127.0.0.1", "--port", "8188", "--lowvram"],
-                cwd=str(COMFY_DIR), creationflags=0x08000000,  # CREATE_NO_WINDOW
+                cwd=str(COMFY_DIR), creationflags=CREATE_NO_WINDOW,  # no console flash
             )
         except Exception:
             _engine_proc = None
@@ -2689,7 +2655,7 @@ def _ffmpeg_missing() -> bool:
     """True if ffmpeg/ffprobe aren't resolvable on PATH — editor endpoints return a
     clear 'ffmpeg not found' error instead of an opaque FileNotFoundError mid-render."""
     return _shutil.which("ffmpeg") is None or _shutil.which("ffprobe") is None
-_NOWIN = 0x08000000  # CREATE_NO_WINDOW — no console flash on subprocess calls
+_NOWIN = CREATE_NO_WINDOW  # no console flash on Windows; 0 (safe) on macOS/Linux
 
 _NVENC_OK = None  # cached: can h264_nvenc actually encode on THIS machine?
 def _has_nvenc() -> bool:
@@ -3334,7 +3300,23 @@ def _esc_dt(s: str) -> str:
     return s
 
 
-_DEFAULT_FONT = "C\\:/Windows/Fonts/arialbd.ttf"
+def _pick_default_font() -> str:
+    """First bold system font that actually EXISTS on this OS, formatted for ffmpeg drawtext
+    (forward slashes, escaped colon). Windows had a hardcoded Arial path; on macOS/Linux that
+    file is absent and drawtext (editor title text) would fail — so probe per-platform."""
+    for c in ("C:/Windows/Fonts/arialbd.ttf",                            # Windows
+              "/System/Library/Fonts/Supplemental/Arial Bold.ttf",       # macOS (Arial)
+              "/System/Library/Fonts/Helvetica.ttc",                     # macOS (always present)
+              "/System/Library/Fonts/SFNS.ttf",                          # macOS (San Francisco)
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):   # Linux
+        try:
+            if Path(c).is_file():
+                return c.replace(":", "\\:")
+        except Exception:
+            pass
+    return "C\\:/Windows/Fonts/arialbd.ttf"   # last-resort original
+
+_DEFAULT_FONT = _pick_default_font()
 _FONT_DIRS = (Path("C:/Windows/Fonts"), Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Fonts",
               Path("/usr/share/fonts"), Path("/Library/Fonts"), Path.home() / ".fonts")
 
@@ -3891,7 +3873,28 @@ async def kit_help(req: Request):
     msg = (body.get("message") or "").strip()
     if not msg:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
-    system = KIT_SYSTEM + ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
+    # the brain BECOMES that character (identity + voice from persona) while keeping every bit of
+    # the real room grounding below so it still gives accurate, feature-true help. Absent/empty =>
+    # byte-for-byte the original Kit path (purely additive).
+    persona = (body.get("persona") or "").strip()
+    room_help = ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    if persona:
+        char_name = (body.get("charName") or "").strip() or "your assistant"
+        char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
+        room_labels = {"studio": "DeMartin Audio Labs", "editor": "LePrince Visual Labs",
+                       "images": "Imagination Station", "build": "Blueprint Builds", "bit16": "Bit1Six"}
+        room_label = room_labels.get(room, "DeMartinville")
+        system = (
+            f"You are {char_name}, a {char_craft} working inside DeMartinville {room_label}. {persona}\n\n"
+            "Stay honest and grounded: only help with what this room can actually do — never invent "
+            "features that don't exist. Here's the ground truth on this room:\n" + room_help
+        )
+        knowledge = (body.get("knowledge") or "").strip()
+        if knowledge:
+            system += ("\n\nYOUR OWN NOTES / HOW YOU WORK (use when relevant):\n" + knowledge[:1500])
+    else:
+        system = KIT_SYSTEM + room_help
     # Kit's brain: pull the few most relevant knowledge slices for THIS question
     # (scoped to the room + the program-wide doc) and ground his answer in them.
     # Best-effort — retrieval must never break a reply.

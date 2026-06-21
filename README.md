@@ -21,7 +21,7 @@ AI you chat, write, build, and make with.
 | **The Studio** | `static/studio.html` | A real **Web-Audio DAW** — see below. |
 | **Images** | `static/images.html` | Local image gen via ComfyUI + FLUX (optional). |
 | **Deep Research** | (in Chat) | She writes the queries, searches the web free (DuckDuckGo), reads pages, and synthesizes — every step visible. |
-| **Bit16 / Talk** | `static/bit16.html`, `talk.html` | A 16-bit game + a talking-avatar voice toy. |
+| **Bit16** | `static/bit16.html` | A 16-bit sprite game maker. |
 
 ### The Studio (`static/studio.html`) — a browser DAW, zero dependencies
 

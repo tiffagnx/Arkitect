@@ -45,7 +45,14 @@ import httpx            # noqa: F401
 import pypdf            # noqa: F401
 
 FROZEN = getattr(sys, "frozen", False)
-ROOT = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.abspath(__file__))
+if FROZEN and sys.platform == "darwin":
+    # Inside the .app, static/ rides in the PyInstaller unpack dir, not next to the exe
+    # (which lives in Contents/MacOS/). Mirror app.py's ROOT so chdir + paths line up.
+    ROOT = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+elif FROZEN:
+    ROOT = os.path.dirname(sys.executable)
+else:
+    ROOT = os.path.dirname(os.path.abspath(__file__))
 HOST = "127.0.0.1"
 PORT = 7777
 URL = f"http://localhost:{PORT}"
@@ -114,7 +121,7 @@ def set_window_icon():
     user32 = ctypes.windll.user32
     hwnd = 0
     for _ in range(80):
-        hwnd = user32.FindWindowW(None, "ARKITECT")
+        hwnd = user32.FindWindowW(None, "DeMartinville")
         if hwnd:
             break
         time.sleep(0.25)
@@ -138,7 +145,7 @@ def _fatal(msg):
     if sys.platform == "win32":
         try:
             import ctypes
-            ctypes.windll.user32.MessageBoxW(0, msg, "ARKITECT", 0x10)  # MB_ICONERROR
+            ctypes.windll.user32.MessageBoxW(0, msg, "DeMartinville", 0x10)  # MB_ICONERROR
         except Exception:
             pass
 
@@ -167,7 +174,7 @@ def _focus_existing_window():
     import ctypes
     user32 = ctypes.windll.user32
     for _ in range(50):
-        hwnd = user32.FindWindowW(None, "ARKITECT")
+        hwnd = user32.FindWindowW(None, "DeMartinville")
         if hwnd:
             user32.ShowWindow(hwnd, 9)            # SW_RESTORE
             user32.SetForegroundWindow(hwnd)
@@ -188,7 +195,7 @@ def main():
     started = start_server()
     if not wait_up():
         # The engine never came up — don't open a blank "can't reach localhost" window.
-        _fatal("ARKITECT's engine didn't start.\n\nSee arkitect-run.log next to the app, "
+        _fatal("DeMartinville's engine didn't start.\n\nSee arkitect-run.log next to the app, "
                "or run \"START HERE.bat\" once to finish setup.")
         if isinstance(started, subprocess.Popen):
             try:
@@ -200,11 +207,13 @@ def main():
     import webview
     threading.Thread(target=set_window_icon, daemon=True).start()
     try:
-        # Force the modern WebView2 (Edge Chromium) engine. If it's missing/broken,
-        # this raises rather than silently rendering in the ancient IE/Trident engine —
-        # we catch it below and open the app in the default browser instead.
-        webview.create_window("ARKITECT", URL, width=1500, height=950, min_size=(1100, 700))
-        webview.start(gui="edgechromium")
+        # Pick the native web engine per-OS. Windows: WebView2 / Edge-Chromium. macOS: the
+        # built-in WKWebView (cocoa). Forcing edgechromium on a Mac RAISES, and the except
+        # below would then silently fall back to a browser tab — faking a "native window
+        # works" pass. If the engine is genuinely missing/broken we still catch it.
+        webview.create_window("DeMartinville", URL, width=1500, height=950, min_size=(1100, 700))
+        _gui = "edgechromium" if sys.platform == "win32" else ("cocoa" if sys.platform == "darwin" else None)
+        webview.start(gui=_gui)
     except Exception:
         import traceback
         import webbrowser

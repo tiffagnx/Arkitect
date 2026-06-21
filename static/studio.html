@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>DeMartin Audio Labs — ARKITECT</title>
+<title>DeMartin Audio Labs — DeMartinville</title>
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
   /* THE STUDIO — professional graphite + steel. No pink: dark grays (Material-style
@@ -735,7 +735,7 @@
 <body>
 <div class="menubar" id="menubar"></div>
 <div class="top">
-  <a class="pr-back" href="/" title="Back to ARKITECT"><span class="pr-ar">←</span></a>
+  <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">←</span></a>
   <div class="tgroup counter"><span class="tg-l">COUNTER</span><span class="clock" id="clock">1|1  0:00.0</span></div>
   <div class="tgroup tempokey"><span class="tg-l">TEMPO · KEY</span>
     <span class="tk-rows">
@@ -7317,7 +7317,7 @@ function laneUiTake(t, placeAt) {
   const bar = $("menubar");
   if (!bar) return;
   if (!window.PT_MENUS) { console.warn("[menu bar] PT_MENUS not loaded — /static/pt-menus.js missing?"); return; }
-  // ARKITECT branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
+  // DeMartinville branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
   window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace' && m.id !== 'event');   // drop Marketplace + Event (Event is 100% MIDI / quantize / tempo-curve — dead weight for a vocal studio; audit 2026-06-18)
   // ── Declutter for a VOCAL studio: hide dead-weight menu items (MIDI, scoring, surround, film
   //    timecode, Avid cloud, quantize/elastic, punch/loop-record, window-layout, DSP accounting).
@@ -7353,7 +7353,7 @@ function laneUiTake(t, placeAt) {
     _helpMenu.title = "Updates";   // owner: the Help menu IS the update center now
     _helpMenu.items = [
       { label:"Check for Updates…", shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:true,  submenu:null },
-      { label:"About ARKITECT",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
+      { label:"About DeMartinville",     shortcut:null, feasibility:"buildable-now", mapsTo:null, separator_after:false, submenu:null },
     ];
   }
   const _fileMenu = window.PT_MENUS.find(m => m.id === 'file');   // flatten "Open Recent" → a clickable item (opens the recent-projects list), since submenu parents get no click action
@@ -7462,7 +7462,7 @@ function laneUiTake(t, placeAt) {
     if (menuId === "track"       && /^Bounce/.test(L))            return onTrack(t => bounceTrackStem(t));
     if (menuId === "setup"       && /^Playback Engine/.test(L)) return () => { const o = $("rail").classList.toggle("open"); const sb = $("setupBtn"); if (sb) sb.classList.toggle("on", o); };
     if (menuId === "help"        && /Update/i.test(L))         return () => { if (window.__updateInfo) openUpdatesDialog(); else checkForUpdates(true); };
-    if (menuId === "help"        && /^About/.test(L))          return () => flash("ARKITECT v" + (window.APP_VERSION||"?") + " — DeMartin Audio Labs · in-browser DAW");
+    if (menuId === "help"        && /^About/.test(L))          return () => flash("DeMartinville v" + (window.APP_VERSION||"?") + " — DeMartin Audio Labs · in-browser DAW");
     if (menuId === "audiosuite") { const _p = AUDIOSUITE.find(p => p.name === L); if (_p) return () => { const t = curTrack() || selTrk(); if (!t) return flash("Select a track first"); _asState.procId = _p.id; openAudioSuite(t); }; }
     if (it.feasibility === "exists" && L !== "To Selection" && BY_MAPSTO[it.mapsTo]) return BY_MAPSTO[it.mapsTo];
     return null;
@@ -7493,7 +7493,7 @@ function laneUiTake(t, placeAt) {
       .replace(/Audio ?Suite/gi, "DeMartin Suite")
       .replace(/Avid Media Composer|Media[- ]?Composer/gi, "a video editor")
       .replace(/Pro ?Tools Ultimate/gi, "the full studio")
-      .replace(/Pro ?Tools/gi, "ARKITECT")
+      .replace(/Pro ?Tools/gi, "DeMartinville")
       .replace(/Melodyne(?: Editor)?/gi, "DeMartin Tune")
       .replace(/\bARA2?\b/gi, "")
       .replace(/DigiDelivery/gi, "cloud delivery")
@@ -7665,7 +7665,7 @@ function laneUiTake(t, placeAt) {
       try { localStorage.setItem("ark_upd_last", String(Date.now())); } catch(e){}
       if (r.status === 404){                             // repo has no published release yet → nothing to nag about
         window.__updateInfo = null; try { localStorage.removeItem("ark_upd_info"); } catch(e){}
-        paintUpdatesBadge(); if (manual) flash("ARKITECT v" + APP_VERSION + " — up to date ✓"); return;
+        paintUpdatesBadge(); if (manual) flash("DeMartinville v" + APP_VERSION + " — up to date ✓"); return;
       }
       if (!r.ok) throw new Error("HTTP " + r.status);
       const rel = await r.json();
@@ -7680,7 +7680,7 @@ function laneUiTake(t, placeAt) {
         if (manual) openUpdatesDialog();
       } else {                                           // already current
         window.__updateInfo = null; try { localStorage.removeItem("ark_upd_info"); } catch(e){}
-        paintUpdatesBadge(); if (manual) flash("ARKITECT v" + APP_VERSION + " — up to date ✓");
+        paintUpdatesBadge(); if (manual) flash("DeMartinville v" + APP_VERSION + " — up to date ✓");
       }
     } catch(e){
       if (manual) flash("Couldn't reach the update server — try again later");
@@ -7693,7 +7693,7 @@ function laneUiTake(t, placeAt) {
     const info = window.__updateInfo;
     const ex = document.getElementById("updDlg"); if (ex) ex.remove();
     const body = info
-      ? '<div class="upd-new">A newer build of ARKITECT is ready.</div>' +
+      ? '<div class="upd-new">A newer build of DeMartinville is ready.</div>' +
         '<div class="upd-vers"><span class="upd-from">v' + esc(APP_VERSION) + '</span><span class="upd-arr">→</span><span class="upd-to">v' + esc(info.version) + '</span></div>' +
         (info.notes ? '<div class="upd-notes">' + esc(info.notes).slice(0, 1400) + '</div>' : "") +
         '<div class="upd-hint">One-tap update (save → install → restart) is coming next — for now this opens the download page.</div>'
@@ -7736,17 +7736,17 @@ function laneUiTake(t, placeAt) {
         body: JSON.stringify({ url: info.asset, version: info.version }) });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "staging failed");
-      setBody('<div class="upd-new">ARKITECT v' + esc(info.version) + ' is ready to install.</div>' +
-              '<div class="upd-hint">Your session is saved. ARKITECT restarts to finish — your audio, sessions and settings all stay exactly where they are.</div>');
+      setBody('<div class="upd-new">DeMartinville v' + esc(info.version) + ' is ready to install.</div>' +
+              '<div class="upd-hint">Your session is saved. DeMartinville restarts to finish — your audio, sessions and settings all stay exactly where they are.</div>');
       setFoot('<button class="modal-btn" id="updLater">Later</button><button class="modal-btn go" id="updRestart">Restart now</button>');
       const later = document.getElementById("updLater");
-      if (later) later.onclick = () => { const d = dlg(); if (d) d.remove(); flash("Update installs next time you open ARKITECT ✓"); };
+      if (later) later.onclick = () => { const d = dlg(); if (d) d.remove(); flash("Update installs next time you open DeMartinville ✓"); };
       const rest = document.getElementById("updRestart");
       if (rest) rest.onclick = async () => {
         setFoot('<button class="modal-btn" disabled>Restarting…</button>');
         try { await fetch("/api/studio/update/restart", { method:"POST" }); } catch(e){}
-        setBody('<div class="upd-ok">Restarting ARKITECT…</div>' +
-                '<div class="upd-hint">If it doesn’t come back in a few seconds, just close this window and open ARKITECT again — the update is already installed.</div>');
+        setBody('<div class="upd-ok">Restarting DeMartinville…</div>' +
+                '<div class="upd-hint">If it doesn’t come back in a few seconds, just close this window and open DeMartinville again — the update is already installed.</div>');
       };
     } catch(e){
       setBody('<div class="upd-new">Couldn’t auto-install this one.</div><div class="upd-hint">' + esc(e.message) + '</div>');

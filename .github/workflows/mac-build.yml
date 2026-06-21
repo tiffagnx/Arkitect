@@ -1,0 +1,169 @@
+name: mac-build
+
+# Builds DeMartinville as a free, downloadable macOS .app — no Mac required to build.
+# Run it manually from the repo's Actions tab (workflow_dispatch), or it fires on a version tag.
+# Produces TWO artifacts: one for Intel Macs, one for Apple-Silicon (M1/M2/M3) Macs — download
+# whichever matches the test machine.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mac-build      # pushing this branch auto-runs the build (no default-branch registration needed)
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13      # Intel (x86_64)
+            arch: intel
+          - runner: macos-14      # Apple Silicon (arm64)
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    name: build-${{ matrix.arch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # requirements.txt has no python pin; the Windows launcher uses 3.12, so match it for parity.
+      # fastapi 0.136 / uvicorn 0.49 / pywebview 6.2.1 all support 3.12.
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ffmpeg (for the smoke test + runtime)
+        run: brew install ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # macOS pywebview backend = the PyObjC Cocoa/WebKit bridge (replaces Windows WebView2).
+          # Without pyobjc-framework-WebKit pywebview cannot create the native WKWebView window.
+          pip install pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-WebKit pyobjc-framework-Quartz pyobjc-framework-Security
+          pip install pyinstaller
+
+      # The repo ships only static/app-icon.ico; a .app wants .icns. Best-effort: build one from
+      # the .ico via sips/iconutil. If it fails, the build still proceeds without a custom icon.
+      - name: Generate .icns icon (best-effort)
+        continue-on-error: true
+        run: |
+          set -e
+          mkdir -p build/icon.iconset
+          sips -s format png static/app-icon.ico --out build/icon-1024.png --resampleHeightWidth 1024 1024
+          for sz in 16 32 64 128 256 512; do
+            d=$((sz*2))
+            sips -z $sz $sz build/icon-1024.png --out build/icon.iconset/icon_${sz}x${sz}.png
+            sips -z $d  $d  build/icon-1024.png --out build/icon.iconset/icon_${sz}x${sz}@2x.png
+          done
+          sips -z 1024 1024 build/icon-1024.png --out build/icon.iconset/icon_512x512@2x.png
+          iconutil -c icns build/icon.iconset -o static/app-icon.icns
+          ls -la static/app-icon.icns
+
+      # Build the .app with an inline PyInstaller command (no committed mac spec needed):
+      #   --windowed         → a .app bundle, no console
+      #   --add-data 'a:b'   → macOS uses ':' as the separator (NOT ';' like Windows)
+      #   app.py is bundled as data AND a hidden import (desktop.py imports it in-process when frozen)
+      #   webview cocoa backend + collected pkgs so the native WKWebView window can open
+      - name: Build DeMartinville.app
+        run: |
+          set -e
+          ICON_FLAG=""
+          if [ -f static/app-icon.icns ]; then ICON_FLAG="--icon static/app-icon.icns"; fi
+          pyinstaller --noconfirm --clean --windowed \
+            --name DeMartinville \
+            $ICON_FLAG \
+            --osx-bundle-identifier LePrinceVisualLabs.DeMartinville \
+            --add-data 'static:static' \
+            --add-data 'app.py:.' \
+            --hidden-import app \
+            --hidden-import webview \
+            --hidden-import webview.platforms.cocoa \
+            --collect-all webview \
+            --collect-all uvicorn \
+            --collect-all websockets \
+            --collect-submodules fastapi \
+            --collect-submodules objc \
+            desktop.py
+          ls -la dist
+          test -d "dist/DeMartinville.app"
+
+      # Free cloud self-test: launch the bundled app, give it 30s, and check the engine answers
+      # on :7777. Proves it BOOTS on macOS (not just that it compiled). Never blocks the upload.
+      - name: Smoke test — does it boot on macOS?
+        continue-on-error: true
+        run: |
+          set +e
+          BIN="dist/DeMartinville.app/Contents/MacOS/DeMartinville"
+          echo "Launching $BIN ..."
+          "$BIN" >/tmp/dmv-run.log 2>&1 &
+          APP_PID=$!
+          OK=0
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:7777/api/version)
+            if [ -n "$code" ] && [ "$code" != "000" ]; then
+              echo "✅ Engine answered on :7777 (HTTP $code) after ${i}s — DeMartinville BOOTS on ${{ matrix.arch }} macOS."
+              OK=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$OK" != "1" ]; then
+            echo "⚠️  Engine did not answer within 30s. The .app still built and is downloadable; the window needs a real Mac to diagnose."
+            echo "----- app log -----"; cat /tmp/dmv-run.log || true
+          fi
+          kill $APP_PID 2>/dev/null || true
+          exit 0
+
+      # Photograph EVERY room as macOS WebKit (the Safari engine the app's WKWebView uses) renders
+      # it — so the look can be verified with zero Mac hardware. Boots the app, drives Playwright's
+      # WebKit over each room URL, screenshots into shots/. Never blocks the build.
+      - name: Room screenshot tour (WebKit / Safari engine)
+        continue-on-error: true
+        run: |
+          set +e
+          npm install playwright
+          npx playwright install webkit
+          BIN="dist/DeMartinville.app/Contents/MacOS/DeMartinville"
+          "$BIN" >/tmp/dmv-run2.log 2>&1 &
+          APP_PID=$!
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:7777/api/version)
+            if [ -n "$code" ] && [ "$code" != "000" ]; then echo "engine up (HTTP $code)"; break; fi
+            sleep 1
+          done
+          node tools/room-shots.js
+          kill $APP_PID 2>/dev/null || true
+          echo "----- shots produced -----"; ls -la shots || true
+          exit 0
+
+      - name: Upload room screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeMartinville-mac-${{ matrix.arch }}-screenshots
+          path: shots/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # ditto preserves the bundle's symlinks/permissions inside the zip (plain zip -r mangles a .app).
+      - name: Zip the .app
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent DeMartinville.app DeMartinville-mac-${{ matrix.arch }}.zip
+          ls -la
+
+      - name: Upload the .app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeMartinville-mac-${{ matrix.arch }}
+          path: dist/DeMartinville-mac-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 14

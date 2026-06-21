@@ -30,8 +30,6 @@
 - [ ] **editor.html:1157-1178** — `expGo` export handler leaks the WebSocket on error throws (same root as 1122-1156). **Fix:** Ensure `ws.close()` runs in `finally` before errors propagate. (x2 with editor.html:1122-1156 — shared WS-leak)
 - [ ] **bit16.html:621-625** — Audio `captureStream()` failure swallowed; user records silent video with no warning. **Fix:** In `catch`, `console.warn` and show a "recording silent" UI indicator.
 - [ ] **bit16.html:241,402,407,629** — Object URLs (`createObjectURL`) never revoked; memory grows with each sprite/song/recording. **Fix:** Revoke the prior URL before creating a new one and on `endGame()`.
-- [ ] **talk.html:442** — Aborting a streaming reply returns early without resetting `streaming`/`thinking`/button/caption (UI stuck). **Fix:** Reset all UI state before the early `return` after `abortCtl.abort()`.
-- [ ] **talk.html:432-438** — TTS blob URL leaks on error/interrupt (only revoked in `onended`). **Fix:** Revoke `audioEl.src` before assigning a new one and in the `onerror` handler.
 - [ ] **swarm.html:238-252** — SSE reader never `cancel()`ed on error (stream/resource leak). **Fix:** Add `finally { reader?.cancel().catch(()=>{}) }`.
 - [ ] **swarm.html:161-164** — XSS: `p.key_url`/`p.free`/`p.models_hint` interpolated into `innerHTML` unsanitized. **Fix:** Build the hint with `textContent` + `createElement('a')` for the link.
 - [ ] **pinkroom-nav.js:60** — Document click listener never removed; duplicates accumulate on re-mount/re-inject. **Fix:** Store the handler as a named fn and `removeEventListener` on unmount (or guard re-registration).
