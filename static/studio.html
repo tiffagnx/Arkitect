@@ -7330,7 +7330,7 @@ function laneUiTake(t, placeAt) {
   if (!bar) return;
   if (!window.PT_MENUS) { console.warn("[menu bar] PT_MENUS not loaded — /static/pt-menus.js missing?"); return; }
   // DeMartinville branding — no Avid / Pro Tools: drop the Marketplace menu; slim Help to updates + about.
-  window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace' && m.id !== 'event');   // drop Marketplace + Event (Event is 100% MIDI / quantize / tempo-curve — dead weight for a vocal studio; audit 2026-06-18)
+  window.PT_MENUS = window.PT_MENUS.filter(m => m.id !== 'marketplace' && m.id !== 'event' && m.id !== 'help');   // drop Marketplace + Event (MIDI/tempo dead weight; audit 2026-06-18) + Help/"Updates" (owner 2026-06-21: the app-wide gear updater replaces the per-studio Updates menu)
   // ── Declutter for a VOCAL studio: hide dead-weight menu items (MIDI, scoring, surround, film
   //    timecode, Avid cloud, quantize/elastic, punch/loop-record, window-layout, DSP accounting).
   //    A hidden item is just not rendered — the underlying feature/rendering is untouched, and a
@@ -7775,8 +7775,10 @@ function laneUiTake(t, placeAt) {
     else localStorage.removeItem("ark_upd_info");        // stale (we already updated past it)
   } catch(e){}
   paintUpdatesBadge();
-  setTimeout(() => checkForUpdates(false), 4000);        // first background check shortly after load
-  setInterval(() => checkForUpdates(false), CHECK_EVERY);
+  // Per-studio update polling DISABLED (owner 2026-06-21: the app-wide gear updater handles updates
+  // now — we update the whole app as we go, so the studio's own "Updates" menu + GitHub poll are gone).
+  // setTimeout(() => checkForUpdates(false), 4000);
+  // setInterval(() => checkForUpdates(false), CHECK_EVERY);
 })();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
