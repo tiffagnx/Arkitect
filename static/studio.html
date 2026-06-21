@@ -958,12 +958,18 @@ function clipsOf(t){
 function syncPrimary(t){ if(t.clips && t.clips.length){ t.buffer = t.clips[0].buffer; t.offset = t.clips[0].start; } }
 function _snapClips(t){ return clipsOf(t).map(c=>({...c})); }   // shallow-copy ALL clip props (muted/name/gain too) so undo/redo round-trips them
 function pushUndoClips(t, label){ UNDO.push({ trackId:t.id, label:label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
+function pushUndoAuto(t){ UNDO.push({ auto:{ trackId:t.id, vol:(t.autoVol||[]).map(b=>({...b})), pan:(t.autoPan||[]).map(b=>({...b})) }, label:"Automation" }); if(UNDO.length>80) UNDO.shift(); REDO.length=0; }
 function undoLast(){
   const u = UNDO.pop(); if(!u){ flash("Nothing to undo"); return; }
   if(u.multi){                                   // a cross-track move snapshots BOTH lanes — restore them together
     REDO.push({ multi: u.multi.map(m=>{ const tt=tracks.find(x=>x.id===m.trackId); return { trackId:m.trackId, clips: tt?_snapClips(tt):[] }; }), label:u.label||"" });
     u.multi.forEach(m=>{ const tt=tracks.find(x=>x.id===m.trackId); if(tt){ tt.clips=m.clips.map(c=>({...c})); if(!tt.clips.length){ tt.buffer=null; tt.offset=0; } syncPrimary(tt); drawLane(tt); if(selTrackId===tt.id) renderChannel(tt); } });
     selClip=null; if(playing) restartPlayback(); flash(u.label?"Undo: "+u.label:"Undid the last edit"); return;
+  }
+  if(u.auto){ const tt=tracks.find(x=>x.id===u.auto.trackId);
+    REDO.push({ auto:{ trackId:u.auto.trackId, vol:((tt&&tt.autoVol)||[]).map(b=>({...b})), pan:((tt&&tt.autoPan)||[]).map(b=>({...b})) }, label:u.label||"" });
+    if(tt){ tt.autoVol=u.auto.vol.map(b=>({...b})); tt.autoPan=u.auto.pan.map(b=>({...b})); drawLane(tt); if(playing) restartPlayback(); }
+    flash(u.label?"Undo: "+u.label:"Undid the last edit"); return;
   }
   const t = tracks.find(x=>x.id===u.trackId); if(!t){ flash("Nothing to undo"); return; }
   REDO.push({ trackId:t.id, label:u.label||"", clips:_snapClips(t) });   // remember current state so Redo can re-apply it
@@ -978,6 +984,11 @@ function redoLast(){
     UNDO.push({ multi: r.multi.map(m=>{ const tt=tracks.find(x=>x.id===m.trackId); return { trackId:m.trackId, clips: tt?_snapClips(tt):[] }; }), label:r.label||"" }); if(UNDO.length>80) UNDO.shift();
     r.multi.forEach(m=>{ const tt=tracks.find(x=>x.id===m.trackId); if(tt){ tt.clips=m.clips.map(c=>({...c})); if(!tt.clips.length){ tt.buffer=null; tt.offset=0; } syncPrimary(tt); drawLane(tt); if(selTrackId===tt.id) renderChannel(tt); } });
     selClip=null; if(playing) restartPlayback(); flash(r.label?"Redo: "+r.label:"Redid the edit"); return;
+  }
+  if(r.auto){ const tt=tracks.find(x=>x.id===r.auto.trackId);
+    UNDO.push({ auto:{ trackId:r.auto.trackId, vol:((tt&&tt.autoVol)||[]).map(b=>({...b})), pan:((tt&&tt.autoPan)||[]).map(b=>({...b})) }, label:r.label||"" }); if(UNDO.length>80) UNDO.shift();
+    if(tt){ tt.autoVol=r.auto.vol.map(b=>({...b})); tt.autoPan=r.auto.pan.map(b=>({...b})); drawLane(tt); if(playing) restartPlayback(); }
+    flash(r.label?"Redo: "+r.label:"Redid the edit"); return;
   }
   const t = tracks.find(x=>x.id===r.trackId); if(!t){ flash("Nothing to redo"); return; }
   UNDO.push({ trackId:t.id, label:r.label||"", clips:_snapClips(t) }); if(UNDO.length>80) UNDO.shift();
@@ -3650,7 +3661,7 @@ function laneUi(t) {
       <div class="ts-mid">
         <div class="ts-ctrls">
           <div class="ts-row">
-            <button class="ts-btn r" title="record-enable (arm) — your next recording lands on this track at the cursor">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button>
+            <button class="ts-btn r" title="record-enable (arm) — your next recording lands on this track at the cursor">●</button><button class="ts-btn s" title="solo">S</button><button class="ts-btn m" title="mute">M</button><button class="ts-btn a" title="automation: Volume → Pan → off (ride the fader/pan over time)">A</button>
           </div>
         </div>
         <div class="lm-meter" title="track level"><i></i></div>
@@ -3676,6 +3687,12 @@ function laneUi(t) {
   mb.onclick = (e) => { e.stopPropagation(); t.muted = !t.muted; mb.classList.toggle("on", t.muted); d.classList.toggle("muted", t.muted); applyMix(); };
   sb.onclick = (e) => { e.stopPropagation(); t.solo = !t.solo; sb.classList.toggle("on", t.solo); applyMix(); };
   rb.onclick = (e) => { e.stopPropagation(); setArm(t, !t.armed); };
+  const ab = d.querySelector(".ts-btn.a");
+  if(ab){ const _AV=['off','vol','pan'], _AN={off:'A',vol:'V',pan:'P'};
+    const syncA=()=>{ ab.textContent=_AN[t.autoView||'off']; ab.classList.toggle("on",(t.autoView||'off')!=='off'); };
+    syncA();
+    ab.onclick=(e)=>{ e.stopPropagation(); const i=_AV.indexOf(t.autoView||'off'); t.autoView=_AV[(i+1)%3]; syncA(); drawLane(t);
+      flash(t.autoView==='off'?'Automation hidden':(t.autoView==='vol'?'Volume automation — click/drag points to ride the level':'Pan automation — click/drag points to ride the pan')); }; }
   bindStripCtl(t, d.querySelector(".ts-ctl.vol"), "gain", 0, 1.4, 0.9, gdbStr, true);
   bindStripCtl(t, d.querySelector(".ts-ctl.pan"), "pan", -1, 1, 0, v => Math.abs(v) < 0.01 ? "C" : (v < 0 ? "L" + Math.round(-v * 100) : "R" + Math.round(v * 100)), false);
   renderLaneCols(t);
@@ -3687,6 +3704,7 @@ function laneUi(t) {
   wv.onmousedown = (e) => {
     if (e.button !== 0) return;
     selectTrack(t);
+    if (t.autoView && t.autoView !== 'off') { autoMouseDown(t, wv, e); return; }   // automation view → edit breakpoints, not clips
     const vd = viewDur(), r = wv.getBoundingClientRect();
     const atTime = scrollT + (e.clientX - r.left) / r.width * vd;
     const cl = clipAt(t, atTime);
@@ -3812,7 +3830,7 @@ function laneUi(t) {
       cur = (Math.abs(e.clientX-lX)<=7||Math.abs(e.clientX-rX)<=7) ? 'ew-resize' : ((e.clientY-r.top) < r.height*0.5 ? 'text' : 'grab'); }   // upper half = I-beam (select), lower = hand (grab)
     wv.style.cursor=cur;
   };
-  wv.oncontextmenu = (e) => showWaveMenu(t, wv, e);
+  wv.oncontextmenu = (e) => { if(t.autoView && t.autoView!=='off'){ e.preventDefault(); autoDelete(t, e, wv); return; } showWaveMenu(t, wv, e); };
   selectTrack(t); ensureMasterLane();
 }
 /* ── INSERT RACK — a track holds a CHAIN of effects (t.inserts), each an
@@ -4984,6 +5002,51 @@ function drawLane(t){
     g.fillStyle="rgba(95,180,206,0.18)"; g.fillRect(x1,0,x2-x1,H);
     g.strokeStyle="rgba(95,180,206,0.7)"; g.lineWidth=1; g.beginPath(); g.moveTo(x1,0); g.lineTo(x1,H); g.moveTo(x2,0); g.lineTo(x2,H); g.stroke();
   }
+  drawAutoOverlay(g, t, W, H);                                              // VOL/PAN automation breakpoint editor overlay
+}
+// ── AUTOMATION VIEW — draw + edit volume/pan breakpoints over the lane (PT-style; A button toggles) ──
+function _x2t(x, W){ return scrollT + (x/W)*viewDur(); }
+function _autoRange(view){ return view==='pan' ? {lo:-1,hi:1} : {lo:0,hi:1.4}; }
+function _autoV2y(v, view, H){ const {lo,hi}=_autoRange(view), pad=7, f=Math.max(0,Math.min(1,(v-lo)/(hi-lo))); return pad + (1-f)*(H-2*pad); }
+function _autoY2v(y, view, H){ const {lo,hi}=_autoRange(view), pad=7; let f=1-(y-pad)/(H-2*pad); f=Math.max(0,Math.min(1,f)); return lo + f*(hi-lo); }
+function autoBpsOf(t){ return t.autoView==='pan' ? (t.autoPan||(t.autoPan=[])) : (t.autoVol||(t.autoVol=[])); }
+function drawAutoOverlay(g, t, W, H){
+  const view=t.autoView; if(!view||view==='off') return;
+  const bps=_sortBp(view==='pan'?t.autoPan:t.autoVol), col=view==='pan'?'#79d0e4':'#d9a441';
+  g.fillStyle='rgba(8,9,13,0.5)'; g.fillRect(0,0,W,H);                       // dim the wave so the line reads
+  const ry=_autoV2y(view==='pan'?0:1.0, view, H);                           // reference line: pan-center / volume-unity
+  g.strokeStyle='rgba(255,255,255,0.16)'; g.lineWidth=1; g.setLineDash([4,4]); g.beginPath(); g.moveTo(0,ry); g.lineTo(W,ry); g.stroke(); g.setLineDash([]);
+  g.fillStyle=col; g.font="700 9px 'Space Mono'"; g.textBaseline='top'; g.fillText(view==='pan'?'PAN':'VOL', 5, 4);
+  if(!bps.length){ g.fillStyle='rgba(233,238,242,0.55)'; g.font="600 9px Inter,system-ui,sans-serif"; g.fillText('click to add a point · right-click a point to delete', 32, 5); return; }
+  g.strokeStyle=col; g.lineWidth=2; g.beginPath();
+  g.moveTo(0, _autoV2y(autoValAt(bps,_x2t(0,W)),view,H));
+  for(const bp of bps){ const x=t2x(bp.t,W); if(x<0) continue; if(x>W) break; g.lineTo(x,_autoV2y(bp.v,view,H)); }
+  g.lineTo(W, _autoV2y(autoValAt(bps,_x2t(W,W)),view,H)); g.stroke();
+  for(const bp of bps){ const x=t2x(bp.t,W); if(x<-5||x>W+5) continue; const y=_autoV2y(bp.v,view,H);
+    g.fillStyle=col; g.beginPath(); g.arc(x,y,3.5,0,7); g.fill(); g.strokeStyle='rgba(8,9,13,0.9)'; g.lineWidth=1; g.stroke(); }
+}
+function autoMouseDown(t, wv, e){
+  const view=t.autoView, arr=autoBpsOf(t);
+  const r=wv.getBoundingClientRect(), W=wv.width||r.width, H=wv.height||r.height;
+  const toPx=(cx,cy)=>({ px:(cx-r.left)/r.width*W, py:(cy-r.top)/r.height*H });
+  const p=toPx(e.clientX,e.clientY);
+  let hit=null, hd=11;
+  for(const bp of arr){ const d=Math.hypot(t2x(bp.t,W)-p.px, _autoV2y(bp.v,view,H)-p.py); if(d<hd){ hd=d; hit=bp; } }
+  pushUndoAuto(t);
+  let target=hit;
+  if(!target){ target={ t:Math.max(0,_x2t(p.px,W)), v:_autoY2v(p.py,view,H) }; arr.push(target); arr.sort((a,b)=>a.t-b.t); drawLane(t); }
+  const mv=(ev)=>{ const q=toPx(ev.clientX,ev.clientY); target.t=Math.max(0,_x2t(q.px,W)); target.v=_autoY2v(q.py,view,H); arr.sort((a,b)=>a.t-b.t); drawLane(t); };
+  const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); if(playing) restartPlayback(); flash((view==='pan'?'Pan':'Volume')+' automation'); };
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function autoDelete(t, e, wv){
+  const view=t.autoView, arr=autoBpsOf(t);
+  const r=wv.getBoundingClientRect(), W=wv.width||r.width, H=wv.height||r.height;
+  const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H;
+  let hit=null, hd=12;
+  for(const bp of arr){ const d=Math.hypot(t2x(bp.t,W)-px, _autoV2y(bp.v,view,H)-py); if(d<hd){ hd=d; hit=bp; } }
+  if(hit){ pushUndoAuto(t); arr.splice(arr.indexOf(hit),1); drawLane(t); if(playing) restartPlayback(); flash("Point removed"); return true; }
+  return false;
 }
 
 /* ── live graph per track ── */
@@ -5042,6 +5105,25 @@ function wouldFeedback(t, busId){
     }
   }
   return false;
+}
+// ── VOLUME / PAN AUTOMATION ── breakpoints ride the track fader/pan over time, scheduled on the
+// SHARED graph (buildTrackGraph) so live playback and the offline bounce stay identical. Stored in
+// the same units as the static control: vol = linear gain 0..1.4 (matches t.gain); pan = -1..1.
+function _sortBp(a){ return (a||[]).slice().sort((x,y)=>x.t-y.t); }
+function autoValAt(bps, tt){
+  if(!bps || !bps.length) return null;
+  if(tt <= bps[0].t) return bps[0].v;
+  const last = bps[bps.length-1]; if(tt >= last.t) return last.v;
+  for(let i=0;i<bps.length-1;i++){ const a=bps[i], b=bps[i+1]; if(tt>=a.t && tt<=b.t){ const f=(b.t-a.t)>1e-6?(tt-a.t)/(b.t-a.t):0; return a.v + (b.v-a.v)*f; } }
+  return last.v;
+}
+function scheduleAutoParam(param, bps, when, offset, lo, hi){
+  if(!bps || !bps.length) return false;
+  const clamp=(v)=>Math.max(lo, Math.min(hi, v));
+  try{ param.cancelScheduledValues(when); }catch(e){}
+  param.setValueAtTime(clamp(autoValAt(bps, offset)), when);            // begin at the value under the current transport pos
+  for(const bp of bps){ if(bp.t <= offset + 1e-6) continue; param.linearRampToValueAtTime(clamp(bp.v), when - offset + bp.t); }
+  return true;
 }
 function buildTrackGraph(c, t, when, offset, isOffline) {
   const isAux = t.type === 'aux';
@@ -5130,6 +5212,10 @@ function buildTrackGraph(c, t, when, offset, isOffline) {
   }
   const live = { srcs, inG, lo, mid, hi, comp, pan, fader, send, insertNodes, sendGains, meter };
   applyTrackTo(t, live);
+  // ride volume/pan over time when this track carries automation (skip vol for a muted/solo'd-out track)
+  { const anySolo = tracks.some(x=>x.solo); const aud = !t.muted && !t.inactive && (!anySolo || t.solo);
+    if(aud && t.autoVol && t.autoVol.length) scheduleAutoParam(fader.gain, _sortBp(t.autoVol), when, offset, 0, 1.4);
+    if(t.autoPan && t.autoPan.length) scheduleAutoParam(pan.pan, _sortBp(t.autoPan), when, offset, -1, 1); }
   return live;
 }
 function applyTrackTo(t, n) {
@@ -5980,6 +6066,7 @@ async function buildProjectPayload(title) {
       output: t.output || 'master',
       inputBus: t.inputBus || null,
       sends: (t.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
+      autoVol: (t.autoVol||[]).map(b=>({ t:b.t, v:b.v })), autoPan: (t.autoPan||[]).map(b=>({ t:b.t, v:b.v })), autoView: t.autoView||'off',
     };
     if (t.type !== 'aux') {                                  // stems carry their clips, each with its own timeline start
       td.clips = [];
@@ -6204,7 +6291,10 @@ async function applyProjectPayload(proj) {
           gain: td.gain != null ? td.gain : 0.9, pan: td.pan != null ? td.pan : 0,
           eq: { lo: td.eq?.lo||0, mid: td.eq?.mid||0, hi: td.eq?.hi||0 }, comp: td.comp || 0, send: td.send || 0,
           inserts: (td.inserts || []).map(ins => ({ name: ins.name, params: { ...(ins.params||{}) }, bypassed: !!ins.bypassed })),
-          muted: !!td.muted, solo: !!td.solo, color: td.color || nextStemColor(), src:null, live:null };
+          muted: !!td.muted, solo: !!td.solo, color: td.color || nextStemColor(),
+          autoVol: Array.isArray(td.autoVol) ? td.autoVol.map(b=>({ t:+b.t, v:+b.v })) : [],
+          autoPan: Array.isArray(td.autoPan) ? td.autoPan.map(b=>({ t:+b.t, v:+b.v })) : [],
+          autoView: td.autoView || 'off', src:null, live:null };
         tracks.push(t); auxLaneUi(t);
         const al = $("lane-"+t.id);
         al.querySelectorAll(".strip input[type=range]").forEach(inp => { if(inp.dataset.k==="gain") inp.value=t.gain; if(inp.dataset.k==="pan") inp.value=t.pan; });
@@ -6240,6 +6330,9 @@ async function applyProjectPayload(proj) {
         input: td.input || 'none',
         output: td.output || 'master',
         sends: (td.sends || []).map(s => ({ slot:s.slot, bus:s.bus, level:s.level, pan:s.pan, prefader:!!s.prefader, on:s.on!==false, fmp:!!s.fmp, toAux:s.toAux })),
+        autoVol: Array.isArray(td.autoVol) ? td.autoVol.map(b=>({ t:+b.t, v:+b.v })) : [],
+        autoPan: Array.isArray(td.autoPan) ? td.autoPan.map(b=>({ t:+b.t, v:+b.v })) : [],
+        autoView: td.autoView || 'off',
         src: null, live: null,
       };
       tracks.push(t);
