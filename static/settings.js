@@ -164,6 +164,13 @@
       pv.style.cssText = "margin-top:6px;font:600 11px Inter,sans-serif;line-height:1.4;color:" + (/^⚠/.test(p.privacy) ? "#E6C16A" : /^🔒/.test(p.privacy) ? "#7FD3B0" : "#9FB4C0");
       el.appendChild(pv); }
   }
+  // an honest privacy label for a SAVED provider, looked up from its matching preset (by base URL, then name)
+  function privacyFor(p) {
+    const n = s => (s || "").replace(/\/+$/, "").toLowerCase();
+    const hit = (PRESETS || []).find(x => x.base_url && p.base_url && n(x.base_url) === n(p.base_url))
+             || (PRESETS || []).find(x => x.name && p.name && x.name.toLowerCase() === p.name.toLowerCase());
+    return (hit && hit.privacy) ? hit.privacy : "☁ Your inputs go to this provider — check its data-use policy";
+  }
   async function loadProviders() {
     const r = await fetch("/api/swarm/providers").then(r => r.json()).catch(() => ({ providers: [] }));
     const list = r.providers || []; const el = $("asSlots");
@@ -171,9 +178,12 @@
     el.innerHTML = "";
     list.forEach(p => {
       const d = document.createElement("div"); d.className = "as-slot" + (p.enabled ? "" : " off");
+      const priv = privacyFor(p);
+      const pcol = /^⚠/.test(priv) ? "#E6C16A" : /^🔒/.test(priv) ? "#7FD3B0" : "#9FB4C0";
       d.innerHTML =
         `<div class="nm">${p.name}${p.grounded ? '<span class="as-tag web">🌐</span>' : ''}<span class="as-tag ${p.enabled ? "on" : "no"}">${p.enabled ? "ON" : "OFF"}</span></div>
          <div class="meta">${p.model || "(no model)"} · key: ${p.key_masked || "—"}</div>
+         <div class="meta" style="margin-top:4px;color:${pcol};font-weight:600;line-height:1.4">${priv}</div>
          <div class="row">
            <button data-act="toggle">${p.enabled ? "Disable" : "Enable"}</button>
            <button class="del" data-act="del">Delete</button>
@@ -187,7 +197,7 @@
     const r = await fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({ error: "failed" }));
     await loadProviders(); window.dispatchEvent(new Event("ark:providers-changed")); return r;   // refresh the chat model picker live
   }
-  async function load() { loadPresets(); loadProviders(); }
+  async function load() { await loadPresets(); loadProviders(); }   // presets first → saved cards get the right privacy label/colour on open
 
   // ── APP-WIDE UPDATER — on every room (the gear is everywhere). Checks GitHub Releases for the
   //    WHOLE app; if a newer version is out, badges the gear + offers a one-click whole-app update. ──
