@@ -28,6 +28,8 @@
   if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
   // the in-room FEEDBACK BUDDY (separate from Kit) — "you're early = you're a builder", collects bugs/ideas
   if (!document.querySelector('script[data-fbk]')) { const fs = document.createElement("script"); fs.src = "/static/feedback-buddy.js"; fs.setAttribute("data-fbk", "1"); document.body.appendChild(fs); }
+  // KEYS — the unified API-key window (exposes window.openKeys): curated picks + deep links + paste, saved locally
+  if (!document.querySelector('script[data-keys]')) { const kys = document.createElement("script"); kys.src = "/static/keys.js"; kys.setAttribute("data-keys", "1"); document.body.appendChild(kys); }
   // NO version badge in the rooms — owner's call: the version lives ONLY on the front page (the chat,
   // next to brain/engine). The corner badge here was cluttering the rooms, so it's intentionally gone.
 })();

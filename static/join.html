@@ -41,6 +41,20 @@
   .wip-flag{display:inline-flex;align-items:center;gap:8px;margin-top:26px;font:600 11px 'Space Mono',monospace;letter-spacing:.1em;color:var(--gold);background:rgba(230,193,106,.09);border:1px solid rgba(230,193,106,.28);padding:7px 13px;border-radius:20px;position:relative}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 9px var(--gold);animation:pulse 1.8s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  /* Kit — a faint ghost behind the top, barely there */
+  .hero::after{content:"";position:absolute;left:0;right:0;top:4px;height:560px;
+    background:url('https://demartinlabs.com/kit-hero.png') center top/contain no-repeat;
+    opacity:.07;pointer-events:none;z-index:0}
+  .hero>.wrap{position:relative;z-index:1}
+  .hero h1.heroline{max-width:20ch;margin:8px auto 4px}
+  /* readiness demo: click a move, it learns it, the bar fills */
+  .demochips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .chip{font:600 12px Inter;color:#CFE6EE;background:rgba(62,156,184,.1);border:1px solid rgba(120,182,205,.34);border-radius:9px;padding:8px 12px;cursor:pointer;transition:transform .08s,background .15s,opacity .2s,border-color .15s}
+  .chip:hover{background:rgba(62,156,184,.2);border-color:rgba(120,182,205,.6)}
+  .chip:active{transform:translateY(1px) scale(.985)}
+  .chip.done{opacity:.42;cursor:default;border-color:rgba(120,182,205,.16);text-decoration:line-through}
+  .demohint{font:600 11.5px 'Space Mono',monospace;letter-spacing:.04em;color:var(--faint);margin-top:10px;min-height:1.3em;transition:color .2s}
+  @media (prefers-reduced-motion: reduce){ .fill{animation:none !important;transition:none !important} }
 
   /* sections */
   section.blk{padding:46px 0;border-top:1px solid var(--line)}
@@ -56,7 +70,7 @@
   .ready .rl{display:flex;justify-content:space-between;font:700 11px 'Space Mono',monospace;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
   .ready .rl b{color:var(--gold)}
   .track{height:11px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden;border:1px solid var(--line)}
-  .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--teal2),#9BE37B 70%,var(--gold));animation:fill 2.6s cubic-bezier(.4,0,.2,1) forwards;animation-delay:.3s}
+  .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--teal2),#9BE37B 70%,var(--gold));transition:width .55s cubic-bezier(.4,0,.2,1)}
   @keyframes fill{to{width:100%}}
   .ready .steps{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   .step{flex:1;min-width:150px;font:600 12.5px Inter;color:#C2C8D1;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
@@ -136,6 +150,7 @@
     <div class="wrap">
       <div class="eyebrow">local · private · yours</div>
       <div class="brand"><span class="dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span></div>
+      <h1 class="heroline">A real creative studio. On your machine. <span class="gold" style="-webkit-text-fill-color:var(--gold);color:var(--gold)">Free.</span></h1>
       <div class="manifesto">
         <p>Three years ago, none of this existed. We blinked — and AI was in everything. Your feed, your coffee, your studio. And everywhere you turn it's the same line: <span class="ln">AI's coming for the music.</span></p>
         <p>So the world ran to the cheap version — <em>type a prompt, generate a song, done.</em> No sweat. No heart. No <em>you.</em></p>
@@ -158,6 +173,7 @@
       <p class="sub">Free, private, on your own machine. This is what's running the second you download it:</p>
       <div class="shots">
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/daw.png" alt="DeMartin Audio Labs"><figcaption><b>DeMartin Audio Labs</b> &mdash; record, edit, mix, master. A real engine, not a toy.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/beats.png" alt="DeMartin Beat Lab"><figcaption><b>DeMartin Beat Lab</b> &mdash; cook a beat from scratch: 808s, synths, a piano roll, and an AI in every plugin.</figcaption></figure>
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/editor.png" alt="LePrince Visual Labs"><figcaption><b>LePrince Visual Labs</b> &mdash; cut video like a pro: keyframes, effects, masks.</figcaption></figure>
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/build.png" alt="Blueprint Builds"><figcaption><b>Blueprint Builds</b> &mdash; describe an app, watch it build itself, live.</figcaption></figure>
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/chat.png" alt="DeMartinville home"><figcaption><b>One private hub</b> &mdash; every room, all local, all free to start.</figcaption></figure>
@@ -189,8 +205,14 @@
       <p>This is the part that trips people out. You don't sit down and "train an AI." No forms, no course, no manual. You just open DeMartinville and work — and because the app owns the tools, it sees your <em>actual moves</em>. Not notes about what you'd do. What you actually do, in the session, in real time. Every chain, every "nah, pull that back 2 dB," every cut you make on instinct. That's the difference between a personality that <em>sounds</em> like you and a character that <em>works</em> like you.</p>
       <p>As it learns, a readiness % fills up — your bar from "rough sketch of me" to "yeah, that's how I'd have done it." It does <b>not</b> go on the board until it's good, and nothing ships under your name without your sign-off.</p>
       <div class="ready">
-        <div class="rl"><span>Your character · readiness</span><b id="rpct">100%</b></div>
-        <div class="track"><div class="fill"></div></div>
+        <div class="rl"><span>Your character · readiness</span><b id="rpct">0%</b></div>
+        <div class="demochips" id="demoChips">
+          <button class="chip" type="button">pull the vocal back 2 dB</button>
+          <button class="chip" type="button">carve the low-mid</button>
+          <button class="chip" type="button">glue the chorus</button>
+        </div>
+        <div class="track"><div class="fill" id="rfill"></div></div>
+        <div class="demohint" id="demoHint">↑ make a move — watch it learn you</div>
         <div class="steps">
           <div class="step"><b>01</b> · Work like normal</div>
           <div class="step"><b>02</b> · It learns your real moves</div>
@@ -271,20 +293,35 @@
         <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Download DeMartinville — free</a>
         <a class="btn ghost" href="mailto:koonce47@gmail.com?subject=DeMartinville%20%E2%80%94%20founding%20creator&body=Tell%20me%20about%20your%20craft%20%2B%20who%20you%27d%20bring%20in%3A%0A%0A" id="ctaJoin">Become a founding creator →</a>
       </div>
-      <div class="truth" style="margin-top:24px"><b>The download works</b> — it pulls the latest DeMartinville release. The "founding creator" button still needs a destination (your email / IG / a sign-up form) — tell me where and I'll wire it.</div>
     </div>
   </section>
 
   <footer><span class="foot-logo"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></span>local · private · yours · built in the open</footer>
 
 <script>
-  // tiny touch: count the readiness bar up to 100 as it fills
+  // the readiness bar is a DEMO: click a "move," it learns it, the bar fills. A mechanic,
+  // not fake data — it shows the exact "you work, it learns you" idea the page explains.
   (function(){
-    var el = document.getElementById('rpct'); if(!el) return;
-    var n = 0; el.textContent = '0%';
-    var iv = setInterval(function(){ n += 4; if(n>=100){ n=100; clearInterval(iv); } el.textContent = n + '%'; }, 100);
-    var join = document.getElementById('ctaJoin');
-    if(0) join.addEventListener('click', function(e){ e.preventDefault(); alert("Founding-creator sign-up isn't wired to a destination yet — point it at your email, IG, or a form and it's live. (You're seeing the work-in-progress, exactly as promised.)"); });
+    var pct = document.getElementById('rpct'), fill = document.getElementById('rfill'),
+        hint = document.getElementById('demoHint'),
+        chips = Array.prototype.slice.call(document.querySelectorAll('#demoChips .chip'));
+    if(!pct || !fill || !chips.length) return;
+    var reduce = false; try{ reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    var shown = 0, done = 0, total = chips.length;
+    function paint(p){ fill.style.width = p + '%'; pct.textContent = p + '%'; }
+    paint(0);
+    chips.forEach(function(c){
+      c.addEventListener('click', function(){
+        if(c.classList.contains('done')) return;
+        c.classList.add('done'); done++;
+        var target = Math.round(done / total * 100);
+        fill.style.width = target + '%';
+        hint.textContent = '✓ it just learned a move from you';
+        if(reduce){ shown = target; pct.textContent = target + '%'; }
+        else { (function tick(){ if(shown < target){ shown++; pct.textContent = shown + '%'; setTimeout(tick, 13); } })(); }
+        if(done === total){ setTimeout(function(){ hint.innerHTML = "<span class='gold'>now it's on the board — you're hireable.</span>"; }, reduce ? 0 : 520); }
+      });
+    });
   })();
 </script>
 <script>

@@ -96,6 +96,19 @@
   .roomlink:hover { background: rgba(255,255,255,.045); color: var(--text); border-color: var(--hairline); transform: translateX(2px); }
   .roomlink .ri { width: 26px; height: 26px; min-width: 26px; display: grid; place-items: center; font-size: 13.5px; border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); transition: background .14s, border-color .14s; }
   .roomlink:hover .ri { background: rgba(62,156,184,.16); border-color: rgba(62,156,184,.45); }
+  .roomsearch { display:flex; align-items:center; gap:7px; margin:10px 6px 6px; padding:7px 10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid var(--hairline); transition:border-color .14s, background .14s; }
+  .roomsearch:focus-within { border-color:rgba(62,156,184,.5); background:rgba(62,156,184,.06); }
+  .roomsearch .rs-ic { color:var(--dim); font-size:13px; }
+  .roomsearch input { flex:1; min-width:0; background:none; border:none; outline:none; color:var(--text); font:500 12.5px Inter; }
+  .brand { position:relative; }
+  .wallegg { position:absolute; top:5px; right:6px; z-index:60; width:11px; height:11px; cursor:pointer; opacity:.4; border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, #6FC0D8, #3E9CB8 60%, rgba(62,156,184,0) 76%);
+    transition:opacity .2s, transform .2s, box-shadow .2s; }
+  .wallegg:hover { opacity:1; transform:scale(1.25); box-shadow:0 0 9px rgba(62,156,184,.7); }
+  .wallegg::after { content:"sign the wall"; position:absolute; top:140%; right:-2px; white-space:nowrap; transform:rotate(-8deg); transform-origin:right top;
+    font:700 8px 'Space Mono',monospace; letter-spacing:.09em; text-transform:uppercase; color:#9FCFDD; opacity:0; transition:opacity .2s; pointer-events:none; }
+  .wallegg:hover::after { opacity:.95; }
+  .arkhero .crew.active { border-color:rgba(62,156,184,.7); background:rgba(62,156,184,.1); box-shadow:0 0 0 1px rgba(62,156,184,.3); }
 
   /* ── main ── */
   .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -285,7 +298,7 @@
 
 <div class="app">
   <aside class="side">
-    <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><small>local · private · yours</small></div>
+    <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><small>local · private · yours</small><span class="wallegg" role="button" aria-label="Sign the wall" onclick="location.href='/static/wall.html'"></span></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
     <div class="raillabel">Memory</div>
@@ -293,15 +306,19 @@
       <button type="button" class="roomlink memlink" data-scope="local"><span class="ri">⚡</span><span>Local memory</span></button>
       <button type="button" class="roomlink memlink" data-scope="cloud"><span class="ri">☁</span><span>Cloud memory</span></button>
     </div>
+    <div class="roomsearch"><span class="rs-ic">⌕</span><input id="roomSearch" type="search" placeholder="Search rooms…" autocomplete="off" aria-label="Search rooms" /></div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
-      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
       <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>DeMartin Beat Lab</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
+    </div>
+    <div class="raillabel">More</div>
+    <div class="roomrail">
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
+      <a class="roomlink" href="/static/draw.html"><span class="ri">✏️</span><span>Sketch Pad</span></a>
+      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
       <a class="roomlink" href="/static/character.html"><span class="ri">🧬</span><span>Characters</span></a>
-      <a class="roomlink" href="/static/wall.html"><span class="ri">🧱</span><span>The Wall</span></a>
       <a class="roomlink" href="/static/join.html"><span class="ri">🎭</span><span>For Creators</span></a>
     </div>
     <div class="sidefoot">
@@ -330,8 +347,8 @@
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
           </div>
           <div class="ark-crew">
-            <div class="crew" draggable="true" data-brain="tiff" title="Drag Tiff into a room on the left"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag me ↙</span></div>
-            <div class="crew" draggable="true" data-brain="kit" title="Drag Kit into a room on the left"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag me ↙</span></div>
+            <div class="crew" draggable="true" data-brain="tiff" title="Drag into a room — or click to talk to Tiff here"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag · or click ↙</span></div>
+            <div class="crew" draggable="true" data-brain="kit" title="Drag into a room — or click to talk to Kit here"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag · or click ↙</span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
@@ -488,6 +505,19 @@ function splitThink(raw) {
 function scrollDown() { const sc = $("scroll"); sc.scrollTop = sc.scrollHeight; }
 
 /* ── send ── */
+// ── who you're talking to in the MAIN chat: click a Tiff/Kit card to switch. Updates the
+//    header (avatar + name) + highlights the active card, and tells /api/chat who to be. ──
+let activeBrain = 'tiff';
+function setChatBrain(id){
+  if(id !== 'tiff' && id !== 'kit') return;
+  activeBrain = id;
+  var av = $('avatar'); var who = document.querySelector('.who');
+  if(av) av.style.background = "url('/static/" + (id==='kit'?'tec':'tiff') + ".png') top center / 150% no-repeat, radial-gradient(circle at 32% 30%, #8FD4E4, var(--pink) 60%, #0E323D)";
+  if(who && who.firstChild) who.firstChild.nodeValue = (id==='kit' ? 'KIT' : 'TIFF');
+  document.querySelectorAll('.crew[data-brain]').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-brain')===id); });
+}
+document.addEventListener('click', function(e){ var c = e.target.closest ? e.target.closest('.crew[data-brain]') : null; if(c) setChatBrain(c.getAttribute('data-brain')); });
+
 async function send() {
   if (streaming) { abortCtl?.abort(); return; }
   if (sessionLoading) { setStatus("loading that chat — one sec…"); return; }
@@ -531,7 +561,7 @@ async function send() {
     const effort = $("think").value;
     const body = mode === "research"
       ? { question: modelText || typed, messages, model: currentModel(), effort }
-      : { messages, model: currentModel(), mode, effort };
+      : { messages, model: currentModel(), mode, effort, character: activeBrain };
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
                                    body: JSON.stringify(body), signal: abortCtl.signal });
     if (!res.ok) throw new Error(`server error ${res.status}`);
@@ -645,8 +675,8 @@ function newChat() {
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
           </div>
           <div class="ark-crew">
-            <div class="crew" draggable="true" data-brain="tiff" title="Drag Tiff into a room on the left"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag me ↙</span></div>
-            <div class="crew" draggable="true" data-brain="kit" title="Drag Kit into a room on the left"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag me ↙</span></div>
+            <div class="crew" draggable="true" data-brain="tiff" title="Drag into a room — or click to talk to Tiff here"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag · or click ↙</span></div>
+            <div class="crew" draggable="true" data-brain="kit" title="Drag into a room — or click to talk to Kit here"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag · or click ↙</span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
@@ -937,6 +967,24 @@ startArkTips();
   function endDrag(){ if(ghost){ ghost.remove(); ghost=null; } if(srcCard){ srcCard.classList.remove('dragging'); srcCard=null; } disarm(); brain=null; }
   document.addEventListener('dragend', endDrag);
   document.addEventListener('drop', function(e){ if(!brain) return; e.preventDefault(); var a=roomUnder(e); if(!a){ var n=nearest(e.clientX,e.clientY); if(n && n.d<64) a=n.a; } var id=brain; endDrag(); if(a && a.dataset.dest){ var dest=a.dataset.dest; location.href = dest + (dest.indexOf('?')>-1?'&':'?') + 'brain=' + encodeURIComponent(id); } });
+})();
+</script>
+<script>
+/* room search (menu option C) — filter the Rooms + More rails by name; empty = the grouped view. */
+(function(){
+  var inp = document.getElementById('roomSearch'); if(!inp) return;
+  var side = document.querySelector('.side'); if(!side) return;
+  inp.addEventListener('input', function(){
+    var q = (inp.value||'').toLowerCase().trim();
+    side.querySelectorAll('a.roomlink').forEach(function(a){ a.style.display = (!q || a.textContent.toLowerCase().indexOf(q)>-1) ? '' : 'none'; });
+    side.querySelectorAll('.roomrail').forEach(function(rail){
+      var rooms = rail.querySelectorAll('a.roomlink'); if(!rooms.length) return;
+      var any = [].some.call(rooms, function(a){ return a.style.display !== 'none'; });
+      var label = rail.previousElementSibling;
+      if(label && label.classList.contains('raillabel')) label.style.display = (!q || any) ? '' : 'none';
+    });
+  });
+  inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ var v=[].filter.call(side.querySelectorAll('a.roomlink'), function(a){return a.style.display!=='none';}); if(v[0]) v[0].click(); } });
 })();
 </script>
 <script src="/static/settings.js"></script>

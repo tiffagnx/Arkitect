@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<link rel="icon" href="/static/kit.ico" />
+<title>Marketplace — DeMartinville</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --violet:#7C8AA5; --amber:#D9A441;
+          --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.52); }
+  * { box-sizing:border-box; margin:0; }
+  html { scroll-behavior:smooth; }
+  body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text); line-height:1.5;
+         background: radial-gradient(1100px 600px at 50% -18%, #1C1E24 0%, var(--bg1) 55%, var(--bg0) 100%);
+         background-attachment:fixed; padding-bottom:78px; }
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(62,156,184,.32); }
+
+  /* wordmark lockup (coded) */
+  .dmv { display:inline-flex; align-items:baseline; line-height:1; white-space:nowrap; }
+  .dmv .b { font-family:Oswald,sans-serif; font-weight:700; font-size:1em; letter-spacing:.005em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .dmv .s { font-family:Allura,cursive; font-size:1.35em; margin-left:-.02em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  /* topbar */
+  .topbar { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:13px;
+            padding:12px 20px; background:rgba(12,13,16,.78); backdrop-filter:blur(14px);
+            border-bottom:1px solid var(--hairline); }
+  .pr-back { display:inline-flex; align-items:center; color:#9AA0AC; padding:7px 12px;
+             border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.03); transition:.14s; }
+  .pr-back:hover { color:#EAEDF2; border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.10); }
+  .pr-back .pr-ar { color:rgba(220,224,230,.95); font:700 15px Oxanium,sans-serif; line-height:1; }
+  .brand-dmv { font-size:21px; }
+  .etch { font:600 10px 'Space Mono',monospace; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); }
+  .topbar .spacer { margin-left:auto; }
+
+  /* search + filter bar (LAYER 3) */
+  .findbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .search { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.05);
+            border:1px solid var(--hairline); border-radius:11px; padding:8px 12px; min-width:220px; }
+  .search:focus-within { border-color:rgba(62,156,184,.55); background:rgba(62,156,184,.06); }
+  .search input { background:none; border:none; outline:none; color:var(--text); font:500 13.5px Inter; width:170px; }
+  .search .mag { color:var(--dim); font-size:14px; }
+  .selwrap { position:relative; }
+  .dep { font:600 12px Inter; color:#D4DAE2; background:rgba(255,255,255,.04); border:1px solid var(--hairline);
+         border-radius:10px; padding:8px 11px; cursor:pointer; }
+  .dep:focus { border-color:rgba(62,156,184,.5); outline:none; }
+
+  .wrap { max-width:1120px; margin:0 auto; padding:26px 22px 60px; }
+
+  /* hero — Person of the Week (LAYER 1, STATIC) */
+  .powk { display:grid; grid-template-columns:150px 1fr auto; gap:24px; align-items:center;
+          padding:24px 26px; border:1px solid rgba(217,164,65,.28); border-radius:22px;
+          background:linear-gradient(150deg, rgba(217,164,65,.10), rgba(24,25,30,.86) 52%);
+          box-shadow:0 22px 60px rgba(0,0,0,.42); position:relative; overflow:hidden; }
+  .powk .ribbon { position:absolute; top:14px; left:14px; font:700 9.5px 'Space Mono',monospace; letter-spacing:.14em;
+                  text-transform:uppercase; color:#0C0D10; background:linear-gradient(120deg,#F0CE8C,var(--amber));
+                  padding:4px 9px; border-radius:7px; }
+  .powk .face { width:150px; height:150px; border-radius:20px; display:flex; align-items:center; justify-content:center;
+                font-family:Oxanium,sans-serif; font-weight:800; font-size:54px; color:#0C0D10; }
+  .powk .pname { font-family:Oxanium,sans-serif; font-weight:800; font-size:30px; line-height:1.05; color:#F4ECDA; }
+  .powk .pcraft { margin-top:3px; font:600 12px 'Space Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:#E3C383; }
+  .powk .ptag { margin-top:10px; color:#CBD0D8; font-size:14.5px; max-width:48ch; }
+  .powk .pcol { display:flex; flex-direction:column; gap:9px; }
+
+  /* shelves (LAYER 2) */
+  section { margin-top:34px; }
+  .sec-h { display:flex; align-items:baseline; gap:12px; margin-bottom:14px; }
+  .sec-h h2 { font-family:Oxanium,sans-serif; font-weight:700; font-size:14px; letter-spacing:.13em;
+              text-transform:uppercase; color:#E9EAED; }
+  .sec-h .note { font:400 12px Inter; color:var(--dim); }
+  .rule { height:1px; background:linear-gradient(90deg,rgba(62,156,184,.4),rgba(255,255,255,.02)); flex:1; align-self:center; }
+
+  /* craft / role spine */
+  .spine { display:flex; flex-wrap:wrap; gap:8px; margin:-4px 0 4px; }
+  .spinechip { font:600 12px Inter; padding:7px 13px; border-radius:99px; cursor:pointer;
+               border:1px solid var(--hairline); background:rgba(255,255,255,.035); color:#C6CBD3; transition:.13s; }
+  .spinechip:hover { border-color:rgba(120,182,205,.5); color:#EAEDF2; }
+  .spinechip.on { background:rgba(62,156,184,.16); border-color:rgba(62,156,184,.6); color:#BFE6F2; }
+
+  /* card grid (3-4 cols) */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(238px,1fr)); gap:14px; }
+  .shelf { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(238px,260px); gap:14px;
+           overflow-x:auto; padding-bottom:6px; scroll-snap-type:x proximity; }
+  .shelf::-webkit-scrollbar { height:8px; } .shelf::-webkit-scrollbar-thumb { background:rgba(62,156,184,.3); border-radius:4px; }
+
+  .card { position:relative; border:1px solid var(--hairline); border-radius:16px; background:var(--panel);
+          padding:16px; cursor:grab; transition:transform .14s, border-color .14s, box-shadow .14s; scroll-snap-align:start; }
+  .card:hover { transform:translateY(-3px); border-color:rgba(120,182,205,.45); box-shadow:0 14px 34px rgba(0,0,0,.4); }
+  .card.dragging { opacity:.55; cursor:grabbing; }
+  .card .crow { display:flex; align-items:center; gap:12px; }
+  .card .av { width:50px; height:50px; border-radius:14px; flex:none; display:flex; align-items:center; justify-content:center;
+              font-family:Oxanium,sans-serif; font-weight:800; font-size:21px; color:#0C0D10; }
+  .card .cn { font:700 15.5px Oxanium,sans-serif; letter-spacing:.01em; color:#EAF0F4; line-height:1.1; }
+  .card .cc { margin-top:2px; font:500 12px Inter; color:var(--dim); }
+  .card .proof { margin-top:13px; display:inline-flex; align-items:center; gap:6px; font:600 10.5px 'Space Mono',monospace;
+                 letter-spacing:.05em; padding:4px 9px; border-radius:7px; border:1px solid rgba(0,209,196,.28);
+                 background:rgba(0,209,196,.07); color:#9BD8C9; }
+  .card .proof.award { border-color:rgba(217,164,65,.4); background:rgba(217,164,65,.09); color:#F0CE8C; }
+  .card .open { margin-top:13px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .card .openbtn { font:700 12px Inter; padding:9px 13px; border-radius:10px; flex:1; text-align:center;
+                   background:linear-gradient(120deg,#5FB4CE,var(--pink)); color:#08161B; border:1px solid transparent; transition:.14s; }
+  .card .openbtn:hover { box-shadow:0 5px 16px rgba(62,156,184,.4); }
+  .card .pill { position:absolute; top:13px; right:13px; font:600 8.5px 'Space Mono',monospace; letter-spacing:.1em;
+                text-transform:uppercase; padding:3px 7px; border-radius:6px; }
+  .pill.house { color:#C9CDD4; background:rgba(255,255,255,.07); border:1px solid var(--hairline); }
+  .pill.preview { color:#8C93A0; background:rgba(255,255,255,.04); border:1px solid var(--hairline); }
+  .pill.new { color:#0C0D10; background:linear-gradient(120deg,#7FE0D3,var(--teal)); }
+  .grabdot { position:absolute; bottom:14px; right:14px; font-size:13px; color:rgba(120,182,205,.6); }
+
+  .empty { color:var(--dim); font-size:14px; padding:30px; text-align:center; border:1px dashed var(--hairline); border-radius:14px; }
+
+  /* deploy dock (drag-to-deploy targets) */
+  .dock { position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; align-items:center; gap:14px;
+          padding:12px 20px; background:rgba(12,13,16,.92); backdrop-filter:blur(16px); border-top:1px solid var(--hairline); }
+  .dock .lbl { font:600 11px 'Space Mono',monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+  .dock .targets { display:flex; gap:10px; flex-wrap:wrap; }
+  .target { display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:12px; cursor:pointer;
+            border:1px dashed rgba(120,182,205,.35); background:rgba(62,156,184,.05); color:#CFE6EE;
+            font:600 12.5px Inter; transition:.13s; }
+  .target:hover { border-color:rgba(120,182,205,.7); }
+  .target.over { border-style:solid; border-color:var(--teal); background:rgba(0,209,196,.16); color:#CFF3EC; transform:scale(1.04); }
+  .target .ti { font-size:15px; }
+  .dock .hint { margin-left:auto; font:400 11.5px Inter; color:var(--dim); }
+
+  /* docked chat launcher (NOT floating over the grid) */
+  .chatdock { position:fixed; right:18px; bottom:74px; z-index:35; display:flex; align-items:center; gap:8px;
+              height:40px; padding:0 15px 0 13px; border-radius:21px; cursor:pointer;
+              border:1px solid rgba(120,182,205,.32); background:linear-gradient(180deg,rgba(42,46,54,.96),rgba(22,24,30,.96));
+              color:#CFE6EE; font:700 12px Oxanium,sans-serif; letter-spacing:.04em; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+  .chatdock:hover { border-color:rgba(120,182,205,.7); transform:translateY(-1px); }
+
+  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%) translateY(10px); z-index:60; opacity:0;
+           background:rgba(20,22,28,.96); border:1px solid rgba(62,156,184,.4); border-radius:12px; padding:11px 16px;
+           font:600 13px Inter; color:#CFE6EE; pointer-events:none; transition:.2s; }
+  .toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:560px){
+    .powk{ grid-template-columns:1fr; text-align:center; justify-items:center; }
+    .powk .pcol{ width:100%; }
+    .dock{ flex-wrap:wrap; gap:9px; } .dock .hint{ display:none; }
+    .search input{ width:120px; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">&larr;</span></a>
+    <span class="dmv brand-dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span>
+    <span class="etch">Marketplace</span>
+    <span class="spacer"></span>
+    <div class="findbar">
+      <label class="search"><span class="mag">⌕</span><input id="q" type="search" placeholder="Search a skill or name…" autocomplete="off" /></label>
+      <select class="dep" id="depFilter" title="Filter by where the skill deploys">
+        <option value="">Deploys into · All</option>
+        <option value="studio">Audio Labs</option>
+        <option value="beats">Beat Lab</option>
+        <option value="editor">Visual Labs</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- LAYER 1 — Person of the Week (static) -->
+    <div class="powk" id="powk"></div>
+
+    <!-- LAYER 2 — craft/role spine -->
+    <section>
+      <div class="sec-h"><h2>Browse by Craft</h2><span class="rule"></span></div>
+      <div class="spine" id="spine"></div>
+    </section>
+
+    <!-- Staff Picks shelf -->
+    <section id="staffSec">
+      <div class="sec-h"><h2>Staff Picks</h2><span class="note">hand-picked.</span><span class="rule"></span></div>
+      <div class="shelf" id="staffShelf"></div>
+    </section>
+
+    <!-- New & worth a look (protected new-arrivals lane) -->
+    <section id="newSec">
+      <div class="sec-h"><h2>New &amp; Worth a Look</h2><span class="note">just arrived — everybody gets a fair shot.</span><span class="rule"></span></div>
+      <div class="shelf" id="newShelf"></div>
+    </section>
+
+    <!-- All skills grid -->
+    <section>
+      <div class="sec-h"><h2 id="gridTitle">All Skills</h2><span class="note" id="trendNote">trending = ranked by who deploys &amp; keeps them.</span><span class="rule"></span></div>
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="emptyMsg" style="display:none">No skill matches that yet. Build one in the Character Forge → <a href="/static/character.html" style="color:#8FC9DA">make a character</a>.</div>
+    </section>
+
+  </div>
+
+  <!-- deploy dock — drag a person onto a room -->
+  <div class="dock">
+    <span class="lbl">Drag a person into a room →</span>
+    <div class="targets" id="targets">
+      <div class="target" data-room="studio">DeMartin Audio Labs</div>
+      <div class="target" data-room="beats">DeMartin Beat Lab</div>
+      <div class="target" data-room="editor">LePrince Visual Labs</div>
+    </div>
+    <span class="hint">…or tap a card’s <b>Open in</b> button. Drop a person on a room and it opens with them inside.</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var ROOMS = {
+    studio: { label:"DeMartin Audio Labs",  url:"/static/studio.html" },
+    beats:  { label:"DeMartin Beat Lab",    url:"/static/beats.html"  },
+    editor: { label:"LePrince Visual Labs", url:"/static/editor.html" },
+    chat:   { label:"Chat",                 url:"/"                    }
+  };
+  // craft -> home room
+  var CRAFT_ROOM = { mix:"studio", master:"studio", producer:"studio", beats:"beats", dj:"studio", video:"editor", color:"editor", writer:"chat" };
+  var SPINE = [
+    {key:"", label:"All"}, {key:"mix", label:"Mixing"}, {key:"beats", label:"Beats"},
+    {key:"master", label:"Mastering"}, {key:"dj", label:"DJ"}, {key:"video", label:"Video Edit"},
+    {key:"color", label:"Color"}, {key:"writer", label:"Writing"}
+  ];
+
+  // The ONLY hard-coded entry is the owner himself. NO fabricated people. Everyone else
+  // on the marketplace comes ONLY from real characters that real users actually build
+  // (loaded below from the dmv_characters store).
+  var SEED = [
+    { id:"koonce", name:"B. Koonce", craft:"mix", craftLabel:"Vocal Mixing Engineer", color:"#3E9CB8",
+      tagline:"25 years putting vocals in the pocket — the skill mixes a vocal the way I would.",
+      proof:"SAMA ’15 · 2nd", proofKind:"award", house:true, profile:"/static/profile.html" }
+  ];
+
+  function roomFor(c){ return c.room || CRAFT_ROOM[c.craft] || "studio"; }
+  function initial(n){ return (n||"?").trim().charAt(0).toUpperCase(); }
+
+  // ── load real user-built characters from the same store the rest of the app uses ──
+  function loadMine(){
+    try{
+      var raw = JSON.parse(localStorage.getItem("dmv_characters"));
+      if(!Array.isArray(raw)) return [];
+      return raw.filter(function(c){ return c && c.id && c.mine; }).map(function(c){
+        return { id:c.id, name:c.name||"Untitled", craft:c.craft||"", craftLabel:c.craftLabel||"Skill",
+                 color:c.color||"#3E9CB8", tagline:c.tagline||"", room:(c.rooms&&c.rooms[0])||CRAFT_ROOM[c.craft]||"studio",
+                 proof: (typeof c.readiness==="number" ? ("Trained "+Math.round(c.readiness)+"%") : "Trained"),
+                 avatar:c.avatar, avatarType:c.avatarType, real:true };
+      });
+    }catch(e){ return []; }
+  }
+
+  var ROSTER = loadMine().concat(SEED);
+
+  // ── card builder ──
+  function avatarEl(c){
+    var a = document.createElement("div"); a.className="av";
+    if(c.avatar && c.avatarType && c.avatarType!=="color"){
+      a.style.background = "#0E0F14";
+      var img = document.createElement("img"); img.src=c.avatar; img.alt="";
+      img.style.cssText="width:100%;height:100%;object-fit:cover;border-radius:14px;"+(c.avatarType==="pixel"?"image-rendering:pixelated;":"");
+      a.appendChild(img);
+    } else {
+      a.style.background = "radial-gradient(120% 120% at 30% 20%, "+lighten(c.color)+", "+c.color+")";
+      a.textContent = initial(c.name);
+    }
+    return a;
+  }
+  function lighten(hex){ try{ var m=hex.replace("#",""); var r=parseInt(m.slice(0,2),16),g=parseInt(m.slice(2,4),16),b=parseInt(m.slice(4,6),16);
+    return "rgb("+Math.min(255,r+60)+","+Math.min(255,g+60)+","+Math.min(255,b+60)+")"; }catch(e){ return "#7FC4D8"; } }
+
+  function card(c){
+    var rk = roomFor(c);
+    var el = document.createElement("div"); el.className="card"; el.draggable=true; el.dataset.id=c.id; el.dataset.room=rk;
+    el.dataset.craft=c.craft||""; el.dataset.name=(c.name||"").toLowerCase()+" "+(c.craftLabel||"").toLowerCase();
+
+    var pill = c.house ? '<span class="pill house" title="the house entry — kept out of the rankings on purpose">House</span>'
+             : c.isNew ? '<span class="pill new">New</span>'
+             : c.preview ? '<span class="pill preview" title="sample card — shows the layout">Preview</span>' : '';
+
+    el.innerHTML =
+      pill +
+      '<div class="crow"></div>' +
+      '<div class="proof'+(c.proofKind==="award"?" award":"")+'">'+(c.proofKind==="award"?"✓ ":"")+ (c.proof||"Trained") +'</div>' +
+      '<div class="open">' +
+        '<a class="openbtn" href="#" data-deploy="'+c.id+'">Open in '+ROOMS[rk].label+' →</a>' +
+      '</div>';
+    el.querySelector(".crow").appendChild(avatarEl(c));
+    var meta = document.createElement("div");
+    meta.innerHTML = '<div class="cn">'+esc(c.name)+'</div><div class="cc">'+esc(c.craftLabel)+'</div>';
+    el.querySelector(".crow").appendChild(meta);
+
+    el.querySelector(".openbtn").addEventListener("click", function(ev){ ev.preventDefault(); deploy(c.id, rk); });
+    el.addEventListener("dragstart", function(ev){ ev.dataTransfer.setData("text/plain", c.id); el.classList.add("dragging"); DRAGID=c.id; });
+    el.addEventListener("dragend", function(){ el.classList.remove("dragging"); DRAGID=null; clearOver(); });
+    // a profile/own-room link on click of the avatar/name (press the person -> their room/page)
+    el.querySelector(".crow").style.cursor="pointer";
+    el.querySelector(".crow").addEventListener("click", function(){ if(c.profile){ location.href=c.profile; } else { deploy(c.id, rk); } });
+    return el;
+  }
+  function esc(s){ return (s||"").replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m];}); }
+
+  var DRAGID = null;
+
+  function deploy(id, room){
+    var c = ROSTER.filter(function(x){return x.id===id;})[0]; if(!c) return;
+    var rk = room || roomFor(c);
+    var url = ROOMS[rk].url;
+    // real (stored) characters carry the ?char= deep-link so the room auto-loads them as the brain
+    if(c.real){ url += (url.indexOf("?")>-1?"&":"?") + "char=" + encodeURIComponent(id); }
+    toast(c.name + " → opening " + ROOMS[rk].label + "…");
+    setTimeout(function(){ location.href = url; }, 480);
+  }
+
+  // ── Person of the Week (static hero) ──
+  function renderHero(){
+    var f = ROSTER.filter(function(c){return c.featured && !c.house;})[0] || ROSTER.filter(function(c){return !c.house;})[0];
+    var box = document.getElementById("powk");
+    if(!f){ box.style.display="none"; return; }   // nobody real to feature yet → no hero
+    var rk = roomFor(f);
+    box.innerHTML = '<span class="ribbon">Person of the Week</span>' +
+      '<div class="face" style="background:radial-gradient(120% 120% at 30% 20%,'+lighten(f.color)+','+f.color+')">'+initial(f.name)+'</div>' +
+      '<div><div class="pname">'+esc(f.name)+'</div><div class="pcraft">'+esc(f.craftLabel)+'</div>' +
+      '<div class="ptag">'+esc(f.tagline||"")+'</div></div>' +
+      '<div class="pcol">' +
+        '<a class="openbtn" href="#" id="heroDeploy" style="text-align:center;padding:12px 18px">Deploy in '+ROOMS[rk].label+' →</a>' +
+        '<span style="font:600 10px \'Space Mono\',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:center">swapped weekly · by hand</span>' +
+      '</div>';
+    document.getElementById("heroDeploy").addEventListener("click", function(ev){ ev.preventDefault(); deploy(f.id, rk); });
+  }
+
+  // ── spine (craft filter) ──
+  var activeCraft = "";
+  function renderSpine(){
+    var s = document.getElementById("spine"); s.innerHTML="";
+    SPINE.forEach(function(sp){
+      var b=document.createElement("button"); b.className="spinechip"+(sp.key===activeCraft?" on":""); b.textContent=sp.label;
+      b.addEventListener("click", function(){ activeCraft=sp.key; renderSpine(); renderGrid(); });
+      s.appendChild(b);
+    });
+  }
+
+  // ── shelves ──
+  function fillShelf(elId, list){
+    var sh=document.getElementById(elId); sh.innerHTML="";
+    list.forEach(function(c){ sh.appendChild(card(c)); });
+    return list.length;
+  }
+
+  // ── main grid (search + craft + deploy filters) ──
+  function renderGrid(){
+    var q = (document.getElementById("q").value||"").toLowerCase().trim();
+    var dep = document.getElementById("depFilter").value;
+    var g = document.getElementById("grid"); g.innerHTML="";
+    var matched = ROSTER.filter(function(c){
+      if(activeCraft && c.craft!==activeCraft) return false;
+      if(dep && roomFor(c)!==dep) return false;
+      if(q){ var hay=(c.name+" "+c.craftLabel+" "+(c.tagline||"")).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      return true;
+    });
+    document.getElementById("emptyMsg").style.display = matched.length? "none":"block";
+    matched.forEach(function(c){ g.appendChild(card(c)); });
+    document.getElementById("gridTitle").textContent = (activeCraft||dep||q) ? ("Results · "+matched.length) : "All Skills";
+  }
+
+  // ── deploy dock drag targets ──
+  function clearOver(){ Array.prototype.forEach.call(document.querySelectorAll(".target"), function(t){ t.classList.remove("over"); }); }
+  function wireTargets(){
+    Array.prototype.forEach.call(document.querySelectorAll(".target"), function(t){
+      t.addEventListener("dragover", function(ev){ ev.preventDefault(); t.classList.add("over"); });
+      t.addEventListener("dragleave", function(){ t.classList.remove("over"); });
+      t.addEventListener("drop", function(ev){ ev.preventDefault(); t.classList.remove("over");
+        var id = ev.dataTransfer.getData("text/plain") || DRAGID; if(id) deploy(id, t.dataset.room); });
+      t.addEventListener("click", function(){ toast("Drag a person’s card onto "+ROOMS[t.dataset.room].label+" — or use a card’s Open button."); });
+    });
+  }
+
+  var _tt;
+  function toast(m){ var t=document.getElementById("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(_tt); _tt=setTimeout(function(){ t.classList.remove("on"); }, 2200); }
+
+  document.getElementById("q").addEventListener("input", renderGrid);
+  document.getElementById("depFilter").addEventListener("change", renderGrid);
+
+  // initial render
+  renderHero();
+  renderSpine();
+  var nStaff = fillShelf("staffShelf", ROSTER.filter(function(c){return c.staff;}));
+  var nNew = fillShelf("newShelf", ROSTER.filter(function(c){return c.isNew;}));
+  if(!nStaff) document.getElementById("staffSec").style.display="none";
+  if(!nNew) document.getElementById("newSec").style.display="none";
+  renderGrid();
+  wireTargets();
+})();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

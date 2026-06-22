@@ -9,7 +9,7 @@
   if (window.__fbk) return;
   const path = location.pathname.toLowerCase();
   const ROOMS = { studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds", editor: "LePrince Visual Labs",
-    images: "Imagination Station" };
+    images: "Imagination Station", draw: "Sketch Pad" };
   let room = null; for (const k in ROOMS) if (path.includes(k + ".html")) { room = k; break; }
   if (!room) return;
   window.__fbk = true;

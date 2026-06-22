@@ -14,7 +14,7 @@
   const path = location.pathname.toLowerCase();
   const ROOMS = {
     studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
-    editor: "LePrince Visual Labs", images: "Imagination Station",
+    editor: "LePrince Visual Labs", images: "Imagination Station", draw: "Sketch Pad",
   };
   let room = null;
   for (const k in ROOMS) { if (path.includes(k + ".html")) { room = k; break; } }
@@ -117,15 +117,17 @@
   .kit-msg.kit b { color:#9FCFDD; }
   .kit-msg.think { color:rgba(198,201,208,.6); font-style:italic; }
   .kit-msg.riff .riff-who { font:800 11px Oxanium; letter-spacing:.04em; }
-  .kit-riff { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
-  .kit-riff:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
-  .kit-riff:disabled { opacity:.5; cursor:default; }
+  .kit-riff, .kit-pipe { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
+  .kit-riff:hover, .kit-pipe:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-riff:disabled, .kit-pipe:disabled { opacity:.5; cursor:default; }
   .kit-tier { display:flex; align-items:center; gap:5px; padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.12); }
   .kit-tier .kt-l { font:700 8.5px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:rgba(170,180,190,.5); margin-right:3px; }
   .kt-pill { font:700 9.5px Oxanium; letter-spacing:.04em; padding:3px 9px; border-radius:20px; cursor:pointer; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03); color:#C6CBD3; }
   .kt-pill.on[data-tier="local"] { border-color:rgba(120,182,205,.85); background:rgba(62,156,184,.18); color:#BFE6F2; }
   .kt-pill.on[data-tier="private"] { border-color:rgba(217,164,65,.85); background:rgba(217,164,65,.2); color:#F0CE8C; }
   .kt-pill.on[data-tier="max"] { border-color:rgba(240,90,120,.9); background:rgba(240,90,120,.22); color:#FFB4C4; }
+  .kt-keylink { margin-left:auto; font:700 9px 'Space Mono',monospace; letter-spacing:.06em; color:#9FCFDD; background:none; border:none; cursor:pointer; padding:3px 4px; }
+  .kt-keylink:hover { color:#CFE6EE; text-decoration:underline; }
   .kit-win.tier-private { border-color:rgba(217,164,65,.5); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(217,164,65,.28), 0 0 26px rgba(217,164,65,.12), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-foot { display:flex; gap:8px; padding:10px 11px; border-top:1px solid rgba(255,255,255,.07); }
@@ -195,9 +197,9 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag a character into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-go" title="ask">➤</button></div>`;
+     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-pipe" title="Run a pipeline — each character does their part in order, handing the work down the line">⛓</button><button class="kit-go" title="ask">➤</button></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -317,6 +319,7 @@
     if (announce && goingUp) ding();
   }
   [...win.querySelectorAll(".kt-pill")].forEach(p => { p.title = TIER_NOTE[p.dataset.tier]; p.onclick = () => setTier(p.dataset.tier, true); });
+  { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
   setTier("local", false);
 
   // ── merge in user-made characters, paint the roster, then default to Kit ──
@@ -376,9 +379,9 @@
     const span = document.createElement("span"); span.innerHTML = fmt(text); d.appendChild(span);
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
   }
-  let riffing = false;
+  let riffing = false, piping = false;
   async function riff(){
-    if (riffing) return;
+    if (riffing || piping) return;
     const others = CHARACTERS.filter(c => c.id !== active.id);
     if (!others.length){ addMsg("kit", "Bring in one more first — tap another in the strip up top, or hit + Build. Two of us and we'll talk."); return; }
     const A = active, B = others[0];
@@ -411,8 +414,46 @@
     } finally { riffing = false; go.disabled = false; if (rb) rb.disabled = false; winSpr.setSpeed(3); }
   }
 
+  // ── PIPELINE — each character does their part IN ORDER, handing the work down the line
+  //    (e.g. producer → artist → engineer). Same local-brain orchestration as the round
+  //    table, but sequential + role-handoff instead of free back-and-forth. ──
+  async function pipeline(){
+    if (riffing || piping) return;
+    const line = [active, ...CHARACTERS.filter(c => c.id !== active.id)];
+    if (line.length < 2){ addMsg("kit", "Need at least two of us for a pipeline — bring in another, or hit + Build."); return; }
+    const seed = input.value.trim() || ("Make something in " + ROOMS[room] + ".");
+    input.value = ""; input.style.height = "auto";
+    const pb = win.querySelector(".kit-pipe");
+    piping = true; go.disabled = true; if (pb) pb.disabled = true; winSpr.setSpeed(9);
+    addMsg("you", "⛓ Pipeline — " + line.map(c => c.name).join(" → ") + " — " + seed);
+    const transcript = [];
+    try {
+      for (let i = 0; i < line.length; i++){
+        const speaker = line[i], isLast = (i === line.length - 1);
+        const done = transcript.map(t => t.name + ": " + t.text).join("\n");
+        const msg = (i === 0)
+          ? ("You're FIRST in a pipeline in " + ROOMS[room] + " working toward: " + seed +
+             "\n\nLay the groundwork as " + speaker.name + " in your lane, 1-2 sentences, then hand off to " + line[1].name + ".")
+          : ("Pipeline in " + ROOMS[room] + " toward: " + seed + "\nDone so far:\n" + done +
+             "\n\nYou're " + speaker.name + ". Take the handoff and add YOUR part in your lane, 1-2 sentences" +
+             (isLast ? ", then wrap it up." : ", then hand to " + line[i + 1].name + "."));
+        const think = addMsg("kit", speaker.name + " is working…"); think.classList.add("think");
+        const payload = { room, message: msg, character: speaker.id, tier };
+        if (speaker.mine){ payload.persona = speaker.persona || ""; payload.knowledge = speaker.knowledge || ""; payload.charName = speaker.name; payload.charCraft = speaker.craftLabel || speaker.craft || ""; }
+        let reply = "";
+        try { const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const j = await r.json(); reply = (j.reply || "").trim(); }
+        catch(e){ reply = ""; }
+        think.remove();
+        if (!reply){ addMsg("kit", "(pipeline stalled — local model hiccup. Run it again.)"); break; }
+        transcript.push({ name: speaker.name, text: reply });
+        addRiffMsg(speaker, reply);
+      }
+    } finally { piping = false; go.disabled = false; if (pb) pb.disabled = false; winSpr.setSpeed(3); }
+  }
+
   go.onclick = ask;
   { const _rb = win.querySelector(".kit-riff"); if (_rb) _rb.onclick = riff; }
+  { const _pb = win.querySelector(".kit-pipe"); if (_pb) _pb.onclick = pipeline; }
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(90, input.scrollHeight) + "px"; });
 

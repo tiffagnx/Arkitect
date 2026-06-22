@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<link rel="icon" href="/static/kit.ico" />
+<title>Sketch Pad — DeMartinville</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --violet:#7C8AA5; --amber:#D9A441;
+          --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.52); }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; overflow:hidden; }
+  body { font-family:Inter,system-ui,sans-serif; color:var(--text); display:flex; flex-direction:column;
+         background: radial-gradient(1100px 600px at 50% -18%, #1C1E24 0%, var(--bg1) 55%, var(--bg0) 100%); }
+  a { text-decoration:none; }
+
+  .dmv { display:inline-flex; align-items:baseline; line-height:1; white-space:nowrap; }
+  .dmv .b { font-family:Oswald,sans-serif; font-weight:700; font-size:1em; letter-spacing:.005em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .dmv .s { font-family:Allura,cursive; font-size:1.35em; margin-left:-.02em;
+            background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .top { display:flex; align-items:center; gap:13px; padding:11px 18px; border-bottom:1px solid var(--hairline);
+         background:rgba(12,13,16,.6); backdrop-filter:blur(12px); flex:none; }
+  .pr-back { display:inline-flex; align-items:center; color:#9AA0AC; padding:7px 11px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.03); transition:.14s; }
+  .pr-back:hover { color:#EAEDF2; border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.1); }
+  .pr-back .pr-ar { color:rgba(220,224,230,.95); font:700 15px Oxanium; line-height:1; }
+  .brand { font-size:20px; }
+  .tag { font:600 10px 'Space Mono'; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
+  .top .sp { margin-left:auto; }
+  .btn { font:700 12px Inter; padding:8px 13px; border-radius:10px; cursor:pointer; border:1px solid var(--hairline); background:rgba(255,255,255,.045); color:var(--text); transition:.14s; }
+  .btn:hover { border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.1); }
+  .btn.hot { background:linear-gradient(120deg,#5FB4CE,var(--pink)); color:#08161B; border-color:transparent; }
+
+  .toolbar { display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:9px 18px; border-bottom:1px solid var(--hairline); flex:none; }
+  .tg { display:flex; align-items:center; gap:4px; }
+  .tool { font:600 12px Inter; padding:7px 11px; border-radius:9px; cursor:pointer; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:#C6CBD3; transition:.12s; }
+  .tool:hover { border-color:rgba(120,182,205,.5); color:#EAEDF2; }
+  .tool.on { background:rgba(62,156,184,.18); border-color:rgba(62,156,184,.65); color:#BFE6F2; }
+  .div { width:1px; height:24px; background:var(--hairline); margin:0 3px; }
+  .lbl { font:600 9px 'Space Mono'; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-right:2px; }
+  .sw { width:22px; height:22px; border-radius:6px; cursor:pointer; border:2px solid rgba(255,255,255,.14); padding:0; }
+  .sw.on { border-color:#fff; transform:scale(1.08); }
+  input[type=color] { width:26px; height:26px; padding:0; border:1px solid var(--hairline); border-radius:7px; background:none; cursor:pointer; }
+  input[type=range] { width:108px; accent-color:var(--pink); }
+  .sizeval { font:600 11px 'Space Mono'; color:var(--dim); width:26px; text-align:center; }
+
+  .stage { flex:1; display:flex; align-items:center; justify-content:center; padding:18px; min-height:0; }
+  .pad { background:#F7F4EC; border-radius:10px; box-shadow:0 18px 50px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.4);
+         touch-action:none; cursor:crosshair; max-width:100%; max-height:100%; }
+  .savednote { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); font:600 11px 'Space Mono'; color:#9BD8C9;
+               background:rgba(20,22,28,.9); border:1px solid rgba(62,156,184,.4); border-radius:10px; padding:6px 12px; opacity:0; transition:.2s; pointer-events:none; }
+  .savednote.on { opacity:1; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">&larr;</span></a>
+    <span class="dmv brand" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span>
+    <span class="tag">Sketch Pad</span>
+    <span class="sp"></span>
+    <button class="btn" id="png">⬇ PNG</button>
+  </div>
+
+  <div class="toolbar">
+    <span class="lbl">Tool</span>
+    <div class="tg" id="tools">
+      <button class="tool on" data-tool="pen">Pen</button>
+      <button class="tool" data-tool="marker">Marker</button>
+      <button class="tool" data-tool="pencil">Pencil</button>
+      <button class="tool" data-tool="eraser">Eraser</button>
+    </div>
+    <span class="div"></span>
+    <span class="lbl">Ink</span>
+    <div class="tg" id="swatches"></div>
+    <input type="color" id="custom" value="#1b1b1f" title="custom color" />
+    <span class="div"></span>
+    <span class="lbl">Size</span>
+    <input type="range" id="size" min="1" max="48" value="6" />
+    <span class="sizeval" id="sizeval">6</span>
+    <span class="div"></span>
+    <button class="tool" id="undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button class="tool" id="redo" title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+    <span class="div"></span>
+    <button class="tool" id="clear">Clear</button>
+  </div>
+
+  <div class="stage"><canvas class="pad" id="pad"></canvas></div>
+  <div class="savednote" id="snote">saved</div>
+
+<script>
+(function(){
+  const PAPER = "#F7F4EC", STORE = "dmv_sketch";
+  const SWATCHES = ["#1b1b1f","#e23b3b","#e6862a","#e8c534","#2fa84f","#2f7fe0","#7c4ad6","#d44d8e","#ffffff"];
+  const cv = document.getElementById("pad"), ctx = cv.getContext("2d");
+  let tool = "pen", color = "#1b1b1f", size = 6, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  // ── canvas sizing (fills the stage, crisp on HiDPI). Preserves art across resizes. ──
+  function sizeCanvas(){
+    const stage = document.querySelector(".stage");
+    const pad = 36;
+    let w = Math.max(320, Math.min(1400, stage.clientWidth - pad));
+    let h = Math.max(240, Math.min(1000, stage.clientHeight - pad));
+    const prev = cv.width ? cv.toDataURL() : null;
+    cv.style.width = w + "px"; cv.style.height = h + "px";
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle = PAPER; ctx.fillRect(0,0,w,h);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (prev){ const im = new Image(); im.onload = ()=>ctx.drawImage(im,0,0,w,h); im.src = prev; }
+  }
+
+  // ── brush stamp engine — smooth, pressure/speed-tapered strokes ──
+  const TOOLS = {
+    pen:    { alpha:1.0,  mul:1.0,  comp:"source-over", jitter:0 },
+    marker: { alpha:0.42, mul:2.4,  comp:"source-over", jitter:0 },
+    pencil: { alpha:0.75, mul:0.7,  comp:"source-over", jitter:0.5 },
+    eraser: { alpha:1.0,  mul:2.2,  comp:"source-over", jitter:0, paper:true },
+  };
+  let drawing = false, last = null, lastT = 0;
+
+  function widthAt(p, speed){
+    let f;
+    if (p && p > 0 && p < 1) f = 0.35 + 0.65 * p;          // real stylus pressure
+    else f = Math.max(0.35, Math.min(1, 1.15 - speed * 0.06)); // mouse/touch: faster = thinner
+    return Math.max(0.6, size * TOOLS[tool].mul * f);
+  }
+  function stamp(x, y, r){
+    const t = TOOLS[tool];
+    ctx.globalCompositeOperation = t.comp;
+    ctx.globalAlpha = t.alpha;
+    ctx.fillStyle = t.paper ? PAPER : color;
+    let jx = 0, jy = 0;
+    if (t.jitter){ jx = (Math.random()-0.5)*r*t.jitter; jy = (Math.random()-0.5)*r*t.jitter; }
+    ctx.beginPath(); ctx.arc(x+jx, y+jy, r, 0, 6.2832); ctx.fill();
+  }
+  function lineStamp(x0,y0,r0,x1,y1,r1){
+    const d = Math.hypot(x1-x0, y1-y0), step = Math.max(1, Math.min(r0,r1)*0.3), n = Math.max(1, Math.ceil(d/step));
+    for (let i=0;i<=n;i++){ const t=i/n; stamp(x0+(x1-x0)*t, y0+(y1-y0)*t, r0+(r1-r0)*t); }
+  }
+  function pt(e){ const r = cv.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top, p:e.pressure }; }
+
+  cv.addEventListener("pointerdown", e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    drawing = true; const a = pt(e); last = { ...a, r: widthAt(a.p, 0)/2 }; lastT = performance.now(); stamp(last.x, last.y, last.r); });
+  cv.addEventListener("pointermove", e=>{ if(!drawing) return; e.preventDefault();
+    const a = pt(e), now = performance.now(), dt = Math.max(1, now-lastT), speed = Math.hypot(a.x-last.x, a.y-last.y)/dt*16;
+    const r = widthAt(a.p, speed)/2;
+    lineStamp(last.x, last.y, last.r, a.x, a.y, r);
+    last = { ...a, r }; lastT = now; });
+  function endStroke(){ if(!drawing) return; drawing = false; ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; pushUndo(); autosave(); }
+  cv.addEventListener("pointerup", endStroke);
+  cv.addEventListener("pointercancel", endStroke);
+  cv.addEventListener("pointerleave", e=>{ if(drawing) endStroke(); });
+
+  // ── undo / redo (ImageData snapshots) ──
+  let undoStack = [], redoStack = [];
+  function snap(){ return ctx.getImageData(0,0,cv.width,cv.height); }
+  function pushUndo(){ undoStack.push(snap()); if(undoStack.length>30) undoStack.shift(); redoStack.length = 0; }
+  function restore(im){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.putImageData(im,0,0); ctx.restore(); }
+  document.getElementById("undo").onclick = ()=>{ if(!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); autosave(); };
+  document.getElementById("redo").onclick = ()=>{ if(!redoStack.length) return; undoStack.push(snap()); restore(redoStack.pop()); autosave(); };
+  window.addEventListener("keydown", e=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z"){ e.preventDefault(); (e.shiftKey?document.getElementById("redo"):document.getElementById("undo")).click(); } });
+
+  // ── save / autosave (localStorage) ──
+  let saveT = null;
+  function flash(){ const n=document.getElementById("snote"); n.classList.add("on"); clearTimeout(flash._t); flash._t=setTimeout(()=>n.classList.remove("on"),900); }
+  function autosave(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try{ localStorage.setItem(STORE, cv.toDataURL("image/png")); flash(); }catch(e){} }, 600); }
+  document.getElementById("png").onclick = ()=>{ const a=document.createElement("a"); a.href=cv.toDataURL("image/png"); a.download="sketch.png"; a.click(); };
+  document.getElementById("clear").onclick = ()=>{ if(!confirm("Clear the whole page?")) return; pushUndo(); const w=parseFloat(cv.style.width), h=parseFloat(cv.style.height); ctx.fillStyle=PAPER; ctx.fillRect(0,0,w,h); autosave(); };
+
+  // ── toolbar wiring ──
+  document.getElementById("tools").addEventListener("click", e=>{ const b=e.target.closest(".tool"); if(!b) return;
+    tool = b.dataset.tool; [...document.querySelectorAll("#tools .tool")].forEach(t=>t.classList.toggle("on", t===b)); });
+  const sw = document.getElementById("swatches");
+  SWATCHES.forEach((c,i)=>{ const b=document.createElement("button"); b.className="sw"+(i===0?" on":""); b.style.background=c; b.title=c;
+    b.onclick=()=>{ color=c; document.getElementById("custom").value=c; [...sw.children].forEach(x=>x.classList.toggle("on",x===b)); if(tool==="eraser"){ tool="pen"; document.querySelectorAll('#tools .tool').forEach(t=>t.classList.toggle("on",t.dataset.tool==="pen")); } }; sw.appendChild(b); });
+  document.getElementById("custom").oninput = e=>{ color=e.target.value; [...sw.children].forEach(x=>x.classList.remove("on")); };
+  const sz = document.getElementById("size"), szv = document.getElementById("sizeval");
+  sz.oninput = ()=>{ size=+sz.value; szv.textContent=sz.value; };
+
+  // ── boot ──
+  sizeCanvas();
+  try { const saved = localStorage.getItem(STORE); if(saved){ const im=new Image(); im.onload=()=>{ const w=parseFloat(cv.style.width), h=parseFloat(cv.style.height); ctx.drawImage(im,0,0,w,h); }; im.src=saved; } } catch(e){}
+  let rt = null; window.addEventListener("resize", ()=>{ clearTimeout(rt); rt=setTimeout(sizeCanvas, 200); });
+})();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>
