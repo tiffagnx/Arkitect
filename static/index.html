@@ -33,7 +33,7 @@
   :root {
     /* ARKITECT — ported from The Studio: professional graphite + steel, no pink.
        One desaturated steel-cyan accent (--pink), slate (--violet), amber for status. */
-    --pink: #3E9CB8; --teal: #2BB6A8; --violet: #7C8AA5; --amber: #D9A441;
+    --pink: #3E9CB8; --accent2: #5FB4CE; --teal: #2BB6A8; --violet: #7C8AA5; --amber: #D9A441;
     --bg0: #0C0D10; --bg1: #15161A; --panel: rgba(24,25,30,0.86);
     --hairline: rgba(255,255,255,0.07); --text: #E9EAED; --dim: rgba(198,201,208,0.52);
   }
@@ -75,7 +75,7 @@
     filter: drop-shadow(0 0 16px rgba(62,156,184,.30)); user-select: none; }
   .brand small { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
   .newchat { margin: 4px 14px 10px; padding: 10px; border: none; border-radius: 12px; cursor: pointer;
-    font: 600 13px Inter; color: #14040E; background: linear-gradient(120deg, #5FB4CE, var(--pink));
+    font: 600 13px Inter; color: #14040E; background: linear-gradient(120deg, var(--accent2), var(--pink));
     box-shadow: 0 4px 18px rgba(62,156,184,.35); transition: transform .12s, box-shadow .12s; }
   .newchat:hover { transform: translateY(-1px); box-shadow: 0 7px 24px rgba(62,156,184,.5); }
   .sesslist { flex: 1; overflow-y: auto; padding: 2px 10px; }
@@ -121,7 +121,7 @@
   @keyframes pulse { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
   .who { font-family: Oxanium; font-size: 13.5px; letter-spacing: .06em; }
   .who small { display: block; font: 400 10px 'Space Mono'; color: var(--dim); letter-spacing: .12em; }
-  select.model { margin-left: auto; max-width: 320px; padding: 8px 12px; border-radius: 10px; outline: none; cursor: pointer;
+  select.model { margin-left: auto; max-width: 180px; text-overflow: ellipsis; padding: 8px 12px; border-radius: 10px; outline: none; cursor: pointer;
     background: rgba(255,255,255,.045); color: var(--text); border: 1px solid var(--hairline); font: 500 12px Inter; }
   select.model option { background: var(--bg1); }
   .model-refresh { margin-left: 6px; width: 34px; height: 34px; flex: none; border-radius: 10px; cursor: pointer; font-size: 15px; line-height: 1;
@@ -147,6 +147,36 @@
     display: flex; align-items: center; justify-content: center; font: 700 10px Oxanium; }
   .msg.tiff .tag { background: radial-gradient(circle at 32% 30%, #8FD4E4, var(--pink)); color: #08222A; box-shadow: 0 0 10px rgba(62,156,184,.5); }
   .msg.you .tag { background: rgba(255,255,255,.08); color: var(--dim); border: 1px solid var(--hairline); }
+  .msg.tiff .tag.tiff { background: radial-gradient(circle at 32% 30%, #F8A6D0, #E94B9C); color: #3A0A22; box-shadow: 0 0 10px rgba(233,75,156,.5); }
+  .msg.tiff .tag.kit  { background: radial-gradient(circle at 32% 30%, #8FD4E4, #3E9CB8); color: #08222A; box-shadow: 0 0 10px rgba(62,156,184,.5); }
+  /* topbar character switcher — fades in once you're chatting; Tiff pink, Kit blue */
+  .charsw { display:flex; align-items:center; gap:5px; margin-left:auto; }   /* sits in the freed-up middle space (model is right-aligned via its own margin-left:auto) */
+  .csf { width:27px; height:27px; border-radius:50%; cursor:pointer; padding:0; border:2px solid transparent;
+    background-size:150%; background-position:top center; background-repeat:no-repeat; opacity:.42;
+    transition:opacity .15s, transform .15s, border-color .15s, box-shadow .15s; }
+  .csf:hover { opacity:.85; transform:translateY(-1px); }
+  .csf.tiff { background-image:url('/static/tiff.png'); }
+  .csf.kit  { background-image:url('/static/tec.png'); }
+  .csf.on { opacity:1; }
+  .csf.tiff.on { border-color:#E94B9C; box-shadow:0 0 9px rgba(233,75,156,.55); }
+  .csf.kit.on  { border-color:#3E9CB8; box-shadow:0 0 9px rgba(62,156,184,.55); }
+  /* welcome-screen character shelf — the roster/marketplace; collapses to the switcher when chatting */
+  .charshelf { display:flex; align-items:center; gap:14px; padding:13px 22px; border-bottom:1px solid var(--hairline); overflow-x:auto; }
+  .charshelf.hide { display:none; }
+  .charshelf::-webkit-scrollbar { height:0; }
+  .cshelf-lbl { font:700 9px 'Space Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); flex:none; }
+  .cshelf-row { display:flex; gap:10px; align-items:center; }
+  .cstile { display:flex; align-items:center; gap:9px; padding:7px 14px 7px 8px; border-radius:14px; border:1px solid var(--hairline); background:rgba(255,255,255,.025); cursor:pointer; flex:none; transition:transform .14s, border-color .14s, box-shadow .14s, background .14s; }
+  .cstile:hover { transform:translateY(-2px); border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.07); }
+  .cstile img { width:36px; height:36px; border-radius:11px; object-fit:contain; pointer-events:none; }
+  .cstile .ct-n { font:700 12.5px Oxanium; letter-spacing:.02em; color:var(--text); display:block; line-height:1.1; }
+  .cstile .ct-r { font:600 8.5px 'Space Mono',monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); display:block; margin-top:2px; }
+  .cstile.tiff:hover { border-color:#E94B9C; box-shadow:0 0 13px rgba(233,75,156,.28); }
+  .cstile.kit:hover  { border-color:#3E9CB8; box-shadow:0 0 13px rgba(62,156,184,.28); }
+  .cstile.build { border-style:dashed; gap:7px; padding:7px 15px; }
+  .cstile.build .ct-plus { font:700 17px Oxanium; color:#9FCFDD; line-height:1; }
+  .cstile.build:hover { border-color:rgba(120,182,205,.6); }
+  .charflash { position:fixed; inset:0; z-index:99998; pointer-events:none; opacity:0; transition:opacity .15s ease-out; }
 
   .steps { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 4px 40px; }
   .step { font: 400 12px 'Space Mono'; color: var(--dim); display: flex; gap: 8px; align-items: center; animation: rise .2s ease-out; }
@@ -216,7 +246,7 @@
     color: var(--dim); background: rgba(255,255,255,.035); border: 1px solid var(--hairline); transition: all .15s; }
   .mode.on { color: #14040E; background: linear-gradient(120deg, #7BF0E4, var(--teal)); border-color: transparent;
     box-shadow: 0 3px 14px rgba(0,209,196,.4); }
-  .mode.chat.on { background: linear-gradient(120deg, #5FB4CE, var(--pink)); color: #14040E; box-shadow: 0 3px 14px rgba(62,156,184,.4); }
+  .mode.chat.on { background: linear-gradient(120deg, var(--accent2), var(--pink)); color: #14040E; box-shadow: 0 3px 14px rgba(62,156,184,.4); }
   select.think { padding: 6px 11px; border-radius: 99px; cursor: pointer; outline: none;
     color: var(--dim); background: rgba(255,255,255,.035); border: 1px solid var(--hairline); font: 600 11px Inter; }
   select.think option { background: var(--bg1); }
@@ -228,7 +258,7 @@
   textarea { flex: 1; min-width: 0; border: none; outline: none; resize: none; background: transparent; color: var(--text);
     font: 400 14.5px Inter; line-height: 1.5; max-height: 160px; padding: 8px 6px; }
   .send { width: 44px; height: 44px; min-width: 44px; border: none; border-radius: 50%; cursor: pointer; font-size: 17px;
-    color: #14040E; background: linear-gradient(135deg, #5FB4CE, var(--pink)); box-shadow: 0 0 16px rgba(62,156,184,.45);
+    color: #14040E; background: linear-gradient(135deg, var(--accent2), var(--pink)); box-shadow: 0 0 16px rgba(62,156,184,.45);
     transition: transform .1s, box-shadow .15s; display: flex; align-items: center; justify-content: center; }
   .send:hover { transform: scale(1.06); }
   .send.stop { background: #2A1318; color: #FF8FA0; border: 1.5px solid rgba(255,90,110,.55); box-shadow: none; }
@@ -295,6 +325,7 @@
 <body>
 <div class="aura"><div class="a1"></div><div class="a2"></div><div class="a3"></div></div>
 <div class="grain"></div>
+<div class="charflash" id="charflash"></div>
 
 <div class="app">
   <aside class="side">
@@ -318,7 +349,6 @@
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
       <a class="roomlink" href="/static/draw.html"><span class="ri">✏️</span><span>Sketch Pad</span></a>
       <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
-      <a class="roomlink" href="/static/character.html"><span class="ri">🧬</span><span>Characters</span></a>
       <a class="roomlink" href="/static/join.html"><span class="ri">🎭</span><span>For Creators</span></a>
     </div>
     <div class="sidefoot">
@@ -334,8 +364,17 @@
     <div class="topbar">
       <div class="avatar" id="avatar"></div>
       <div class="who">TIFF<small id="status">ready</small></div>
+      <div class="charsw" id="charsw" style="display:none">
+        <button class="csf tiff on" data-brain="tiff" title="Talk to Tiff" type="button"></button>
+        <button class="csf kit" data-brain="kit" title="Talk to Kit" type="button"></button>
+      </div>
       <select class="model" id="model"></select>
       <button class="model-refresh" id="modelRefresh" title="Refresh DeMartinville — reload the app to pick up the latest (no exit + restart)">⟳</button>
+    </div>
+
+    <div class="charshelf" id="charshelf">
+      <div class="cshelf-lbl">Characters</div>
+      <div class="cshelf-row" id="cshelfRow"></div>
     </div>
 
     <div class="scroll" id="scroll"><div class="col" id="col">
@@ -345,10 +384,6 @@
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
-          </div>
-          <div class="ark-crew">
-            <div class="crew" draggable="true" data-brain="tiff" title="Drag into a room — or click to talk to Tiff here"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag · or click ↙</span></div>
-            <div class="crew" draggable="true" data-brain="kit" title="Drag into a room — or click to talk to Kit here"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag · or click ↙</span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
@@ -456,9 +491,11 @@ function md(t) { // tiny safe formatter: bold + inline code only
 }
 function addMsg(role, text, atts) {
   $("hello")?.remove();
+  { var _cs = $("charsw"); if (_cs) _cs.style.display = "flex"; }   // switcher appears once you're chatting
+  { var _sh = $("charshelf"); if (_sh) _sh.classList.add("hide"); }  // ...and the big shelf collapses into it
   const d = document.createElement("div");
   d.className = `msg ${role === "user" ? "you" : "tiff"}`;
-  d.innerHTML = `<div class="tag">${role === "user" ? "B" : "T"}</div><div class="bubble"></div>`;
+  d.innerHTML = `<div class="tag${role === "user" ? "" : (activeBrain === "kit" ? " kit" : " tiff")}">${role === "user" ? "B" : (activeBrain === "kit" ? "K" : "T")}</div><div class="bubble"></div>`;
   const bub = d.querySelector(".bubble");
   bub.innerHTML = md(text || "");
   if (atts && atts.length) {
@@ -508,15 +545,55 @@ function scrollDown() { const sc = $("scroll"); sc.scrollTop = sc.scrollHeight; 
 // ── who you're talking to in the MAIN chat: click a Tiff/Kit card to switch. Updates the
 //    header (avatar + name) + highlights the active card, and tells /api/chat who to be. ──
 let activeBrain = 'tiff';
+function charDing(id){
+  try {
+    var ac = window.__ac || (window.__ac = new (window.AudioContext||window.webkitAudioContext)());
+    if (ac.state === 'suspended') ac.resume();
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine';
+    var f1 = id==='kit' ? 523 : 659, f2 = id==='kit' ? 392 : 880;   // Kit drops, Tiff lifts — you can HEAR who
+    o.frequency.setValueAtTime(f1, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(f2, ac.currentTime + 0.13);
+    g.gain.setValueAtTime(0.0001, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.16, ac.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.28);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.3);
+  } catch(_){}
+}
+function charFlash(color){
+  var f = $('charflash'); if(!f) return;
+  f.style.background = 'radial-gradient(ellipse at center, rgba(0,0,0,0) 42%, ' + color + ' 112%)';
+  f.style.opacity = '1';
+  setTimeout(function(){ f.style.opacity = '0'; }, 150);
+}
 function setChatBrain(id){
   if(id !== 'tiff' && id !== 'kit') return;
+  var _changed = (id !== activeBrain);
   activeBrain = id;
   var av = $('avatar'); var who = document.querySelector('.who');
   if(av) av.style.background = "url('/static/" + (id==='kit'?'tec':'tiff') + ".png') top center / 150% no-repeat, radial-gradient(circle at 32% 30%, #8FD4E4, var(--pink) 60%, #0E323D)";
   if(who && who.firstChild) who.firstChild.nodeValue = (id==='kit' ? 'KIT' : 'TIFF');
   document.querySelectorAll('.crew[data-brain]').forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-brain')===id); });
+  document.querySelectorAll('.csf[data-brain]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-brain')===id); });
+  if(av) av.style.boxShadow = (id==='kit' ? '0 0 0 2px rgba(62,156,184,.75)' : '0 0 0 2px rgba(233,75,156,.75)');
+  try { window.activeBrain = id; if (window.setMascotChar) window.setMascotChar(id); } catch(_){}   // switch the bottom animation to match
+  // theme the whole UI to the active character — Tiff pink, Kit blue
+  var _rs = document.documentElement.style;
+  _rs.setProperty('--pink',    id==='kit' ? '#3E9CB8' : '#D9568F');
+  _rs.setProperty('--accent2', id==='kit' ? '#5FB4CE' : '#F2A0C8');
+  if(_changed){ charFlash(id==='kit' ? 'rgba(62,156,184,.5)' : 'rgba(217,86,143,.5)'); charDing(id); }   // flash + sound only on a real switch
 }
-document.addEventListener('click', function(e){ var c = e.target.closest ? e.target.closest('.crew[data-brain]') : null; if(c) setChatBrain(c.getAttribute('data-brain')); });
+document.addEventListener('click', function(e){ var c = e.target.closest ? e.target.closest('.crew[data-brain],.csf[data-brain],.cstile[data-brain]') : null; if(c) setChatBrain(c.getAttribute('data-brain')); });
+// the welcome-screen character shelf — the roster. REAL characters only: Tiff + Kit, plus a "build your own" tile.
+function renderShelf(){
+  var row = $("cshelfRow"); if(!row) return;
+  row.innerHTML =
+    '<div class="cstile tiff" data-brain="tiff" title="Talk to Tiff"><img src="/static/tiff.png" alt=""><span><span class="ct-n">Tiff</span><span class="ct-r">words</span></span></div>' +
+    '<div class="cstile kit" data-brain="kit" title="Talk to Kit"><img src="/static/tec.png" alt=""><span><span class="ct-n">Kit</span><span class="ct-r">build</span></span></div>' +
+    '<div class="cstile build" onclick="location.href=\'/static/character.html\'" title="Build your own character"><span class="ct-plus">＋</span><span class="ct-n">Build your own</span></div>';
+}
+renderShelf();
 
 async function send() {
   if (streaming) { abortCtl?.abort(); return; }
@@ -540,7 +617,7 @@ async function send() {
   const dispAtts = atts.map(a => ({ kind: a.kind, name: a.name, url: a.kind === "image" ? a.url : undefined }));
   const userMsg = { role: "user", content, _typed: typed, _files: fileAtts.map(f => ({ name: f.name })) };
 
-  ta.value = ""; ta.style.height = "auto";
+  ta.value = ""; ta.style.height = "auto"; growInput();
   clearAtts();
   addMsg("user", typed, dispAtts);
   messages.push(userMsg);
@@ -665,6 +742,8 @@ async function loadSessions() {
 function newChat() {
   if (streaming) { abortCtl?.abort(); }   // don't strand an in-flight reply on the old (now-cleared) chat
   sessionId = null; messages = [];
+  { var _cs = $("charsw"); if (_cs) _cs.style.display = "none"; }   // back on the welcome screen → hide the switcher
+  { var _sh = $("charshelf"); if (_sh) _sh.classList.remove("hide"); renderShelf(); }   // ...and bring the character shelf back
   // rebuild the welcome state in place — no full reload (kills flicker + keeps the page alive)
   $("col").innerHTML =
     `<div class="hello" id="hello">
@@ -673,10 +752,6 @@ function newChat() {
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
           <div class="ark-wings">
             <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
-          </div>
-          <div class="ark-crew">
-            <div class="crew" draggable="true" data-brain="tiff" title="Drag into a room — or click to talk to Tiff here"><img class="tiff-pfp" src="/static/tiff.png" alt="Tiff" /><span><b>TIFF</b><small>creative partner · words</small></span><span class="grab">drag · or click ↙</span></div>
-            <div class="crew" draggable="true" data-brain="kit" title="Drag into a room — or click to talk to Kit here"><img src="/static/tec.png" alt="Kit" /><span><b>KIT</b><small>creative partner · build</small></span><span class="grab">drag · or click ↙</span></div>
           </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
@@ -777,12 +852,13 @@ $("researchType").onchange = () => { swarmOn = $("researchType").value === "swar
 
 /* ── mic: tap to talk, PAUSE freely, tap again when done — YOU press send (never auto-sends) ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false, wantStop = false, finalText = "";
+let rec = null, listening = false, wantStop = false, finalText = "", pendingInterim = "";
 function micActive(on){
-  $("mic").style.background = on ? "linear-gradient(135deg,#5FB4CE,var(--pink))" : "rgba(255,255,255,.07)";
+  $("mic").style.background = on ? "linear-gradient(135deg,var(--accent2),var(--pink))" : "rgba(255,255,255,.07)";
   $("mic").style.color = on ? "#14040E" : "#D8CCE4";
 }
-function growInput(){ const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }
+function growInput(){ const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px";
+  try { document.querySelector(".tec-mascot")?.classList.toggle("busy", t.value.trim().length > 0); } catch(_){} }
 function stopMic(){ if (listening) { wantStop = true; try { rec?.stop(); } catch(_){} } }
 $("mic").onclick = () => {
   if (!SR) { setStatus("this browser has no speech engine — Chrome does", true); return; }
@@ -790,6 +866,7 @@ $("mic").onclick = () => {
   if (rec) { try { rec.onend = null; rec.abort(); } catch(_){} rec = null; }   // kill any prior instance so rapid taps don't overlap
   wantStop = false;
   finalText = $("input").value ? $("input").value.replace(/\s+$/,"") + " " : "";   // keep anything already typed
+  pendingInterim = "";
   rec = new SR();
   rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;  // keep listening through pauses
   rec.onstart = () => { listening = true; micActive(true); setStatus("listening… take your time — tap 🎙 again when you're done"); };
@@ -797,7 +874,17 @@ $("mic").onclick = () => {
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {             // only NEW results (no double-counting)
       const r = e.results[i];
-      if (r.isFinal) finalText += r[0].transcript + " "; else interim += r[0].transcript;
+      if (r.isFinal) {
+        // Chrome's speech engine bleeps profanity (***) in FINAL results, but the live
+        // interim is usually uncensored — if the final got masked, keep the clean interim.
+        let t = r[0].transcript;
+        if (/\*/.test(t) && pendingInterim && !/\*/.test(pendingInterim)) t = pendingInterim;
+        finalText += t + " ";
+        pendingInterim = "";
+      } else {
+        interim += r[0].transcript;
+        pendingInterim = r[0].transcript;
+      }
     }
     $("input").value = (finalText + interim).replace(/\s{2,}/g, " ").replace(/^\s+/, "");
     growInput();
@@ -810,7 +897,7 @@ $("mic").onclick = () => {
   rec.start();
 };
 const ta = $("input");
-ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; });
+ta.addEventListener("input", growInput);
 ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); stopMic(); send(); } });
 $("send").onclick = () => { stopMic(); send(); };
 

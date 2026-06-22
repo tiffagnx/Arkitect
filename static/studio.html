@@ -679,7 +679,7 @@
   .mb-title.on { color:#fff; background:rgba(62,156,184,.10); border-bottom-color:var(--pink); }
   /* Kit rides the menu bar next to Help — matches LePrince Visual Labs exactly */
   .kit-mount { display:flex; align-items:center; }
-  .menubar .kit-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
+  .menubar .kit-fab.in-bar, .menubar .fbk-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
   .menubar .kit-fab.in-bar canvas { width:19px; height:19px; }   /* match the Visual Lab — keep Kit's face small + aligned in the bar (studio was missing this → Kit too big) */
   /* blank-slate hero: Kit's face instead of the abstract diamond (frame 0 of the 9-frame sprite sheet, gently floating) */
   .drop-spark.kit { width:92px; height:92px; margin:0 auto 12px; background:url(/static/kit-hero.png) center/contain no-repeat;   /* the WHOLE transparent Kit "little guy" (no tile/icon bg) — ships in static/ */
@@ -748,6 +748,23 @@
 <div class="top">
   <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">←</span></a>
   <div class="tgroup counter"><span class="tg-l">COUNTER</span><span class="clock" id="clock">1|1  0:00.0</span></div>
+  <div class="tgroup"><span class="tg-l">VIEW</span>
+    <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
+  </div>
+  <div class="tgroup"><span class="tg-l">TOOLS</span>
+    <span class="toolsel" id="toolsel" title="edit tool">
+      <span class="toolrow">
+        <button class="tb" id="toolGrab" title="Grabber — move clips (drag the LOWER half of a clip)">✋</button>
+        <button class="tb" id="toolTrim" title="Trimmer — resize a clip's edge">✂</button>
+        <button class="tb" id="toolSel" title="Selector — highlight a time range (drag the UPPER half of a clip)">⌶</button>
+      </span>
+      <button class="smartbtn" id="toolSmart" title="Smart Tool — all three at once: UPPER half of a clip selects, LOWER half moves, edges trim, top corners fade. No tool-switching.">⌐ SMART</button>
+    </span>
+  </div>
+  <div class="tgroup"><span class="tg-l">CLICK</span>
+    <button class="tp metro" id="metroBtn" title="Count-in metronome click — on / off">♪</button>
+  </div>
+  <span class="countin" id="countin"></span>
   <div class="tgroup tempokey"><span class="tg-l">TEMPO · KEY</span>
     <span class="tk-rows">
       <span class="tk-r"><input class="tk-bpm" id="bpmTop" type="number" min="40" max="240" step="1" value="120" title="project tempo (BPM) — type it, or TAP / AUTO"><button class="tk-b" id="bpmTapTop" title="tap the beat 4+ times in time">TAP</button><button class="tk-b" id="bpmAutoTop" title="auto-detect tempo from the selected clip">AUTO</button></span>
@@ -768,23 +785,6 @@
         <button class="tp nav" id="toend" title="Go to End (End)">⏭</button>
       </span>
       <button class="tp loop" id="loop" title="Loop" style="display:none">↻</button>
-    </span>
-  </div>
-  <div class="tgroup"><span class="tg-l">CLICK</span>
-    <button class="tp metro" id="metroBtn" title="Count-in metronome click — on / off">♪</button>
-  </div>
-  <span class="countin" id="countin"></span>
-  <div class="tgroup"><span class="tg-l">VIEW</span>
-    <div class="vtoggle" title="Edit window = waveforms / clips. Mix window = the console."><button class="vt on" id="vEdit">EDIT</button><button class="vt" id="vMix">MIX</button></div>
-  </div>
-  <div class="tgroup"><span class="tg-l">TOOLS</span>
-    <span class="toolsel" id="toolsel" title="edit tool">
-      <span class="toolrow">
-        <button class="tb" id="toolGrab" title="Grabber — move clips (drag the LOWER half of a clip)">✋</button>
-        <button class="tb" id="toolTrim" title="Trimmer — resize a clip's edge">✂</button>
-        <button class="tb" id="toolSel" title="Selector — highlight a time range (drag the UPPER half of a clip)">⌶</button>
-      </span>
-      <button class="smartbtn" id="toolSmart" title="Smart Tool — all three at once: UPPER half of a clip selects, LOWER half moves, edges trim, top corners fade. No tool-switching.">⌐ SMART</button>
     </span>
   </div>
   <div class="tgroup"><span class="tg-l">FX</span>
@@ -962,6 +962,10 @@ function hexA(hex, a){ const m = (hex||"#3E9CB8").replace("#",""); return `rgba(
    ═══════════════════════════════════════════════════════════════════════ */
 function rid(){ return Math.random().toString(36).slice(2); }
 let selClip = null;        // {trackId, clipId} — the clip currently under edit
+let selClips = new Set();  // multi-select: "trackId|clipId" keys — Shift+click to build a group (for bouncing just those clips)
+const clipKey = (tid, cid) => tid + '|' + cid;
+function isClipSelected(tid, cid){ return selClips.has(clipKey(tid, cid)) || (selClip && selClip.trackId===tid && selClip.clipId===cid); }
+function clearMultiSel(){ if(selClips.size) selClips.clear(); }
 const UNDO = [];           // [{trackId, clips:[{id,buffer,start}], label}] snapshots (newest last)
 const REDO = [];           // forward stack — filled by undoLast, cleared on any fresh edit
 let _toastT;
@@ -1435,13 +1439,63 @@ function granularStretch(buf, S){ // output ≈ N*S samples, SAME pitch (Hann ov
   return o; }
 function fxPitchBuf(buf, semis){ if(!semis) return buf; const P=Math.pow(2,semis/12); return resampleBuf(granularStretch(buf, P), P); }
 function fxStretchBuf(buf, S){ return granularStretch(buf, S); }
+// DeMartin Spindown — true tape/turntable varispeed (pitch + time fall together like a record winding
+// to a stop), with the CURVE, TARGET, MOMENTUM and CHARACTER Pro Tools Vari-Fi never gave you. Pure-JS
+// variable-rate resample with 4-point Hermite interpolation → rate-rising saturation + darken-as-it-slows
+// + end fade. NEVER named "Vari-Fi" (Avid trademark).
+function fxSpindown(buf, p){
+  const sr=buf.sampleRate, ch=buf.numberOfChannels, inLen=buf.length;
+  const up=(+p.mode||0)>=0.5;
+  const tRate=Math.max(0.001,(p.target!=null?+p.target:0)/100);      // end speed (0 = full stop)
+  const r1=up?tRate:1, r2=up?1:tRate;                                // spinDown 1→target · spinUp target→1
+  const curve=Math.round(p.curve!=null?+p.curve:1), tau=1.5+((p.mom!=null?+p.mom:50)/100)*4;
+  const wowD=Math.pow(2,(p.wow!=null?+p.wow:15)/1200)-1, flutD=Math.pow(2,(p.flut!=null?+p.flut:6)/1200)-1;
+  const drive=1+((p.drive!=null?+p.drive:20)/100)*2, darkAmt=(p.dark!=null?+p.dark:50)/100;
+  const ease=(x)=> curve===0?x : curve===2?x*x*(3-2*x) : (1-Math.exp(-x*tau))/(1-Math.exp(-tau));   // linear · tape(exp) · S
+  // precompute read positions (phase-locked across channels); output length = the integral of the rate curve
+  const maxOut=Math.floor(inLen*4)+Math.floor(sr*0.05), reads=[], rates=[];
+  let read=0, n=0;
+  while(read<inLen-2 && n<maxOut){
+    const x=Math.min(1,read/inLen); let r=r1+(r2-r1)*ease(x); const tS=n/sr;
+    r*=(1+wowD*Math.sin(2*Math.PI*2*tS)+flutD*Math.sin(2*Math.PI*10*tS));   // wow ~2Hz + flutter ~10Hz on the read-rate
+    r=Math.max(0.001,r); reads.push(read); rates.push(r); read+=r; n++;
+  }
+  const outLen=Math.max(1,reads.length), out=ctx.createBuffer(ch,outLen,sr);
+  const fadeN=Math.min(outLen,Math.floor(sr*((p.fade!=null?+p.fade:30)/1000)));
+  for(let c=0;c<ch;c++){
+    const s=buf.getChannelData(c), d=out.getChannelData(c); let lp=0;
+    for(let j=0;j<outLen;j++){
+      const pos=reads[j], i=Math.floor(pos), f=pos-i;
+      const a0=s[Math.max(0,i-1)]||0, a1=s[Math.min(inLen-1,i)]||0, a2=s[Math.min(inLen-1,i+1)]||0, a3=s[Math.min(inLen-1,i+2)]||0;
+      const c1=0.5*(a2-a0), c2=a0-2.5*a1+2*a2-0.5*a3, c3=0.5*(a3-a0)+1.5*(a1-a2);
+      let v=((c3*f+c2)*f+c1)*f+a1;                                  // 4-pt Hermite (clean, not crunchy)
+      const slow=1-Math.min(1,rates[j]);                            // 0 at full speed → 1 as it stops
+      const dr=drive*(1+slow*0.8); v=Math.tanh(v*dr)/Math.tanh(dr); // tape saturation that RISES into the slowdown
+      lp += (1-darkAmt*slow*0.85)*(v-lp); v=lp;                     // lowpass that closes as it slows (darken)
+      if(!up && fadeN>0 && j>outLen-fadeN){ const ft=(outLen-j)/fadeN; v*=ft*ft; }   // spin-down dies in silence
+      if(up && fadeN>0 && j<fadeN){ const ft=j/fadeN; v*=ft*ft; }                    // spin-up fades in from the frozen start
+      d[j]=Math.max(-1,Math.min(1,v));
+    }
+  }
+  return out;
+}
 
 const AUDIOSUITE = [
   { id:'gain',    name:'Gain',        params:[{id:'db', label:'GAIN dB',  min:-24,max:24, step:0.5, value:0,  fmt:v=>(v>0?'+':'')+v.toFixed(1)+'dB'}],          run:(buf,p)=>fxGainBuf(buf,p.db) },
   { id:'norm',    name:'Normalize',   params:[{id:'tgt',label:'PEAK dB',  min:-12,max:0,  step:0.5, value:-1, fmt:v=>v.toFixed(1)+'dB'}],                        run:(buf,p)=>fxNormalizeBuf(buf,p.tgt) },
   { id:'pitch',   name:'Pitch Shift', params:[{id:'st', label:'SEMITONES',min:-12,max:12, step:1,   value:0,  fmt:v=>(v>0?'+':'')+v}],                            run:(buf,p)=>fxPitchBuf(buf,p.st) },
   { id:'stretch', name:'Time Stretch',params:[{id:'rate',label:'LENGTH x',min:0.5,max:2,  step:0.01,value:1,  fmt:v=>v.toFixed(2)+'x'}],                          run:(buf,p)=>fxStretchBuf(buf,p.rate) },
-  { id:'varifi',  name:'Vari-Fi',     params:[{id:'dir', label:'MODE',  min:0, max:1, step:1, value:0, fmt:v=>v<0.5?'SLOW DOWN':'SPEED UP'}],                    run:(buf,p)=>fxVariFi(buf, p.dir<0.5?'down':'up') },
+  { id:'spindown', name:'DeMartin Spindown', params:[
+      {id:'mode',  label:'DIRECTION',  min:0,max:1,  step:1, value:0,  fmt:v=>v<0.5?'SPIN DOWN':'SPIN UP'},
+      {id:'target',label:'END SPEED',  min:0,max:100,step:1, value:0,  fmt:v=>v+'%'},
+      {id:'curve', label:'CURVE',      min:0,max:2,  step:1, value:1,  fmt:v=>['LINEAR','TAPE','S-CURVE'][Math.round(v)]||'TAPE'},
+      {id:'mom',   label:'MOMENTUM',   min:0,max:100,step:1, value:50, fmt:v=>v+'%'},
+      {id:'drive', label:'SATURATION', min:0,max:100,step:1, value:20, fmt:v=>v+'%'},
+      {id:'dark',  label:'DARKEN',     min:0,max:100,step:1, value:50, fmt:v=>v+'%'},
+      {id:'wow',   label:'WOW',        min:0,max:50, step:1, value:15, fmt:v=>v+'¢'},
+      {id:'flut',  label:'FLUTTER',    min:0,max:15, step:1, value:6,  fmt:v=>v+'¢'},
+      {id:'fade',  label:'END FADE',   min:0,max:200,step:5, value:30, fmt:v=>v+'ms'} ],
+    run:(buf,p)=>fxSpindown(buf,p) },
 ];
 let _asState = {};   // {procId, params:{}}
 function openAudioSuite(t){
@@ -3961,7 +4015,16 @@ function laneUi(t) {
         if(Math.abs(SEL.a-SEL.b)<0.01){ SEL=null; drawLane(t); } else flash("Selection made — right-click for options"); };
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
     }
-    if (!cl) { selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); window.throwBarRefresh?.(); return; }   // empty → playhead
+    if (!cl) { clearMultiSel(); selClip=null; SEL=null; drawLane(t); renderChannel(t); seek(atTime); window.throwBarRefresh?.(); return; }   // empty → playhead + clear the multi-selection
+    if (e.shiftKey) {                                                           // SHIFT+click = build up a multi-clip selection (for a grouped bounce)
+      if (selClip && !selClips.has(clipKey(selClip.trackId, selClip.clipId))) selClips.add(clipKey(selClip.trackId, selClip.clipId));   // fold the existing single sel into the set
+      const k = clipKey(t.id, cl.id);
+      if (selClips.has(k)) selClips.delete(k); else selClips.add(k);            // toggle this clip
+      selClip = { trackId: t.id, clipId: cl.id };                              // keep this as the "primary" for clip-ops
+      tracks.forEach(tt => drawLane(tt)); renderChannel(t); window.throwBarRefresh?.();
+      return;                                                                  // don't start a grab/move on a shift-click
+    }
+    clearMultiSel();                                                           // plain click resets the multi-selection
     selClip = { trackId: t.id, clipId: cl.id }; drawLane(t); renderChannel(t); seek(atTime); window.throwBarRefresh?.();   // drop the edit cursor right where you click the clip
     const sx = e.clientX;
     const leftX = r.left + ((cl.start - scrollT)/vd)*r.width, rightX = r.left + ((cl.start + cl.buffer.duration - scrollT)/vd)*r.width;
@@ -3972,8 +4035,8 @@ function laneUi(t) {
       const oB=cl.buffer, oS=cl.start, oD=cl.buffer.duration; let trimmed=false;
       const mv=(ev)=>{ if(!trimmed && Math.abs(ev.clientX-sx)>2){ trimmed=true; pushUndoClips(t); }
         if(trimmed){ const dt=(ev.clientX-sx)/r.width*vd;
-          if(edge==='L'){ let cut=snapTime(oS+Math.max(0,dt))-oS; cut=Math.max(0,Math.min(oD-0.05,cut)); cl.start=oS+cut; cl.buffer=bufSlice(oB, cut/oD, 1); }
-          else { let keep=snapTime(oS+oD+Math.min(0,dt))-oS; keep=Math.max(0.05,Math.min(oD,keep)); cl.buffer=bufSlice(oB, 0, keep/oD); }
+          if(edge==='L'){ let cut=snapTime(oS+Math.max(0,dt))-oS; cut=Math.max(0,Math.min(oD-0.05,cut)); cl.start=oS+cut; cl.buffer=bufSlice(oB, cut/oD, 1); cl.fadeIn=Math.min(cl.fadeIn||0, cl.buffer.duration); }
+          else { let keep=snapTime(oS+oD+Math.min(0,dt))-oS; keep=Math.max(0.05,Math.min(oD,keep)); cl.buffer=bufSlice(oB, 0, keep/oD); cl.fadeOut=Math.min(cl.fadeOut||0, cl.buffer.duration); }
           drawLane(t); } };
       const up=()=>{ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); if(trimmed){ syncPrimary(t); if(playing) restartPlayback(); flash("Trimmed clip"); } };
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); return;
@@ -5168,8 +5231,9 @@ function _shapeCurve(shape, u){ u = u<0?0 : u>1?1 : u;
   return u;                                                  // 'lin' / default = standard linear
 }
 function _fadeGain(shape, x, dir){ return _shapeCurve(shape||'lin', dir==='out' ? 1-x : x); }
-function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh){
-  const N=data.length, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*vZoom;
+function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh, gain){
+  gain = (gain==null?1:gain);                                              // clip-gain (dB) scales the drawn wave; cap-clamp below keeps it in the lane
+  const N=data.length, mid=(yT+yB)/2, cap=(yB-yT)/2*0.96, amp=(yB-yT)/2*0.92*vZoom*gain;
   fi=fi||0; fo=fo||0; dur=dur||0;
   g.strokeStyle=hexA(color,0.92); g.lineWidth=1; g.beginPath();         // zero line (subtle)
   g.moveTo(x0+pa, mid); g.lineTo(x0+pb, mid); g.strokeStyle="rgba(255,255,255,0.06)"; g.stroke();
@@ -5190,16 +5254,16 @@ function drawWaveBand(g, data, x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, 
 }
 // one clip's waveform inside its box [x0, x0+w], on-screen part only. Stereo buffers render a
 // DUAL waveform (channel 0 on top, channel 1 on the bottom); mono renders one centered band.
-function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo, inSh, outSh){
+function drawClipWave(g, buf, x0, w, yT, yB, color, fi, fo, inSh, outSh, gain){
   const W=g.canvas.width, pa=Math.max(0,Math.floor(-x0)), pb=Math.min(w, Math.ceil(W-x0)), dur=buf.duration;
   if(buf.numberOfChannels>1){
     const split=(yT+yB)/2;
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb, fi, fo, dur, inSh, outSh);
-    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb, fi, fo, dur, inSh, outSh);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, split, color, pa, pb, fi, fo, dur, inSh, outSh, gain);
+    drawWaveBand(g, buf.getChannelData(1), x0, w, split, yB, color, pa, pb, fi, fo, dur, inSh, outSh, gain);
     g.strokeStyle="rgba(255,255,255,0.05)"; g.lineWidth=1; g.beginPath();   // channel divider
     g.moveTo(x0+pa, split); g.lineTo(x0+pb, split); g.stroke();
   } else {
-    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh);
+    drawWaveBand(g, buf.getChannelData(0), x0, w, yT, yB, color, pa, pb, fi, fo, dur, inSh, outSh, gain);
   }
 }
 // LIVE record waveform — while capturing, draw the incoming audio as a growing red wave on the armed
@@ -5231,12 +5295,14 @@ function drawLane(t){
   for(const cl of clipsOf(t)){
     const x=t2x(cl.start,W), w=Math.max(2,(cl.buffer.duration/vd)*W);
     if(x+w<0 || x>W) continue;                                              // off-screen clip
-    const seld = selClip && selClip.trackId===t.id && selClip.clipId===cl.id;
+    const seld = isClipSelected(t.id, cl.id);                                  // light up every clip in the multi-selection
     const fx=Math.max(0,x), fw=Math.min(W,x+w)-fx;
     const showBar = fw>34, nbH = showBar?NB:0;                              // hide name bar on slivers
     g.fillStyle="#0d0e13"; g.fillRect(fx,0,fw,H);                          // OPAQUE base so overlapping clips fully cover each other (no see-through bleed)
     g.fillStyle=hexA(t.color, seld?0.22:0.13); g.fillRect(fx,0,fw,H);       // subtle track-color tint over the opaque base (keeps the bright waveform popping)
-    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, cl.fadeIn||0, cl.fadeOut||0, cl.fadeInShape, cl.fadeOutShape);   // waveform tapers across its fades, shape-matched
+    // clamp fades to the clip's actual length so a CUT/TRIM that shortened the clip can't leave a fade longer than the audio (the skewed-wedge bug)
+    const _cd=cl.buffer.duration; let _fi=Math.min(cl.fadeIn||0,_cd), _fo=Math.min(cl.fadeOut||0,_cd); if(_fi+_fo>_cd){ const _k=_cd/(_fi+_fo); _fi*=_k; _fo*=_k; }
+    drawClipWave(g, cl.buffer, x, w, nbH+1, H-2, t.color, _fi, _fo, cl.fadeInShape, cl.fadeOutShape, (cl.gain==null?1:cl.gain));   // waveform tapers across fades + scales with the clip's dB gain
     // ── clip name bar across the top (Pro Tools) ──
     if(showBar){
       g.fillStyle=hexA(t.color, seld?0.78:0.6); g.fillRect(fx,0,fw,nbH);
@@ -5250,12 +5316,12 @@ function drawLane(t){
     g.strokeStyle = seld ? "rgba(255,255,255,0.95)" : hexA(t.color,0.7); g.lineWidth = seld?2:1;
     g.strokeRect(x+0.5,0.5,Math.max(1,w-1),H-1);                            // clip border (may extend off-canvas, that's fine)
     // ── fades: diagonal taper + shaded region (overlap two clips & fade each = a crossfade, no click) ──
-    const fiPx=(cl.fadeIn||0)/vd*W, foPx=(cl.fadeOut||0)/vd*W;   // fade lines follow the chosen shape (curved for Equal-Power / S-Curve)
+    const fiPx=_fi/vd*W, foPx=_fo/vd*W;   // fade lines follow the chosen shape, clamped to clip length (matches the wave taper)
     if(fiPx>1){ g.strokeStyle="rgba(255,255,255,0.62)"; g.lineWidth=1.4; g.beginPath();
       for(let px=0;px<=fiPx;px+=2){ const yy=(H-1)-_fadeGain(cl.fadeInShape,px/fiPx,'in')*(H-2); px===0?g.moveTo(x+px,yy):g.lineTo(x+px,yy); } g.stroke(); }
     if(foPx>1){ const xr=x+w; g.strokeStyle="rgba(255,255,255,0.62)"; g.lineWidth=1.4; g.beginPath();
       for(let px=0;px<=foPx;px+=2){ const yy=(H-1)-_fadeGain(cl.fadeOutShape,px/foPx,'out')*(H-2); px===0?g.moveTo((xr-foPx)+px,yy):g.lineTo((xr-foPx)+px,yy); } g.stroke(); }
-    if(seld){                                                                // PT-style fade HANDLES: a little square at each top corner of the SELECTED clip — drag it to pull a fade
+    if(selClip && selClip.trackId===t.id && selClip.clipId===cl.id){          // PT-style fade HANDLES: only on the PRIMARY clip (not every multi-selected one)
       const hs=7, inHX=x+fiPx, outHX=(x+w)-foPx;
       const dh=(hx)=>{ if(hx < x-3 || hx > x+w+3) return; g.fillStyle="rgba(255,255,255,0.95)"; g.fillRect(hx-hs/2,1,hs,hs); g.strokeStyle="rgba(8,9,13,0.85)"; g.lineWidth=1; g.strokeRect(hx-hs/2+0.5,1.5,hs-1,hs-1); };
       dh(inHX); dh(outHX);
@@ -6153,18 +6219,25 @@ async function renderBounce({ source = 'master', startT = 0, endT = null, sample
   const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
   oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterSum);
   setupBusNodes(oc);
+  let _muteRestore = null;
+  if (source === 'selclips') {                                                       // bounce ONLY the highlighted clips → mute everything else for this offline render
+    _muteRestore = [];
+    tracks.forEach(tt => clipsOf(tt).forEach(cl => { if (!isClipSelected(tt.id, cl.id)) { _muteRestore.push([cl, cl.muted]); cl.muted = true; } }));
+  }
   const lives = {};
   tracks.forEach(t => { lives[t.id] = buildTrackGraph(oc, t, 0, startT, true); });   // when=0, offset=startT → render the range from transport startT
   buildMasterChain(oc, true);
-  if (source === 'master') lim.connect(oc.destination);                              // ONLY the chosen source reaches the destination
+  if (source === 'master' || source === 'selclips') lim.connect(oc.destination);     // ONLY the chosen source reaches the destination
   else if (source.indexOf('track:') === 0) { const lv = lives[source.slice(6)]; const node = lv && (tap === 'pre' ? lv.comp : lv.fader); if (node) node.connect(oc.destination); }   // tap:'pre' = post inserts/EQ/comp, PRE pan+fader (for Commit/Freeze)
   else if (source.indexOf('bus:') === 0)   { const bn = oc._busNodes && oc._busNodes[source.slice(4)]; if (bn) bn.connect(oc.destination); }
   const rendered = await oc.startRendering();
+  if (_muteRestore) _muteRestore.forEach(([cl, m]) => { cl.muted = m; });             // restore the clips we temporarily muted for a selected-clips bounce
   try { oc._ins?.forEach(n => n?.dispose?.()); oc._ins = []; } catch {}
   return rendered;
 }
 function bounceSourceOptions() {
   const o = [{ v:'master', label:'Main Mix (Master)' }];
+  if (selClips.size > 0) o.push({ v:'selclips', label:'Selected clips · ' + selClips.size });
   tracks.filter(t => t.type !== 'aux').forEach(t => o.push({ v:'track:'+t.id, label:'Stem · '+t.name }));
   buses.forEach(b => o.push({ v:'bus:'+b.id, label:'Bus · '+b.name }));
   return o;
@@ -6178,7 +6251,7 @@ function openBounceDialog() {
   const ov = document.createElement('div'); ov.id = 'bounceDlg'; ov.className = 'bdlg-ov';
   ov.innerHTML = `
     <div class="bdlg">
-      <div class="bdlg-h">Bounce to Disk</div>
+      <div class="bdlg-h">Bounce Down</div>
       <label class="bdlg-row"><span>Source</span><select id="bSrc">${bounceSourceOptions().map(o=>`<option value="${o.v}">${o.label}</option>`).join("")}</select></label>
       <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option><option value="mp3">MP3 · 320 kbps</option></select></label>
       <label class="bdlg-row"><span>Bit depth</span><select id="bBits"><option value="24">24-bit</option><option value="16">16-bit</option></select></label>
@@ -6206,19 +6279,61 @@ function openBounceDialog() {
       const bits = parseInt(bBits.value, 10) || 24;
       const rate = parseInt(ov.querySelector('#bRate').value, 10) || null;
       let startT = 0, endT = contentDur();
-      if (ov.querySelector('#bRange').value === 'sel' && hasSel) { startT = Math.min(SEL.a, SEL.b); endT = Math.max(SEL.a, SEL.b); }
+      if (source === 'selclips') {                                              // tight range around the selected clips (no dead air)
+        let lo = Infinity, hi = 0;
+        tracks.forEach(tt => clipsOf(tt).forEach(cl => { if (isClipSelected(tt.id, cl.id)) { lo = Math.min(lo, cl.start); hi = Math.max(hi, cl.start + cl.buffer.duration); } }));
+        if (lo === Infinity) { go.disabled=false; go.textContent='Bounce'; note.textContent='No clips selected.'; return; }
+        startT = lo; endT = hi;
+      } else if (ov.querySelector('#bRange').value === 'sel' && hasSel) { startT = Math.min(SEL.a, SEL.b); endT = Math.max(SEL.a, SEL.b); }
       const name = ((ov.querySelector('#bName').value || 'mix').trim().replace(/[^\w\- ]/g,'')) || 'mix';
       const buf = await renderBounce({ source, startT, endT, sampleRate: rate });
       const wav = bufferToWavBlob(buf, bits);
-      if (fmt === 'wav' && dest === 'download') {                                  // pure client path — no backend
-        const a = document.createElement('a'); a.href = URL.createObjectURL(wav); a.download = name + '.wav'; a.click();
-        flash('Bounced ' + name + '.wav (' + bits + '-bit)'); ov.remove(); return;
+      // ── WAV → Download: instant in-browser save when it works. The native WebView2 shell
+      //    silently drops a blob download, so detect that and fall back to a real disk write. ──
+      if (fmt === 'wav' && dest === 'download') {
+        go.textContent = 'saving…';
+        const url = URL.createObjectURL(wav);
+        let downloaded = false;
+        try {
+          const a = document.createElement('a');
+          a.href = url; a.download = name + '.wav'; a.rel = 'noopener'; a.style.display = 'none';
+          document.body.appendChild(a); a.click(); a.remove();
+          downloaded = !window.chrome?.webview;                                   // WebView2 → never trust the click; real browser → it took
+        } catch (e) { downloaded = false; }
+        finally { setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 4000); }
+        if (downloaded) { flash('Bounced ' + name + '.wav (' + bits + '-bit)'); ov.remove(); return; }
+        go.textContent = 'writing…';                                              // native shell swallowed it → write to a folder via the backend
+        let d = currentFolderDir, s = currentFolderName;
+        if (!d) { const r = await fetch('/api/studio/session/pick-folder', { method:'POST' }); d = (await r.json().catch(()=>({}))).path; s = null;
+          if (!d) { go.disabled=false; go.textContent='Bounce'; note.textContent='Pick a folder to save the WAV.'; return; } }
+        const wb = await blobToDataUrl(wav);
+        const rr = await fetch('/api/studio/session/bounce', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dir:d, session:s, filename:name, format:'wav', wav:wb }) });
+        const jj = await rr.json().catch(()=>({}));
+        if (jj && jj.ok) { flash('Bounced → ' + jj.path); ov.remove(); }
+        else { go.disabled=false; go.textContent='Bounce'; note.textContent='Bounce failed: ' + ((jj&&jj.error)||('HTTP '+rr.status)); note.classList.add('bad'); }
+        return;
       }
-      go.textContent = 'writing…';                                                // disk write and/or MP3 encode → backend
+      go.textContent = 'writing…';
+      // ── WAV → Choose folder: browser File System Access API writes straight into a chosen folder ──
+      if (dest === 'choose' && fmt === 'wav' && window.showDirectoryPicker) {
+        let dh;
+        try { dh = await window.showDirectoryPicker({ id:'demartin-bounce', mode:'readwrite' }); }
+        catch (err) { go.disabled=false; go.textContent='Bounce'; note.textContent='Cancelled — no folder chosen.'; return; }
+        const fh = await dh.getFileHandle(name + '.wav', { create:true });
+        const ws = await fh.createWritable(); await ws.write(wav); await ws.close();
+        flash('Bounced → ' + name + '.wav'); ov.remove(); return;
+      }
+      // ── backend write (Session folder, native picker, or MP3 encode) ──
       let dir = null, session = null;
       if (dest === 'session') { dir = currentFolderDir; session = currentFolderName; }
-      else { const r = await fetch('/api/studio/session/pick-folder', { method:'POST' }); dir = (await r.json()).path;
-        if (!dir) { go.disabled=false; go.textContent='Bounce'; note.textContent='Cancelled — no folder chosen.'; return; } }
+      else {
+        let r = null; try { r = await fetch('/api/studio/session/pick-folder', { method:'POST' }); } catch(_){}
+        dir = r ? ((await r.json().catch(()=>({}))).path || null) : null;
+        if (!dir) {                                                               // no native picker (plain browser) → download WAV, or tell MP3 it needs the app
+          if (fmt === 'wav') { const a=document.createElement('a'); a.href=URL.createObjectURL(wav); a.download=name+'.wav'; a.style.display='none'; document.body.appendChild(a); a.click(); a.remove(); flash('Bounced ' + name + '.wav (downloaded)'); ov.remove(); return; }
+          go.disabled=false; go.textContent='Bounce'; note.textContent='No folder access here — MP3 needs the desktop app.'; note.classList.add('bad'); return;
+        }
+      }
       const wavB64 = await blobToDataUrl(wav);
       const res = await fetch('/api/studio/session/bounce', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ dir, session, filename: name, format: fmt, wav: wavB64 }) });
@@ -7919,7 +8034,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "1.6.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "1.7.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;

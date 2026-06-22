@@ -170,35 +170,14 @@ window.PT_MENUS = [
     ]
    },
    {
-    "label": "Bounce to",
-    "shortcut": null,
-    "ptShortcut": null,
-    "behavior": "Submenu that mixes audible tracks routed to a common output into one file.",
-    "feasibility": "buildable-now",
-    "mapsTo": null,
+    "label": "Bounce Down...",
+    "shortcut": "Ctrl+Alt+B",
+    "ptShortcut": "Ctrl+Alt+B",
+    "behavior": "Opens the Bounce Down dialog to render the mix (or selected clips) to a WAV / MP3 file.",
+    "feasibility": "exists",
+    "mapsTo": "#exportBtn",
     "separator_after": false,
-    "submenu": [
-     {
-      "label": "Disk...",
-      "shortcut": "Ctrl+Alt+B",
-      "ptShortcut": "Ctrl+Alt+B",
-      "behavior": "Opens the Bounce to Disk / Bounce Mix dialog to choose source, file type, channel format, bit depth, sample rate, conversion, and post-bounce options.",
-      "feasibility": "exists",
-      "mapsTo": "#exportBtn",
-      "separator_after": false,
-      "submenu": null
-     },
-     {
-      "label": "QuickTime / Mix (video)...",
-      "shortcut": null,
-      "ptShortcut": null,
-      "behavior": "Legacy Bounce to QuickTime Movie: bounces the main video track plus a mono/stereo audio mixdown to a flattened .mov.",
-      "feasibility": "buildable-later",
-      "mapsTo": null,
-      "separator_after": false,
-      "submenu": null
-     }
-    ]
+    "submenu": null
    },
    {
     "label": "Import",
