@@ -159,7 +159,8 @@
         <p class="coda">It's not finished. We're building it in the open, with the people who'll actually use it. If that's you — you're early, and you're exactly who it's for.</p>
       </div>
       <div class="cta-row">
-        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Get DeMartinville — free</a>
+        <a class="btn go dl-mac" data-arm="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip" data-intel="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-intel.zip" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
+        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Download for Windows</a>
         <a class="btn ghost" href="#how">See how it works ↓</a>
       </div>
       <div class="wip-flag"><span class="dot"></span> EARLY · BUILT IN THE OPEN · FOR THE ONES WHO GIVE A DAMN</div>
@@ -290,7 +291,8 @@
     <div class="wrap">
       <h2>The chair's open. Get in before it's obvious.</h2>
       <div class="cta-row">
-        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Download DeMartinville — free</a>
+        <a class="btn go dl-mac" data-arm="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip" data-intel="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-intel.zip" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
+        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Download for Windows</a>
         <a class="btn ghost" href="mailto:koonce47@gmail.com?subject=DeMartinville%20%E2%80%94%20founding%20creator&body=Tell%20me%20about%20your%20craft%20%2B%20who%20you%27d%20bring%20in%3A%0A%0A" id="ctaJoin">Become a founding creator →</a>
       </div>
     </div>
@@ -328,13 +330,26 @@
 (function(){var h=location.hostname;if(h==='localhost'||h==='127.0.0.1'){var a=document.createElement('a');a.href='/';a.textContent=String.fromCharCode(8592)+' Back';a.title='Back to DeMartinville';a.style.cssText='position:fixed;top:14px;left:14px;z-index:99999;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:11px;text-decoration:none;cursor:pointer;background:linear-gradient(180deg,rgba(42,46,54,.92),rgba(24,26,32,.92));border:1px solid rgba(255,255,255,.13);box-shadow:0 3px 10px rgba(0,0,0,.4);color:#E7E9EE;font:700 13px Oxanium,sans-serif;';document.body.appendChild(a);}})();
 </script>
 <script>
-(function(){var p=navigator.platform||'',ua=navigator.userAgent||'';
-if(!(/Mac|iPhone|iPad|iPod/.test(p)||/Mac OS X/.test(ua)))return;
-var rows=document.querySelectorAll('.cta-row');
-for(var i=0;i<rows.length;i++){var n=document.createElement('div');
-n.style.cssText='margin-top:12px;font:600 13px Inter,sans-serif;color:#E6C16A;text-align:center;width:100%;line-height:1.5';
-n.innerHTML='On a Mac? That download is Windows for now — the Mac build is almost here. <a href="mailto:koonce47@gmail.com?subject=Mac%20version" style="color:#7BB6CD">Email me</a> and you will get it the day it drops.';
-rows[i].appendChild(n);}})();
+/* The Mac button serves Apple Silicon by default (every Mac since 2020); swap to the Intel
+   build only when an Intel/AMD GPU is positively detected. Keeps it one clean "Mac" button. */
+(function(){
+  var macBtns=document.querySelectorAll('.dl-mac');
+  if(!macBtns.length)return;
+  var appleSilicon=true;
+  try{
+    var c=document.createElement('canvas');
+    var gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+    if(gl){
+      var ext=gl.getExtension('WEBGL_debug_renderer_info');
+      var r=ext?(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||''):'';
+      if(/intel|amd|radeon|nvidia|geforce/i.test(r)&&!/apple/i.test(r))appleSilicon=false;
+    }
+  }catch(e){}
+  for(var i=0;i<macBtns.length;i++){
+    var u=appleSilicon?macBtns[i].getAttribute('data-arm'):macBtns[i].getAttribute('data-intel');
+    if(u)macBtns[i].href=u;
+  }
+})();
 </script>
 </body>
 </html>
