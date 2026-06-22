@@ -1,5 +1,26 @@
 # DeMartinville — Changelog
 
+## v1.6.0 — Your own plugins, an AI that drives them, and artifact-free stretch
+
+The studio learned to run **your real plugins** — and put an AI on top of them.
+
+### 🎛 Bring your own plugins (Waves / VST3 / AU)
+Use the plugins **you already own**, right inside DeMartinville — through the engine, on your own machine where your licenses live.
+- **Beat Lab:** on any Warp / Sampler / Slicer channel hit **🎛 Plugin** → search your installed plugins → load it → **Apply** bakes your sample through the *real* plugin (non-destructive).
+- **Studio:** right-click any clip → **🎛 Run through your plugin…** → same flow → bakes onto the clip (Undo reverts).
+
+### 🧠 An AI brain on the knobs
+Don't know what 47 cryptic Waves knobs do? Hit **🧠 Smart** and the AI turns them into a few **safe macros** — *Brightness, Warmth, Punch* — each clamped so you can't break it.
+
+### 〰 Artifact-free time-stretch
+Beat Lab's **Keep-Pitch** warp now runs through a **pro, transient-aware stretch engine** (the class real DAWs ship) instead of the old algorithm — local, free, and far cleaner on melodies and vocals.
+
+### ✂ Pixel-perfect sampling
+- **Slice Editor** — drag the slice markers to move a chop, double-click to add/remove, click a slice to hear it; auto-detect with sensitivity + a ÷8/÷16 grid.
+- **Warp downbeat marker** — drag the waveform to set exactly where bar 1 begins; the loop re-aligns seamlessly.
+
+*Note: native-plugin hosting runs through the local audio engine. It works where that engine is installed; see the in-app notes if a plugin can't be found.*
+
 ## v1.5.0 — Beat Lab goes pro: sampling, swing & every DAW's best trick
 
 Beat Lab grew up. We pulled the one thing each major DAW does better than anyone — its "moat" — and built them all in.
