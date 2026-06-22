@@ -767,6 +767,14 @@ async def chat(req: Request):
     # ~4.8K tokens every turn (verified speed win, 2026-06-13).
     mem = memory_block(messages)
     mem += craft_kb_block(messages)                   # Tiff also draws on Kit's craft binder (how-to-mix) when the question calls for it
+    # Who the user picked in the front door (Tiff default, or Kit). Rides in the LAST user
+    # message (NOT the cached persona prefix) so cache stays warm — Tiff stays the base brain,
+    # we just flip the VOICE to Kit for this turn when Kit is the active card.
+    if (body.get("character") or "").strip().lower() == "kit":
+        mem += ("\n\n[Answer THIS one as KIT, not Tiff — a DIFFERENT personality, not a different job: "
+                "blunt, plainspoken, a no-BS dude who happens to think like a builder. It's his VOICE/vibe, "
+                "NOT tasks — do NOT ask 'what do you want to build?' or steer toward projects (nobody builds "
+                "in this chat). He's just a chill, straight-shooting companion to talk to. Same knowledge, Kit's personality.]")
     msgs = [dict(m) for m in messages[-12:]]          # cap history (was 24) + copy so we don't mutate
     msgs = [_clean_msg(m) for m in msgs]              # strip display-only fields, normalize content
     if mem:
@@ -4202,6 +4210,99 @@ async def beat_brain(req: Request):
     if not text:
         text = "Done — tweaked it." if setvals else "Say that again?"
     return {"reply": text, "set": setvals}
+
+
+# ── AI-BRAIN MACROS for native plugins (Track A v2) — turn a wall of cryptic Waves/VST3 params
+#    into a few intuitive, SAFE macro sliders (Brightness/Warmth/Punch…). The LLM (which knows the
+#    plugin) maps each macro to clamped raw-value bands; a name-keyword heuristic is the fallback so
+#    it always returns something even with no model. Every value stays in [0,1] (normalized raw).
+PLUGIN_MACRO_SYSTEM = (
+    "You are a master mix engineer who knows the plugin '{name}' cold. You are given its parameters; "
+    "each has a normalized value 0..1 (and, where discrete, its choices). Design 3 to 5 intuitive MACRO "
+    "controls a beatmaker actually wants for THIS plugin (e.g. Brightness, Warmth, Punch, Air, Drive, "
+    "Space, Tightness — pick what fits). Each macro maps to SAFE value bands on the real params so the "
+    "user can't make it sound bad.\n\n"
+    "Output ONLY a JSON object, no prose, no code fence:\n"
+    '{\"baseline\":{\"paramId\":raw,...},\"macros\":[{\"name\":\"Punch\",\"desc\":\"short\",'
+    '\"targets\":[{\"id\":\"paramId\",\"at0\":0.2,\"at100\":0.7}]}]}\n'
+    "Rules: every raw / at0 / at100 is within [0,1]; only use ids from the list; keep bands musical "
+    "(never extreme); baseline = a great starting point for the important params."
+)
+_MACRO_KW = {
+    "Brightness": ["bright","high","treble","air","presence","hf","top","tone","sheen","clarity"],
+    "Warmth":     ["warm","drive","sat","color","colour","thd","analog","tube","character","crunch"],
+    "Punch":      ["attack","release","ratio","comp","punch","transient","thresh","snap"],
+    "Weight":     ["low","bass","sub","lf","boom","weight","body","thick","fat"],
+    "Space":      ["mix","wet","blend","depth","space","reverb","room","width","size","decay","verb"],
+}
+def _macro_heuristic(name, params):
+    macros, used = [], set()
+    def lbl(p): return ((p.get("label") or "") + " " + (p.get("id") or "")).lower()
+    for mname, kws in _MACRO_KW.items():
+        targets = []
+        for p in params:
+            pid = p.get("id")
+            if not pid or pid in used:
+                continue
+            if any(k in lbl(p) for k in kws):
+                targets.append({"id": pid, "at0": 0.35, "at100": 0.72}); used.add(pid)
+        if targets:
+            macros.append({"name": mname, "desc": "", "targets": targets[:4]})
+    return {"baseline": {}, "macros": macros[:5], "heuristic": True}
+
+
+def _validate_macros(obj, ids):
+    """Keep only valid ids + clamp every raw value to [0,1]. Returns None if nothing usable."""
+    if not isinstance(obj, dict):
+        return None
+    cl = lambda v: max(0.0, min(1.0, float(v)))
+    baseline = {}
+    for k, v in (obj.get("baseline") or {}).items():
+        if k in ids and isinstance(v, (int, float)):
+            baseline[k] = cl(v)
+    macros = []
+    for m in (obj.get("macros") or []):
+        if not isinstance(m, dict):
+            continue
+        tg = []
+        for t in (m.get("targets") or []):
+            if isinstance(t, dict) and t.get("id") in ids and isinstance(t.get("at0"), (int, float)) and isinstance(t.get("at100"), (int, float)):
+                tg.append({"id": t["id"], "at0": cl(t["at0"]), "at100": cl(t["at100"])})
+        if tg and m.get("name"):
+            macros.append({"name": str(m["name"])[:18], "desc": str(m.get("desc") or "")[:80], "targets": tg[:5]})
+    if not macros:
+        return None
+    return {"baseline": baseline, "macros": macros[:6]}
+
+
+@app.post("/api/plugin-macros")
+async def plugin_macros(req: Request):
+    body = await req.json()
+    name = (body.get("name") or "this plugin").strip()
+    params = body.get("params") or []
+    ids = {p.get("id") for p in params if p.get("id")}
+    if not ids:
+        return {"ok": False, "error": "no params"}
+    lines = []
+    for p in params[:60]:
+        ch = (" choices=" + str(len(p["choices"]))) if p.get("choices") else ""
+        lines.append(f"- {p.get('id')} ({p.get('label', p.get('id'))}): now={p.get('raw')}{ch}")
+    system = PLUGIN_MACRO_SYSTEM.replace("{name}", name) + "\n\nPARAMETERS:\n" + "\n".join(lines)
+    out = None
+    try:
+        slots = _enabled_slots()
+        if slots:
+            text, _ = await _call_with_fallback(slots, system, f"Design the macros for {name}.", 700, 0.4)
+        else:
+            text = await _kit_local(system, f"Design the macros for {name}.")
+        m = re.search(r"\{.*\}", text or "", re.S)
+        if m:
+            out = _validate_macros(json.loads(m.group(0)), ids)
+    except Exception:
+        out = None
+    if not out:
+        out = _macro_heuristic(name, params)        # always return usable macros
+    return {"ok": True, **out}
 
 
 # ── CHARACTER AVATAR PROMPT — a vision model LOOKS at the user's uploaded photo and writes a

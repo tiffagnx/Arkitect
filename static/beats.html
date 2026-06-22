@@ -1884,15 +1884,18 @@ async function openNativeFx(ch, redraw){
   bar.querySelector('.pw-x').onclick=()=>{ w.style.display='none'; };
   dragWin(w,bar); openWins[key]=w; bringFront(w);
   const pickWrap=el('div');
+  const macroWrap=el('div'); macroWrap.style.cssText='display:none;flex-direction:column;gap:2px';
   const ctrlWrap=el('div'); ctrlWrap.style.cssText='display:none;max-height:232px;overflow:auto;padding-right:4px';
-  const actions=el('div'); actions.style.cssText='display:none;gap:7px';
+  const actions=el('div'); actions.style.cssText='display:none;gap:7px;flex-wrap:wrap';
   const status=el('div'); status.style.cssText="font:500 9.5px 'Space Mono';color:var(--dim2);line-height:1.55";
-  body.append(pickWrap, ctrlWrap, actions, status);
+  body.append(pickWrap, macroWrap, ctrlWrap, actions, status);
 
-  let curVals={}, curPlugin=null;
+  let curVals={}, curPlugin=null, curParams=[];
   const applyBtn=el('button','tb solid','✓ Apply to sample');
+  const smartBtn=el('button','tb','🧠 Smart'); smartBtn.title='AI turns this plugin’s knobs into a few safe macros (Brightness / Warmth / Punch…)';
+  const manualBtn=el('button','tb','⚙ Manual'); manualBtn.style.display='none';
   const revBtn=el('button','tb','↩ Revert'); revBtn.style.display=ch._bufDry?'inline-block':'none';
-  actions.append(applyBtn, revBtn);
+  actions.append(applyBtn, smartBtn, manualBtn, revBtn);
 
   status.textContent='Scanning your installed plugins…';
   const data=await fetchNativePlugins();
@@ -1916,11 +1919,38 @@ async function openNativeFx(ch, redraw){
     status.innerHTML='Loading <b>'+p.name+'</b>… <span style="color:var(--dim2)">first load of a Waves plugin can take ~30–45s (license check)</span>';
     const pr=await fetch('/api/native-plugins/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p.path,sub:p.sub})}).then(r=>r.json()).catch(()=>({ok:false,error:'request failed'}));
     if(!pr.ok){ status.innerHTML='⚠ '+(pr.error||'could not load'); return; }
-    curVals={}; ctrlWrap.innerHTML='';
+    curVals={}; curParams=pr.params||[]; ctrlWrap.innerHTML=''; macroWrap.innerHTML='';
+    macroWrap.style.display='none'; manualBtn.style.display='none'; smartBtn.style.display='inline-block';
     (pr.params||[]).forEach(pp=>ctrlWrap.append(npControl(pp,curVals)));
     ctrlWrap.style.display='block'; actions.style.display='flex';
-    status.innerHTML='Loaded <b>'+p.name+'</b> — '+(pr.params||[]).length+' controls. Tweak, then Apply.';
+    status.innerHTML='Loaded <b>'+p.name+'</b> — '+(pr.params||[]).length+' controls. Hit 🧠 Smart for easy macros, or tweak + Apply.';
   }
+  // ── AI-brain macros: a few safe Brightness/Warmth/Punch sliders over the raw params ──
+  function npMacroControl(macro){
+    const row=el('div'); row.style.cssText='display:flex;flex-direction:column;gap:3px;margin-bottom:9px';
+    const top=el('div'); top.style.cssText='display:flex;justify-content:space-between;align-items:baseline';
+    const lab=el('span',null,macro.name); lab.style.cssText='font:700 11px Inter;color:#C9B8FF';
+    const val=el('span'); val.style.cssText="font:600 10px 'Space Mono';color:#9FDDF0"; val.textContent='50%';
+    top.append(lab,val); row.append(top);
+    if(macro.desc){ const d=el('div',null,macro.desc); d.style.cssText='font:500 9px Inter;color:var(--dim2);margin-top:-2px'; row.append(d); }
+    const sl=el('input'); sl.type='range'; sl.min=0; sl.max=100; sl.value=50; sl.style.cssText='width:100%;accent-color:#9B8BFF';
+    const apply=m=>{ (macro.targets||[]).forEach(t=>{ curVals[t.id]=t.at0+(m/100)*(t.at100-t.at0); }); val.textContent=Math.round(m)+'%'; };
+    sl.oninput=()=>apply(+sl.value); apply(50);
+    row.append(sl); return row;
+  }
+  async function loadMacros(){
+    if(!curPlugin) return;
+    smartBtn.disabled=true; status.innerHTML='🧠 Building smart macros for <b>'+curPlugin.name+'</b>…';
+    const r=await fetch('/api/plugin-macros',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:curPlugin.name,params:curParams})}).then(x=>x.json()).catch(()=>({ok:false}));
+    smartBtn.disabled=false;
+    if(!r.ok||!r.macros||!r.macros.length){ status.innerHTML='⚠ Couldn’t build macros for this one — use the manual knobs.'; return; }
+    Object.entries(r.baseline||{}).forEach(([k,v])=>{ curVals[k]=v; });
+    macroWrap.innerHTML=''; r.macros.forEach(mc=>macroWrap.append(npMacroControl(mc)));
+    macroWrap.style.display='flex'; ctrlWrap.style.display='none'; smartBtn.style.display='none'; manualBtn.style.display='inline-block';
+    status.innerHTML='🧠 '+r.macros.length+' safe macro'+(r.macros.length>1?'s':'')+(r.heuristic?' (offline)':'')+' — clamped so you can’t break it. Apply when it sounds right.';
+  }
+  smartBtn.onclick=loadMacros;
+  manualBtn.onclick=()=>{ macroWrap.style.display='none'; ctrlWrap.style.display='block'; manualBtn.style.display='none'; smartBtn.style.display='inline-block'; status.textContent='Manual controls.'; };
   applyBtn.onclick=async()=>{
     if(!curPlugin) return;
     if(!ch._buf){ status.textContent='Load a sample into this channel first.'; return; }
