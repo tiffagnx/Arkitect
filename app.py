@@ -836,7 +836,7 @@ async def chat(req: Request):
                     "low":    "Mode: Quick — sharp and fast, but unmistakably sharp.",
                     "medium": "Mode: Balanced — think it through, then give a strong answer.",
                     "high":   "Mode: Deep — reason step by step; be thorough, rigorous, and complete.",
-                    "max":    "Mode: GOD MODE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops.",
+                    "max":    "Mode: GOD PARTICLE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops.",
                 }.get(_effort, "")
                 _god = ("\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — "
                         "show out. Bring your full reasoning, taste, and creativity, and make it obvious a "
