@@ -1208,17 +1208,19 @@ function updateZoomUi(){ const zl=document.getElementById("zoomLbl"); if(zl) zl.
   const vz=document.getElementById("vzoomSlider"); if(vz && document.activeElement!==vz) vz.value=laneH; }
 function relayoutAll(){ clampScroll(); tracks.forEach(t=>drawLane(t)); updateZoomUi(); drawRuler(); drawOverview(); }
 function setZoom(z){ zoom=Math.max(ZMIN,Math.min(zMax(),z)); relayoutAll(); }
-// zoom by a factor while keeping the playhead (or view centre) under the same spot —
-// so pressing + drills straight into where you're working, all the way to milliseconds
-function zoomAround(factor, anchorT){
+// zoom to an ABSOLUTE level while keeping the playhead (or mouse/view-centre) under the same
+// spot — so the +/- buttons AND the slider both drill straight into where the red line is.
+function setZoomAnchored(z, anchorT){
   const vd=viewDur(); const ph=(typeof pos==='function')?pos():0;
   // anchor on the MOUSE time (anchorT) if given, else the playhead-if-visible, else view centre
   const anchor=(anchorT!=null) ? anchorT : ((ph>=scrollT && ph<=scrollT+vd) ? ph : scrollT+vd/2);
   const frac=vd>0 ? (anchor-scrollT)/vd : 0.5;
-  zoom=Math.max(ZMIN,Math.min(zMax(),zoom*factor));
+  zoom=Math.max(ZMIN,Math.min(zMax(),z));
   scrollT=Math.max(0, anchor-frac*viewDur());
   relayoutAll();
 }
+// zoom by a factor (same anchoring) — so pressing + drills straight into where you're working
+function zoomAround(factor, anchorT){ setZoomAnchored(zoom*factor, anchorT); }
 function setLaneH(h){ laneH=h; tracks.forEach(t=>{ const cv=document.querySelector('#lane-'+t.id+' .wave'); if(cv){ cv.height=h; cv.style.height=h+'px'; drawLane(t); } }); updateZoomUi(); }
 
 // ── WHOLE-VIEW ZOOM (task #1) — the bottom zoom bar drives the existing centralized engine ──
@@ -6018,7 +6020,7 @@ function splitAtPlayhead(){
 $("vzIn").onclick  = () => { vZoom = Math.min(8, vZoom*1.4); tracks.forEach(t=>drawLane(t)); };
 $("vzOut").onclick = () => { vZoom = Math.max(1, vZoom/1.4); tracks.forEach(t=>drawLane(t)); };
 // whole-view zoom bar (task #1): horizontal log-mapped zoom, vertical lane-height zoom, fit-session
-$("hzoomSlider").oninput = (e) => setZoom(sliderToZoom(parseFloat(e.target.value)));
+$("hzoomSlider").oninput = (e) => setZoomAnchored(sliderToZoom(parseFloat(e.target.value)));   // zoom in ON the playhead (the red line), not from the edge
 $("vzoomSlider").oninput = (e) => setVZoom(parseInt(e.target.value,10));
 $("vhIn").onclick  = () => setVZoom(laneH + 22);   // +  = taller tracks (all lanes together, PT-style vertical zoom)
 $("vhOut").onclick = () => setVZoom(laneH - 22);   // −  = shorter tracks
