@@ -1907,6 +1907,93 @@ async def health():
     return {"brain": await brain_up(), "engine": await _engine_up()}
 
 
+# ── HARDWARE CAPABILITY — is this machine fast enough for a LOCAL AI brain? ────
+# Honest read so a light laptop isn't quietly pushed into a multi-GB model that runs
+# at a crawl. The verdict drives the in-app nudge: poor → "use your own API key (free
+# options) or skip the AI; the studio still works." Cached — hardware doesn't change.
+_CAP_CACHE = None
+
+
+def _detect_capability() -> dict:
+    import platform as _pf
+    sysname = _pf.system()
+    machine = (_pf.machine() or "").lower()
+    gpu = ""
+    vram_mb = 0
+    # NVIDIA (Windows/Linux) is the gold path for a local LLM — ask it directly.
+    try:
+        import subprocess
+        flags = CREATE_NO_WINDOW if sysname == "Windows" else 0
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total",
+                              "--format=csv,noheader,nounits"],
+                             capture_output=True, text=True, timeout=4, creationflags=flags)
+        if out.returncode == 0 and out.stdout.strip():
+            parts = [p.strip() for p in out.stdout.strip().splitlines()[0].split(",")]
+            gpu = parts[0]
+            try:
+                vram_mb = int(float(parts[1]))
+            except Exception:
+                vram_mb = 0
+    except Exception:
+        pass
+    apple_silicon = (sysname == "Darwin" and ("arm" in machine or "aarch" in machine))
+    # RAM — best-effort, never fatal (no hard psutil dependency).
+    ram_gb = None
+    try:
+        import psutil
+        ram_gb = round(psutil.virtual_memory().total / (1024 ** 3))
+    except Exception:
+        try:
+            if sysname == "Windows":
+                import ctypes
+
+                class _MS(ctypes.Structure):
+                    _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                                ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                                ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                                ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                                ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+                ms = _MS()
+                ms.dwLength = ctypes.sizeof(_MS)
+                ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+                ram_gb = round(ms.ullTotalPhys / (1024 ** 3))
+            else:
+                ram_gb = round((os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")) / (1024 ** 3))
+        except Exception:
+            ram_gb = None
+    # Verdict: good = runs local fast · marginal = runs, maybe slow · poor = CPU-only crawl.
+    if apple_silicon and (ram_gb is None or ram_gb >= 16):
+        verdict, reason = "good", "Apple Silicon — runs a local AI brain well."
+    elif apple_silicon:
+        verdict, reason = "marginal", "Apple Silicon with limited memory — a small local model is okay."
+    elif vram_mb >= 6000:
+        verdict, reason = "good", f"{gpu or 'Your GPU'} ({vram_mb} MB VRAM) — plenty for a local AI brain."
+    elif vram_mb >= 4000:
+        verdict, reason = "marginal", f"{gpu or 'Your GPU'} ({vram_mb} MB VRAM) — a local brain runs, maybe a touch slow."
+    else:
+        verdict = "poor"
+        reason = ("Intel Mac — a local AI brain runs on the CPU and is very slow here."
+                  if sysname == "Darwin"
+                  else "No NVIDIA GPU detected — a local AI brain would run on the CPU and be very slow on this machine.")
+    recommend = {"good": "local", "marginal": "either", "poor": "cloud"}[verdict]
+    return {"verdict": verdict, "gpu": gpu, "vram_mb": vram_mb, "ram_gb": ram_gb,
+            "platform": sysname, "apple_silicon": apple_silicon, "reason": reason, "recommend": recommend}
+
+
+@app.get("/api/capability")
+async def capability():
+    """Honest hardware read for the UI's weak-machine nudge. Cached; cheap to poll."""
+    global _CAP_CACHE
+    if _CAP_CACHE is None:
+        _CAP_CACHE = _detect_capability()
+    try:
+        from swarm_routes import _enabled_slots
+        has_cloud_key = bool(_enabled_slots())
+    except Exception:
+        has_cloud_key = False
+    return {**_CAP_CACHE, "has_cloud_key": has_cloud_key}
+
+
 # ── IMAGES — FLUX on B's own GPU via ComfyUI (D:\tiff-images, port 8188) ───
 # Free, unlimited, local. ARKITECT is the pretty face; ComfyUI is the
 # engine room. If the engine isn't running, we say so plainly.

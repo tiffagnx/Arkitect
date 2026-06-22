@@ -1076,5 +1076,37 @@ startArkTips();
 </script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
+<script>
+/* Honest weak-machine nudge: if this PC can't run a local AI brain well AND the user
+   has no cloud key yet, say so once — and point at the free fix (their own API key) or
+   working without AI. Driven by /api/capability. Dismissible; never nags twice. */
+window.arkCapNudge = function(cap){
+  try{
+    if(!cap || cap.verdict !== 'poor' || cap.has_cloud_key) return;
+    if(localStorage.getItem('ark_cap_dismissed') === '1') return;
+    if(document.getElementById('arkCapBar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'arkCapBar';
+    bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:60px;z-index:100000;max-width:min(640px,92vw);background:linear-gradient(180deg,#1b1c22,#141519);border:1px solid rgba(230,193,106,.4);border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.55);padding:14px 16px;color:#E7E9EE;font:500 13.5px/1.55 Inter,system-ui,sans-serif;display:flex;gap:12px;align-items:flex-start';
+    bar.innerHTML =
+      '<div style="font-size:20px;line-height:1.1">⚡</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-weight:700;margin-bottom:3px;color:#E6C16A">This machine will run a local AI brain very slowly.</div>'
+      +   '<div style="color:#C2C8D1">The studio itself runs great here — record, mix, cut video, make beats. But for instant AI replies, plug in your own API key (Groq, Google &amp; others have free tiers) instead of leaning on this machine — or just work without the AI.</div>'
+      +   '<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap">'
+      +     '<button id="arkCapKey" style="cursor:pointer;border:0;border-radius:9px;padding:8px 13px;font:700 12.5px Inter;color:#1a1408;background:linear-gradient(120deg,#E6C16A,#D9A441)">Add your API key →</button>'
+      +     '<button id="arkCapSkip" style="cursor:pointer;border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:8px 13px;font:600 12.5px Inter;color:#C2C8D1;background:rgba(255,255,255,.04)">Use without AI</button>'
+      +   '</div>'
+      + '</div>'
+      + '<button id="arkCapX" title="Dismiss" aria-label="Dismiss" style="cursor:pointer;border:0;background:none;color:#9AA0AC;font-size:19px;line-height:1;padding:0 2px">×</button>';
+    document.body.appendChild(bar);
+    function close(remember){ if(remember){ try{ localStorage.setItem('ark_cap_dismissed','1'); }catch(e){} } bar.remove(); }
+    document.getElementById('arkCapX').onclick   = function(){ close(true); };
+    document.getElementById('arkCapSkip').onclick = function(){ close(true); };
+    document.getElementById('arkCapKey').onclick  = function(){ close(false); (window.arkOpenSettings || function(){ var g=document.querySelector('.as-gear'); if(g) g.click(); })(); };
+  }catch(e){}
+};
+(function(){ fetch('/api/capability').then(function(r){return r.json();}).then(window.arkCapNudge).catch(function(){}); })();
+</script>
 </body>
 </html>
