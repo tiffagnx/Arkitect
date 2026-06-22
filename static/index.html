@@ -165,9 +165,13 @@
   .charshelf.hide { display:none; }
   .charshelf::-webkit-scrollbar { height:0; }
   .cshelf-lbl { font:700 9px 'Space Mono',monospace; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); flex:none; }
+  .cshelf-hint { color:rgba(120,182,205,.75); letter-spacing:.06em; font-weight:700; text-transform:none; }
   .cshelf-row { display:flex; gap:10px; align-items:center; }
-  .cstile { display:flex; align-items:center; gap:9px; padding:7px 14px 7px 8px; border-radius:14px; border:1px solid var(--hairline); background:rgba(255,255,255,.025); cursor:pointer; flex:none; transition:transform .14s, border-color .14s, box-shadow .14s, background .14s; }
+  .cstile { display:flex; align-items:center; gap:9px; padding:7px 14px 7px 8px; border-radius:14px; border:1px solid var(--hairline); background:rgba(255,255,255,.025); cursor:grab; flex:none; transition:transform .14s, border-color .14s, box-shadow .14s, background .14s; }
   .cstile:hover { transform:translateY(-2px); border-color:rgba(120,182,205,.5); background:rgba(62,156,184,.07); }
+  .cstile[data-brain]:active { cursor:grabbing; }
+  .cstile.build { cursor:pointer; }
+  .cstile.dragging { opacity:.35; }
   .cstile img { width:36px; height:36px; border-radius:11px; object-fit:contain; pointer-events:none; }
   .cstile .ct-n { font:700 12.5px Oxanium; letter-spacing:.02em; color:var(--text); display:block; line-height:1.1; }
   .cstile .ct-r { font:600 8.5px 'Space Mono',monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); display:block; margin-top:2px; }
@@ -395,7 +399,7 @@
     </div>
 
     <div class="charshelf" id="charshelf">
-      <div class="cshelf-lbl">Your Crew</div>
+      <div class="cshelf-lbl">Your Crew <span class="cshelf-hint">— drag one into a room →</span></div>
       <div class="cshelf-row" id="cshelfRow"></div>
     </div>
 
@@ -613,8 +617,8 @@ document.addEventListener('click', function(e){ var c = e.target.closest ? e.tar
 function renderShelf(){
   var row = $("cshelfRow"); if(!row) return;
   row.innerHTML =
-    '<div class="cstile tiff" data-brain="tiff" title="Talk to Tiff"><img src="/static/tiff.png" alt=""><span><span class="ct-n">Tiff</span><span class="ct-r">words</span></span></div>' +
-    '<div class="cstile kit" data-brain="kit" title="Talk to Kit"><img src="/static/tec.png" alt=""><span><span class="ct-n">Kit</span><span class="ct-r">build</span></span></div>' +
+    '<div class="cstile tiff" data-brain="tiff" draggable="true" title="Tiff — your general-purpose creative partner (vibe, words, ideas). Click to chat, or drag her into a room to bring her in."><img src="/static/tiff.png" alt=""><span><span class="ct-n">Tiff</span><span class="ct-r">general</span></span></div>' +
+    '<div class="cstile kit" data-brain="kit" draggable="true" title="Kit — the specialist for deeper, hands-on, technical work. Click to chat, or drag him into a room to bring him in."><img src="/static/tec.png" alt=""><span><span class="ct-n">Kit</span><span class="ct-r">specialist</span></span></div>' +
     '<div class="cstile build" onclick="location.href=\'/static/character.html\'" title="Build your own agent"><span class="ct-plus">＋</span><span class="ct-n">Build your own</span></div>';
 }
 renderShelf();
@@ -1066,7 +1070,7 @@ startArkTips();
 (function(){
   var brain = null, ghost = null, srcCard = null;
   var EMPTY = new Image(); EMPTY.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-  function card(e){ return (e.target && e.target.closest) ? e.target.closest('.crew[data-brain]') : null; }
+  function card(e){ return (e.target && e.target.closest) ? e.target.closest('.cstile[data-brain],.crew[data-brain],.csf[data-brain]') : null; }
   function rooms(){ return [].slice.call(document.querySelectorAll('a.roomlink')).filter(function(a){ return a.dataset && a.dataset.dest; }); }
   function roomUnder(e){ var a = (e.target && e.target.closest) ? e.target.closest('a.roomlink') : null; return (a && a.dataset && a.dataset.dest) ? a : null; }
   function disarm(){ var l = document.querySelectorAll('.roomlink.brain-armed'); for (var i=0;i<l.length;i++) l[i].classList.remove('brain-armed'); }
