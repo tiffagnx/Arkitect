@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<title>DeMartinville — for creators</title>
+<meta name="description" content="Turn your craft into an AI that works in your style — then book the real you when it matters. Recruiting ground-floor creators, in the open." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0A0B0E; --bg1:#101116; --panel:#15161B; --line:rgba(255,255,255,.08);
+    --text:#E7E9EE; --dim:#9AA0AC; --faint:rgba(154,160,172,.6);
+    --teal:#7BB6CD; --teal2:#3E9CB8; --gold:#E6C16A; --gold2:#D9A441; --purp:#C98BD0;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.65 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:920px;margin:0 auto;padding:0 22px}
+  .eyebrow{font:700 10px 'Space Mono',monospace;letter-spacing:.34em;text-transform:uppercase;color:var(--faint)}
+  h1,h2,h3{font-family:Oxanium,sans-serif;font-weight:800;letter-spacing:-.01em;line-height:1.08;margin:0}
+  a{color:inherit}
+  .accent{color:var(--teal)}
+  .gold{color:var(--gold)}
+
+  /* hero */
+  .hero{position:relative;padding:78px 0 60px;text-align:center;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(60% 50% at 50% 0%, rgba(62,156,184,.16), transparent 70%),
+    radial-gradient(40% 40% at 80% 30%, rgba(230,193,106,.08), transparent 70%);pointer-events:none}
+  .brand{font:800 17px Oxanium;letter-spacing:.3em;color:var(--text);margin:14px 0 30px;position:relative}
+  .hero h1{font-size:clamp(31px,5.4vw,54px);max-width:14ch;margin:0 auto;background:linear-gradient(180deg,#fff,#b9c6cc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;position:relative}
+  .hero p.sub{max-width:60ch;margin:22px auto 0;color:#C7CCD4;font-size:clamp(15px,2vw,18px);position:relative}
+  .cta-row{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:34px;position:relative}
+  .btn{display:inline-flex;align-items:center;gap:8px;font:700 14px Inter;padding:14px 24px;border-radius:13px;cursor:pointer;text-decoration:none;border:1px solid transparent;transition:transform .12s,box-shadow .12s,filter .12s}
+  .btn.go{color:#1a1408;background:linear-gradient(120deg,var(--gold),var(--gold2));box-shadow:0 6px 22px rgba(217,164,65,.34)}
+  .btn.go:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(217,164,65,.46)}
+  .btn.ghost{color:var(--text);border-color:var(--line);background:rgba(255,255,255,.04)}
+  .btn.ghost:hover{border-color:rgba(120,182,205,.6);transform:translateY(-2px)}
+  .wip-flag{display:inline-flex;align-items:center;gap:8px;margin-top:26px;font:600 11px 'Space Mono',monospace;letter-spacing:.1em;color:var(--gold);background:rgba(230,193,106,.09);border:1px solid rgba(230,193,106,.28);padding:7px 13px;border-radius:20px;position:relative}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 9px var(--gold);animation:pulse 1.8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  /* Kit — a faint ghost behind the top, barely there */
+  .hero::after{content:"";position:absolute;left:0;right:0;top:4px;height:560px;
+    background:url('https://demartinlabs.com/kit-hero.png') center top/contain no-repeat;
+    opacity:.07;pointer-events:none;z-index:0}
+  .hero>.wrap{position:relative;z-index:1}
+  .hero h1.heroline{max-width:20ch;margin:8px auto 4px}
+  /* readiness demo: click a move, it learns it, the bar fills */
+  .demochips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .chip{font:600 12px Inter;color:#CFE6EE;background:rgba(62,156,184,.1);border:1px solid rgba(120,182,205,.34);border-radius:9px;padding:8px 12px;cursor:pointer;transition:transform .08s,background .15s,opacity .2s,border-color .15s}
+  .chip:hover{background:rgba(62,156,184,.2);border-color:rgba(120,182,205,.6)}
+  .chip:active{transform:translateY(1px) scale(.985)}
+  .chip.done{opacity:.42;cursor:default;border-color:rgba(120,182,205,.16);text-decoration:line-through}
+  .demohint{font:600 11.5px 'Space Mono',monospace;letter-spacing:.04em;color:var(--faint);margin-top:10px;min-height:1.3em;transition:color .2s}
+  @media (prefers-reduced-motion: reduce){ .fill{animation:none !important;transition:none !important} }
+
+  /* sections */
+  section.blk{padding:46px 0;border-top:1px solid var(--line)}
+  .kicker{font:700 11px 'Space Mono',monospace;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);margin-bottom:14px}
+  section.blk h2{font-size:clamp(23px,3.6vw,33px);max-width:20ch;margin-bottom:16px}
+  section.blk p{color:#C2C8D1;max-width:66ch}
+  section.blk p + p{margin-top:14px}
+  .note{margin-top:20px;padding:13px 16px;border-left:3px solid var(--gold);background:rgba(230,193,106,.06);border-radius:0 10px 10px 0;font:600 13.5px Inter;color:#E6D3A8}
+  .note.teal{border-left-color:var(--teal);background:rgba(62,156,184,.07);color:#BFE0EC}
+
+  /* readiness bar */
+  .ready{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 20px}
+  .ready .rl{display:flex;justify-content:space-between;font:700 11px 'Space Mono',monospace;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
+  .ready .rl b{color:var(--gold)}
+  .track{height:11px;border-radius:99px;background:rgba(0,0,0,.5);overflow:hidden;border:1px solid var(--line)}
+  .fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--teal2),#9BE37B 70%,var(--gold));transition:width .55s cubic-bezier(.4,0,.2,1)}
+  @keyframes fill{to{width:100%}}
+  .ready .steps{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .step{flex:1;min-width:150px;font:600 12.5px Inter;color:#C2C8D1;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .step b{color:var(--teal);font-family:'Space Mono';font-size:11px;letter-spacing:.1em}
+
+  /* boogie story */
+  .story{background:linear-gradient(160deg,#16171d,#101116);border:1px solid var(--line);border-radius:18px;padding:26px 26px;position:relative;overflow:hidden}
+  .story::before{content:"“";position:absolute;top:-14px;right:18px;font:800 130px Oxanium;color:rgba(230,193,106,.07);line-height:1}
+  .story p{max-width:none}
+
+  /* ladder */
+  .ladder{display:flex;flex-direction:column;gap:11px;margin-top:24px}
+  .rung{display:flex;gap:15px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;position:relative}
+  .rung .n{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:800 13px Oxanium;color:#0c0d10}
+  .rung .rt{font:700 15px Oxanium;letter-spacing:.02em;margin-bottom:3px}
+  .rung .rd{font:500 13.5px Inter;color:#AEB4BE}
+  .rung.r1{margin-left:0} .rung.r2{margin-left:18px} .rung.r3{margin-left:36px} .rung.r4{margin-left:54px}
+  .rung.r1 .n{background:#6b7280} .rung.r2 .n{background:var(--teal)} .rung.r3 .n{background:linear-gradient(120deg,var(--gold),var(--gold2))} .rung.r4 .n{background:linear-gradient(120deg,#fff,var(--gold))}
+  .rung.r3{border-color:rgba(230,193,106,.4);box-shadow:0 0 30px rgba(230,193,106,.07)}
+  .rung.r3 .rt{color:var(--gold)}
+  .tagme{font:700 9px 'Space Mono';letter-spacing:.12em;color:var(--gold);border:1px solid rgba(230,193,106,.4);border-radius:6px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .flywheel{margin-top:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;background:rgba(62,156,184,.06);border:1px solid rgba(62,156,184,.22);border-radius:14px;padding:18px}
+  .fw-node{font:700 12.5px Oxanium;letter-spacing:.04em;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:9px 13px;text-align:center}
+  .fw-arrow{font-size:18px;color:var(--teal)}
+  .fw-cap{flex-basis:100%;text-align:center;font:600 13px Inter;color:#BFE0EC;margin-top:4px}
+
+  /* grids */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+  .gcell{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 17px}
+  .gcell h4{font:700 11px 'Space Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+  .gcell p{font:500 13.5px Inter;color:#BcC2CC;margin:0}
+  .bullets{margin:20px 0 0;padding:0;list-style:none;display:grid;gap:9px}
+  .bullets li{padding-left:24px;position:relative;font:500 14.5px Inter;color:#C2C8D1}
+  .bullets li::before{content:"→";position:absolute;left:0;color:var(--gold);font-weight:700}
+
+  /* final + footer */
+  .final{text-align:center;padding:60px 0 30px}
+  .final h2{font-size:clamp(25px,4vw,38px);max-width:18ch;margin:0 auto 8px;background:linear-gradient(180deg,#fff,#c4ccd2);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .truth{max-width:62ch;margin:18px auto 0;font:600 13.5px Inter;color:#AEB4BE;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:15px 18px}
+  footer{border-top:1px solid var(--line);padding:26px 0 40px;text-align:center;color:var(--faint);font:500 12px 'Space Mono',monospace;letter-spacing:.06em}
+  @media (max-width:640px){ .grid2{grid-template-columns:1fr} .rung.r2,.rung.r3,.rung.r4{margin-left:0} }
+  /* the manifesto hero — the opening that does the emotional work (owner's words, his soul) */
+  .manifesto{ max-width:60ch; margin:6px auto 0; position:relative; }
+  .manifesto p{ color:#C2C8D1; font-size:clamp(15px,1.95vw,18.5px); line-height:1.72; margin:0 0 17px; }
+  .manifesto p em{ font-style:italic; color:#e2e7ed; }
+  .manifesto p b{ color:#fff; }
+  .manifesto .ln{ color:var(--text); font-weight:600; }
+  .manifesto .peak{ font-family:Oxanium,sans-serif; font-weight:800; font-size:clamp(25px,4.2vw,42px); line-height:1.14; letter-spacing:-.01em; color:var(--text); margin:28px auto 24px; }
+  .manifesto .peak .gold{ color:var(--gold); }
+  .manifesto .coda{ font-size:clamp(13px,1.5vw,15px); color:var(--dim); margin-top:24px; }
+
+  /* DeMartinville brand logo — the ONE canonical wordmark (static/arkitect-logo.png), embedded so the real brand shows everywhere this file goes. NEVER font-render DeMartinville. */
+  .dmv{display:inline-flex;align-items:center;justify-content:center;gap:.42em;line-height:1}
+  .dmv .r{height:1px;width:1.05em;background:#5b6470;flex:none}
+  .dmv .w{white-space:nowrap;line-height:1}
+  .dmv .b{font-family:Oswald,sans-serif;font-weight:700;font-size:1em;letter-spacing:.005em}
+  .dmv .s{font-family:Allura,cursive;font-size:1.35em;margin-left:-.02em}
+  .dmv .b,.dmv .s{background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .brand{text-align:center;margin:16px auto 30px;filter:drop-shadow(0 2px 14px rgba(120,182,205,.18))}
+  .brand .dmv{font-size:clamp(30px,6vw,52px)}
+  .foot-logo{display:inline-block;vertical-align:middle;margin-right:9px;opacity:.62}
+  .foot-logo .dmv{font-size:17px}
+  .showcase{padding:42px 0 6px;border-top:1px solid var(--line)}
+  .showcase h2{font-size:clamp(22px,3.4vw,31px);max-width:20ch;margin:10px 0 6px}
+  .showcase .sub{color:#AEB4BE;font:500 14px Inter;max-width:60ch;margin:0 0 22px}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .shots figure{margin:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+  .shots img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+  .shots figcaption{padding:11px 14px;font:500 13px Inter;color:#BcC2CC;line-height:1.45}
+  .shots figcaption b{color:var(--text);font-weight:600}
+  @media (max-width:640px){ .shots{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="wrap">
+      <div class="eyebrow">local · private · yours</div>
+      <div class="brand"><span class="dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span></div>
+      <h1 class="heroline">A real creative studio. On your machine. <span class="gold" style="-webkit-text-fill-color:var(--gold);color:var(--gold)">Free.</span></h1>
+      <div class="manifesto">
+        <p>Three years ago, none of this existed. We blinked — and AI was in everything. Your feed, your coffee, your studio. And everywhere you turn it's the same line: <span class="ln">AI's coming for the music.</span></p>
+        <p>So the world ran to the cheap version — <em>type a prompt, generate a song, done.</em> No sweat. No heart. No <em>you.</em></p>
+        <p><b>That's not what this is.</b> DeMartinville is for the ones who still give a damn — the real artist, the real engineer, the real producer who <em>lives</em> in the work. And here's the flip: instead of some company mining your craft to train <em>their</em> AI, you train one on <span class="gold">yourself</span> — private, on your own machine, where nothing ever leaves.</p>
+        <p class="peak">It trains off you, but it doesn't replace you.<br><span class="gold">Now you've got a new tool in your arsenal. And it's yours.</span></p>
+        <p class="coda">It's not finished. We're building it in the open, with the people who'll actually use it. If that's you — you're early, and you're exactly who it's for.</p>
+      </div>
+      <div class="cta-row">
+        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Get DeMartinville — free</a>
+        <a class="btn ghost" href="#how">See how it works ↓</a>
+      </div>
+      <div class="wip-flag"><span class="dot"></span> EARLY · BUILT IN THE OPEN · FOR THE ONES WHO GIVE A DAMN</div>
+    </div>
+  </header>
+
+  <section class="showcase">
+    <div class="wrap">
+      <div class="kicker">what's actually inside</div>
+      <h2>Not a pitch. A real studio you can open right now.</h2>
+      <p class="sub">Free, private, on your own machine. This is what's running the second you download it:</p>
+      <div class="shots">
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/daw.png" alt="DeMartin Audio Labs"><figcaption><b>DeMartin Audio Labs</b> &mdash; record, edit, mix, master. A real engine, not a toy.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/beats.png" alt="DeMartin Beat Lab"><figcaption><b>DeMartin Beat Lab</b> &mdash; cook a beat from scratch: 808s, synths, a piano roll, and an AI in every plugin.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/editor.png" alt="LePrince Visual Labs"><figcaption><b>LePrince Visual Labs</b> &mdash; cut video like a pro: keyframes, effects, masks.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/build.png" alt="Blueprint Builds"><figcaption><b>Blueprint Builds</b> &mdash; describe an app, watch it build itself, live.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/chat.png" alt="DeMartinville home"><figcaption><b>One private hub</b> &mdash; every room, all local, all free to start.</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+
+    <section class="blk" id="how">
+      <div class="kicker">the core of it</div>
+      <h2>It's not our marketplace. It's <span class="accent">your</span> studio.</h2>
+      <p><b>First, it's just yours — and free.</b> A real studio on your own machine: record and mix music, cut video, generate images. All private, nothing leaves your computer. That's worth downloading on its <em>own</em> — and it's live <span class="accent">today</span>, not someday.</p>
+      <p><b>Where it's headed</b> — the part nobody's built yet: you'll be able to train a version of your <em>own</em> craft — your sound, your moves — into something your people can tap, in your style, with your name on it. Some will want the whole studio; some just want your sound for one session. We're building that part <span class="accent">in the open.</span></p>
+      <div class="note">Your name. Your people. Your money, all of it. We just build the rooms.</div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">the idea</div>
+      <h2>What if your skill could clock in without you?</h2>
+      <p>Picture a version of you that lives inside a real creative studio. Not a chatbot that <em>talks</em> about mixing — one that actually mixes. Edits. Arranges. Writes. In your style. You drag your character into a room and it goes to work. Drop it in the audio room, it's an audio brain. Drop the same character in the video room, it flips and thinks like a video pro. It doesn't just answer — it makes the move, inside safe rails, the way you taught it.</p>
+      <p>And here's what makes it real instead of hype: <span class="accent">the app already does this today.</span> DeMartinville has tools right now that listen to a vocal and actually fix it — EQ, de-ess, compression, the whole chain — and a mix assistant that analyzes a session and makes real, bounded moves. That's the engine, runnable on your own machine. The marketplace just puts <b>your</b> taste in the driver's seat.</p>
+      <div class="note">Nobody's doing this yet. The board is empty. That's the whole pitch.</div>
+    </section>
+
+    <section class="blk" id="build">
+      <div class="kicker">how you make one</div>
+      <h2>You build your character by doing what you already do</h2>
+      <p>This is the part that trips people out. You don't sit down and "train an AI." No forms, no course, no manual. You just open DeMartinville and work — and because the app owns the tools, it sees your <em>actual moves</em>. Not notes about what you'd do. What you actually do, in the session, in real time. Every chain, every "nah, pull that back 2 dB," every cut you make on instinct. That's the difference between a personality that <em>sounds</em> like you and a character that <em>works</em> like you.</p>
+      <p>As it learns, a readiness % fills up — your bar from "rough sketch of me" to "yeah, that's how I'd have done it." It does <b>not</b> go on the board until it's good, and nothing ships under your name without your sign-off.</p>
+      <div class="ready">
+        <div class="rl"><span>Your character · readiness</span><b id="rpct">0%</b></div>
+        <div class="demochips" id="demoChips">
+          <button class="chip" type="button">pull the vocal back 2 dB</button>
+          <button class="chip" type="button">carve the low-mid</button>
+          <button class="chip" type="button">glue the chorus</button>
+        </div>
+        <div class="track"><div class="fill" id="rfill"></div></div>
+        <div class="demohint" id="demoHint">↑ make a move — watch it learn you</div>
+        <div class="steps">
+          <div class="step"><b>01</b> · Work like normal</div>
+          <div class="step"><b>02</b> · It learns your real moves</div>
+          <div class="step"><b>03</b> · Hit 100% → on the board, you're hireable</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">what it looks like</div>
+      <h2>Say there's a guy named Boogie</h2>
+      <div class="story">
+        <p>Boogie's been mixing records 30 years. Golden ears. But there's one Boogie and only so many hours in his week — he turns down more work than he takes. So Boogie opens DeMartinville and just mixes, like he always has. The app watches how he rides a vocal, carves a low-mid, glues a chorus. His readiness bar fills.</p>
+        <p>One day, Boogie the character goes on the board. Now a kid in another city — who could never afford a day with the real Boogie — drags Boogie into their session. The character pulls up a vocal chain the way Boogie would, in his style. The kid's record sounds like it passed through golden ears, because in a way it did. And when that kid wants to go all the way? There's a button to book the <b>real</b> Boogie, live — screen-shared into the actual session.</p>
+        <p><span class="gold">Boogie didn't add an hour to his week, but his taste works in a thousand sessions at once — and the ones who want the human find the human.</span></p>
+      </div>
+      <div class="note teal">Swap "Boogie" for a producer, beatmaker, videographer, editor, colorist, lighting pro, topline writer. Craft + audience = a character.</div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">the ladder</div>
+      <h2>From free, to your AI, to the real you — paid up the whole way</h2>
+      <div class="ladder">
+        <div class="rung r1"><div class="n">1</div><div><div class="rt">Free &amp; local</div><div class="rd">The base app is free and runs on your own machine. Built-in AI, your own private character to build and use. Nothing leaves your computer. The floor everybody stands on.</div></div></div>
+        <div class="rung r2"><div class="n">2</div><div><div class="rt">The everyday character</div><div class="rd">Solid, affordable, always-on — for work that just needs to get done.</div></div></div>
+        <div class="rung r3"><div class="n">3</div><div><div class="rt">Your premium creator character <span class="tagme">THIS IS YOU</span></div><div class="rd">Works in your style, trained on your real moves. Pay-per-use — and you keep 100% of it, every single time, in sessions you'll never even see.</div></div></div>
+        <div class="rung r4"><div class="n">4</div><div><div class="rt">The capstone — live with the human</div><div class="rd">A real session with the real you, screen-shared in. The highest fee, because it's the realest thing there is.</div></div></div>
+      </div>
+      <div class="flywheel">
+        <div class="fw-node">Live human session</div>
+        <div class="fw-arrow">→</div>
+        <div class="fw-node">trains your AI</div>
+        <div class="fw-arrow">→</div>
+        <div class="fw-node">AI funnels people back to the human</div>
+        <div class="fw-cap">The robot sells the master; the master makes the robot smarter. You get paid to improve your own product.</div>
+      </div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">the honest question</div>
+      <h2>"How do you get users in here for me to sell to?"</h2>
+      <p>This is the right question to lead with, so here's the honest mechanism — no fake user counter to wave at you. The base studio is free and genuinely useful on its own: a full DAW, a video editor, image gen, all local and private. People don't show up for a marketplace — <span class="accent">they show up for a free studio that does real work.</span> So users are already in the building before characters are the thing they pay for.</p>
+      <ul class="bullets">
+        <li>Free tool = a warm funnel. The marketplace is the upsell, not a cold storefront.</li>
+        <li>You're distribution, not just a seller. A name people already follow, showing up as a character, is a reason for their fans to download the whole app.</li>
+        <li>Early is the spotlight. The first expert in a lane owns discovery + the default pick — before it's crowded.</li>
+        <li>Using the app builds your character — so you bank value while we fill the room together.</li>
+      </ul>
+      <div class="note">I'm not selling you a finished crowd. I'm offering you the front row while we fill the room — together.</div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">your stuff stays yours</div>
+      <h2>Everything you make here is <span class="accent">yours.</span> Full stop.</h2>
+      <p>Let's kill the red flag before it starts: every song, every recording, every session you make in DeMartinville is <b>100% yours</b> — it lives on your machine, and we don't own a single note of it. What you <em>sell</em> is access to your character. Not your catalog. Never your catalog.</p>
+      <div class="grid2">
+        <div class="gcell"><h4>Your music + your work</h4><p>All of it. Your tracks, your stems, your recordings, your craft — local, private, and yours, the same as if you made them anywhere else. The platform doesn't touch your catalog, period.</p></div>
+        <div class="gcell"><h4>Your secret sauce — protected</h4><p>When someone pays, they pay to <em>use</em> your character — they get a result in your style, but never the raw craft underneath. They can't crack it open, copy your sound, or walk off with it. You rent out the magic; nobody gets the recipe.</p></div>
+        <div class="gcell"><h4>Your name + your character</h4><p>Yours too — update it, pause it, pull it down, or leave and take it with you. No lock-in. And nothing goes out under your name until <b>you</b> say it's good — the readiness bar is a real gate, not a rubber stamp.</p></div>
+        <div class="gcell"><h4>The money</h4><p>People pay-per-use to use your character, and you keep 100% of it. We don't take a cut of your work. Pay-per-use, never a monthly meter on your buyers — and <b>you're never billed for compute on a slow month.</b></p></div>
+      </div>
+    </section>
+
+    <section class="blk">
+      <div class="kicker">no smoke</div>
+      <h2>This is early. We're building it in the open. We're not hiding that.</h2>
+      <p>Some of what you just read is live and working today — the studio, the rooms, the tools that already analyze and take real action on your audio. Some of it is the road we're driving toward, out loud, in public. We're telling you that on purpose, because the people we want aren't looking for a finished, locked-down platform — those get built by committee, for the masses, and they never have soul.</p>
+      <p>We want the <span class="gold">builders.</span> The ones who get hyped about getting in before it's obvious, who want a say in how their craft gets represented for the next ten years. If you need it perfect before you'll touch it, no hard feelings — come back when it's everywhere. But if reading this made something light up, if you're already thinking <em>"yo, holy shit, we gotta get in on this"</em> — that's the feeling. That's exactly who this is for.</p>
+      <div class="truth"><b>What's true right now:</b> free to start · your work stays on your machine · you set your price and keep 100% · no fake names or knockoffs · we build in the open — no vaporware.</div>
+    </section>
+
+  </main>
+
+  <section class="final" id="early">
+    <div class="wrap">
+      <h2>The chair's open. Get in before it's obvious.</h2>
+      <div class="cta-row">
+        <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/ARKITECT.zip">⬇&nbsp; Download DeMartinville — free</a>
+        <a class="btn ghost" href="mailto:koonce47@gmail.com?subject=DeMartinville%20%E2%80%94%20founding%20creator&body=Tell%20me%20about%20your%20craft%20%2B%20who%20you%27d%20bring%20in%3A%0A%0A" id="ctaJoin">Become a founding creator →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer><span class="foot-logo"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></span>local · private · yours · built in the open</footer>
+
+<script>
+  // the readiness bar is a DEMO: click a "move," it learns it, the bar fills. A mechanic,
+  // not fake data — it shows the exact "you work, it learns you" idea the page explains.
+  (function(){
+    var pct = document.getElementById('rpct'), fill = document.getElementById('rfill'),
+        hint = document.getElementById('demoHint'),
+        chips = Array.prototype.slice.call(document.querySelectorAll('#demoChips .chip'));
+    if(!pct || !fill || !chips.length) return;
+    var reduce = false; try{ reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    var shown = 0, done = 0, total = chips.length;
+    function paint(p){ fill.style.width = p + '%'; pct.textContent = p + '%'; }
+    paint(0);
+    chips.forEach(function(c){
+      c.addEventListener('click', function(){
+        if(c.classList.contains('done')) return;
+        c.classList.add('done'); done++;
+        var target = Math.round(done / total * 100);
+        fill.style.width = target + '%';
+        hint.textContent = '✓ it just learned a move from you';
+        if(reduce){ shown = target; pct.textContent = target + '%'; }
+        else { (function tick(){ if(shown < target){ shown++; pct.textContent = shown + '%'; setTimeout(tick, 13); } })(); }
+        if(done === total){ setTimeout(function(){ hint.innerHTML = "<span class='gold'>now it's on the board — you're hireable.</span>"; }, reduce ? 0 : 520); }
+      });
+    });
+  })();
+</script>
+<script>
+(function(){var h=location.hostname;if(h==='localhost'||h==='127.0.0.1'){var a=document.createElement('a');a.href='/';a.textContent=String.fromCharCode(8592)+' Back';a.title='Back to DeMartinville';a.style.cssText='position:fixed;top:14px;left:14px;z-index:99999;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:11px;text-decoration:none;cursor:pointer;background:linear-gradient(180deg,rgba(42,46,54,.92),rgba(24,26,32,.92));border:1px solid rgba(255,255,255,.13);box-shadow:0 3px 10px rgba(0,0,0,.4);color:#E7E9EE;font:700 13px Oxanium,sans-serif;';document.body.appendChild(a);}})();
+</script>
+<script>
+(function(){var p=navigator.platform||'',ua=navigator.userAgent||'';
+if(!(/Mac|iPhone|iPad|iPod/.test(p)||/Mac OS X/.test(ua)))return;
+var rows=document.querySelectorAll('.cta-row');
+for(var i=0;i<rows.length;i++){var n=document.createElement('div');
+n.style.cssText='margin-top:12px;font:600 13px Inter,sans-serif;color:#E6C16A;text-align:center;width:100%;line-height:1.5';
+n.innerHTML='On a Mac? That download is Windows for now — the Mac build is almost here. <a href="mailto:koonce47@gmail.com?subject=Mac%20version" style="color:#7BB6CD">Email me</a> and you will get it the day it drops.';
+rows[i].appendChild(n);}})();
+</script>
+</body>
+</html>
