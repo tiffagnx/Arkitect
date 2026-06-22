@@ -1759,6 +1759,111 @@ function openBatchFades(){
   q('bfOk').onclick=()=>{ if(_applyBatchFades()!==false) close(); };
   syncUI();
 }
+/* ════════════════════════════════════════════════════════════════════════════
+   NATIVE PLUGINS in the Studio (Track A v2) — run a clip through the user's OWN
+   VST3/AU/Waves plugin via the engine, then BAKE the processed audio onto the clip.
+   Reuses the exact same /api/native-plugins/* + /api/plugin-macros backend as Beat
+   Lab. v1 = apply/bake; Undo reverts (pushUndoClips). Params driven by raw 0..1.
+   ════════════════════════════════════════════════════════════════════════════ */
+let _spCache=null, _spLoading=null;
+async function studioScanPlugins(force){
+  if(_spCache && !force) return _spCache;
+  if(_spLoading) return _spLoading;
+  _spLoading=(async()=>{
+    const r=await fetch('/api/native-plugins/scan'+(force?'?refresh=1':'')).then(x=>x.json()).catch(()=>({ok:false,error:'engine offline'}));
+    _spLoading=null;
+    if(!r.ok){ _spCache={list:[],error:r.error||'unavailable'}; return _spCache; }
+    const flat=[];
+    (r.plugins||[]).forEach(p=>{ if(p.subnames&&p.subnames.length) p.subnames.forEach(s=>flat.push({path:p.path,sub:s,name:s,host:p.file})); else flat.push({path:p.path,sub:'-',name:p.name,host:p.file}); });
+    flat.sort((a,b)=>a.name.localeCompare(b.name));
+    _spCache={list:flat,error:null}; return _spCache;
+  })();
+  return _spLoading;
+}
+function _spInput(el){ el.style.cssText+=';background:#16161c;border:1px solid #444;color:#ddd;border-radius:6px;padding:5px 7px;font:500 11px Inter'; return el; }
+function spCtrl(p, vals){
+  const row=document.createElement('div'); row.style.cssText='display:flex;flex-direction:column;gap:3px;margin-bottom:8px';
+  const top=document.createElement('div'); top.style.cssText='display:flex;justify-content:space-between;align-items:baseline;gap:8px';
+  top.innerHTML='<span style="font:600 10.5px Inter;color:#ddd">'+(p.label||p.id)+'</span><span class="spv" style="font:600 10px monospace;color:#9FDDF0"></span>';
+  row.appendChild(top); const val=top.querySelector('.spv');
+  const n=p.choices?p.choices.length:0, raw0=(p.id in vals)?vals[p.id]:(p.raw||0); vals[p.id]=raw0;
+  const labelFor=raw=>{ if(n>0){const i=Math.max(0,Math.min(n-1,Math.round(raw*(n-1))));return p.choices[i];} if(p.min!=null&&p.max!=null){const v=p.min+raw*(p.max-p.min);return (Math.abs(v)>=100?v.toFixed(0):v.toFixed(2))+(p.unit?(' '+p.unit):'');} return Math.round(raw*100)+'%'; };
+  if(n>1&&n<=24){ const sel=_spInput(document.createElement('select')); sel.style.width='100%'; p.choices.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=c;sel.appendChild(o);}); sel.selectedIndex=Math.round(raw0*(n-1)); sel.onchange=()=>{vals[p.id]=sel.selectedIndex/(n-1);}; row.appendChild(sel); }
+  else { const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=1000; sl.value=Math.round(raw0*1000); sl.style.cssText='width:100%'; val.textContent=labelFor(raw0); sl.oninput=()=>{const raw=+sl.value/1000;vals[p.id]=raw;val.textContent=labelFor(raw);}; row.appendChild(sl); }
+  return row;
+}
+function spMacro(macro, vals){
+  const row=document.createElement('div'); row.style.cssText='display:flex;flex-direction:column;gap:3px;margin-bottom:9px';
+  row.innerHTML='<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 11px Inter;color:#C9B8FF">'+macro.name+'</span><span class="spmv" style="font:600 10px monospace;color:#9FDDF0">50%</span></div>'+(macro.desc?'<div style="font:500 9px Inter;color:#888;margin-top:-2px">'+macro.desc+'</div>':'');
+  const sl=document.createElement('input'); sl.type='range'; sl.min=0; sl.max=100; sl.value=50; sl.style.cssText='width:100%;accent-color:#9B8BFF';
+  const mv=row.querySelector('.spmv');
+  const ap=m=>{ (macro.targets||[]).forEach(tg=>{vals[tg.id]=tg.at0+(m/100)*(tg.at100-tg.at0);}); mv.textContent=Math.round(m)+'%'; };
+  sl.oninput=()=>ap(+sl.value); ap(50); row.appendChild(sl); return row;
+}
+async function openStudioPlugin(t, cl){
+  if(!cl || !cl.buffer){ flash('No audio on this clip'); return; }
+  const w=document.createElement('div'); w.className='plugwin'; w.style.left='220px'; w.style.top='108px'; w.style.width='346px';
+  w.innerHTML='<div class="pw-bar"><b>🎛 Native Plugin</b> &nbsp;<small style="opacity:.6">'+((cl.name||'clip'))+' · your real VST3 / Waves</small><button class="pw-x" style="float:right">✕</button></div>';
+  const body=document.createElement('div'); body.className='pw-body'; body.style.cssText='padding:11px 13px;display:flex;flex-direction:column;gap:9px'; w.appendChild(body);
+  const pickWrap=document.createElement('div');
+  const macroWrap=document.createElement('div'); macroWrap.style.cssText='display:none;flex-direction:column;gap:2px';
+  const ctrlWrap=document.createElement('div'); ctrlWrap.style.cssText='display:none;max-height:230px;overflow:auto;padding-right:4px';
+  const actions=document.createElement('div'); actions.style.cssText='display:none;gap:7px;flex-wrap:wrap';
+  const status=document.createElement('div'); status.style.cssText='font:500 9.5px monospace;color:#999;line-height:1.5';
+  body.append(pickWrap,macroWrap,ctrlWrap,actions,status);
+  document.body.appendChild(w); makeDraggable(w, w.querySelector('.pw-bar')); bringFront(w);
+  w.querySelector('.pw-x').onclick=()=>w.remove();
+  let curVals={}, curPlugin=null, curParams=[];
+  const mkBtn=(txt,accent)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:6px 11px;font:600 11px Inter;cursor:pointer;border-radius:6px;border:1px solid #444;color:'+(accent?'#fff':'#ddd')+';background:'+(accent?'#5b6cff':'#26262e'); return b; };
+  const applyBtn=mkBtn('✓ Apply to clip',1), smartBtn=mkBtn('🧠 Smart'), manualBtn=mkBtn('⚙ Manual');
+  manualBtn.style.display='none'; actions.append(applyBtn, smartBtn, manualBtn);
+  status.textContent='Scanning your installed plugins…';
+  const data=await studioScanPlugins();
+  if(data.error){ status.innerHTML='⚠ '+data.error; return; }
+  if(!data.list.length){ status.textContent='No VST3/AU plugins found on this machine.'; return; }
+  const search=_spInput(document.createElement('input')); search.placeholder='🔎 search '+data.list.length+' plugins — CLA-76, EQ, reverb'; search.style.width='100%';
+  const list=document.createElement('div'); list.style.cssText='max-height:150px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:2px';
+  pickWrap.append(search,list);
+  const paint=q=>{ list.innerHTML=''; data.list.filter(p=>!q||p.name.toLowerCase().includes(q)).slice(0,150).forEach(p=>{ const it=document.createElement('div'); it.style.cssText='padding:5px 8px;border-radius:6px;cursor:pointer;font:500 11px Inter;color:#ddd'; it.innerHTML='<b>'+p.name+'</b>'+(p.host&&p.host.indexOf('WaveShell')>=0?' <span style="color:#F2C76B;font:700 8px Inter">WAVES</span>':''); it.onmouseenter=()=>it.style.background='rgba(155,139,255,.16)'; it.onmouseleave=()=>it.style.background=''; it.onclick=()=>loadP(p); list.appendChild(it); }); };
+  search.oninput=()=>paint(search.value.trim().toLowerCase()); paint('');
+  status.textContent=data.list.length+' plugins found — pick one to load.';
+  async function loadP(p){
+    curPlugin=p; ctrlWrap.style.display='none'; actions.style.display='none'; macroWrap.style.display='none';
+    status.innerHTML='Loading <b>'+p.name+'</b>… <span style="opacity:.6">first Waves load can take ~30–45s (license check)</span>';
+    const pr=await fetch('/api/native-plugins/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p.path,sub:p.sub})}).then(r=>r.json()).catch(()=>({ok:false,error:'request failed'}));
+    if(!pr.ok){ status.innerHTML='⚠ '+(pr.error||'could not load'); return; }
+    curVals={}; curParams=pr.params||[]; ctrlWrap.innerHTML=''; smartBtn.style.display='inline-block'; manualBtn.style.display='none';
+    curParams.forEach(pp=>ctrlWrap.appendChild(spCtrl(pp,curVals)));
+    ctrlWrap.style.display='block'; actions.style.display='flex';
+    status.innerHTML='Loaded <b>'+p.name+'</b> — '+curParams.length+' controls. 🧠 Smart for macros, or tweak + Apply.';
+  }
+  smartBtn.onclick=async()=>{
+    if(!curPlugin) return; smartBtn.disabled=true; status.innerHTML='🧠 Building safe macros for <b>'+curPlugin.name+'</b>…';
+    const r=await fetch('/api/plugin-macros',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:curPlugin.name,params:curParams})}).then(x=>x.json()).catch(()=>({ok:false}));
+    smartBtn.disabled=false;
+    if(!r.ok||!r.macros||!r.macros.length){ status.innerHTML='⚠ Couldn’t build macros — use the manual knobs.'; return; }
+    Object.entries(r.baseline||{}).forEach(([k,v])=>{curVals[k]=v;});
+    macroWrap.innerHTML=''; r.macros.forEach(mc=>macroWrap.appendChild(spMacro(mc,curVals)));
+    macroWrap.style.display='flex'; ctrlWrap.style.display='none'; smartBtn.style.display='none'; manualBtn.style.display='inline-block';
+    status.innerHTML='🧠 '+r.macros.length+' safe macro'+(r.macros.length>1?'s':'')+(r.heuristic?' (offline)':'')+' — clamped so you can’t break it. Apply when it sounds right.';
+  };
+  manualBtn.onclick=()=>{ macroWrap.style.display='none'; ctrlWrap.style.display='block'; manualBtn.style.display='none'; smartBtn.style.display='inline-block'; status.textContent='Manual controls.'; };
+  applyBtn.onclick=async()=>{
+    if(!curPlugin||!cl.buffer) return; applyBtn.disabled=true; const t0=Date.now();
+    status.innerHTML='Applying <b>'+curPlugin.name+'</b> through the engine…';
+    try{
+      const dataUrl=await blobToDataUrl(bufferToWavBlob(cl.buffer,24));
+      const r=await fetch('/api/native-plugins/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:curPlugin.path,sub:curPlugin.sub,params:curVals,wav:dataUrl})}).then(x=>x.json());
+      if(!r.ok){ status.innerHTML='⚠ '+(r.error||'render failed'); applyBtn.disabled=false; return; }
+      const nb=await ctx.decodeAudioData(dataUrlToArrayBuffer(r.wav));
+      pushUndoClips(t, 'Plugin: '+curPlugin.name);
+      cl.buffer=nb; afterClipFx(t, cl, 'Baked through '+curPlugin.name+' ✓');
+      status.innerHTML='✓ Baked <b>'+curPlugin.name+'</b> in '+((Date.now()-t0)/1000).toFixed(1)+'s onto the clip — Undo (Ctrl-Z) reverts.';
+    }catch(e){ status.innerHTML='⚠ '+(e.message||e); }
+    applyBtn.disabled=false;
+  };
+}
+
 function showWaveMenu(t, wv, e){
   e.preventDefault();
   const vd=viewDur(), frac=Math.max(0,Math.min(1,e.offsetX/wv.clientWidth)), atTime=scrollT+frac*vd;
@@ -1790,6 +1895,7 @@ function showWaveMenu(t, wv, e){
       add("◢◣  Fade shape: "+_SN[cl.fadeInShape||'lin'], ()=>{ const nx=_SH[(_SH.indexOf(cl.fadeInShape||'lin')+1)%3]; cl.fadeInShape=nx; cl.fadeOutShape=nx; drawLane(t); if(playing) restartPlayback(); flash("Fade shape: "+_SN[nx]); }); }
     sep();
     add("⚙  DeMartin Suite…", ()=>{ selClip={trackId:t.id,clipId:cl.id}; openAudioSuite(t); });
+    add("🎛  Run through your plugin…", ()=>openStudioPlugin(t, cl));
   } else { const cx=e.clientX, cy=e.clientY; add("✨  Generate a sound here…", ()=>openSfxPrompt(t, atTime, cx, cy)); }
   sep();
   add("↶  Undo", undoLast);
