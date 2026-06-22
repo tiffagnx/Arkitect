@@ -105,9 +105,10 @@
       <div class="as-body">
         <div class="as-sec" id="asUpdSec" style="display:none"><div class="as-upd" id="asUpd"></div></div>
         <div class="as-sec">
-          <h3>Cloud models &amp; API keys — make ARKITECT smarter</h3>
+          <h3>Cloud models &amp; API keys — make DeMartinville smarter</h3>
           <div class="as-sub">Add a provider with <b>your own API key</b> and its model shows up in your <b>chat model picker</b> (☁) and powers <b>Swarm</b> research. Keys stay on this machine — nothing is shared. On a light PC, this is how you run a frontier brain — flat-monthly picks like <b>Featherless</b> &amp; <b>Z.ai GLM</b>, or free <b>Groq</b>.</div>
           <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Pick a provider in the <b>Provider</b> dropdown below — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> right under it — that opens their site. Make a free account and copy the key they give you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. Done — Swarm research now runs on your key.</li></ol></div>
+          <div class="as-note" style="margin-top:10px;padding:9px 11px;border-radius:9px;background:rgba(230,193,106,.08);border:1px solid rgba(230,193,106,.28);font:600 11.5px Inter,sans-serif;color:#E6D3A8;line-height:1.5">⚠️ On privacy: a cloud model sends your inputs to that provider to answer — it's not 100% on-your-machine like a local model. <b>Your agent's knowledge always stays on your computer; we never see it.</b> Each provider below shows whether it trains on your data — pick one that doesn't for sensitive work.</div>
           <div class="as-slots" id="asSlots"><div class="as-empty">loading…</div></div>
           <div class="as-formhead">＋ Add a provider</div>
           <div class="as-form" id="asForm">
@@ -158,6 +159,10 @@
     const hint = (p.free && p.free !== "—" ? `${p.free}. ` : "") + (p.models_hint ? `models: ${p.models_hint}.` : "");
     const el = $("asHint"); el.textContent = hint;
     if (p.key_url) { el.appendChild(document.createTextNode(" · ")); const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "get a free key ↗"; el.appendChild(a); }
+    // honest privacy label: 🔒 doesn't train on you (green) · ⚠️ free tier may (gold) · ☁ check policy (neutral)
+    if (p.privacy) { const pv = document.createElement("div"); pv.textContent = p.privacy;
+      pv.style.cssText = "margin-top:6px;font:600 11px Inter,sans-serif;line-height:1.4;color:" + (/^⚠/.test(p.privacy) ? "#E6C16A" : /^🔒/.test(p.privacy) ? "#7FD3B0" : "#9FB4C0");
+      el.appendChild(pv); }
   }
   async function loadProviders() {
     const r = await fetch("/api/swarm/providers").then(r => r.json()).catch(() => ({ providers: [] }));
@@ -207,7 +212,7 @@
       box.querySelector("#asUpdGo").onclick = () => installAppUpdate(url, ver);
     } else {
       box.className = "as-upd";
-      box.innerHTML = `<span>✓ ARKITECT <b>v${cur}</b> — you're on the latest.</span>`;
+      box.innerHTML = `<span>✓ DeMartinville <b>v${cur}</b> — you're on the latest.</span>`;
       gear.classList.remove("upd");
     }
   }
@@ -247,7 +252,7 @@
       const r = await fetch("/api/studio/update/stage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, version: ver }) }).then(r => r.json());
       if (!r.ok) throw new Error(r.error || "couldn't stage the update");
       box.className = "as-upd avail";
-      box.innerHTML = `<span>✓ <b>v${ver} is ready.</b> ARKITECT restarts to finish — your sessions &amp; keys stay put.</span><button class="as-upd-btn" id="asUpdRestart">Restart now</button>`;
+      box.innerHTML = `<span>✓ <b>v${ver} is ready.</b> DeMartinville restarts to finish — your sessions &amp; keys stay put.</span><button class="as-upd-btn" id="asUpdRestart">Restart now</button>`;
       box.querySelector("#asUpdRestart").onclick = async () => { box.innerHTML = `<span>Restarting…</span>`; try { await fetch("/api/studio/update/restart", { method: "POST" }); } catch (e) { } };
     } catch (e) {
       box.innerHTML = `<span>Update failed: ${e.message}. <a href="https://github.com/${UPD_REPO}/releases/latest" target="_blank" rel="noopener">Download it manually ↗</a></span>`;
