@@ -14,18 +14,29 @@
   const path = location.pathname.toLowerCase();
   const ROOMS = {
     studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
-    editor: "LePrince Visual Labs", images: "Imagination Station", bit16: "Bit1Six",
+    editor: "LePrince Visual Labs", images: "Imagination Station",
   };
   let room = null;
   for (const k in ROOMS) { if (path.includes(k + ".html")) { room = k; break; } }
   if (!room) return;                 // chat / non-room → no roster
+  // ── a character is only in a room if you DRAGGED them in from the front page:
+  //    ?brain=kit|tiff for the two built-ins, or ?char=ID for a user-built one. No param →
+  //    nothing mounts here at all; rooms have NO helper until you bring someone in. ──
+  let broughtId = null;
+  try {
+    const sp = new URLSearchParams(location.search);
+    const brain = (sp.get("brain") || "").toLowerCase();
+    if (brain === "kit" || brain === "tiff") broughtId = brain;
+    else { const cid = sp.get("char"); if (cid) broughtId = cid; }
+  } catch (_) {}
+  if (!broughtId) return;            // nobody dragged in → this room stays empty
   window.__kit = true;
 
   // ── the two built-in helpers, and the ONLY pre-made characters: Kit (the in-room build-bot)
   //    and Tiff (the creative partner). Everyone else in the roster is a REAL character a human
   //    builds for themselves — we never ship invented people. ──
   const CHARACTERS_BUILTIN = [
-    { id: "kit",  name: "Kit",  tag: "your build-bot",        color: "#7BB6CD", sprite: true,
+    { id: "kit",  name: "Kit",  tag: "creative partner · build", color: "#7BB6CD", sprite: true,
       intro: r => `Yo — I'm Kit. I know my way around ${r}. Stuck on anything? Ask me and I'll walk you through it.` },
     { id: "tiff", name: "Tiff", tag: "your creative partner",  color: "#E58FB5",
       intro: r => `Hey — it's Tiff. I usually live up in the main chat, but I'm here in ${r} too. Talk to me about the song, the vision, the words — the creative side of what you're making.` },
@@ -275,16 +286,10 @@
     if (reactivate) paintHost();   // refresh header label/avatar in case readiness/name changed
   }
   refreshRoster(false);
-  setActive(active, true);   // default: Kit, room-aware
-
-  // deep-link: /static/<room>.html?char=ID → open the helper + activate that stored character
-  try {
-    const cid = new URLSearchParams(location.search).get("char");
-    if (cid) {
-      const target = CHARACTERS.find(c => c.id === cid && c.mine);
-      if (target) { win.classList.add("open"); setActive(target, true); }
-    }
-  } catch (_) {}
+  // bring in ONLY the character dragged here from the front page (kit/tiff, or a user-built one)
+  const bring = CHARACTERS.find(c => c.id === broughtId) || CHARACTERS[0];
+  win.classList.add("open");
+  setActive(bring, true);
 
   // live refresh when a character is saved/edited/deleted (same tab via CustomEvent,
   // other tabs via storage). Best-effort — never disrupts an in-progress chat.

@@ -296,7 +296,7 @@ _CLOUD_CORE = [{
         "B built both, and you're one collaborator across them.\n"
         "- ARKITECT is B's private LOCAL station: this app, running on his own machine, "
         "localhost only, nothing phones home. It's where you are right now. It holds the rooms — Blueprint Builds, "
-        "DeMartin Audio Labs (the DAW), LePrince Visual Labs (video), Imagination Station (images), Bit1Six.\n"
+        "DeMartin Audio Labs (the DAW), LePrince Visual Labs (video), Imagination Station (images).\n"
         "- HeyTiff.ai is your CLOUD home: the web studio B built (Supabase-backed, at heytiff.ai). Same you, in the "
         "cloud, reachable from anywhere.\n"
         "You share one voice, one history with B, one body of knowledge — the deep memory you carry here came over "
@@ -3857,10 +3857,6 @@ ROOM_HELP = {
 - "Polish" rewrites your prompt richer. Set aspect ratio / size up top.
 - First image after a cold start takes a minute or two while the engine wakes; after that it's quick. Finished images drop into the gallery below.
 - "free memory" clears the image engine out of VRAM if things get heavy.""",
-  "bit16": """Bit1Six — make a playable 16-bit game (and turn it into a music video).
-- PLAY mode is a real side-scroller — run, sprint, jump; the level is built from your song.
-- Hit REC in-game to capture the run as your video.
-- The DIRECTOR toggle unlocks the deeper tools (camera moves, props, scenes) when you want them — start simple.""",
 }
 
 async def _kit_local(system: str, user: str) -> str:
@@ -3893,7 +3889,7 @@ async def kit_help(req: Request):
         char_name = (body.get("charName") or "").strip() or "your assistant"
         char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
         room_labels = {"studio": "DeMartin Audio Labs", "beats": "DeMartin Beat Lab", "editor": "LePrince Visual Labs",
-                       "images": "Imagination Station", "build": "Blueprint Builds", "bit16": "Bit1Six"}
+                       "images": "Imagination Station", "build": "Blueprint Builds"}
         room_label = room_labels.get(room, "DeMartinville")
         system = (
             f"You are {char_name}, a {char_craft} working inside DeMartinville {room_label}. {persona}\n\n"

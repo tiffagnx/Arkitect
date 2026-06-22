@@ -25,8 +25,6 @@ station and personal assistant.
   free and unlimited. Draft, Photo, Z-Image, and Edit modes.
 - **Blueprint Builds (Build)** — describe an app or tool in plain words and it
   vibe-codes a working single-file web app in a live preview.
-- **Bit1Six (bit16)** — turn a song into a playable 16-bit side-scroller game and
-  capture a run as a music video.
 
 ## Tiff vs. Kit (two different assistants)
 - **Tiff** is the creative collaborator — the voice and director — and she lives
