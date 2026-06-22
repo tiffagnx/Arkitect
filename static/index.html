@@ -250,6 +250,28 @@
   select.think { padding: 6px 11px; border-radius: 99px; cursor: pointer; outline: none;
     color: var(--dim); background: rgba(255,255,255,.035); border: 1px solid var(--hairline); font: 600 11px Inter; }
   select.think option { background: var(--bg1); }
+
+  /* ── EFFORT LEVER — drag Faster ←→ Smarter; the fill "charges up" (flows faster + glows hotter) toward Smarter ── */
+  .elever { display:flex; align-items:center; gap:8px; padding:5px 11px; border-radius:99px;
+    background:rgba(255,255,255,.04); border:1px solid var(--hairline); user-select:none; }
+  .el-end { font:700 8.5px 'Space Mono',monospace; letter-spacing:.06em; color:var(--faint); text-transform:uppercase; }
+  .el-track { position:relative; width:104px; height:8px; border-radius:99px; background:rgba(255,255,255,.09); cursor:pointer; }
+  .el-fill { position:absolute; left:0; top:0; bottom:0; width:8px; border-radius:99px;
+    background:linear-gradient(90deg,#2E8FAE,#7BB6CD 35%,#E6C16A 60%,#7BB6CD 85%,#2E8FAE);
+    background-size:280% 100%; animation:elflow 3.4s linear infinite;
+    box-shadow:0 0 8px rgba(120,182,205,.45); transition:width .18s cubic-bezier(.4,0,.2,1); }
+  @keyframes elflow { to { background-position:-280% 0; } }
+  .el-thumb { position:absolute; top:50%; left:0; width:15px; height:15px; border-radius:50%; transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#fff,#CFE6EE 58%,#7BB6CD);
+    box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 10px rgba(120,182,205,.6); cursor:grab; transition:left .18s cubic-bezier(.4,0,.2,1); }
+  .el-thumb:active { cursor:grabbing; }
+  .el-name { font:700 10.5px Oxanium; letter-spacing:.03em; color:var(--teal); min-width:64px; }
+  .elever.e2 .el-fill { animation-duration:2.1s; box-shadow:0 0 12px rgba(120,182,205,.6); }
+  .elever.e3 .el-fill { animation-duration:1.05s; box-shadow:0 0 17px rgba(230,193,106,.72), 0 0 7px rgba(123,182,205,.6); }
+  .elever.e3 .el-thumb { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 17px rgba(230,193,106,.85); animation:elpulse 1.05s ease-in-out infinite; }
+  .elever.e3 .el-name { color:var(--gold); }
+  @keyframes elpulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.45); } }
+  @media (prefers-reduced-motion: reduce) { .el-fill, .el-thumb { animation:none !important; } }
   .hint { font: 400 10.5px 'Space Mono'; color: var(--dim); margin-left: auto; }
   .inputrow { display: flex; gap: 10px; align-items: flex-end; padding: 10px;
     background: var(--panel); backdrop-filter: blur(26px); border: 1px solid var(--hairline); border-radius: 22px;
@@ -396,11 +418,13 @@
         <button class="mode chat on" id="modeChat">💬 Chat</button>
         <button class="mode" id="modeWrite">✍️ Write</button>
         <button class="mode" id="modeResearch">🔬 Research</button>
-        <select class="think" id="think" title="How hard Tiff thinks before she answers">
-          <option value="low">⚡ Quick</option>
-          <option value="medium">🧠 Balanced</option>
-          <option value="high">🔥 Deep</option>
-        </select>
+        <div class="elever e1" id="elever" title="How hard Tiff thinks — drag toward Smarter for deeper reasoning">
+          <span class="el-end">Faster</span>
+          <span class="el-track" id="elTrack"><span class="el-fill" id="elFill"></span><span class="el-thumb" id="elThumb"></span></span>
+          <span class="el-end">Smarter</span>
+          <span class="el-name" id="elName">⚡ Quick</span>
+        </div>
+        <input type="hidden" id="think" value="low">
         <select class="think" id="researchType" title="Web = quick search · Swarm = your own free LLM keys dig deeper, then she merges it" style="display:none"><option value="web">🌐 Web</option><option value="swarm">🛰 Swarm</option></select>
         <span class="hint" id="hint" style="display:none">enter to send · shift+enter = new line</span>
       </div>
@@ -1072,6 +1096,44 @@ startArkTips();
     });
   });
   inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ var v=[].filter.call(side.querySelectorAll('a.roomlink'), function(a){return a.style.display!=='none';}); if(v[0]) v[0].click(); } });
+})();
+</script>
+<script>
+/* EFFORT LEVER — drag/click Faster ←→ Smarter; snaps to 3 stops and writes #think.value
+   (low/medium/high), so the existing send code is untouched. Fill "charges up" toward Smarter. */
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var ev=$("elever"), track=$("elTrack"), fill=$("elFill"), thumb=$("elThumb"), name=$("elName"), hidden=$("think");
+  if(!ev||!track||!fill||!thumb||!hidden) return;
+  var STOPS=[{v:"low",t:"⚡ Quick",cls:"e1"},{v:"medium",t:"🧠 Balanced",cls:"e2"},{v:"high",t:"🔥 Deep",cls:"e3"}];
+  var idx=0;
+  function apply(i){
+    idx=Math.max(0,Math.min(2,i));
+    var s=STOPS[idx], frac=idx/2, w=track.clientWidth||104;
+    hidden.value=s.v;
+    name.textContent=s.t;
+    ev.classList.remove("e1","e2","e3"); ev.classList.add(s.cls);
+    fill.style.width=Math.max(8, frac*w)+"px";
+    thumb.style.left=(frac*w)+"px";
+    try{ localStorage.setItem("dmv-effort", s.v); }catch(e){}
+  }
+  function fromX(clientX){
+    var r=track.getBoundingClientRect();
+    var frac=r.width?(clientX-r.left)/r.width:0; frac=Math.max(0,Math.min(1,frac));
+    apply(Math.round(frac*2));
+  }
+  track.addEventListener("mousedown",function(e){ e.preventDefault(); fromX(e.clientX);
+    var mv=function(e2){ fromX(e2.clientX); };
+    var up=function(){ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); };
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
+  });
+  track.addEventListener("touchstart",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
+  track.addEventListener("touchmove",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
+  var saved=null; try{ saved=localStorage.getItem("dmv-effort"); }catch(e){}
+  var si=STOPS.findIndex(function(s){return s.v===saved;});
+  apply(si>=0?si:0);
+  requestAnimationFrame(function(){ apply(idx); });   // fix px positions once the track is laid out
+  window.addEventListener("resize",function(){ apply(idx); });
 })();
 </script>
 <script src="/static/settings.js"></script>
