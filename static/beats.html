@@ -1301,9 +1301,43 @@ function prepWarp(ch){
   if(!ch || !ch._buf) return;
   const targetDur=(ch._loopBars||1)*secPerBar();
   if(ch._warpMode===1 && targetDur>0){
+    // immediate WSOLA placeholder so nothing's silent, then upgrade to the pro engine stretch
     try{ ch._warpBuf=timeStretch(ch._buf, targetDur/ch._buf.duration); ch._warpRate=1; }
     catch(e){ ch._warpBuf=ch._buf; ch._warpRate=warpRate(ch); }
-  } else { ch._warpBuf=ch._buf; ch._warpRate=warpRate(ch); }
+    ch._proStretch=false; requestProStretch(ch, targetDur);
+  } else { ch._warpBuf=ch._buf; ch._warpRate=warpRate(ch); ch._proKey=null; ch._proStretch=false; ch._proToasted=false; }
+}
+/* Keep-Pitch upgrade — swap the WSOLA placeholder for the engine's pro-grade, transient-aware
+   stretch (pedalboard.time_stretch — the class real DAWs ship; local, artifact-free) once it
+   returns. Stale requests (tempo changed again mid-flight) are dropped and re-queued. */
+async function engineStretch(buf, factor, semis){
+  try{
+    const b64=await wavBase64(buf);
+    const r=await fetch('/api/native-stretch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({wav:b64,factor:factor,semitones:semis||0})}).then(x=>x.json());
+    if(!r.ok || !r.wav) return null;
+    return await b64ToBuffer(r.wav.split(',')[1]);
+  }catch(e){ return null; }
+}
+let _proBusy={};
+async function requestProStretch(ch, targetDur){
+  if(!ch._buf || targetDur<=0) return;
+  const key=ch.id+'|'+targetDur.toFixed(4)+'|'+ch._buf.length;
+  if(ch._proKey===key && ch._proStretch) return;          // already pro for this exact bake
+  ch._proKey=key;
+  if(_proBusy[ch.id]) return;                             // one request in flight per channel
+  _proBusy[ch.id]=true;
+  try{
+    const nb=await engineStretch(ch._buf, ch._buf.duration/targetDur, 0);
+    if(nb && ch._proKey===key){                           // still the wanted bake
+      ch._warpBuf=nb; ch._warpRate=1; ch._proStretch=true;
+      if(playing && ch._warpMode===1 && ch.type==='warp') startWarpChannel(ch, ctx.currentTime);
+      if(!ch._proToasted){ ch._proToasted=true; toast('Pro stretch — artifact-free ✓'); }
+    }
+  } finally {
+    _proBusy[ch.id]=false;
+    if(ch._warpMode===1 && ch._proKey!==key) requestProStretch(ch,(ch._loopBars||1)*secPerBar());
+  }
 }
 function rewarpLive(){   // BPM drag while playing — Re-Pitch updates instantly, Keep-Pitch re-bakes (debounced)
   if(!ctx) return;
@@ -1601,6 +1635,8 @@ function openInstrument(ch){
   foot.append(bigKnob({id:'_swing',label:'Swing',min:-25,max:25,step:1,def:0,fmt:v=>(v>0?'+':'')+Math.round(v)+'%'}, ()=>ch._swing||0, v=>{ch._swing=v;}));
   if(I.melodic){ const rl=el('div','knobwrap'); rl.style.width='auto';
     const rk=bigKnob({label:'Root',min:24,max:84,step:1,def:ch.root,unit:'',fmt:v=>noteName(v)}, ()=>ch.root, v=>{ch.root=v; renderRack();}); foot.append(rk); }
+  if(ch.type==='sampler'||ch.type==='slicer'){ const pb=el('button','tb','🎛 Plugin'); pb.title='Run this sample through your own Waves/VST3 plugin and bake it in';
+    pb.onclick=()=>openNativeFx(ch, ()=>renderRack()); foot.append(pb); }
   const parts=[bar]; if(presetRow)parts.push(presetRow); parts.push(body,foot); w.append(...parts);
   // AI brain panel (Layer 5 fills the logic; shell here)
   const ai=el('div','pw-ai'); ai.innerHTML=`<div class="log"></div><div class="row"><input placeholder="Ask ${ch.name}…"><button class="send">➤</button></div>`;
@@ -1645,7 +1681,8 @@ function openWarpEditor(ch){
   rePitch.title='Stretches to tempo, pitch follows (great for drum loops)';
   keepPitch.title='Stretches to tempo but holds the key (great for melodies/vocals)';
   rePitch.onclick=()=>{ ch._warpMode=0; prepWarp(ch); paintMode(); restartIfPlaying(ch); };
-  keepPitch.onclick=()=>{ ch._warpMode=1; toast('Baking keep-pitch…'); setTimeout(()=>{ prepWarp(ch); paintMode(); restartIfPlaying(ch); toast('Keep-Pitch on — key preserved ✓'); },25); };
+  keepPitch.onclick=()=>{ ch._warpMode=1; ch._proToasted=false; toast('Keep-Pitch — baking pro stretch…'); setTimeout(()=>{ prepWarp(ch); paintMode(); restartIfPlaying(ch); },25); };
+  keepPitch.title='Stretches to tempo but holds the key — artifact-free pro engine stretch (melodies/vocals)';
   modeRow.append(el('span',null,'<span style="font:700 8px \'Space Mono\';letter-spacing:.14em;color:var(--dim2)">WARP</span>'), rePitch, keepPitch); paintMode();
   bodyEl.append(modeRow);
   const row1=el('div'); row1.style.cssText='display:flex;align-items:center;gap:7px;flex-wrap:wrap';
@@ -1666,10 +1703,12 @@ function openWarpEditor(ch){
   const chopBtn=el('button','tb','🔪 Chop to slices'); chopBtn.title='Slice this sample at its hits → a Slicer channel you can re-sequence (MPC/Slicex style)';
   chopBtn.onclick=()=>chopToSlicer(ch,'transient');
   const revBtn=el('button','tb','↩ Reverse'); revBtn.onclick=()=>{ reverseBuffer(ch); prepWarp(ch); restartIfPlaying(ch); drawWaveform(cv,ch._buf); toast('Reversed'); };
-  row3.append(chopBtn, revBtn);
+  const plugBtn=el('button','tb','🎛 Plugin'); plugBtn.title='Run this loop through your own Waves/VST3 plugin (comp, EQ, reverb…) and bake it in';
+  plugBtn.onclick=()=>openNativeFx(ch, ()=>drawWaveform(cv,ch._buf));
+  row3.append(chopBtn, revBtn, plugBtn);
   bodyEl.append(row3);
   const hint=el('div'); hint.style.cssText="font:500 9px 'Space Mono';color:var(--dim2);line-height:1.55";
-  hint.textContent='Re-Pitch = stretches to tempo, pitch follows (drum loops). Keep-Pitch = stretches but holds the key (melodies/vocals). If it sounds half/double speed, hit ÷2 or ×2.';
+  hint.textContent='Re-Pitch = stretches to tempo, pitch follows (drum loops). Keep-Pitch = holds the key, artifact-free pro stretch (melodies/vocals). If it sounds half/double speed, hit ÷2 or ×2.';
   bodyEl.append(hint);
   w.append(bar,bodyEl);
   const ai=el('div','pw-ai'); ai.innerHTML=`<div class="log"></div><div class="row"><input placeholder="Ask ${ch.name}…"><button class="send">➤</button></div>`; w.append(ai);
@@ -1693,6 +1732,136 @@ function warpBrainAsk(ai,ch,w,upd){
   else log.append(el('div','aim bot','Try "half time", "double time", "this is a 4 bar loop", or "the clip is 140 bpm".'));
   log.scrollTop=log.scrollHeight;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NATIVE PLUGINS (Track A) — run a sample through the user's OWN VST3/AU/Waves.
+   The browser can't host native plugins, but our engine can (pedalboard): we send
+   the sample's audio to /api/native-plugins/render, the real plugin processes it,
+   and we bake the result back into ch._buf (non-destructive — ch._bufDry keeps the
+   original). Every param is driven by its normalized raw value (0..1) — universal.
+   ════════════════════════════════════════════════════════════════════════════ */
+let _npCache=null, _npLoading=null;
+async function fetchNativePlugins(force){
+  if(_npCache && !force) return _npCache;
+  if(_npLoading) return _npLoading;
+  _npLoading=(async()=>{
+    const r=await fetch('/api/native-plugins/scan'+(force?'?refresh=1':'')).then(x=>x.json()).catch(()=>({ok:false,error:'engine offline'}));
+    _npLoading=null;
+    if(!r.ok){ _npCache={list:[],error:r.error||'unavailable'}; return _npCache; }
+    const flat=[];
+    (r.plugins||[]).forEach(p=>{
+      if(p.subnames && p.subnames.length) p.subnames.forEach(s=>flat.push({path:p.path,sub:s,name:s,host:p.file}));
+      else flat.push({path:p.path,sub:'-',name:p.name,host:p.file});
+    });
+    flat.sort((a,b)=>a.name.localeCompare(b.name));
+    _npCache={list:flat,error:null};
+    return _npCache;
+  })();
+  return _npLoading;
+}
+function npControl(p, vals){
+  const row=el('div'); row.style.cssText='display:flex;flex-direction:column;gap:3px;margin-bottom:8px';
+  const top=el('div'); top.style.cssText='display:flex;justify-content:space-between;align-items:baseline;gap:8px';
+  const lab=el('span',null,p.label||p.id); lab.style.cssText='font:600 10.5px Inter;color:var(--text)';
+  const val=el('span'); val.style.cssText="font:600 10px 'Space Mono';color:#9FDDF0";
+  top.append(lab,val); row.append(top);
+  const n=p.choices?p.choices.length:0;
+  const raw0=(p.id in vals)?vals[p.id]:(p.raw||0); vals[p.id]=raw0;
+  const labelFor=(raw)=>{
+    if(n>0){ const i=Math.max(0,Math.min(n-1,Math.round(raw*(n-1)))); return p.choices[i]; }
+    if(p.min!=null && p.max!=null){ const v=p.min+raw*(p.max-p.min); return (Math.abs(v)>=100?v.toFixed(0):v.toFixed(2))+(p.unit?(' '+p.unit):''); }
+    return Math.round(raw*100)+'%';
+  };
+  if(n>1 && n<=24){
+    const sel=el('select'); sel.style.cssText='width:100%;padding:4px 6px;border-radius:6px;background:rgba(0,0,0,.3);border:1px solid var(--hair2);color:var(--text);font:500 11px Inter';
+    p.choices.forEach((c,i)=>{ const o=el('option',null,c); o.value=i; sel.append(o); });
+    sel.selectedIndex=Math.round(raw0*(n-1));
+    sel.onchange=()=>{ vals[p.id]=sel.selectedIndex/(n-1); };
+    row.append(sel);
+  } else {
+    const sl=el('input'); sl.type='range'; sl.min=0; sl.max=1000; sl.value=Math.round(raw0*1000); sl.style.cssText='width:100%';
+    val.textContent=labelFor(raw0);
+    sl.oninput=()=>{ const raw=+sl.value/1000; vals[p.id]=raw; val.textContent=labelFor(raw); };
+    row.append(sl);
+  }
+  return row;
+}
+async function openNativeFx(ch, redraw){
+  const key='np'+ch.id; let w=openWins[key]; if(w){ w.style.display='flex'; bringFront(w); return; }
+  w=el('div','pwin'); w.style.cssText='left:210px;top:130px;width:344px';
+  const bar=el('div','pw-bar',`<span class="pw-ic" style="background:#5BC8E833">🎛</span><span class="pw-tt"><b>Native Plugin</b><small>${ch.name} · your real VST3 / Waves</small></span><button class="pw-x">✕</button>`);
+  const body=el('div'); body.style.cssText='padding:11px 13px;display:flex;flex-direction:column;gap:9px';
+  w.append(bar,body); $('#wins').append(w);
+  bar.querySelector('.pw-x').onclick=()=>{ w.style.display='none'; };
+  dragWin(w,bar); openWins[key]=w; bringFront(w);
+  const pickWrap=el('div');
+  const ctrlWrap=el('div'); ctrlWrap.style.cssText='display:none;max-height:232px;overflow:auto;padding-right:4px';
+  const actions=el('div'); actions.style.cssText='display:none;gap:7px';
+  const status=el('div'); status.style.cssText="font:500 9.5px 'Space Mono';color:var(--dim2);line-height:1.55";
+  body.append(pickWrap, ctrlWrap, actions, status);
+
+  let curVals={}, curPlugin=null;
+  const applyBtn=el('button','tb solid','✓ Apply to sample');
+  const revBtn=el('button','tb','↩ Revert'); revBtn.style.display=ch._bufDry?'inline-block':'none';
+  actions.append(applyBtn, revBtn);
+
+  status.textContent='Scanning your installed plugins…';
+  const data=await fetchNativePlugins();
+  if(data.error){ status.innerHTML='⚠ '+data.error+'<br><span style="color:var(--dim2)">Native plugins run through the engine — make sure DeMartinville was launched via setup (it installs the host).</span>'; return; }
+  if(!data.list.length){ status.textContent='No VST3/AU plugins found on this machine.'; return; }
+  const search=el('input'); search.placeholder='🔎 search '+data.list.length+' plugins — e.g. CLA-76, EQ, reverb';
+  search.style.cssText='width:100%;padding:6px 8px;border-radius:7px;background:rgba(0,0,0,.3);border:1px solid var(--hair2);color:var(--text);font:500 11px Inter';
+  const list=el('div'); list.style.cssText='max-height:150px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:2px';
+  pickWrap.append(search,list);
+  const paint=(q)=>{ list.innerHTML=''; const f=data.list.filter(p=>!q||p.name.toLowerCase().includes(q)).slice(0,150);
+    f.forEach(p=>{ const waves=p.host&&p.host.indexOf('WaveShell')>=0; const it=el('div',null,`<b>${p.name}</b>`+(waves?' <span style="color:#F2C76B;font:700 8px Inter">WAVES</span>':''));
+      it.style.cssText='padding:5px 8px;border-radius:6px;cursor:pointer;font:500 11px Inter;color:var(--text)';
+      it.onmouseenter=()=>it.style.background='rgba(91,200,232,.14)'; it.onmouseleave=()=>it.style.background='';
+      it.onclick=()=>loadPlugin(p); list.append(it); });
+    if(!f.length) list.append(el('div',null,'<span style="color:var(--dim2);font:500 10px Inter;padding:6px">no match</span>')); };
+  search.oninput=()=>paint(search.value.trim().toLowerCase()); paint('');
+  status.textContent=data.list.length+' plugins found — pick one to load.';
+
+  async function loadPlugin(p){
+    curPlugin=p; ctrlWrap.style.display='none'; actions.style.display='none';
+    status.innerHTML='Loading <b>'+p.name+'</b>… <span style="color:var(--dim2)">first load of a Waves plugin can take ~30–45s (license check)</span>';
+    const pr=await fetch('/api/native-plugins/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:p.path,sub:p.sub})}).then(r=>r.json()).catch(()=>({ok:false,error:'request failed'}));
+    if(!pr.ok){ status.innerHTML='⚠ '+(pr.error||'could not load'); return; }
+    curVals={}; ctrlWrap.innerHTML='';
+    (pr.params||[]).forEach(pp=>ctrlWrap.append(npControl(pp,curVals)));
+    ctrlWrap.style.display='block'; actions.style.display='flex';
+    status.innerHTML='Loaded <b>'+p.name+'</b> — '+(pr.params||[]).length+' controls. Tweak, then Apply.';
+  }
+  applyBtn.onclick=async()=>{
+    if(!curPlugin) return;
+    if(!ch._buf){ status.textContent='Load a sample into this channel first.'; return; }
+    applyBtn.disabled=true; const t0=Date.now();
+    status.innerHTML='Applying through <b>'+curPlugin.name+'</b>… processing on your machine…';
+    try{
+      const b64=await wavBase64(ch._buf);
+      const r=await fetch('/api/native-plugins/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:curPlugin.path,sub:curPlugin.sub,params:curVals,wav:b64})}).then(x=>x.json());
+      if(!r.ok){ status.innerHTML='⚠ '+(r.error||'render failed'); applyBtn.disabled=false; return; }
+      const nb=await b64ToBuffer(r.wav.split(',')[1]);
+      ch._bufDry=ch._bufDry||ch._buf; ch._buf=nb;
+      ch._nativeFx={name:curPlugin.name,path:curPlugin.path,sub:curPlugin.sub,params:curVals};
+      wavBase64(nb).then(x=>{ch._sampleB64=x;}).catch(()=>{});
+      if(ch.type==='warp') prepWarp(ch);
+      restartIfPlaying(ch); if(redraw)redraw(); renderRack();
+      revBtn.style.display='inline-block';
+      status.innerHTML='✓ Baked through <b>'+curPlugin.name+'</b> in '+((Date.now()-t0)/1000).toFixed(1)+'s — non-destructive (Revert to undo).';
+      toast('Baked through '+curPlugin.name+' ✓');
+    }catch(e){ status.innerHTML='⚠ '+(e.message||e); }
+    applyBtn.disabled=false;
+  };
+  revBtn.onclick=()=>{
+    if(!ch._bufDry) return; ch._buf=ch._bufDry; ch._bufDry=null; ch._nativeFx=null;
+    wavBase64(ch._buf).then(x=>{ch._sampleB64=x;}).catch(()=>{});
+    if(ch.type==='warp') prepWarp(ch);
+    restartIfPlaying(ch); if(redraw)redraw(); renderRack();
+    revBtn.style.display='none'; status.textContent='Reverted to the dry sample.'; toast('Reverted to dry');
+  };
+}
+
 let _z=200;
 function bringFront(w){ w.style.zIndex=++_z; }
 function applyPreset(ch,I,w,params){

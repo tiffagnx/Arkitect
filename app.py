@@ -3024,6 +3024,187 @@ async def studio_bounce(req: Request):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# NATIVE PLUGIN HOSTING (Track A) — let users load their OWN VST3/AU/Waves plugins
+# and run audio through them. Native plugins can't run in the browser, but our engine
+# is native: it hosts them via Spotify's `pedalboard`. Every load/render runs in an
+# ISOLATED SUBPROCESS (plugin_host.py) with a timeout, because a misbehaving native
+# plugin can hard-segfault the interpreter uncatchably — this way a bad plugin kills a
+# throwaway worker, never the app. v1 = render/bake ("apply your plugin → freeze").
+# ══════════════════════════════════════════════════════════════════════════════
+import tempfile as _tempfile
+_PLUGIN_SCAN_CACHE = {"ts": 0.0, "data": None}
+_PLUGIN_HOST_OK = {"ts": 0.0, "ok": None}
+_PLUGIN_PARAMS_CACHE = {}   # {f"{path}|{sub}": result} — a plugin's params never change, and a
+                            # cold Waves load is slow (license check), so enumerate each only once.
+
+
+def _plugin_python() -> str:
+    """Interpreter that runs the host worker. Prefer the project venv (where pedalboard
+    is installed); fall back to sys.executable (in a source run that already IS the venv)."""
+    cand = (ROOT / "venv" / "Scripts" / "python.exe") if sys.platform == "win32" else (ROOT / "venv" / "bin" / "python")
+    if cand.exists():
+        return str(cand)
+    return sys.executable
+
+
+def _plugin_host_ready() -> bool:
+    """True if the worker interpreter can import pedalboard. Cached 60s."""
+    if _PLUGIN_HOST_OK["ok"] is not None and (time.time() - _PLUGIN_HOST_OK["ts"] < 60):
+        return _PLUGIN_HOST_OK["ok"]
+    ok = False
+    try:
+        r = subprocess.run([_plugin_python(), "-c", "import pedalboard"],
+                           capture_output=True, creationflags=_NOWIN, timeout=25)
+        ok = (r.returncode == 0)
+    except Exception:
+        ok = False
+    _PLUGIN_HOST_OK.update(ts=time.time(), ok=ok)
+    return ok
+
+
+def _run_plugin_worker(args, timeout=30):
+    """Invoke plugin_host.py in a subprocess; return the last JSON object it printed.
+    Tolerates plugin chatter on stdout/stderr by scanning for the trailing JSON line."""
+    worker = ROOT / "plugin_host.py"
+    if not worker.exists():
+        return {"error": "plugin host worker missing"}
+    try:
+        r = subprocess.run([_plugin_python(), str(worker), *args],
+                           capture_output=True, text=True, creationflags=_NOWIN, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {"error": f"plugin timed out after {timeout}s — it may need activation (iLok/Waves) or crashed on load"}
+    except Exception as e:
+        return {"error": f"worker failed: {e}"}
+    for line in reversed((r.stdout or "").splitlines()):
+        line = line.strip()
+        if line.startswith("{") or line.startswith("["):
+            try:
+                return json.loads(line)
+            except Exception:
+                continue
+    return {"error": ("plugin crashed or returned no data. " + (r.stderr or "")[-280:]).strip()}
+
+
+@app.get("/api/native-plugins/scan")
+async def native_plugins_scan(refresh: int = 0):
+    """List the user's installed VST3/AU plugins (+ Waves shell sub-plugins). Cached 5min
+    because scanning opens each plugin file; ?refresh=1 forces a fresh scan."""
+    if not refresh and _PLUGIN_SCAN_CACHE["data"] is not None and (time.time() - _PLUGIN_SCAN_CACHE["ts"] < 300):
+        return {"ok": True, "plugins": _PLUGIN_SCAN_CACHE["data"], "cached": True}
+    if not await asyncio.to_thread(_plugin_host_ready):
+        return {"ok": False, "unavailable": True,
+                "error": "Native-plugin host isn't installed yet. Re-run setup (it installs pedalboard).",
+                "plugins": []}
+    res = await asyncio.to_thread(_run_plugin_worker, ["scan"], 120)
+    if isinstance(res, dict) and res.get("error"):
+        return {"ok": False, "error": res["error"], "plugins": []}
+    _PLUGIN_SCAN_CACHE.update(ts=time.time(), data=res)
+    return {"ok": True, "plugins": res}
+
+
+@app.post("/api/native-plugins/params")
+async def native_plugins_params(req: Request):
+    """Enumerate one plugin's parameters → JSON the UI turns into knobs.
+    Body: {path, sub?}. `sub` is a Waves-shell sub-plugin name (e.g. 'CLA-76 Stereo')."""
+    body = await req.json()
+    path = (body.get("path") or "").strip()
+    sub = (body.get("sub") or "-").strip() or "-"
+    if not path or not os.path.exists(path):
+        return JSONResponse({"error": "plugin not found on disk"}, status_code=400)
+    ckey = f"{path}|{sub}"
+    if ckey in _PLUGIN_PARAMS_CACHE:
+        return {"ok": True, "cached": True, **_PLUGIN_PARAMS_CACHE[ckey]}
+    # cold Waves loads do an iLok/license check that can take a while → generous timeout
+    res = await asyncio.to_thread(_run_plugin_worker, ["params", path, sub], 90)
+    if isinstance(res, dict) and res.get("error"):
+        return {"ok": False, "error": res["error"]}
+    _PLUGIN_PARAMS_CACHE[ckey] = res
+    return {"ok": True, **res}
+
+
+@app.post("/api/native-plugins/render")
+async def native_plugins_render(req: Request):
+    """Apply a native plugin to audio (the v1 'freeze' path). Body:
+    {path, sub?, params:{id:value}, wav:<base64 wav>} → returns processed {wav:<base64>}.
+    Runs in an isolated subprocess so a plugin crash can't take down the engine."""
+    body = await req.json()
+    path = (body.get("path") or "").strip()
+    sub = (body.get("sub") or "-").strip() or "-"
+    params = body.get("params") or {}
+    wav_b64 = body.get("wav") or ""
+    if not path or not os.path.exists(path):
+        return JSONResponse({"error": "plugin not found on disk"}, status_code=400)
+    try:
+        raw = base64.b64decode(wav_b64.split(",", 1)[-1])
+    except Exception:
+        return JSONResponse({"error": "bad audio data"}, status_code=400)
+    tmp = Path(_tempfile.mkdtemp(prefix="dmvplug_"))
+    in_wav, out_wav, pj = tmp / "in.wav", tmp / "out.wav", tmp / "params.json"
+    try:
+        in_wav.write_bytes(raw)
+        pj.write_text(json.dumps(params), encoding="utf-8")
+        res = await asyncio.to_thread(_run_plugin_worker,
+                                      ["render", path, sub, str(pj), str(in_wav), str(out_wav)], 120)
+        if isinstance(res, dict) and res.get("error"):
+            return {"ok": False, "error": res["error"]}
+        if not out_wav.exists():
+            return {"ok": False, "error": "render produced no output"}
+        out_b64 = base64.b64encode(out_wav.read_bytes()).decode("ascii")
+        return {"ok": True, "wav": "data:audio/wav;base64," + out_b64,
+                "frames": res.get("frames"), "samplerate": res.get("samplerate")}
+    finally:
+        _shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ── Pro-grade time-stretch (Track B) — Beat Lab's "Keep-Pitch" warp routed through the
+#    engine's professional transient-aware stretcher (pedalboard.time_stretch, the class of
+#    algorithm real DAWs ship) instead of the in-browser WSOLA. Local, free, private, offline.
+#    Run inline (it's pedalboard's own safe code — no third-party plugin to segfault — and fast).
+def _do_stretch(raw, factor, semis):
+    try:
+        import pedalboard
+        from pedalboard.io import AudioFile
+        import io as _io
+        with AudioFile(_io.BytesIO(raw)) as f:
+            sr = f.samplerate
+            audio = f.read(f.frames)
+        out = pedalboard.time_stretch(audio, sr, float(factor), float(semis), high_quality=True)
+        buf = _io.BytesIO()
+        chans = out.shape[0] if out.ndim > 1 else 1
+        with AudioFile(buf, "w", sr, chans, format="wav") as f:
+            f.write(out)
+        return buf.getvalue()
+    except ImportError:
+        return {"error": "stretch engine not installed"}
+    except Exception as e:
+        return {"error": f"stretch failed: {str(e)[:160]}"}
+
+
+@app.post("/api/native-stretch")
+async def native_stretch(req: Request):
+    """Pitch-preserving (or pitch-shifting) time-stretch via the pro engine. Body:
+    {wav:<base64>, factor:<stretch_factor>, semitones:<pitch shift>} → {wav:<base64>}.
+    stretch_factor = sourceDuration / targetDuration (>1 = faster/shorter, <1 = slower/longer)."""
+    body = await req.json()
+    wav_b64 = body.get("wav") or ""
+    try:
+        factor = float(body.get("factor") or 1.0)
+        semis = float(body.get("semitones") or 0.0)
+    except Exception:
+        return JSONResponse({"error": "bad factor"}, status_code=400)
+    if not (0.05 <= factor <= 20):
+        return JSONResponse({"error": "factor out of range"}, status_code=400)
+    try:
+        raw = base64.b64decode(wav_b64.split(",", 1)[-1])
+    except Exception:
+        return JSONResponse({"error": "bad audio data"}, status_code=400)
+    out = await asyncio.to_thread(_do_stretch, raw, factor, semis)
+    if isinstance(out, dict):
+        return {"ok": False, **out}
+    return {"ok": True, "wav": "data:audio/wav;base64," + base64.b64encode(out).decode("ascii")}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # AUTO-UPDATER (pass 2) — stage a GitHub release ZIP, then apply it on the NEXT
 # launch (setup-and-run.ps1 does the swap while the server is down, so the running
 # process never overwrites itself). The user's data/ and venv/ are always preserved
@@ -3857,6 +4038,10 @@ ROOM_HELP = {
 - "Polish" rewrites your prompt richer. Set aspect ratio / size up top.
 - First image after a cold start takes a minute or two while the engine wakes; after that it's quick. Finished images drop into the gallery below.
 - "free memory" clears the image engine out of VRAM if things get heavy.""",
+  "draw": """Sketch Pad — a clean drawing canvas (ported from heytiff's NapkinPad, rebuilt native).
+- Pick a tool up top: Pen, Marker, Pencil, or Eraser — plus an ink color and a brush size.
+- Draw with a mouse, finger, or stylus; stylus pressure (and speed) changes the line weight.
+- Undo / Redo, Clear, and the PNG button to download your sketch. It autosaves to this machine as you draw.""",
 }
 
 async def _kit_local(system: str, user: str) -> str:
@@ -3871,6 +4056,19 @@ async def _kit_local(system: str, user: str) -> str:
             "temperature": 0.4, "reasoning_effort": "low", "stream": False,
         })
     return (r.json()["choices"][0]["message"].get("content") or "").strip()
+
+async def _kit_learn(msg: str, reply: str) -> None:
+    """In-room helpers LEARN how you work: pull durable preferences/facts out of a Kit/Tiff
+    exchange and save them to the SAME memory store Tiff uses — so what one learns, both
+    recall (the existing recall block in kit_help picks them up next turn). Runs LOCALLY
+    (fact extraction never leaves the machine) and fire-and-forget so it never blocks or
+    breaks a reply. Reuses Tiff's conservative _auto_remember verbatim."""
+    try:
+        loaded = await _loaded_models()
+        model = (loaded[0] if loaded else DEFAULT_MODEL)
+        await _auto_remember(model, [{"role": "user", "content": msg}], reply)
+    except Exception:
+        pass
 
 @app.post("/api/kit")
 async def kit_help(req: Request):
@@ -3919,14 +4117,23 @@ async def kit_help(req: Request):
                       "\n".join(f"- {m.get('text','')}" for m in hits)
     except Exception:
         pass
-    slots = _enabled_slots()
+    # ── BRAIN TIER routing — the in-room switch sends tier = local | private | max.
+    #    local       → stay on the user's OWN machine (skip cloud even if a key exists,
+    #                  honoring the "private, on your machine" promise).
+    #    private/max → use a configured cloud brain if there is one, else fall back to local.
+    #    (private vs max share one cloud path today — slots carry no privacy tier yet.) ──
+    tier = (body.get("tier") or "local").strip().lower()
+    slots = _enabled_slots() if tier != "local" else []
     try:
         if slots:
-            text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # free cloud brain, auto-fallback
+            text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # cloud brain, auto-fallback
         else:
-            text = await _kit_local(system, msg)                                     # local fallback
+            text = await _kit_local(system, msg)                                     # local (default, or no cloud key set)
     except Exception:
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
+    # LEARN how you work — pull durable prefs/facts from this exchange into the shared memory
+    # store (local, fire-and-forget) so Tiff & Kit recall them next time.
+    _fire(_kit_learn(msg, text))
     return {"reply": text or "Hm, I blanked on that — ask me again?"}
 
 
