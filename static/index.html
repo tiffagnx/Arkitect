@@ -274,6 +274,16 @@
   .elever.e3 .el-fill { animation-duration:1.05s; box-shadow:0 0 17px rgba(230,193,106,.72), 0 0 7px rgba(123,182,205,.6); }
   .elever.e3 .el-thumb { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 17px rgba(230,193,106,.85); animation:elpulse 1.05s ease-in-out infinite; }
   .elever.e3 .el-name { color:var(--gold); }
+  /* GOD MODE (Claude only) — full-spectrum energy, fastest flow, hottest glow */
+  .elever.e4 .el-fill { animation-duration:.62s;
+    background:linear-gradient(90deg,#3E9CB8,#7BB6CD 22%,#E6C16A 48%,#E94B9C 68%,#7BB6CD 86%,#3E9CB8); background-size:320% 100%;
+    box-shadow:0 0 22px rgba(230,193,106,.85), 0 0 11px rgba(233,75,156,.6); }
+  .elever.e4 .el-thumb { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 22px rgba(230,193,106,.95); animation:elpulse .62s ease-in-out infinite; }
+  .elever.e4 .el-name { color:#FFE6A3; text-shadow:0 0 10px rgba(230,193,106,.7); }
+  .elever.claude { border-color:rgba(230,193,106,.42); }
+  .elever.claude::after { content:"⚡ CLAUDE"; font:800 8px Oxanium,sans-serif; letter-spacing:.12em; color:#E6C16A; opacity:.9; }
+  .dock.claude-brain .inputrow { border-color:rgba(230,193,106,.5);
+    box-shadow:0 0 0 1px rgba(230,193,106,.22), 0 0 26px rgba(230,193,106,.13), 0 14px 50px rgba(0,0,0,.4); }
   @keyframes elpulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.45); } }
   @media (prefers-reduced-motion: reduce) { .el-fill, .el-thumb { animation:none !important; } }
   .hint { font: 400 10.5px 'Space Mono'; color: var(--dim); margin-left: auto; }
@@ -1111,14 +1121,16 @@ startArkTips();
   var $=function(id){return document.getElementById(id);};
   var ev=$("elever"), track=$("elTrack"), fill=$("elFill"), thumb=$("elThumb"), name=$("elName"), hidden=$("think");
   if(!ev||!track||!fill||!thumb||!hidden) return;
-  var STOPS=[{v:"low",t:"⚡ Quick",cls:"e1"},{v:"medium",t:"🧠 Balanced",cls:"e2"},{v:"high",t:"🔥 Deep",cls:"e3"}];
+  var BASE=[{v:"low",t:"⚡ Quick",cls:"e1"},{v:"medium",t:"🧠 Balanced",cls:"e2"},{v:"high",t:"🔥 Deep",cls:"e3"}];
+  var GOD={v:"max",t:"🔱 God Mode",cls:"e4"};   // only reachable when the brain is Claude
+  var STOPS=BASE.slice();
   var idx=0;
   function apply(i){
-    idx=Math.max(0,Math.min(2,i));
-    var s=STOPS[idx], frac=idx/2, w=track.clientWidth||104;
+    var n=STOPS.length; idx=Math.max(0,Math.min(n-1,i));
+    var s=STOPS[idx], frac=n>1?idx/(n-1):0, w=track.clientWidth||104;
     hidden.value=s.v;
     name.textContent=s.t;
-    ev.classList.remove("e1","e2","e3"); ev.classList.add(s.cls);
+    ev.classList.remove("e1","e2","e3","e4"); ev.classList.add(s.cls);
     fill.style.width=Math.max(8, frac*w)+"px";
     thumb.style.left=(frac*w)+"px";
     try{ localStorage.setItem("dmv-effort", s.v); }catch(e){}
@@ -1126,7 +1138,7 @@ startArkTips();
   function fromX(clientX){
     var r=track.getBoundingClientRect();
     var frac=r.width?(clientX-r.left)/r.width:0; frac=Math.max(0,Math.min(1,frac));
-    apply(Math.round(frac*2));
+    apply(Math.round(frac*(STOPS.length-1)));
   }
   track.addEventListener("mousedown",function(e){ e.preventDefault(); fromX(e.clientX);
     var mv=function(e2){ fromX(e2.clientX); };
@@ -1135,9 +1147,24 @@ startArkTips();
   });
   track.addEventListener("touchstart",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
   track.addEventListener("touchmove",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
+  // GOD MODE — when the brain is Claude, the lever gains a 4th "🔱 God Mode" (max) stop.
+  window.arkLeverGod=function(on){
+    var cur=STOPS[idx]&&STOPS[idx].v;
+    STOPS = on ? BASE.concat([GOD]) : BASE.slice();
+    ev.classList.toggle("godcap", !!on);
+    var ni=STOPS.findIndex(function(s){return s.v===cur;});
+    apply(ni>=0?ni:Math.min(idx,STOPS.length-1));
+  };
+  // watch the model picker: Claude brain → unlock God Mode + light up the composer
+  function isClaude(){ var sel=$("model"); if(!sel) return false; var o=sel.options[sel.selectedIndex]; return /claude|anthropic/i.test(((o&&o.textContent)||"")+" "+(sel.value||"")); }
+  function syncBrain(){ var c=isClaude(); window.arkLeverGod(c); ev.classList.toggle("claude",c); var d=document.querySelector(".dock"); if(d) d.classList.toggle("claude-brain",c); }
+  var mp=$("model"); if(mp) mp.addEventListener("change",syncBrain);
+  window.addEventListener("ark:providers-changed",function(){ setTimeout(syncBrain,60); });
+  window.addEventListener("load",function(){ setTimeout(syncBrain,140); });
   var saved=null; try{ saved=localStorage.getItem("dmv-effort"); }catch(e){}
   var si=STOPS.findIndex(function(s){return s.v===saved;});
   apply(si>=0?si:0);
+  syncBrain();
   requestAnimationFrame(function(){ apply(idx); });   // fix px positions once the track is laid out
   window.addEventListener("resize",function(){ apply(idx); });
 })();

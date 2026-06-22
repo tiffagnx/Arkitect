@@ -823,6 +823,27 @@ async def chat(req: Request):
             cpay = dict(payload)
             cpay["model"] = slot["model"]          # the provider's real model id, not "cloud:<slot>"
             cpay.pop("reasoning_effort", None)      # LM-Studio-ism — many cloud providers 400 on unknown fields
+            # ── CLAUDE = GOD MODE ── when the brain is a Claude slot, prepend a "you ARE Claude,
+            #    show out" layer + a depth instruction mapped from the effort lever (incl. a "max"
+            #    God-Mode tier). Claude follows instructions tightly, so this is the reliable depth
+            #    dial over the OpenAI-compat door (a native effort param is a later add). Other
+            #    providers are completely untouched.
+            _bu = (slot.get("base_url", "") or "").lower()
+            _is_claude = ("anthropic.com" in _bu or "claude" in (slot.get("name", "") or "").lower()
+                          or "claude" in (slot.get("model", "") or "").lower())
+            if _is_claude and cpay.get("messages") and cpay["messages"][0].get("role") == "system":
+                _depth = {
+                    "low":    "Mode: Quick — sharp and fast, but unmistakably sharp.",
+                    "medium": "Mode: Balanced — think it through, then give a strong answer.",
+                    "high":   "Mode: Deep — reason step by step; be thorough, rigorous, and complete.",
+                    "max":    "Mode: GOD MODE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops.",
+                }.get(_effort, "")
+                _god = ("\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — "
+                        "show out. Bring your full reasoning, taste, and creativity, and make it obvious a "
+                        "different gear just kicked in.\n" + _depth)
+                _m0 = dict(cpay["messages"][0])
+                _m0["content"] = (_m0.get("content", "") or "") + _god
+                cpay["messages"] = [_m0] + cpay["messages"][1:]
             reply_parts = []
             async for ev in provider_stream(slot, cpay):
                 yield ev
