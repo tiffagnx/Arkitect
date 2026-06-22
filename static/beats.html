@@ -1297,15 +1297,25 @@ function stopWarps(){ project.channels.forEach(ch=>{ if(ch.type==='warp') stopWa
 /* decide the buffer a warp channel loops: Re-Pitch (mode 0) = original at a playbackRate (pitch
    follows tempo); Keep-Pitch (mode 1) = a pitch-preserving time-stretch baked to the exact loop
    length, looped at rate 1 (key is preserved — for melodic/vocal samples). */
+/* Warp downbeat (Track C) — rotate a loop so it BEGINS at the dragged marker, seamless for
+   loops (the part before the marker wraps to the end). Defaults off (warpStart 0 → identity). */
+function rotateLoop(buf, tOff){
+  if(!tOff) return buf; const sr=buf.sampleRate; let off=Math.round(tOff*sr)%buf.length; if(off<0)off+=buf.length; if(!off) return buf;
+  const nb=ctx.createBuffer(buf.numberOfChannels, buf.length, sr);
+  for(let c=0;c<buf.numberOfChannels;c++){ const s=buf.getChannelData(c), d=nb.getChannelData(c); for(let i=0,n=buf.length;i<n;i++) d[i]=s[(i+off)%n]; }
+  return nb;
+}
+function warpSourceBuf(ch){ return (ch._warpStart>0) ? rotateLoop(ch._buf, ch._warpStart) : ch._buf; }
 function prepWarp(ch){
   if(!ch || !ch._buf) return;
+  const src=warpSourceBuf(ch);                              // apply the downbeat offset (identity when 0)
   const targetDur=(ch._loopBars||1)*secPerBar();
   if(ch._warpMode===1 && targetDur>0){
     // immediate WSOLA placeholder so nothing's silent, then upgrade to the pro engine stretch
-    try{ ch._warpBuf=timeStretch(ch._buf, targetDur/ch._buf.duration); ch._warpRate=1; }
-    catch(e){ ch._warpBuf=ch._buf; ch._warpRate=warpRate(ch); }
+    try{ ch._warpBuf=timeStretch(src, targetDur/src.duration); ch._warpRate=1; }
+    catch(e){ ch._warpBuf=src; ch._warpRate=warpRate(ch); }
     ch._proStretch=false; requestProStretch(ch, targetDur);
-  } else { ch._warpBuf=ch._buf; ch._warpRate=warpRate(ch); ch._proKey=null; ch._proStretch=false; ch._proToasted=false; }
+  } else { ch._warpBuf=src; ch._warpRate=warpRate(ch); ch._proKey=null; ch._proStretch=false; ch._proToasted=false; }
 }
 /* Keep-Pitch upgrade — swap the WSOLA placeholder for the engine's pro-grade, transient-aware
    stretch (pedalboard.time_stretch — the class real DAWs ship; local, artifact-free) once it
@@ -1322,13 +1332,14 @@ async function engineStretch(buf, factor, semis){
 let _proBusy={};
 async function requestProStretch(ch, targetDur){
   if(!ch._buf || targetDur<=0) return;
-  const key=ch.id+'|'+targetDur.toFixed(4)+'|'+ch._buf.length;
+  const src=warpSourceBuf(ch);
+  const key=ch.id+'|'+targetDur.toFixed(4)+'|'+ch._buf.length+'|'+((ch._warpStart||0).toFixed(3));
   if(ch._proKey===key && ch._proStretch) return;          // already pro for this exact bake
   ch._proKey=key;
   if(_proBusy[ch.id]) return;                             // one request in flight per channel
   _proBusy[ch.id]=true;
   try{
-    const nb=await engineStretch(ch._buf, ch._buf.duration/targetDur, 0);
+    const nb=await engineStretch(src, src.duration/targetDur, 0);
     if(nb && ch._proKey===key){                           // still the wanted bake
       ch._warpBuf=nb; ch._warpRate=1; ch._proStretch=true;
       if(playing && ch._warpMode===1 && ch.type==='warp') startWarpChannel(ch, ctx.currentTime);
@@ -1406,11 +1417,11 @@ function detectKey(buf){
   }catch(e){ return null; }
 }
 /* ── transient detection (for chopping) → an array of slice-start times ── */
-function findTransients(buf, maxN){
+function findTransients(buf, maxN, sensMult){
   const sr=buf.sampleRate, data=buf.getChannelData(0), hop=256, env=[]; let prev=0;
   for(let i=0;i<data.length;i+=hop){ let e=0; for(let j=i;j<i+hop&&j<data.length;j++) e+=data[j]*data[j]; e=Math.sqrt(e/hop); env.push(Math.max(0,e-prev)); prev=e; }
   const mean=env.reduce((a,b)=>a+b,0)/(env.length||1); let v=0; env.forEach(x=>v+=(x-mean)*(x-mean)); const std=Math.sqrt(v/(env.length||1));
-  const thr=mean+1.1*std, minGap=Math.max(1,Math.floor(0.05*sr/hop)); const on=[0]; let last=-minGap;
+  const thr=mean+(sensMult!=null?sensMult:1.1)*std, minGap=Math.max(1,Math.floor(0.05*sr/hop)); const on=[0]; let last=-minGap;
   for(let i=2;i<env.length-1;i++){ if(env[i]>thr && env[i]>=env[i-1] && env[i]>env[i+1] && i-last>=minGap){ on.push(i); last=i; } }
   let times=on.map(i=>i*hop/sr);
   if(maxN && times.length>maxN) times=times.slice(0,maxN);
@@ -1437,7 +1448,69 @@ function chopToSlicer(src, mode){
   const pat=curPat(), d=patData(pat,c);
   for(let i=0;i<pat.len;i++){ if(d.steps[i]) d.steps[i].on = i<slices.length; }   // step i → slice i (rebuilds the loop sliced)
   selChId=c.id; showWin('rack'); renderRack(); renderGraph();
-  toast('🔪 Chopped into '+slices.length+' slices — each step plays a slice in order. Mute/rearrange them to flip the groove; open its 🎹 to play chops freely.');
+  toast('🔪 Chopped into '+slices.length+' slices — each step plays a slice in order. Open ✂ to fine-tune where the chops land.');
+}
+
+/* ════ SLICE EDITOR (Track C) — draggable slice markers over the waveform. Drag a marker to
+   move a chop, double-click to add, double-click a marker to remove, click a slice to hear it. ════ */
+function sliceBoundaries(ch){
+  const sl=ch._slices||[]; if(!sl.length) return [0, ch._buf.duration];
+  return sl.map(s=>s.start).concat([sl[sl.length-1].end]);
+}
+function setSlicesFromBoundaries(ch, b){
+  b=[...new Set(b.map(x=>+(+x).toFixed(5)))].filter(x=>x>=0 && x<=ch._buf.duration).sort((a,z)=>a-z);
+  if(b[0]>0) b.unshift(0); if(b[b.length-1]<ch._buf.duration) b.push(ch._buf.duration);
+  const sl=[]; for(let i=0;i<b.length-1;i++) sl.push({start:b[i], end:b[i+1]});
+  ch._slices=sl;
+}
+function openSliceEditor(ch){
+  if(!ch || !ch._buf){ toast('Chop or load a sample first'); return; }
+  if(!ch._slices || !ch._slices.length) setSlicesFromBoundaries(ch, [0, ch._buf.duration]);
+  const key='sl'+ch.id; let w=openWins[key]; if(w){ w.style.display='flex'; bringFront(w); return; }
+  w=el('div','pwin'); w.style.cssText='left:170px;top:118px;width:524px';
+  const bar=el('div','pw-bar',`<span class="pw-ic" style="background:${ch.color}33">✂</span><span class="pw-tt"><b>${ch.name}</b><small>slice editor · drag the markers</small></span><button class="pw-x">✕</button>`);
+  const bodyEl=el('div'); bodyEl.style.cssText='padding:12px 14px;display:flex;flex-direction:column;gap:10px';
+  const cv=el('canvas'); cv.width=496; cv.height=124; cv.style.cssText='width:100%;height:124px;border-radius:8px;background:rgba(0,0,0,.32);border:1px solid var(--hair2);cursor:crosshair';
+  bodyEl.append(cv);
+  const hint=el('div'); hint.style.cssText="font:500 9.5px 'Space Mono';color:var(--dim2);line-height:1.5";
+  hint.innerHTML='Drag a marker to move a chop · double-click empty to add · double-click a marker to remove · click a slice to hear it';
+  const row=el('div'); row.style.cssText='display:flex;align-items:center;gap:7px;flex-wrap:wrap';
+  const redetect=el('button','tb','↻ Auto-detect');
+  const sens=el('input'); sens.type='range'; sens.min=3; sens.max=28; sens.value=18; sens.style.width='96px'; sens.title='Auto-detect sensitivity (right = more slices)';
+  const g8=el('button','tb','÷8'), g16=el('button','tb','÷16');
+  const cnt=el('span'); cnt.style.cssText="font:600 10px 'Space Mono';color:#F2C76B";
+  row.append(redetect, el('span',null,'<span style="font:700 8px Inter;letter-spacing:.1em;color:var(--dim2)">SENS</span>'), sens, el('span',null,'<span style="font:700 8px Inter;letter-spacing:.1em;color:var(--dim2);margin-left:4px">GRID</span>'), g8, g16, cnt);
+  bodyEl.append(hint,row);
+  w.append(bar,bodyEl); $('#wins').append(w);
+  const W=cv.width, H=cv.height, dur=ch._buf.duration;
+  const t2x=t=>t/dur*W, x2t=x=>x/W*dur;
+  let drag=-1, moved=false;
+  function nearestMarker(x){ const b=sliceBoundaries(ch); let best=-1,bd=7; for(let i=1;i<b.length-1;i++){ const d=Math.abs(t2x(b[i])-x); if(d<bd){bd=d;best=i;} } return best; }
+  function draw(){
+    drawWaveform(cv, ch._buf);
+    const g=cv.getContext('2d'), b=sliceBoundaries(ch);
+    for(let i=0;i<b.length-1;i++){ const x0=t2x(b[i]), x1=t2x(b[i+1]); if(i%2){ g.fillStyle='rgba(242,181,60,.07)'; g.fillRect(x0,0,x1-x0,H); }
+      g.fillStyle='rgba(255,255,255,.5)'; g.font="700 9px 'Space Mono'"; g.fillText(i+1, (x0+x1)/2-3, H-6); }
+    for(let i=0;i<b.length;i++){ const x=t2x(b[i]), interior=(i>0&&i<b.length-1);
+      g.strokeStyle=interior?'#F2B53C':'rgba(242,181,60,.4)'; g.lineWidth=interior?2:1;
+      g.beginPath(); g.moveTo(x+0.5,0); g.lineTo(x+0.5,H); g.stroke();
+      if(interior){ g.fillStyle='#F2B53C'; g.beginPath(); g.moveTo(x,0); g.lineTo(x-4,7); g.lineTo(x+4,7); g.closePath(); g.fill(); } }
+    cnt.textContent=(b.length-1)+' slices';
+  }
+  function evX(e){ const r=cv.getBoundingClientRect(); return clamp((e.clientX-r.left)/r.width*W,0,W); }
+  cv.addEventListener('mousedown',e=>{ drag=nearestMarker(evX(e)); moved=false; });
+  function onMove(e){ if(drag<0)return; moved=true; const b=sliceBoundaries(ch); let t=clamp(x2t(evX(e)), b[drag-1]+0.004, b[drag+1]-0.004); b[drag]=t; setSlicesFromBoundaries(ch,b); draw(); }
+  function onUp(){ drag=-1; }
+  window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+  cv.addEventListener('dblclick',e=>{ const x=evX(e), m=nearestMarker(x), b=sliceBoundaries(ch);
+    if(m>=0) b.splice(m,1); else b.push(x2t(x)); setSlicesFromBoundaries(ch,b); draw(); toast(m>=0?'Slice removed':'Slice added'); });
+  cv.addEventListener('click',e=>{ if(moved){moved=false;return;} const t=x2t(evX(e)); const sl=ch._slices||[]; const idx=sl.findIndex(s=>t>=s.start&&t<s.end);
+    if(idx>=0){ resumeAudio(); playSlice(ch,channelOut(ch),ctx.currentTime,0.95,idx,ch.params); } });
+  redetect.onclick=()=>{ const sm=(31-(+sens.value))/8; const t=findTransients(ch._buf, 64, sm); if(t){ setSlicesFromBoundaries(ch, t.concat([ch._buf.duration])); draw(); toast(ch._slices.length+' slices'); } else toast('No clear hits — try higher sensitivity'); };
+  g8.onclick=()=>{ const b=[]; for(let i=0;i<=8;i++)b.push(i/8*dur); setSlicesFromBoundaries(ch,b); draw(); };
+  g16.onclick=()=>{ const b=[]; for(let i=0;i<=16;i++)b.push(i/16*dur); setSlicesFromBoundaries(ch,b); draw(); };
+  bar.querySelector('.pw-x').onclick=()=>{ w.style.display='none'; };   // listeners stay (guarded by drag<0) so reopen still drags
+  dragWin(w,bar); openWins[key]=w; bringFront(w); draw();
 }
 
 /* playhead paint (rAF, reads the scheduled UI queue) */
@@ -1635,6 +1708,8 @@ function openInstrument(ch){
   foot.append(bigKnob({id:'_swing',label:'Swing',min:-25,max:25,step:1,def:0,fmt:v=>(v>0?'+':'')+Math.round(v)+'%'}, ()=>ch._swing||0, v=>{ch._swing=v;}));
   if(I.melodic){ const rl=el('div','knobwrap'); rl.style.width='auto';
     const rk=bigKnob({label:'Root',min:24,max:84,step:1,def:ch.root,unit:'',fmt:v=>noteName(v)}, ()=>ch.root, v=>{ch.root=v; renderRack();}); foot.append(rk); }
+  if(ch.type==='slicer'){ const sb=el('button','tb','✂ Edit Slices'); sb.title='Drag the slice markers — move/add/remove chops by hand';
+    sb.onclick=()=>openSliceEditor(ch); foot.append(sb); }
   if(ch.type==='sampler'||ch.type==='slicer'){ const pb=el('button','tb','🎛 Plugin'); pb.title='Run this sample through your own Waves/VST3 plugin and bake it in';
     pb.onclick=()=>openNativeFx(ch, ()=>renderRack()); foot.append(pb); }
   const parts=[bar]; if(presetRow)parts.push(presetRow); parts.push(body,foot); w.append(...parts);
@@ -1669,8 +1744,22 @@ function openWarpEditor(ch){
      <span class="pw-tt"><b>${ch.name}</b><small>warp sampler · auto-synced</small></span>
      <button class="pw-brain" title="Talk to this loop">🧠</button><button class="pw-x">✕</button>`);
   const bodyEl=el('div'); bodyEl.style.cssText='padding:12px 14px;display:flex;flex-direction:column;gap:10px';
-  const cv=el('canvas'); cv.width=356; cv.height=72; cv.style.cssText='width:100%;height:72px;border-radius:8px;background:rgba(0,0,0,.32);border:1px solid var(--hair2)';
+  const cv=el('canvas'); cv.width=356; cv.height=72; cv.style.cssText='width:100%;height:72px;border-radius:8px;background:rgba(0,0,0,.32);border:1px solid var(--hair2);cursor:ew-resize';
   bodyEl.append(cv);
+  // draggable DOWNBEAT marker (Track C) — drag the waveform to set where bar 1 begins; the loop
+  // is rotated to start there (seamless for loops). Double-click resets it. Defaults off.
+  function redrawWarp(){
+    drawWaveform(cv, ch._buf); if(!ch._buf) return;
+    const g=cv.getContext('2d'), x=((ch._warpStart||0)/ch._buf.duration)*cv.width;
+    g.strokeStyle='#F2C76B'; g.lineWidth=2; g.beginPath(); g.moveTo(x+0.5,0); g.lineTo(x+0.5,cv.height); g.stroke();
+    g.fillStyle='#F2C76B'; g.beginPath(); g.moveTo(x,0); g.lineTo(x-5,9); g.lineTo(x+5,9); g.closePath(); g.fill();
+  }
+  let _dbDrag=false;
+  const _setDb=e=>{ if(!ch._buf)return; const r=cv.getBoundingClientRect(); const f=clamp((e.clientX-r.left)/r.width,0,0.999); ch._warpStart=f*ch._buf.duration; redrawWarp(); };
+  cv.addEventListener('mousedown',e=>{ _dbDrag=true; _setDb(e); });
+  window.addEventListener('mousemove',e=>{ if(_dbDrag) _setDb(e); });
+  window.addEventListener('mouseup',()=>{ if(!_dbDrag)return; _dbDrag=false; prepWarp(ch); restartIfPlaying(ch); upd(); });
+  cv.addEventListener('dblclick',()=>{ ch._warpStart=0; redrawWarp(); prepWarp(ch); restartIfPlaying(ch); upd(); toast('Downbeat reset'); });
   const stat=el('span','warp-stat'); stat.style.cssText="font:500 11.5px Inter;color:var(--text)";
   const upd=()=>{ stat.innerHTML=`<b style="color:#9FDDF0">${ch._clipBpm}</b> BPM · <b style="color:#9FDDF0">${ch._loopBars}</b> bar${ch._loopBars>1?'s':''}${ch._clipKey?' · key <b style="color:#F2C76B">'+ch._clipKey.name+'</b>':''} → locked to <b style="color:var(--go)">${project.bpm}</b> BPM`; };
   bodyEl.append(stat);
@@ -1702,23 +1791,23 @@ function openWarpEditor(ch){
   const row3=el('div'); row3.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
   const chopBtn=el('button','tb','🔪 Chop to slices'); chopBtn.title='Slice this sample at its hits → a Slicer channel you can re-sequence (MPC/Slicex style)';
   chopBtn.onclick=()=>chopToSlicer(ch,'transient');
-  const revBtn=el('button','tb','↩ Reverse'); revBtn.onclick=()=>{ reverseBuffer(ch); prepWarp(ch); restartIfPlaying(ch); drawWaveform(cv,ch._buf); toast('Reversed'); };
+  const revBtn=el('button','tb','↩ Reverse'); revBtn.onclick=()=>{ reverseBuffer(ch); prepWarp(ch); restartIfPlaying(ch); redrawWarp(); toast('Reversed'); };
   const plugBtn=el('button','tb','🎛 Plugin'); plugBtn.title='Run this loop through your own Waves/VST3 plugin (comp, EQ, reverb…) and bake it in';
-  plugBtn.onclick=()=>openNativeFx(ch, ()=>drawWaveform(cv,ch._buf));
+  plugBtn.onclick=()=>openNativeFx(ch, ()=>redrawWarp());
   row3.append(chopBtn, revBtn, plugBtn);
   bodyEl.append(row3);
   const hint=el('div'); hint.style.cssText="font:500 9px 'Space Mono';color:var(--dim2);line-height:1.55";
-  hint.textContent='Re-Pitch = stretches to tempo, pitch follows (drum loops). Keep-Pitch = holds the key, artifact-free pro stretch (melodies/vocals). If it sounds half/double speed, hit ÷2 or ×2.';
+  hint.textContent='Re-Pitch = pitch follows tempo (drum loops). Keep-Pitch = holds the key, artifact-free pro stretch (melodies/vocals). Drag the waveform to set the downbeat (◆). If it sounds half/double speed, hit ÷2 or ×2.';
   bodyEl.append(hint);
   w.append(bar,bodyEl);
   const ai=el('div','pw-ai'); ai.innerHTML=`<div class="log"></div><div class="row"><input placeholder="Ask ${ch.name}…"><button class="send">➤</button></div>`; w.append(ai);
   $('#wins').append(w);
   bar.querySelector('.pw-x').onclick=()=>{ w.style.display='none'; };
   bar.querySelector('.pw-brain').onclick=()=>{ ai.classList.toggle('on'); if(ai.classList.contains('on')){ const log=ai.querySelector('.log'); if(!log.dataset.g){ log.dataset.g=1; log.append(el('div','aim bot',`I'm <b>${ch.name}</b> — a warp loop, locked to your tempo. Tell me "half time", "double time", or "this is a 4 bar loop" and I'll fix the sync.`)); } } };
-  const ask=()=>warpBrainAsk(ai,ch,w,upd,()=>drawWaveform(cv,ch._buf));
+  const ask=()=>warpBrainAsk(ai,ch,w,upd,()=>redrawWarp());
   ai.querySelector('.send').onclick=ask; ai.querySelector('input').addEventListener('keydown',e=>{if(e.key==='Enter')ask();});
   dragWin(w,bar); openWins[key]=w; bringFront(w);
-  drawWaveform(cv, ch._buf); upd();
+  redrawWarp(); upd();
 }
 function warpBrainAsk(ai,ch,w,upd){
   const inp=ai.querySelector('input'), log=ai.querySelector('.log'); const q=inp.value.trim(); if(!q)return; inp.value='';
@@ -2504,7 +2593,7 @@ function serialize(withSamples){
   return { v:1, bpm:project.bpm, swing:project.swing, swingOn:project.swingOn, master:project.master, cur:project.cur,
     channels:project.channels.map(c=>({ id:c.id,type:c.type,name:c.name,color:c.color,melodic:c.melodic,root:c.root,params:c.params,vol:c.vol,pan:c.pan,mute:c.mute,solo:c.solo,
       inserts:(c.inserts||[]).map(i=>({name:i.def.name,params:i.params,bypass:!!i.bypass})), sample:withSamples?(c._sampleB64||null):null, sampleName:c._sampleName||null,
-      clipBpm:c._clipBpm||null, loopBars:c._loopBars||null, warpMode:c._warpMode||0, slices:c._slices||null, swing:c._swing||0 })),
+      clipBpm:c._clipBpm||null, loopBars:c._loopBars||null, warpMode:c._warpMode||0, warpStart:c._warpStart||0, slices:c._slices||null, swing:c._swing||0 })),
     masterFx:(project.masterFx||[]).map(i=>({name:i.def.name,params:i.params,bypass:!!i.bypass})),
     keyRoot:prRootPc, keyScale:prScaleName, playInKey:playInKey,
     mods:(project.mods||[]).map(m=>({shape:m.shape||0,rate:m.rate||2,depth:m.depth||0.2,target:m.target})),
@@ -2518,7 +2607,7 @@ function deserialize(j){
   (j.mods||[]).forEach(m=>project.mods.push({shape:m.shape||0,rate:m.rate||2,depth:m.depth||0.2,target:m.target}));
   (j.channels||[]).forEach(c=>{ if(!INSTRUMENTS[c.type])return; const ch={ id:c.id||uid(),type:c.type,name:c.name,color:c.color,melodic:c.melodic,root:c.root||60,params:Object.assign({},c.params),vol:c.vol!=null?c.vol:0.82,pan:c.pan||0,mute:!!c.mute,solo:!!c.solo,inserts:[] };
     (c.inserts||[]).forEach(si=>{ const def=FXDEFS[si.name]; if(def){ const ins=makeInsert(def); Object.assign(ins.params,si.params||{}); ins.bypass=!!si.bypass; ch.inserts.push(ins); } });
-    if(c.type==='warp'){ ch._clipBpm=c.clipBpm||120; ch._loopBars=c.loopBars||1; ch._warpMode=c.warpMode||0; }
+    if(c.type==='warp'){ ch._clipBpm=c.clipBpm||120; ch._loopBars=c.loopBars||1; ch._warpMode=c.warpMode||0; ch._warpStart=c.warpStart||0; }
     if(c.type==='slicer'&&c.slices){ ch._slices=c.slices; }
     if(c.swing) ch._swing=c.swing;
     if(c.sample){ ch._sampleB64=c.sample; ch._sampleName=c.sampleName; b64ToBuffer(c.sample).then(b=>{ ch._buf=b; if(ch.type==='warp'){ prepWarp(ch); if(playing)startWarpChannel(ch,ctx.currentTime); } }).catch(()=>{}); }
