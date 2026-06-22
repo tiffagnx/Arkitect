@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Character Forge — DeMartinville</title>
+<title>Agent Forge — DeMartinville</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
@@ -370,7 +370,7 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
   <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">&larr;</span></a>
   <div class="brandwrap">
     <span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span>
-    <span class="tag etch">Character Forge</span>
+    <span class="tag etch">Agent Forge</span>
   </div>
 </div>
 
@@ -380,7 +380,7 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
   <div class="hero sheen loop">
     <div class="hero-inner">
       <div class="eyebrow etch">Precision Tool · Local · Yours</div>
-      <h1>Forge a character that works like <span class="ice">you.</span></h1>
+      <h1>Forge an agent that works like <span class="ice">you.</span></h1>
       <p class="sub">Build your own creative brain from your own face and your own moves. It lives in your rooms, talks in your style, and points back to the real you. Local. Private. Yours.</p>
       <div class="specstrip">
         <span class="etch">3 ways to build a face</span><span class="div"></span>
@@ -431,7 +431,7 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
           <div class="stage">
             <!-- PIXEL -->
             <div class="stagepane show" data-pane="pixel">
-              <p class="stephelp">Turn your real face into a 16-bit character. Free, takes a minute.</p>
+              <p class="stephelp">Turn your real face into a 16-bit avatar. Free, takes a minute.</p>
               <div class="dz" id="dzPixel"><div class="dzicon"></div><div class="dzt" id="dzPixelT">drop your photo</div></div>
               <input type="file" id="filePixel" accept="image/*" hidden />
               <div class="geminicard chip-glass">
@@ -511,7 +511,7 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
           </div>
           <div class="btnrow">
             <button class="btn ice" id="saveTakeBtn" disabled>Save + take them into the room →</button>
-            <button class="btn" id="saveBtn" disabled>Save character</button>
+            <button class="btn" id="saveBtn" disabled>Save agent</button>
           </div>
           <div class="savehelp" id="saveHelp">name + craft first.</div>
         </div>
@@ -533,7 +533,7 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
             </div>
           </div>
           <div class="bezel"><div class="face" id="cardFace"></div></div>
-          <div class="cname ph" id="cname">Your character</div>
+          <div class="cname ph" id="cname">Your agent</div>
           <div class="ctag ph" id="ctag">their one-line tagline</div>
           <div class="cchips">
             <span class="craftchip chip-glass" id="craftchip" style="display:none"></span>
@@ -640,7 +640,7 @@ function computeReadiness(s, knowledge){
 /* ── persona ── */
 function buildPersona(s){
   const c = craftOf(s.craft), v = voiceOf(s.voice);
-  const name = s.name.trim() || (c ? c.label : "Your character");
+  const name = s.name.trim() || (c ? c.label : "Your agent");
   const craftLabel = c ? c.label : "creative helper";
   const vs = v ? v.sample : "";
   const tag = s.tagline.trim();
@@ -911,7 +911,7 @@ function render(animate){
 
   /* name + tagline */
   const cn = $("cname");
-  cn.textContent = state.name.trim() || "Your character";
+  cn.textContent = state.name.trim() || "Your agent";
   cn.classList.toggle("ph", !state.name.trim());
   const ct = $("ctag");
   ct.textContent = state.tagline.trim() || "their one-line tagline";
@@ -1099,7 +1099,7 @@ function renderRoster(){
       </div>`;
     card.querySelector(".edit").onclick = () => loadIntoForm(ch);
     card.querySelector(".del").onclick = () => {
-      if(confirm("Delete " + (ch.name||"this character") + "? They only live on your machine — this can't be undone.")){
+      if(confirm("Delete " + (ch.name||"this agent") + "? They only live on your machine — this can't be undone.")){
         const a = loadAll().filter(x => x.id !== ch.id);
         saveAll(a);
         if(state.id === ch.id) resetForm();
@@ -1113,7 +1113,7 @@ function renderRoster(){
   if(!arr.length){
     const e = document.createElement("div");
     e.className = "panel-steel empty";
-    e.innerHTML = `<h3>Nobody on your roster yet</h3><p>These are only the characters you build. Tiff and Kit live in the rooms — this is your bench.</p>`;
+    e.innerHTML = `<h3>Nobody on your roster yet</h3><p>These are only the agents you build. Tiff and Kit live in the rooms — this is your bench.</p>`;
     body.appendChild(e);
   }
 }

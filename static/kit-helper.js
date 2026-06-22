@@ -54,12 +54,12 @@
       if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) arr = p; }
     } catch (_) { arr = []; }
     return arr.filter(c => c && c.id && c.mine).map(c => ({
-      id: c.id, name: c.name || "Character", tag: c.tagline || c.craftLabel || "",
+      id: c.id, name: c.name || "Agent", tag: c.tagline || c.craftLabel || "",
       color: c.color || "#7BB6CD", avatar: c.avatar || "", avatarType: c.avatarType || "color", mine: true,
       persona: c.persona || "", knowledge: c.knowledge || "",
       craft: c.craft || "", craftLabel: c.craftLabel || "",
       readiness: typeof c.readiness === "number" ? c.readiness : 0,
-      intro: r => `${c.name || "I'm in"} — ${c.craftLabel || "your character"} in ${r}. ${c.tagline || "Let's get to work."}`,
+      intro: r => `${c.name || "I'm in"} — ${c.craftLabel || "your agent"} in ${r}. ${c.tagline || "Let's get to work."}`,
     }));
   }
   function rebuildCharacters() { return CHARACTERS_BUILTIN.concat(loadMine()); }
@@ -196,7 +196,7 @@
   win.innerHTML =
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
-     <div class="kit-hint">drag a character into the room, or tap to bring them in</div>
+     <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
      <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-pipe" title="Run a pipeline — each character does their part in order, handing the work down the line">⛓</button><button class="kit-go" title="ask">➤</button></div>`;
@@ -242,10 +242,10 @@
       if (ch.mine) {
         chip.classList.add("mine");
         const p = document.createElement("span"); p.className = "cp"; p.textContent = Math.round(ch.readiness || 0) + "%"; chip.appendChild(p);
-        chip.title = (ch.tag || ch.name) + " — your character (" + Math.round(ch.readiness || 0) + "% ready)";
+        chip.title = (ch.tag || ch.name) + " — your agent (" + Math.round(ch.readiness || 0) + "% ready)";
       } else if (ch.preview) {
         const p = document.createElement("span"); p.className = "cp"; p.textContent = "PREVIEW"; chip.appendChild(p);
-        chip.title = ch.tag + " (preview character)";
+        chip.title = ch.tag + " (preview agent)";
       } else {
         chip.title = ch.tag || ch.name;
       }
@@ -255,7 +255,7 @@
       roster.appendChild(chip);
     });
     // trailing "+ Build" chip → the character creator
-    const build = document.createElement("div"); build.className = "kit-chip kit-chip-build"; build.title = "Build your own character";
+    const build = document.createElement("div"); build.className = "kit-chip kit-chip-build"; build.title = "Build your own agent";
     const bn = document.createElement("span"); bn.className = "cn"; bn.textContent = "+ Build"; build.appendChild(bn);
     build.onclick = () => { location.href = "/static/character.html"; };
     roster.appendChild(build);
@@ -283,7 +283,7 @@
 
   // ── floating launcher (labelled with the active character) ──
   const fabSpr = makeSprite(28, 3);
-  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Your in-room character — tap to open, drag the cast in";
+  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Your in-room agent — tap to open, drag your crew in";
   fab.appendChild(fabSpr.cv); const fabLabel = document.createElement("span"); fabLabel.textContent = "Yo, Kit"; fab.appendChild(fabLabel);
   const _bar = document.querySelector(".kit-mount, .top");
   if (_bar) { fab.classList.add("in-bar"); win.classList.add("from-bar"); _bar.appendChild(fab); } else { document.body.appendChild(fab); }
