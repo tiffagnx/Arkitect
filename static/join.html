@@ -142,6 +142,13 @@
   .shots figcaption{padding:11px 14px;font:500 13px Inter;color:#BcC2CC;line-height:1.45}
   .shots figcaption b{color:var(--text);font-weight:600}
   @media (max-width:640px){ .shots{grid-template-columns:1fr} }
+
+  /* ── scroll-read reveal: words light to blue + lift as they cross your reading line (airbyte-style).
+        Colour is interpolated in JS (engine-proof); CSS just sets the resting "unread" look. ── */
+  [data-reveal] .rw{ display:inline-block; opacity:.56; transform:translateY(.16em); }
+  @media (prefers-reduced-motion: reduce){
+    [data-reveal] .rw{ opacity:1 !important; transform:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -349,6 +356,86 @@
     var u=appleSilicon?macBtns[i].getAttribute('data-arm'):macBtns[i].getAttribute('data-intel');
     if(u)macBtns[i].href=u;
   }
+})();
+</script>
+<script>
+/* Scroll-read reveal — wraps prose into words, then lights each one to blue + lifts it
+   as it crosses your reading line (and dims back on scroll up). Airbyte-style. */
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var SEL  = '.manifesto p, section.blk > p, .story p';
+  var KEEP = '.gold, .accent, b, strong, a';   // keep these words' own color — only lift them
+  var blocks = document.querySelectorAll(SEL);
+  if(!blocks.length) return;
+  var words = [];
+
+  function wrap(el){
+    var texts = [];
+    (function collect(node){
+      for(var i=0;i<node.childNodes.length;i++){
+        var n = node.childNodes[i];
+        if(n.nodeType===3){ if(n.nodeValue && n.nodeValue.trim()) texts.push(n); }
+        else if(n.nodeType===1 && n.tagName!=='SCRIPT' && n.tagName!=='STYLE' && !n.classList.contains('dmv')) collect(n);
+      }
+    })(el);
+    texts.forEach(function(tn){
+      var parent = tn.parentNode;
+      var keep = !!(parent.closest && parent.closest(KEEP));
+      var frag = document.createDocumentFragment();
+      tn.nodeValue.split(/(\s+)/).forEach(function(part){
+        if(part==='') return;
+        if(/^\s+$/.test(part)){ frag.appendChild(document.createTextNode(part)); return; }
+        var s = document.createElement('span');
+        s.className = 'rw' + (keep ? ' rw-keep' : '');
+        s.textContent = part;
+        frag.appendChild(s);
+        words.push(s);
+      });
+      parent.replaceChild(frag, tn);
+    });
+    el.setAttribute('data-reveal','');
+  }
+  blocks.forEach(wrap);
+
+  var vh = window.innerHeight, ticking = false, data = [];
+  var START = 0.90, END = 0.50;   // a word starts lighting at 90% down, fully lit by 50% (reading zone)
+  var LIT = [169,220,242];        // #a9dcf2 — the brand sky-blue a read word glows toward
+  function rgbArr(s){ var m=s.match(/-?\d+(\.\d+)?/g); return m ? [+m[0],+m[1],+m[2]] : [194,200,209]; }
+  function build(){               // capture each word's natural colour ONCE, before we touch it
+    var sy = window.pageYOffset;
+    data = words.map(function(el){
+      var r = el.getBoundingClientRect(), keep = el.classList.contains('rw-keep');
+      return { el:el, cy:r.top + r.height/2 + sy, keep:keep, base: keep ? null : rgbArr(getComputedStyle(el).color) };
+    });
+  }
+  function measure(){             // re-find positions only (keep captured base colours)
+    vh = window.innerHeight;
+    var sy = window.pageYOffset;
+    for(var i=0;i<data.length;i++){ var r = data[i].el.getBoundingClientRect(); data[i].cy = r.top + r.height/2 + sy; }
+    update();
+  }
+  function update(){
+    ticking = false;
+    var sy = window.pageYOffset, s = vh*START, span = vh*(START-END);
+    for(var i=0;i<data.length;i++){
+      var d = data[i], y = d.cy - sy;
+      if(y < -140 || y > vh+140) continue;
+      var p = (s - y)/span; p = p<0?0:p>1?1:p;
+      var st = d.el.style;
+      st.opacity   = (.56 + p*.44).toFixed(3);
+      st.transform = 'translateY(' + ((1-p)*.16).toFixed(3) + 'em)';
+      if(!d.keep){
+        var b = d.base;
+        st.color = 'rgb(' + Math.round(b[0]+(LIT[0]-b[0])*p) + ',' + Math.round(b[1]+(LIT[1]-b[1])*p) + ',' + Math.round(b[2]+(LIT[2]-b[2])*p) + ')';
+        st.textShadow = p > .03 ? '0 0 ' + (p*12).toFixed(1) + 'px rgba(123,182,205,' + (p*.4).toFixed(3) + ')' : 'none';
+      }
+    }
+  }
+  function onScroll(){ if(!ticking){ ticking = true; requestAnimationFrame(update); } }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', measure);
+  window.addEventListener('load', measure);   // re-measure once lazy images settle the layout
+  build(); measure();
 })();
 </script>
 </body>
