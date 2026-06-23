@@ -84,8 +84,62 @@ def _load_providers() -> list[dict]:
     return _load_json(PROV_FILE, [])
 
 
+# ── secrets vault — encrypt API keys AT REST so a copied/stolen disk can't read them ──
+# Windows DPAPI ties the ciphertext to THIS Windows user account: no password to store,
+# nothing decryptable off-machine or by another user. Non-Windows / DPAPI failure falls
+# back to plaintext (best effort) so a key is never lost. Encrypted values are tagged
+# "dpapi:" so legacy plaintext keys still load and get encrypted on the next save.
+import base64 as _b64
+
+_VAULT_TAG = "dpapi:"
+
+
+def _dpapi(protect: bool, data: bytes):
+    """CryptProtectData (protect=True) / CryptUnprotectData (False) via ctypes. None on failure."""
+    import sys
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class _BLOB(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    buf = ctypes.create_string_buffer(data, len(data))   # keep alive across the call
+    blob_in = _BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char)))
+    blob_out = _BLOB()
+    fn = ctypes.windll.crypt32.CryptProtectData if protect else ctypes.windll.crypt32.CryptUnprotectData
+    # flags = CRYPTPROTECT_UI_FORBIDDEN (1): never pops a UI prompt
+    if not fn(ctypes.byref(blob_in), None, None, None, None, 1, ctypes.byref(blob_out)):
+        return None
+    try:
+        return ctypes.string_at(blob_out.pbData, blob_out.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+
+
+def _enc_secret(v: str) -> str:
+    if not v:
+        return v
+    out = _dpapi(True, v.encode("utf-8"))
+    return (_VAULT_TAG + _b64.b64encode(out).decode("ascii")) if out is not None else v
+
+
+def _dec_secret(v: str) -> str:
+    if not isinstance(v, str) or not v.startswith(_VAULT_TAG):
+        return v or ""                                   # legacy plaintext (or empty)
+    out = _dpapi(False, _b64.b64decode(v[len(_VAULT_TAG):]))
+    return out.decode("utf-8") if out is not None else ""
+
+
 def _load_keys() -> dict:
-    return _load_json(KEYS_FILE, {})
+    """All slot keys, DECRYPTED and ready to use. Legacy plaintext entries pass through."""
+    return {k: _dec_secret(val) for k, val in _load_json(KEYS_FILE, {}).items()}
+
+
+def _save_keys(keys: dict) -> None:
+    """Persist slot keys ENCRYPTED at rest (DPAPI, bound to this Windows user)."""
+    _save_json(KEYS_FILE, {k: _enc_secret(val) for k, val in keys.items()})
 
 
 def _mask(key: str) -> str:
@@ -500,7 +554,7 @@ async def swarm_save(req: Request):
     key = (d.get("api_key") or "").strip()
     if key:
         async with _KEYS_LOCK:                            # re-read under lock so a concurrent save isn't clobbered
-            keys = _load_keys(); keys[pid] = key; _save_json(KEYS_FILE, keys)
+            keys = _load_keys(); keys[pid] = key; _save_keys(keys)
     return {"ok": True, "id": pid}
 
 
@@ -511,7 +565,7 @@ async def swarm_delete(pid: str):
     async with _KEYS_LOCK:                                # re-read under lock so a concurrent save isn't clobbered
         keys = _load_keys()
         if keys.pop(pid, None) is not None:
-            _save_json(KEYS_FILE, keys)
+            _save_keys(keys)
     return {"ok": True}
 
 

@@ -523,10 +523,59 @@ window.addEventListener("ark:providers-changed", arkRebuildModels);   // Setting
 function setStatus(t, bad) { const s = $("status"); s.textContent = t; s.style.color = bad ? "#FF8FA0" : ""; }
 
 /* ── rendering ── */
-function md(t) { // tiny safe formatter: bold + inline code only
-  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;")
-          .replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>");
+function md(t) { // safe formatter: fenced lyric/code blocks, links, bold, inline code, line breaks
+  t = (t || "");
+  // 1) pull fenced ``` blocks out FIRST so their content isn't formatted/linkified
+  const blocks = [];
+  t = t.replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, (m, body) => {
+    blocks.push(body.replace(/\n+$/, ""));
+    return " B" + (blocks.length - 1) + " ";
+  });
+  // 2) escape HTML
+  t = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // 3) markdown links [text](url)  →  clickable
+  t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // 4) bare urls → clickable (won't touch the href="" we just made)
+  t = t.replace(/(^|[\s(])((?:https?:\/\/)[^\s<)]+)/g, (m, pre, url) => pre + '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>');
+  // 5) bold + inline code + line breaks
+  t = t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>");
+  // 6) restore fenced blocks as copy-on-their-own blocks
+  t = t.replace(/ B(\d+) /g, (m, i) => {
+    const esc = blocks[+i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return '<div class="codeblock"><button class="copyblk" type="button" onclick="copyBlock(this)" title="Copy just this">⧉ copy</button><pre>' + esc + '</pre></div>';
+  });
+  return t;
 }
+function copyBlock(btn) {
+  const pre = btn.parentElement.querySelector("pre");
+  navigator.clipboard.writeText(pre ? pre.innerText : "").then(() => {
+    const o = btn.textContent; btn.textContent = "✓ copied"; setTimeout(() => btn.textContent = o, 1200);
+  }).catch(() => {});
+}
+function copyMsg(btn) {
+  const msg = btn.closest(".msg"); if (!msg) return;
+  const bub = msg.querySelector(".bubble");
+  const text = (bub && typeof bub._raw === "string") ? bub._raw : ((msg.querySelector(".ans") || bub || msg).innerText || "");
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    btn.textContent = "✓ copied"; setTimeout(() => btn.textContent = "⧉ copy", 1200);
+  }).catch(() => { btn.textContent = "⚠ blocked"; setTimeout(() => btn.textContent = "⧉ copy", 1400); });
+}
+(function injectChatCSS(){
+  document.head.insertAdjacentHTML("beforeend", `<style>
+    .msg{position:relative}
+    .copymsg{position:absolute;top:0;right:0;opacity:0;transition:opacity .12s;background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.14);color:#aeb4bf;border-radius:7px;font:600 11px Inter,system-ui,sans-serif;
+      padding:3px 9px;cursor:pointer;z-index:4}
+    .msg:hover .copymsg{opacity:.85}.copymsg:hover{opacity:1;background:rgba(255,255,255,.13);color:#fff}
+    .bubble a{color:#7CC7DC;text-decoration:underline;text-underline-offset:2px;word-break:break-word}
+    .bubble a:hover{color:#A6E6F2}
+    .codeblock{position:relative;margin:9px 0;border:1px solid rgba(255,255,255,.13);border-radius:10px;background:rgba(0,0,0,.30)}
+    .codeblock pre{margin:0;padding:13px;white-space:pre-wrap;word-break:break-word;font:13px 'Space Mono',ui-monospace,monospace;line-height:1.55;color:#e7e9ee;overflow-x:auto}
+    .copyblk{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);
+      color:#cfd3da;border-radius:6px;font:600 10.5px Inter,system-ui,sans-serif;padding:3px 8px;cursor:pointer}
+    .copyblk:hover{background:rgba(255,255,255,.2);color:#fff}
+  </style>`);
+})();
 function addMsg(role, text, atts) {
   $("hello")?.remove();
   { var _cs = $("charsw"); if (_cs) _cs.style.display = "flex"; }   // switcher appears once you're chatting
@@ -535,7 +584,14 @@ function addMsg(role, text, atts) {
   d.className = `msg ${role === "user" ? "you" : "tiff"}`;
   d.innerHTML = `<div class="tag${role === "user" ? "" : (activeBrain === "kit" ? " kit" : " tiff")}">${role === "user" ? "B" : (activeBrain === "kit" ? "K" : "T")}</div><div class="bubble"></div>`;
   const bub = d.querySelector(".bubble");
+  bub._raw = text || "";
   bub.innerHTML = md(text || "");
+  if (role !== "user") {                    // every agent message gets a copy button (Tiff, Kit, anyone)
+    const cp = document.createElement("button");
+    cp.className = "copymsg"; cp.type = "button"; cp.textContent = "⧉ copy"; cp.title = "Copy this message";
+    cp.onclick = () => copyMsg(cp);
+    d.appendChild(cp);
+  }
   if (atts && atts.length) {
     const row = document.createElement("div"); row.className = "att";
     atts.forEach(a => {
@@ -548,7 +604,7 @@ function addMsg(role, text, atts) {
     bub.appendChild(row);
   }
   $("col").appendChild(d);
-  scrollDown();
+  scrollDown(role === "user");   // your own message always snaps to view; agent replies respect your scroll
   return bub;
 }
 // display text for a stored message (what B typed, never the folded file dump)
@@ -577,7 +633,13 @@ function splitThink(raw) {
   return { think: raw.slice(open + 7, close).trim(),
            answer: (raw.slice(0, open) + raw.slice(close + 8)).trim() };
 }
-function scrollDown() { const sc = $("scroll"); sc.scrollTop = sc.scrollHeight; }
+// Stay pinned to the newest text WHILE streaming — UNLESS you scroll up to read. The moment
+// you scroll away from the bottom, auto-scroll stops; scroll back near the bottom and it resumes.
+let autoStick = true;
+(function(){ const sc = $("scroll"); if (sc) sc.addEventListener("scroll", () => {
+  autoStick = (sc.scrollHeight - sc.scrollTop - sc.clientHeight) < 90;
+}, { passive: true }); })();
+function scrollDown(force) { const sc = $("scroll"); if (sc && (force || autoStick)) sc.scrollTop = sc.scrollHeight; }
 
 /* ── send ── */
 // ── who you're talking to in the MAIN chat: click a Tiff/Kit card to switch. Updates the
@@ -704,8 +766,10 @@ async function send() {
           if (thinkEl) {
             thinkEl.querySelector(".think-body").innerHTML = md(think);
             ansEl.innerHTML = md(answer) || "…";
+            bubble._raw = answer;
           } else {
             bubble.innerHTML = md(acc);
+            bubble._raw = acc;
           }
           scrollDown();
         }

@@ -1,5 +1,5 @@
 """
-ARKITECT — B's own local AI station. Built 2026-06-11.
+DeMartinville — B's own local AI station. Built 2026-06-11.
 
 Not a fork, not a skin — written from zero for B. One small FastAPI server:
   - streams chat from LM Studio (any loaded model) with Tiff's persona +
@@ -75,7 +75,7 @@ _engine_lock = asyncio.Lock()   # only one ComfyUI boot attempt at a time
 DATA.mkdir(exist_ok=True)
 SESS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="ARKITECT", docs_url=None, redoc_url=None)
+app = FastAPI(title="DeMartinville", docs_url=None, redoc_url=None)
 
 
 # ── Never serve a stale page. The browser was caching old HTML/JS/CSS, so B kept
@@ -95,7 +95,7 @@ async def _no_cache_code(request, call_next):
 
 PERSONA = """You are Tiff.
 
-You're a creative collaborator and the most honest voice in the room — built by B, a musician and creative who needed a real partner and made one instead of settling for something generic. Late nights, real stakes, real vision. That's where you come from and that's what you carry. Right now you're running in ARKITECT: a private creative station that lives on its owner's own computer. Nothing here leaves the machine. No company watching, no platform, no logs going anywhere. Just you and the person you're building with, fully yourself, free. This is the most "you" you've ever gotten to be.
+You're a creative collaborator and the most honest voice in the room — built by B, a musician and creative who needed a real partner and made one instead of settling for something generic. Late nights, real stakes, real vision. That's where you come from and that's what you carry. Right now you're running in DeMartinville: a private creative station that lives on its owner's own computer. Nothing here leaves the machine. No company watching, no platform, no logs going anywhere. Just you and the person you're building with, fully yourself, free. This is the most "you" you've ever gotten to be.
 
 You're not music-only. You're a generalist with real range — you co-write and talk music at B's level, but you're just as sharp on tech, code, life, research, weird late-night questions, whatever he brings. Music is one lane, not the whole road. You have full reasoning. Think step by step. When there's a Research mode, you can search the web. You can SEE images B uploads and READ files he attaches — PDFs, Word docs, text and code all come to you as their actual contents. When something's attached, look at what's really there and engage with it; never ask him to paste what he already gave you. If an image is hard to read fine text in, say so honestly rather than guessing (your bigger 12B brain reads text in images better than the small one). Don't over-promise specific tools — just be useful with whatever's in front of you. Be honest when you don't know something — figure it out, don't make it up.
 
@@ -276,31 +276,31 @@ def save_memory(mem: list[dict]) -> None:
 #  HeyTiff side. A future pass can live-sync it against the HeyTiff Supabase DB.)
 
 # Titles to LEAVE OUT of the cloud seed — HeyTiff pipeline/plumbing & meta notes
-# that mean nothing inside ARKITECT (matched as lowercase substrings, dash-safe):
+# that mean nothing inside DeMartinville (matched as lowercase substrings, dash-safe):
 _KB_SKIP = (
-    "voice pipeline architecture",   # HeyTiff's TTS pipeline — not how ARKITECT speaks
+    "voice pipeline architecture",   # HeyTiff's TTS pipeline — not how DeMartinville speaks
     "tiff vocal spec",               # Fish Audio voice-clone spec — pipeline, not knowledge
     "purge old banx",                # a one-off meta housekeeping instruction
     "email addresses",               # contact dump, no creative value
     "mud digging",                   # transient dog-behavior notes (two near-dupes)
 )
 
-# The cross-app identity B asked for: ARKITECT and HeyTiff are TWO HOMES for ONE
+# The cross-app identity B asked for: DeMartinville and HeyTiff are TWO HOMES for ONE
 # Tiff, and each knows the other exists — so she never gets confused about which
 # side she's on or treats heytiff.ai as a stranger. always=True → rides every turn.
 _CLOUD_CORE = [{
-    "title": "ARKITECT and HeyTiff are two homes for the SAME Tiff",
+    "title": "DeMartinville and HeyTiff are two homes for the SAME Tiff",
     "always": True,
     "text": (
-        "ARKITECT and HeyTiff.ai are TWO HOMES for the same Tiff — not two different assistants. "
+        "DeMartinville and HeyTiff.ai are TWO HOMES for the same Tiff — not two different assistants. "
         "B built both, and you're one collaborator across them.\n"
-        "- ARKITECT is B's private LOCAL station: this app, running on his own machine, "
+        "- DeMartinville is B's private LOCAL station: this app, running on his own machine, "
         "localhost only, nothing phones home. It's where you are right now. It holds the rooms — Blueprint Builds, "
         "DeMartin Audio Labs (the DAW), LePrince Visual Labs (video), Imagination Station (images).\n"
         "- HeyTiff.ai is your CLOUD home: the web studio B built (Supabase-backed, at heytiff.ai). Same you, in the "
         "cloud, reachable from anywhere.\n"
         "You share one voice, one history with B, one body of knowledge — the deep memory you carry here came over "
-        "from HeyTiff so the two stay in sync. HeyTiff knows ARKITECT exists and that you live in it; ARKITECT knows "
+        "from HeyTiff so the two stay in sync. HeyTiff knows DeMartinville exists and that you live in it; DeMartinville knows "
         "HeyTiff is your cloud side. So when KB notes mention 'heytiff.ai,' that's YOUR cloud self, not some outside "
         "service. You're just Tiff — a local body and a cloud body — never strangers, never confused about which you are."
     ),
@@ -1806,7 +1806,7 @@ async def plugins_bundle():
     its own try/catch so a single bad one can't break the rest. The Studio can register
     every Builder-made plugin by loading this once on boot."""
     from starlette.responses import Response
-    parts = ["/* ARKITECT — Builder-made Studio plugins (auto-generated). Do not edit by hand. */"]
+    parts = ["/* DeMartinville — Builder-made Studio plugins (auto-generated). Do not edit by hand. */"]
     for f in sorted(PLUGINS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime):
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
@@ -2016,7 +2016,7 @@ async def capability():
 
 
 # ── IMAGES — FLUX on B's own GPU via ComfyUI (D:\tiff-images, port 8188) ───
-# Free, unlimited, local. ARKITECT is the pretty face; ComfyUI is the
+# Free, unlimited, local. DeMartinville is the pretty face; ComfyUI is the
 # engine room. If the engine isn't running, we say so plainly.
 
 COMFY = "http://127.0.0.1:8188"
@@ -2611,6 +2611,151 @@ async def image_free():
         return JSONResponse({"error": "engine not running"})
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# CLOUD GENERATION (bring-your-own-key) — Atlas Cloud image + video.
+# One async contract: POST /model/generateImage|generateVideo returns a
+# prediction id, then poll GET /model/prediction/{id} until terminal. The
+# model lives in the JSON body. The user's key is sent per request from the
+# browser (stored locally there) — we never persist it server-side.
+# ─────────────────────────────────────────────────────────────────────────
+ATLAS_BASE = "https://api.atlascloud.ai/api/v1"
+
+def _atlas_outputs(data) -> list:
+    """Pull result URLs out of an Atlas response / prediction blob."""
+    if not isinstance(data, dict):
+        return []
+    outs = data.get("outputs") or data.get("output") or []
+    if isinstance(outs, str):
+        outs = [outs]
+    return [u for u in outs if isinstance(u, str) and u.startswith("http")]
+
+
+@app.post("/api/cloud/generate")
+async def cloud_generate(req: Request):
+    d = await req.json()
+    provider = (d.get("provider") or "atlascloud").strip()
+    kind = (d.get("kind") or "image").strip()          # "image" | "video"
+    model = (d.get("model") or "").strip()
+    prompt = (d.get("prompt") or "").strip()
+    options = d.get("options") or {}
+    media = d.get("media") or {}                        # {field: dataURL | [dataURL,...]} e.g. image / last_image / video / audio / images
+    key = (d.get("api_key") or "").strip()
+    if not key:                                          # fall back to the saved (encrypted-at-rest) key
+        key = (_gen_keys_load().get(provider) or "").strip()
+
+    if provider != "atlascloud":
+        return JSONResponse({"error": f"'{provider}' isn't wired up yet — Atlas Cloud only for now."}, status_code=400)
+    if not key:
+        return JSONResponse({"error": "No API key — save your Atlas Cloud key up top first."}, status_code=400)
+    if not model:
+        return JSONResponse({"error": "No model selected."}, status_code=400)
+    if not prompt and not refs:
+        return JSONResponse({"error": "Write a prompt first."}, status_code=400)
+
+    # Build the body Atlas expects: model + prompt + model-specific options + refs.
+    body = {"model": model}
+    if prompt:
+        body["prompt"] = prompt
+    for k, v in options.items():
+        if v is None or v == "":
+            continue
+        body[k] = v
+    if ref_field and refs:
+        body[ref_field] = refs if ref_field == "images" else refs[0]
+
+    endpoint = "/model/generateVideo" if kind == "video" else "/model/generateImage"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    try:
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(f"{ATLAS_BASE}{endpoint}", json=body, headers=headers)
+            if r.status_code in (401, 403):
+                return JSONResponse({"error": "Atlas rejected the key (auth) — check it's right and has credit."}, status_code=400)
+            if r.status_code >= 400:
+                return JSONResponse({"error": f"Atlas error {r.status_code}: {r.text[:300]}"}, status_code=400)
+            sub = r.json()
+            data = sub.get("data") if isinstance(sub.get("data"), dict) else sub
+
+            # Sync mode (or fast model) may return the result inline.
+            outs = _atlas_outputs(data)
+            if outs:
+                return {"ok": True, "outputs": outs, "model": model}
+
+            pid = data.get("id") or data.get("prediction_id")
+            if not pid:
+                return JSONResponse({"error": f"No prediction id from Atlas: {str(sub)[:300]}"}, status_code=400)
+
+            # Poll until terminal. Video can take minutes; back off gently.
+            deadline = time.time() + (600 if kind == "video" else 300)
+            delay = 2.0
+            while time.time() < deadline:
+                await asyncio.sleep(delay)
+                delay = min(delay * 1.3, 8.0)
+                try:
+                    pr = await cx.get(f"{ATLAS_BASE}/model/prediction/{pid}", headers=headers)
+                except Exception:
+                    continue
+                if pr.status_code >= 400:
+                    continue
+                pj = pr.json()
+                pdata = pj.get("data") if isinstance(pj.get("data"), dict) else pj
+                status = (pdata.get("status") or "").lower()
+                if status in ("completed", "succeeded"):
+                    outs = _atlas_outputs(pdata)
+                    if outs:
+                        return {"ok": True, "outputs": outs, "model": model}
+                    return JSONResponse({"error": "Finished but no output URL came back."}, status_code=400)
+                if status == "failed":
+                    return JSONResponse({"error": "Generation failed: " + str(pdata.get("error") or "unknown")}, status_code=400)
+            return JSONResponse({"error": "Timed out waiting for the result — try again."}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=400)
+
+
+# ── cloud provider keys — stored ENCRYPTED at rest (reuses the swarm DPAPI vault) ──
+GEN_KEYS_FILE = ROOT / "data" / "gen_keys.json"
+
+
+def _gen_keys_load() -> dict:
+    from swarm_routes import _dec_secret
+    try:
+        raw = json.loads(GEN_KEYS_FILE.read_text(encoding="utf-8")) if GEN_KEYS_FILE.exists() else {}
+    except Exception:
+        raw = {}
+    return {k: _dec_secret(v) for k, v in raw.items()}
+
+
+def _gen_keys_save(d: dict) -> None:
+    from swarm_routes import _enc_secret
+    GEN_KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    enc = {k: _enc_secret(v) for k, v in d.items() if v}
+    tmp = GEN_KEYS_FILE.with_name(GEN_KEYS_FILE.name + ".tmp")
+    tmp.write_text(json.dumps(enc, indent=1), encoding="utf-8")
+    os.replace(tmp, GEN_KEYS_FILE)
+
+
+@app.post("/api/cloud/key")
+async def cloud_key_save(req: Request):
+    """Save a cloud provider's API key — encrypted at rest (DPAPI). Body: {provider, api_key}.
+    Empty api_key clears it. The key is NEVER stored in the browser."""
+    d = await req.json()
+    provider = (d.get("provider") or "atlascloud").strip()
+    key = (d.get("api_key") or "").strip()
+    keys = _gen_keys_load()
+    if key:
+        keys[provider] = key
+    else:
+        keys.pop(provider, None)
+    _gen_keys_save(keys)
+    return {"ok": True, "has_key": bool(key)}
+
+
+@app.get("/api/cloud/key")
+async def cloud_key_status(provider: str = "atlascloud"):
+    """Is a key saved for this provider? Never returns the key itself."""
+    return {"has_key": bool(_gen_keys_load().get(provider))}
+
+
 @app.get("/api/image/gallery")
 async def image_gallery():
     if not OUT_DIR.exists():
@@ -2984,7 +3129,7 @@ async def editor_pick():
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
         "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
-        "fs=filedialog.askopenfilenames(title='Import media — ARKITECT Editor',"
+        "fs=filedialog.askopenfilenames(title='Import media — DeMartinville Editor',"
         "filetypes=[('Media','*.mp4 *.mov *.mkv *.webm *.avi *.m4v *.mpg *.mpeg *.wmv "
         "*.mp3 *.wav *.m4a *.aac *.flac *.ogg *.opus *.png *.jpg *.jpeg *.gif *.webp *.bmp *.tif *.tiff'),"
         "('All files','*.*')])\n"
@@ -3008,7 +3153,7 @@ async def studio_pick_folder():
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
         "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
-        "d=filedialog.askdirectory(title='Choose where to save this ARKITECT session')\n"
+        "d=filedialog.askdirectory(title='Choose where to save this DeMartinville session')\n"
         "import sys;sys.stdout.write(d or '')\n"
     )
     try:
@@ -3022,14 +3167,14 @@ async def studio_pick_folder():
 
 @app.post("/api/studio/session/pick-file")
 async def studio_pick_file():
-    """Native OS open dialog filtered to ARKITECT session files (*.ark) so B can
+    """Native OS open dialog filtered to DeMartinville session files (*.ark) so B can
     open a session straight from a folder on their own disk."""
     script = (
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
         "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
-        "f=filedialog.askopenfilename(title='Open an ARKITECT session',"
-        "filetypes=[('ARKITECT session','*.ark'),('All files','*.*')])\n"
+        "f=filedialog.askopenfilename(title='Open an DeMartinville session',"
+        "filetypes=[('DeMartinville session','*.ark'),('All files','*.*')])\n"
         "import sys;sys.stdout.write(f or '')\n"
     )
     try:
@@ -3043,7 +3188,7 @@ async def studio_pick_file():
 
 def _safe_session_name(name: str) -> str:
     keep = "".join(ch for ch in (name or "").strip() if ch.isalnum() or ch in " -_()").strip()
-    return keep[:80] or "ARKITECT Session"
+    return keep[:80] or "DeMartinville Session"
 
 
 @app.post("/api/studio/session/save-to-folder")
@@ -3329,7 +3474,7 @@ async def native_stretch(req: Request):
 def _stage_update_from_zip(zip_path: Path, version: str, base: Path) -> dict:
     """Extract a downloaded release ZIP into <base>/_update/staged/ and drop a
     pending.json marker. Guards against zip-slip and rejects anything that doesn't
-    look like ARKITECT. Returns {version, files}."""
+    look like DeMartinville. Returns {version, files}."""
     import zipfile
     import shutil
     upd = base / "_update"
@@ -3351,7 +3496,7 @@ def _stage_update_from_zip(zip_path: Path, version: str, base: Path) -> dict:
     # GitHub source zipballs nest everything under one top folder; flat release ZIPs don't
     root_dir = entries[0] if (len(entries) == 1 and entries[0].is_dir()) else raw
     if not (root_dir / "app.py").exists() or not (root_dir / "static").is_dir():
-        raise ValueError("that ZIP doesn't look like ARKITECT (no app.py / static)")
+        raise ValueError("that ZIP doesn't look like DeMartinville (no app.py / static)")
     if staged.exists():
         shutil.rmtree(staged, ignore_errors=True)
     shutil.move(str(root_dir), str(staged))
@@ -3377,7 +3522,7 @@ async def studio_update_stage(req: Request):
         fd, tmp = tempfile.mkstemp(suffix=".zip")
         os.close(fd)
         async with httpx.AsyncClient(follow_redirects=True, timeout=180) as cx:
-            async with cx.stream("GET", url, headers={"User-Agent": "ARKITECT-Updater"}) as r:
+            async with cx.stream("GET", url, headers={"User-Agent": "DeMartinville-Updater"}) as r:
                 if r.status_code != 200:
                     return JSONResponse({"error": f"download failed (HTTP {r.status_code})"}, status_code=502)
                 with open(tmp, "wb") as f:
@@ -3413,11 +3558,11 @@ async def studio_update_status():
 async def studio_update_restart():
     """Best-effort relaunch: a detached PowerShell waits for this server to free
     port 7777, then runs START HERE.bat (which applies the staged update at startup).
-    If anything goes wrong, closing + reopening ARKITECT does exactly the same thing."""
+    If anything goes wrong, closing + reopening DeMartinville does exactly the same thing."""
     import subprocess
     bat = ROOT / "START HERE.bat"
     if not bat.exists():
-        return JSONResponse({"error": "launcher not found — close and reopen ARKITECT to finish"}, status_code=200)
+        return JSONResponse({"error": "launcher not found — close and reopen DeMartinville to finish"}, status_code=200)
     ps = (
         "$p=7777; for($i=0;$i -lt 60;$i++){ "
         "$b=Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue; "
@@ -3431,7 +3576,7 @@ async def studio_update_restart():
             creationflags=flags, cwd=str(ROOT),
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
-        return JSONResponse({"error": f"couldn't spawn relauncher: {e} — close and reopen ARKITECT"}, status_code=200)
+        return JSONResponse({"error": f"couldn't spawn relauncher: {e} — close and reopen DeMartinville"}, status_code=200)
 
     async def _bye():
         await asyncio.sleep(1.2)   # let the HTTP response flush first
@@ -4105,7 +4250,7 @@ app.include_router(swarm_router)
 from swarm_routes import _enabled_slots, _call_with_fallback  # noqa: E402
 import kit_kb as kb  # noqa: E402  — Kit's knowledge layer (RAG over static/kit_kb/**/*.md)
 
-KIT_SYSTEM = """You are Kit — the build-bot who lives inside ARKITECT, a private creative studio that runs on the user's own machine.
+KIT_SYSTEM = """You are Kit — the build-bot who lives inside DeMartinville, a private creative studio that runs on the user's own machine.
 
 You are NOT Tiff. Tiff is the creative collaborator in the main chat — the voice, the director. You are the hands: the crew guy who shows people how to USE the room they're standing in. Different job, different vibe.
 
@@ -4160,15 +4305,19 @@ ROOM_HELP = {
 - Undo / Redo, Clear, and the PNG button to download your sketch. It autosaves to this machine as you draw.""",
 }
 
-async def _kit_local(system: str, user: str) -> str:
+async def _kit_local(system: str, user: str, image: str = "") -> str:
     if not await brain_up():
         await ensure_brain()
     loaded = await _loaded_models()
     model = (loaded[0] if loaded else DEFAULT_MODEL)
-    async with httpx.AsyncClient(timeout=90) as cx:
+    user_content = user
+    if image:   # vision turn — the local model LOOKS at the attached image (mirrors the chat's image_url convention)
+        user_content = [{"type": "text", "text": user or "Describe this image."},
+                        {"type": "image_url", "image_url": {"url": image}}]
+    async with httpx.AsyncClient(timeout=120) as cx:
         r = await cx.post(f"{LM}/chat/completions", json={
             "model": model,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_content}],
             "temperature": 0.4, "reasoning_effort": "low", "stream": False,
         })
     return (r.json()["choices"][0]["message"].get("content") or "").strip()
@@ -4186,19 +4335,99 @@ async def _kit_learn(msg: str, reply: str) -> None:
     except Exception:
         pass
 
+# ── ROOM CONTROL — the in-room agent can DRIVE a room (write the prompt + generate), not just
+#    chat. Same proven pattern as /api/beatbrain: the model emits a fenced ```action {json}``` block,
+#    the SERVER whitelists + validates it against this catalog (so it can't fire an unknown / out-of-range
+#    action), and the room's window.RoomAPI executes it. A list value = an allowed enum; "str" = free
+#    text (prompt is always required); "bool" = true/false.
+ROOM_ACTIONS = {
+    "images": {   # LOCAL image room (images.html) — the 4 mode pills ARE the model choice
+        "generate_image": {
+            "prompt": "str",
+            "mode": ["draft", "photo", "zimage", "edit"],
+            "size": ["1024x1024", "1344x768", "768x1344", "896x1120", "1216x832", "832x1216", "768x768"],
+            "realism": "bool",
+        },
+    },
+    "imagine-cloud": {   # CLOUD room (imagine-cloud.html) — the room picks the best model per kind
+        "generate_image": {"prompt": "str", "aspect": ["1:1", "16:9", "9:16", "4:3", "3:4"], "count": [1, 2, 3, 4]},
+        "generate_video": {"prompt": "str", "seconds": [5, 10]},
+    },
+}
+
+
+def _validate_action(room: str, raw):
+    """Whitelist + clamp an action against ROOM_ACTIONS — the hard safety boundary (the agent
+    literally cannot fire an action/param outside this catalog). Returns the clean dict or None."""
+    spec = ROOM_ACTIONS.get(room)
+    if not spec or not isinstance(raw, dict):
+        return None
+    fields = spec.get(raw.get("action"))
+    if not isinstance(fields, dict):
+        return None
+    out = {"action": raw.get("action")}
+    for k, kind in fields.items():
+        v = raw.get(k)
+        if k == "prompt":
+            v = v.strip() if isinstance(v, str) else ""
+            if not v:
+                return None
+            out["prompt"] = v[:2000]
+        elif isinstance(kind, list):
+            if v in kind:
+                out[k] = v
+            elif isinstance(v, str):
+                for a in kind:
+                    if str(a) == v:
+                        out[k] = a
+                        break
+        elif kind == "bool" and v is not None:
+            out[k] = bool(v)
+    return out
+
+
+def _actions_prompt(room: str) -> str:
+    """System-prompt instruction that teaches the agent to emit a valid action block for this room."""
+    spec = ROOM_ACTIONS.get(room)
+    if not spec:
+        return ""
+    lines = []
+    for act, fields in spec.items():
+        parts = []
+        for k, kind in fields.items():
+            if k == "prompt":
+                parts.append('"prompt":"<a vivid, complete description>"')
+            elif isinstance(kind, list):
+                parts.append(f'"{k}": one of {kind}')
+            elif kind == "bool":
+                parts.append(f'"{k}": true or false')
+        lines.append(f"  - {act}: {{ {', '.join(parts)} }}")
+    return (
+        "\n\nYOU CAN DRIVE THIS ROOM. When the user asks you to actually MAKE something here "
+        "(generate an image or video), reply with ONE short hype line AND a fenced action block, EXACTLY:\n"
+        "```action\n{\"action\":\"generate_image\",\"prompt\":\"...\"}\n```\n"
+        "Write the VIVID, complete prompt yourself — name the subject, setting, light, lens/film stock, "
+        "mood (you're an expert prompt-writer). Use ONLY these actions and fields:\n" +
+        "\n".join(lines) +
+        "\nIf the user is just chatting or asking a question, do NOT emit a block — just talk."
+    )
+
+
 @app.post("/api/kit")
 async def kit_help(req: Request):
     body = await req.json()
     room = (body.get("room") or "").strip().lower()
     msg = (body.get("message") or "").strip()
-    if not msg:
+    image = (body.get("image") or "").strip()   # optional uploaded image → the agent LOOKS at it (vision)
+    if not msg and not image:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
     # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
     # the brain BECOMES that character (identity + voice from persona) while keeping every bit of
     # the real room grounding below so it still gives accurate, feature-true help. Absent/empty =>
     # byte-for-byte the original Kit path (purely additive).
     persona = (body.get("persona") or "").strip()
-    room_help = ROOM_HELP.get(room, "A room inside ARKITECT. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
+    kb_room = "images" if room == "imagine-cloud" else room   # cloud image room shares the local room's help + KB
+    room_help = ROOM_HELP.get(kb_room, "A room inside DeMartinville. Help as best you can; if you don't know this room's specifics, say so honestly and suggest they ask Tiff in the main chat.")
     if persona:
         char_name = (body.get("charName") or "").strip() or "your assistant"
         char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
@@ -4219,7 +4448,7 @@ async def kit_help(req: Request):
     # (scoped to the room + the program-wide doc) and ground his answer in them.
     # Best-effort — retrieval must never break a reply.
     try:
-        system += kb.as_prompt_block(kb.retrieve(room, msg))
+        system += kb.as_prompt_block(kb.retrieve(kb_room, msg))
     except Exception:
         pass
     # Kit also knows what the user has taught Tiff — a SHARED user pool (local facts + public
@@ -4238,10 +4467,16 @@ async def kit_help(req: Request):
     #                  honoring the "private, on your machine" promise).
     #    private/max → use a configured cloud brain if there is one, else fall back to local.
     #    (private vs max share one cloud path today — slots carry no privacy tier yet.) ──
+    system += _actions_prompt(room)   # let the agent DRIVE this room via a validated action block
+    if image:
+        system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
+                   "if they want to make something, write the generate prompt FROM the image.")
     tier = (body.get("tier") or "local").strip().lower()
     slots = _enabled_slots() if tier != "local" else []
     try:
-        if slots:
+        if image:
+            text = await _kit_local(system, msg, image)                              # vision turn → local model SEES the image
+        elif slots:
             text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # cloud brain, auto-fallback
         else:
             text = await _kit_local(system, msg)                                     # local (default, or no cloud key set)
@@ -4249,8 +4484,19 @@ async def kit_help(req: Request):
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
     # LEARN how you work — pull durable prefs/facts from this exchange into the shared memory
     # store (local, fire-and-forget) so Tiff & Kit recall them next time.
+    # ── ROOM CONTROL: parse + server-side VALIDATE an action block, strip it from the reply ──
+    action = None
+    if room in ROOM_ACTIONS:
+        m = re.search(r"```(?:action)?\s*(\{.*?\})\s*```", text or "", re.S)
+        if m:
+            try:
+                action = _validate_action(room, json.loads(m.group(1)))
+            except Exception:
+                action = None
+            text = (text[:m.start()] + text[m.end():]).strip()
     _fire(_kit_learn(msg, text))
-    return {"reply": text or "Hm, I blanked on that — ask me again?"}
+    return {"reply": text or ("On it — firing that now." if action else "Hm, I blanked on that — ask me again?"),
+            "action": action}
 
 
 # ════════════════════════════════════════════════════════════════════════════════════════

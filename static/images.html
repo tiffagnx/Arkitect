@@ -15,9 +15,9 @@
   .top a:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
   .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
     background:linear-gradient(100deg,#8FD4E4,var(--pink) 40%,#7C8AA5); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .top select { margin-left:auto; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.045);
+  .top select, .optbar select { margin-left:auto; padding:8px 12px; border-radius:10px; background:rgba(255,255,255,.045);
     color:var(--text); border:1px solid var(--hairline); font:500 12px Inter; outline:none; }
-  .top select option { background:var(--bg1); }
+  .top select option, .optbar select option { background:var(--bg1); }
   .wrap { max-width:980px; margin:0 auto; padding:20px 18px 40px; }
   .modes { display:inline-flex; gap:4px; padding:4px; margin-bottom:12px; background:var(--panel);
     backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:14px; }
@@ -62,6 +62,19 @@
 <div class="top">
   <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">←</span></a>
   <h1>🎨 IMAGINATION STATION</h1>
+  <a href="/static/imagine-cloud.html" title="Use cloud models (Nano Banana, Wan 2.7, Qwen…) with your own API key — image + video. No GPU needed."
+     style="margin-left:auto; color:#14040E; background:linear-gradient(135deg,#6FC0D8,#3E9CB8); border:none; font:700 11px Oxanium; letter-spacing:.08em; padding:8px 14px; border-radius:10px; box-shadow:0 0 14px rgba(62,156,184,.4); text-decoration:none;">☁ Switch to Cloud</a>
+  <span class="kit-mount" style="display:inline-flex; align-items:center; gap:6px; margin-left:8px;"></span>
+</div>
+<div class="wrap">
+  <div id="agentDock" class="agent-dock"></div>
+  <div class="optbar" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+  <div class="modes" id="modes" style="margin-bottom:0;">
+    <button data-mode="draft" title="Fast throwaway iterations — schnell. Quick but painterly.">DRAFT</button>
+    <button data-mode="photo" class="on" title="Photoreal text-to-image — Krea-dev. Slowest, max detail.">PHOTO</button>
+    <button data-mode="zimage" title="Fast photoreal — Z-Image Turbo. Realistic like Photo but ~3x faster.">Z-IMAGE</button>
+    <button data-mode="edit" title="Instruction edit — Kontext. Attach a photo, tell her what to change.">EDIT</button>
+  </div>
   <select id="size" title="Aspect ratio. FLUX renders ~1 megapixel; photo mode then upscales ~2x, so finals land well above 1080p.">
     <option value="1024x1024">1:1 Square · 1024</option>
     <option value="1344x768">16:9 Wide · 1344×768</option>
@@ -74,13 +87,6 @@
   <label id="realismWrap" title="Realism LoRA — adds real-camera skin texture + grain on Photo mode. Uncheck for the base Krea look." style="display:flex; align-items:center; gap:5px; color:var(--dim); font:600 11px Inter; cursor:pointer; white-space:nowrap;">
     <input type="checkbox" id="realism" checked /> ✨ Realism
   </label>
-</div>
-<div class="wrap">
-  <div class="modes" id="modes">
-    <button data-mode="draft" title="Fast throwaway iterations — schnell. Quick but painterly.">DRAFT</button>
-    <button data-mode="photo" class="on" title="Photoreal text-to-image — Krea-dev. Slowest, max detail.">PHOTO</button>
-    <button data-mode="zimage" title="Fast photoreal — Z-Image Turbo. Realistic like Photo but ~3x faster.">Z-IMAGE</button>
-    <button data-mode="edit" title="Instruction edit — Kontext. Attach a photo, tell her what to change.">EDIT</button>
   </div>
   <div class="modeHint" id="modeHint">PHOTO — photoreal text-to-image. Describe the picture; she handles the camera.</div>
   <div class="bar">
@@ -110,6 +116,19 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+
+/* ── smart default: a machine that can't run a local AI brain / GPU image gen lands on the CLOUD
+   generator (this local engine needs a gaming GPU). Capable machines stay here on local.
+   ?local=1 (the cloud page's "Switch to Local" link) forces local + skips this check. ── */
+(function(){
+  try {
+    if (new URLSearchParams(location.search).get("local") === "1") return;
+    fetch("/api/capability").then(r => r.json()).then(c => {
+      if (c && c.recommend === "cloud") location.replace("/static/imagine-cloud.html");
+    }).catch(() => {});
+  } catch (_) {}
+})();
+
 let busy = false;
 let refData = ""; // data URL of the attached reference (img2img / edit)
 let mode = "photo"; // draft · photo · edit — default PHOTO
@@ -310,6 +329,24 @@ $("polishUndo").onclick = () => {
 // wrap generate (hoisted, reassignable) so the stale "polished" affordance hides on every generate path
 const _genOrig = generate;
 generate = async (over) => { $("polishRow").style.display = "none"; return _genOrig(over); };
+
+/* ── ROOM CONTROL — lets the in-room agent (Tiff/Kit) DRIVE this room: she writes the prompt + generates. ── */
+window.RoomAPI = {
+  room: "images",
+  setPrompt(t){ $("prompt").value = t || ""; },
+  setMode(m){ if (["draft","photo","zimage","edit"].includes(m)) setMode(m); },
+  setSize(s){ if (s && [...$("size").options].some(o => o.value === s)) $("size").value = s; },
+  setRealism(on){ if ($("realism")) $("realism").checked = !!on; },
+  async run(o){
+    o = o || {};
+    if (o.mode) this.setMode(o.mode);
+    if (o.size) this.setSize(o.size);
+    if (typeof o.realism === "boolean") this.setRealism(o.realism);
+    if (o.prompt) this.setPrompt(o.prompt);
+    if (mode === "edit" && !refData) setMode("photo");   // agent can't attach a ref → don't stall in edit mode
+    return generate();
+  }
+};
 </script>
 <script src="/static/pinkroom-nav.js"></script>
 </body>

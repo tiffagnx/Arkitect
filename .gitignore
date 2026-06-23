@@ -17,6 +17,7 @@ verify-*.png
 *.zip
 
 # Native build binary (25MB — ships as a GitHub Release asset via release.ps1, not in git history)
+DeMartinville.exe
 ARKITECT.exe
 build/
 dist/

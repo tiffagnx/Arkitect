@@ -1,13 +1,13 @@
 """
-ARKITECT — native desktop app.
+DeMartinville — native desktop app.
 
-Runs the ARKITECT engine and shows it in its OWN native window via WebView2
+Runs the DeMartinville engine and shows it in its OWN native window via WebView2
 (built into Windows) — no browser, no Edge icon, its own taskbar icon (your logo).
 
 Two ways it runs:
-  • as a script  (ARKITECT (app).bat → pythonw desktop.py): starts uvicorn as a
+  • as a script  (DeMartinville (app).bat → pythonw desktop.py): starts uvicorn as a
     child process WITH --reload on a git checkout, so code edits still apply live.
-  • as ARKITECT.exe (PyInstaller build): a frozen exe can't shell out to
+  • as DeMartinville.exe (PyInstaller build): a frozen exe can't shell out to
     `python -m uvicorn`, so it runs the server IN-PROCESS. The exe carries the
     icon, so the taskbar shows your logo and it pins like any real program.
 
@@ -57,7 +57,12 @@ HOST = "127.0.0.1"
 PORT = 7777
 URL = f"http://localhost:{PORT}"
 ICON = os.path.join(ROOT, "static", "app-icon.ico")   # swap this file to change the icon
-APPID = "LePrinceVisualLabs.ARKITECT"
+APPID = "LePrinceVisualLabs.DeMartinville"
+# Persistent WebView2 profile so a one-time "Allow microphone" STICKS. The default profile is
+# ephemeral (a fresh temp dir every launch) → the mic grant is forgotten and re-prompts each time.
+# Prefer %APPDATA% (writable even if the app is installed under Program Files); fall back to a
+# local dir in a dev checkout.
+WEBVIEW_PROFILE = os.path.join(os.environ.get("APPDATA") or ROOT, "DeMartinville", "webview-profile")
 
 
 def _port_open(host=HOST, port=PORT):
@@ -163,12 +168,12 @@ def _acquire_single_instance() -> bool:
     import ctypes
     k32 = ctypes.windll.kernel32
     ERROR_ALREADY_EXISTS = 183
-    _SINGLETON_HANDLE = k32.CreateMutexW(None, False, "ARKITECT_single_instance")
+    _SINGLETON_HANDLE = k32.CreateMutexW(None, False, "DeMartinville_single_instance")
     return k32.GetLastError() != ERROR_ALREADY_EXISTS
 
 
 def _focus_existing_window():
-    """Bring the already-open ARKITECT window to the front (run by the 2nd launch)."""
+    """Bring the already-open DeMartinville window to the front (run by the 2nd launch)."""
     if sys.platform != "win32":
         return
     import ctypes
@@ -189,7 +194,7 @@ def main():
         _focus_existing_window()
         return
     # NOTE: we deliberately do NOT set an explicit AppUserModelID. As a real .exe,
-    # the window's taskbar button is ARKITECT.exe itself, so "Pin to taskbar" (from
+    # the window's taskbar button is DeMartinville.exe itself, so "Pin to taskbar" (from
     # the running taskbar icon) pins and relaunches correctly. A custom AUMID without
     # a registered shortcut can make the pin fail to relaunch on Win11.
     started = start_server()
@@ -211,14 +216,32 @@ def main():
         # built-in WKWebView (cocoa). Forcing edgechromium on a Mac RAISES, and the except
         # below would then silently fall back to a browser tab — faking a "native window
         # works" pass. If the engine is genuinely missing/broken we still catch it.
-        webview.create_window("DeMartinville", URL, width=1500, height=950, min_size=(1100, 700))
+        # Open MAXIMIZED so the window lands clean and centered (pywebview's default
+        # placement can drop it low/off-center on some displays). text_select=True keeps
+        # page text selectable like a normal app.
+        webview.create_window("DeMartinville", URL, width=1500, height=950,
+                              min_size=(1100, 700), maximized=True, text_select=True)
         _gui = "edgechromium" if sys.platform == "win32" else ("cocoa" if sys.platform == "darwin" else None)
-        webview.start(gui=_gui)
+        # WebView2 gates the right-click Paste menu (AreDefaultContextMenusEnabled) and
+        # browser keys on pywebview's `debug` flag. Without it, right-click has no Paste.
+        # Turn debug ON to restore the full copy/paste context menu — but suppress the
+        # auto-opening DevTools so the app still looks clean (F12 stays available).
+        try:
+            webview.settings['OPEN_DEVTOOLS_IN_DEBUG'] = False
+        except Exception:
+            pass
+        # private_mode=False + a fixed storage_path = a DURABLE profile, so granted device
+        # permissions (microphone / camera) + sign-ins persist across launches — one "Allow", ever.
+        try:
+            os.makedirs(WEBVIEW_PROFILE, exist_ok=True)
+        except Exception:
+            pass
+        webview.start(gui=_gui, debug=True, private_mode=False, storage_path=WEBVIEW_PROFILE)
     except Exception:
         import traceback
         import webbrowser
         traceback.print_exc()
-        webbrowser.open(URL)   # the server is already running — keep ARKITECT usable
+        webbrowser.open(URL)   # the server is already running — keep DeMartinville usable
         try:
             while True:
                 time.sleep(3600)   # stay alive so the in-process server keeps serving the tab

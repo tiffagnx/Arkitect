@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Imagination Station · Cloud — DeMartinville</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.55); --amber:#E9A050; }
+  * { box-sizing:border-box; margin:0; }
+  body { min-height:100vh; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1200px 700px at 30% -10%, #181922 0%, var(--bg1) 45%, var(--bg0) 100%); }
+  .top { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--hairline); }
+  .top a.back { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a.back:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#8FD4E4,var(--pink) 40%,#7C8AA5); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .switchLocal { margin-left:auto; color:var(--dim); text-decoration:none; font:600 11px Oxanium; letter-spacing:.06em;
+    padding:8px 14px; border:1px solid var(--hairline); border-radius:10px; }
+  .switchLocal:hover { color:var(--text); border-color:rgba(62,156,184,.45); }
+  .wrap { max-width:1180px; margin:0 auto; padding:18px 18px 50px; }
+
+  .keycard { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 14px; margin-bottom:18px;
+    background:var(--panel); backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:16px; }
+  .keycard .lbl { font:700 10px Oxanium; letter-spacing:.14em; color:var(--dim); }
+  .keycard select, .keycard input { padding:9px 12px; border-radius:10px; background:rgba(255,255,255,.045);
+    color:var(--text); border:1px solid var(--hairline); font:500 12.5px Inter; outline:none; }
+  .keycard select option { background:var(--bg1); }
+  .keycard input { flex:1; min-width:220px; font-family:'Space Mono'; }
+  .keycard input:focus { border-color:rgba(62,156,184,.5); }
+  .keysave { padding:9px 16px; border:none; border-radius:10px; cursor:pointer; color:#14040E; font:700 11px Oxanium; letter-spacing:.06em;
+    background:linear-gradient(135deg,#6FC0D8,var(--pink)); box-shadow:0 0 12px rgba(62,156,184,.35); }
+  .keystatus { font:400 11px 'Space Mono'; color:var(--teal); }
+  .getkey { color:var(--pink); text-decoration:none; font:600 11px Inter; }
+  .getkey:hover { text-decoration:underline; }
+
+  .panels { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:920px){ .panels { grid-template-columns:1fr; } }
+  .panel { background:var(--panel); backdrop-filter:blur(26px); border:1px solid var(--hairline); border-radius:20px; padding:16px; }
+  .panel h2 { font:700 13px Oxanium; letter-spacing:.12em; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+  .panel h2 .pico { font-size:16px; }
+  .panel h2 .badge { margin-left:auto; font:600 9px Oxanium; letter-spacing:.1em; color:var(--teal);
+    border:1px solid rgba(43,182,168,.4); border-radius:999px; padding:3px 8px; }
+
+  .field { margin-bottom:12px; }
+  .field > label { display:block; font:700 9.5px Oxanium; letter-spacing:.14em; color:var(--dim); margin-bottom:6px; }
+  .modes { display:inline-flex; gap:4px; padding:4px; background:rgba(255,255,255,.03); border:1px solid var(--hairline); border-radius:12px; }
+  .modes button { border:none; background:transparent; color:var(--dim); cursor:pointer; padding:6px 14px; border-radius:9px;
+    font:600 11px Oxanium; letter-spacing:.08em; transition:all .14s; }
+  .modes button.on { color:#14040E; background:linear-gradient(135deg,#6FC0D8,var(--pink)); box-shadow:0 0 12px rgba(62,156,184,.35); }
+  select.sel, textarea.ta { width:100%; padding:10px 12px; border-radius:10px; background:rgba(255,255,255,.045);
+    color:var(--text); border:1px solid var(--hairline); font:500 13px Inter; outline:none; }
+  select.sel option { background:var(--bg1); }
+  textarea.ta { resize:vertical; min-height:74px; line-height:1.5; font-size:13.5px; }
+  textarea.ta:focus, select.sel:focus { border-color:rgba(62,156,184,.5); }
+  textarea.neg { width:100%; padding:9px 12px; border-radius:10px; background:rgba(255,255,255,.035); border:1px solid var(--hairline);
+    color:var(--text); font:500 12.5px Inter; outline:none; resize:vertical; min-height:42px; }
+  .modelnote { font:400 10.5px 'Space Mono'; color:var(--dim); margin-top:5px; }
+
+  .opts { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .opt { display:flex; flex-direction:column; gap:5px; }
+  .opt > span { font:700 9px Oxanium; letter-spacing:.12em; color:var(--dim); }
+  .pills { display:flex; gap:5px; flex-wrap:wrap; }
+  .pills button { border:1px solid var(--hairline); background:rgba(255,255,255,.03); color:var(--dim); cursor:pointer;
+    padding:6px 11px; border-radius:999px; font:600 11px Inter; transition:all .12s; }
+  .pills button.on { color:#14040E; background:linear-gradient(135deg,#6FC0D8,var(--pink)); border-color:transparent; }
+  .toggle { display:flex; align-items:center; gap:7px; cursor:pointer; color:var(--dim); font:600 11.5px Inter; user-select:none; padding-top:14px; }
+  .toggle input { accent-color:var(--pink); width:15px; height:15px; }
+
+  /* ── glowing, clearly-labeled upload slots ── */
+  .inputs { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .slot { display:flex; flex-direction:column; gap:7px; }
+  .slot .uplabel { font:700 9px Oxanium; letter-spacing:.12em; color:var(--dim); }
+  .upbtn { display:flex; align-items:center; gap:8px; padding:12px 15px; border-radius:13px; cursor:pointer;
+    background:linear-gradient(135deg, rgba(111,192,216,.22), rgba(62,156,184,.10));
+    border:1.5px solid rgba(62,156,184,.6); color:#A6E6F2; font:700 11px Oxanium; letter-spacing:.05em;
+    box-shadow:0 0 18px rgba(62,156,184,.30); transition:all .15s; white-space:nowrap; }
+  .upbtn span.ico { font-size:15px; }
+  .upbtn:hover { box-shadow:0 0 26px rgba(62,156,184,.6); border-color:#6FC0D8; color:#fff; transform:translateY(-1px); }
+  .upbtn.req { border-color:rgba(233,160,80,.7); color:#FFD9A8;
+    background:linear-gradient(135deg, rgba(233,160,80,.20), rgba(62,156,184,.06)); box-shadow:0 0 18px rgba(233,160,80,.30); }
+  .upbtn.req:hover { box-shadow:0 0 26px rgba(233,160,80,.55); border-color:#F0B36A; color:#fff; }
+  .upthumbs { display:flex; gap:6px; flex-wrap:wrap; }
+  .upthumbs .rt { position:relative; }
+  .upthumbs img { width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid rgba(62,156,184,.5); display:block; }
+  .upthumbs .file { display:inline-flex; align-items:center; gap:6px; padding:7px 9px; border-radius:8px;
+    background:rgba(255,255,255,.05); border:1px solid var(--hairline); font:500 10px 'Space Mono'; color:var(--text); }
+  .upthumbs .x { position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; border:none; cursor:pointer;
+    background:#E0245E; color:#fff; font-size:9px; line-height:1; }
+  .upthumbs .file .x { position:static; width:15px; height:15px; }
+
+  .genbtn { width:100%; margin-top:14px; padding:13px 0; border:none; border-radius:12px; cursor:pointer; color:#14040E;
+    font:700 12.5px Oxanium; letter-spacing:.1em; background:linear-gradient(135deg,#6FC0D8,var(--pink)); box-shadow:0 0 18px rgba(62,156,184,.4); }
+  .genbtn:disabled { opacity:.5; cursor:default; box-shadow:none; }
+  .pstatus { font:400 11px 'Space Mono'; color:var(--dim); min-height:16px; margin-top:10px; }
+  .results { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:12px; }
+  .results .cell { border-radius:12px; overflow:hidden; border:1px solid var(--hairline); background:rgba(255,255,255,.02); aspect-ratio:1; position:relative; }
+  .results .cell.load { display:flex; align-items:center; justify-content:center; }
+  .results .cell.load::after { content:""; width:22px; height:22px; border:2px solid rgba(62,156,184,.3); border-top-color:var(--pink);
+    border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .results a { display:block; width:100%; height:100%; }
+  .results img, .results video { width:100%; height:100%; object-fit:cover; display:block; }
+  .results .err { padding:8px; font:500 10px 'Space Mono'; color:#FF8A8A; }
+
+  .foot { margin-top:20px; font:400 11px 'Space Mono'; color:var(--dim); text-align:center; line-height:1.6; }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(62,156,184,.25); border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="back" href="/" title="Back to DeMartinville">←</a>
+  <h1>🎨 IMAGINATION STATION · CLOUD</h1>
+  <a class="switchLocal" href="/static/images.html?local=1" title="Back to the free local engine (your GPU)">⚡ Switch to Local</a>
+  <span class="kit-mount" style="display:inline-flex; align-items:center; gap:6px; margin-left:8px;"></span>
+</div>
+
+<div class="wrap">
+  <div id="agentDock" class="agent-dock"></div>
+  <div class="keycard">
+    <span class="lbl">PROVIDER</span>
+    <select id="provider">
+      <option value="atlascloud" selected>Atlas Cloud</option>
+      <option value="fal" disabled>fal.ai — coming soon</option>
+      <option value="kie" disabled>Kie — coming soon</option>
+    </select>
+    <input id="apikey" type="password" placeholder="Paste your Atlas Cloud API key…" autocomplete="off" />
+    <button class="keysave" id="keypaste" title="Paste from clipboard (or just click the box and press Ctrl+V)" style="background:rgba(255,255,255,.06); color:var(--text);">📋 Paste</button>
+    <button class="keysave" id="keysave">Save key</button>
+    <span class="keystatus" id="keystatus"></span>
+    <a class="getkey" id="getkey" href="https://www.atlascloud.ai/console/api-keys" target="_blank" rel="noopener">Get a key ↗</a>
+  </div>
+
+  <div class="panels">
+    <!-- ───────────── IMAGE ───────────── -->
+    <div class="panel" id="imgPanel">
+      <h2><span class="pico">🖼</span> IMAGE <span class="badge" id="imgBadge">text → image</span></h2>
+      <div class="field">
+        <label>MODE</label>
+        <div class="modes" id="imgModes">
+          <button data-m="t2i" class="on">Text → Image</button>
+          <button data-m="i2i">Image → Image</button>
+        </div>
+      </div>
+      <div class="inputs" id="imgInputs" style="display:none;"></div>
+      <div class="field">
+        <label>MODEL</label>
+        <select class="sel" id="imgModel"></select>
+        <div class="modelnote" id="imgModelNote"></div>
+      </div>
+      <div class="field">
+        <label>PROMPT</label>
+        <textarea class="ta" id="imgPrompt" placeholder="Describe the image — be specific: subject, light, mood, style…"></textarea>
+      </div>
+      <div class="field" id="imgNegWrap" style="display:none;">
+        <label>NEGATIVE PROMPT (optional)</label>
+        <textarea class="neg" id="imgNeg" placeholder="What to avoid…"></textarea>
+      </div>
+      <div class="field">
+        <label>OPTIONS</label>
+        <div class="opts" id="imgOpts"></div>
+      </div>
+      <button class="genbtn" id="imgGen">✦ GENERATE</button>
+      <div class="pstatus" id="imgStatus"></div>
+      <div class="results" id="imgResults"></div>
+    </div>
+
+    <!-- ───────────── VIDEO ───────────── -->
+    <div class="panel" id="vidPanel">
+      <h2><span class="pico">🎬</span> VIDEO <span class="badge" id="vidBadge">text → video</span></h2>
+      <div class="field">
+        <label>MODE</label>
+        <div class="modes" id="vidModes">
+          <button data-m="t2v" class="on">Text → Video</button>
+          <button data-m="i2v">Image → Video</button>
+        </div>
+      </div>
+      <div class="inputs" id="vidInputs" style="display:none;"></div>
+      <div class="field">
+        <label>MODEL</label>
+        <select class="sel" id="vidModel"></select>
+        <div class="modelnote" id="vidModelNote"></div>
+      </div>
+      <div class="field">
+        <label>PROMPT</label>
+        <textarea class="ta" id="vidPrompt" placeholder="Describe the shot — motion, camera move, what happens…"></textarea>
+      </div>
+      <div class="field" id="vidNegWrap" style="display:none;">
+        <label>NEGATIVE PROMPT (optional)</label>
+        <textarea class="neg" id="vidNeg" placeholder="What to avoid…"></textarea>
+      </div>
+      <div class="field">
+        <label>OPTIONS</label>
+        <div class="opts" id="vidOpts"></div>
+      </div>
+      <button class="genbtn" id="vidGen">✦ GENERATE</button>
+      <div class="pstatus" id="vidStatus"></div>
+      <div class="results" id="vidResults"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    Cloud models bill to <b>your own provider key</b> — pay-as-you-go (~$0.03–$0.14 / image, more for video). Nothing runs without your key.<br/>
+    Want it free? <a class="getkey" href="/static/images.html">⚡ Switch to Local</a> and run on your own GPU.
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+/* ────────────────────────────────────────────────────────────
+   MODEL CATALOG — verified live against Atlas Cloud docs (2026-06-22).
+   Each model declares its upload "inputs" (image / last_image / video /
+   audio / images) + the option controls it exposes, so the UI adapts per
+   model. "Count" (1–4) is a client-side batch on the image side.
+   ──────────────────────────────────────────────────────────── */
+const NB_ASPECT = ["1:1","3:2","2:3","3:4","4:3","4:5","5:4","9:16","16:9","21:9"];
+const SEEDREAM_SIZES = [["2048*2048","2K · 1:1"],["2304*1296","16:9"],["1296*2304","9:16"],["2048*1536","4:3"],["1536*2048","3:4"],["4096*4096","4K · 1:1"]];
+const QWEN_SIZES = [["1328*1328","1:1"],["1664*928","16:9"],["928*1664","9:16"],["1472*1140","4:3"],["1140*1472","3:4"]];
+const QEDIT_SIZES = [["1024*1024","1:1"],["1280*720","16:9"],["720*1280","9:16"],["1536*1024","3:2"]];
+const WAN_VID_SIZES = [["1280*720","720p · 16:9"],["720*1280","720p · 9:16"],["1920*1080","1080p · 16:9"],["1080*1920","1080p · 9:16"],["960*960","1:1"]];
+
+const IMG_MODELS = [
+  { id:"google/nano-banana-pro/text-to-image", editId:"google/nano-banana-pro/edit", name:"Nano Banana Pro",
+    note:"Google · best quality + typography (~$0.14). Edit takes up to 10 refs.", modes:["t2i","i2i"],
+    inputs:[ {field:"images", label:"Reference image(s)", icon:"📎", accept:"image/*", multiple:true, max:10, required:true} ],
+    opts:[ {k:"aspect_ratio",label:"ASPECT",type:"select",choices:NB_ASPECT,def:"1:1"},
+           {k:"resolution",label:"RES",type:"pills",choices:["1k","2k","4k"],def:"1k"},
+           {k:"enable_web_search",label:"🌐 WEB SEARCH",type:"toggle",def:false} ] },
+  { id:"bytedance/seedream-v4", name:"Seedream v4",
+    note:"ByteDance · photoreal + character likeness · up to 4K.", modes:["t2i"], inputs:[],
+    opts:[ {k:"size",label:"SIZE",type:"select",choices:SEEDREAM_SIZES,def:"2048*2048"} ] },
+  { id:"qwen/qwen-image-2.0/text-to-image", name:"Qwen Image 2.0",
+    note:"Alibaba · native text rendering (EN + 中文).", modes:["t2i"], inputs:[],
+    opts:[ {k:"size",label:"SIZE",type:"select",choices:QWEN_SIZES,def:"1328*1328"} ] },
+  { id:"alibaba/wan-2.7/image-edit", name:"Wan 2.7 — Image Edit",
+    note:"Alibaba (“1.2.7”) · edit + recompose · cheap (~$0.03). Needs 1–9 refs.", modes:["i2i"],
+    inputs:[ {field:"images", label:"Image(s) to edit", icon:"📎", accept:"image/*", multiple:true, max:9, required:true} ],
+    opts:[ {k:"size",label:"SIZE",type:"pills",choices:["1K","2K"],def:"2K"},
+           {k:"thinking_mode",label:"🧠 THINKING",type:"toggle",def:true} ] },
+  { id:"atlascloud/qwen-image/edit-plus", name:"Qwen Image — Edit Plus",
+    note:"Alibaba · multi-image edit · up to 3 refs.", modes:["i2i"],
+    inputs:[ {field:"images", label:"Reference(s) — up to 3", icon:"📎", accept:"image/*", multiple:true, max:3, required:true} ],
+    opts:[ {k:"size",label:"SIZE",type:"select",choices:QEDIT_SIZES,def:"1024*1024"} ] },
+];
+
+const VID_MODELS = [
+  { id:"alibaba/wan-2.7/image-to-video", name:"Wan 2.7 — Image→Video",
+    note:"Alibaba (“1.2.7”) · first frame · +last frame · +source video · +audio.", modes:["i2v"], negPrompt:true,
+    inputs:[ {field:"image", label:"First frame", icon:"🖼", accept:"image/*", required:true},
+             {field:"last_image", label:"Last frame", icon:"🏁", accept:"image/*"},
+             {field:"video", label:"Source video", icon:"🎬", accept:"video/*"},
+             {field:"audio", label:"Audio", icon:"🎵", accept:"audio/*"} ],
+    opts:[ {k:"resolution",label:"RES",type:"pills",choices:["720P","1080P"],def:"1080P"},
+           {k:"duration",label:"SECONDS",type:"pills",choices:[5,10],def:5},
+           {k:"prompt_extend",label:"✨ PROMPT EXTEND",type:"toggle",def:true} ] },
+  { id:"alibaba/wan-2.5/text-to-video", name:"Wan 2.5 — Text→Video",
+    note:"Alibaba · native audio sync · 5 or 10s.", modes:["t2v"], inputs:[], negPrompt:true,
+    opts:[ {k:"size",label:"SIZE",type:"select",choices:WAN_VID_SIZES,def:"1280*720"},
+           {k:"duration",label:"SECONDS",type:"pills",choices:[5,10],def:5},
+           {k:"generate_audio",label:"🔊 AUDIO",type:"toggle",def:true} ] },
+  { id:"minimax/hailuo-02/pro", name:"MiniMax Hailuo 02 Pro",
+    note:"MiniMax · text OR image → video · 6s.", modes:["t2v","i2v"],
+    inputs:[ {field:"image", label:"First frame", icon:"🖼", accept:"image/*", required:true} ],
+    opts:[ {k:"enable_prompt_expansion",label:"✨ PROMPT EXPAND",type:"toggle",def:false} ] },
+  { id:"kwaivgi/kling-v3.0-pro/image-to-video", name:"Kling 3.0 Pro — Image→Video",
+    note:"Kuaishou · native audio · 5 or 10s.", modes:["i2v"], negPrompt:true,
+    inputs:[ {field:"image", label:"First frame", icon:"🖼", accept:"image/*", required:true},
+             {field:"end_image", label:"Last frame", icon:"🏁", accept:"image/*"} ],
+    opts:[ {k:"duration",label:"SECONDS",type:"pills",choices:[5,10],def:5},
+           {k:"sound",label:"🔊 SOUND",type:"toggle",def:false} ] },
+  { id:"kwaivgi/kling-v2.1-i2v-standard", name:"Kling 2.1 — Image→Video",
+    note:"Kuaishou · reliable, well-documented i2v · 5 or 10s.", modes:["i2v"], negPrompt:true,
+    inputs:[ {field:"image", label:"First frame", icon:"🖼", accept:"image/*", required:true} ],
+    opts:[ {k:"duration",label:"SECONDS",type:"pills",choices:[5,10],def:5} ] },
+  { id:"bytedance/seedance-2.0/image-to-video", name:"Seedance 2.0 — Image→Video",
+    note:"ByteDance · synced audio · up to 15s. (params being confirmed)", modes:["i2v"], tentative:true,
+    inputs:[ {field:"image", label:"First frame", icon:"🖼", accept:"image/*", required:true} ],
+    opts:[ {k:"resolution",label:"RES",type:"pills",choices:["720p","1080p"],def:"720p"},
+           {k:"ratio",label:"RATIO",type:"pills",choices:["adaptive","16:9","9:16","1:1"],def:"adaptive"} ] },
+  { id:"alibaba/wan-2.7/text-to-video", name:"Wan 2.7 — Text→Video",
+    note:"Alibaba · multi-shot + auto audio. (params being confirmed)", modes:["t2v"], inputs:[], tentative:true, negPrompt:true,
+    opts:[ {k:"resolution",label:"RES",type:"pills",choices:["720P","1080P"],def:"720P"},
+           {k:"aspect_ratio",label:"ASPECT",type:"pills",choices:["16:9","9:16","1:1"],def:"16:9"},
+           {k:"duration",label:"SECONDS",type:"pills",choices:[5,10],def:5} ] },
+];
+
+/* ───────────── provider key — saved ENCRYPTED on the backend, never in the browser ───────────── */
+let keySaved = false;
+async function loadKey(){
+  $("apikey").value = "";
+  try {
+    const r = await fetch("/api/cloud/key?provider=" + encodeURIComponent($("provider").value)).then(r=>r.json());
+    keySaved = !!r.has_key;
+  } catch { keySaved = false; }
+  $("keystatus").textContent = keySaved ? "🔒 key saved (encrypted on this device)" : "";
+  $("apikey").placeholder = keySaved ? "key saved — paste a new one to replace" : "Paste your Atlas Cloud API key…";
+}
+$("keysave").onclick = async () => {
+  const k = $("apikey").value.trim();
+  try {
+    const r = await fetch("/api/cloud/key", { method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ provider: $("provider").value, api_key: k }) }).then(r=>r.json());
+    keySaved = !!r.has_key;
+    $("apikey").value = "";
+    $("keystatus").textContent = keySaved ? "🔒 saved (encrypted on this device)" : "cleared";
+    $("apikey").placeholder = keySaved ? "key saved — paste a new one to replace" : "Paste your Atlas Cloud API key…";
+  } catch(e){ $("keystatus").textContent = "⚠ couldn't save: " + e.message; }
+};
+$("keypaste").onclick = async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (t && t.trim()) { $("apikey").value = t.trim(); $("keystatus").textContent = "pasted — hit Save key"; $("apikey").focus(); }
+    else { $("apikey").focus(); $("keystatus").textContent = "clipboard empty — copy your key, or click the box + press Ctrl+V"; }
+  } catch (e) { $("apikey").focus(); $("keystatus").textContent = "click the box and press Ctrl+V to paste"; }
+};
+$("provider").onchange = loadKey;
+loadKey();
+
+/* ───────────── generic panel controller (image + video share it) ───────────── */
+function makePanel(cfg){
+  const state = { mode: cfg.modes[0], model: cfg.catalog[0], opts:{}, media:{}, count:1 };
+  const forMode = () => cfg.catalog.filter(m => m.modes.includes(state.mode));
+
+  function renderModelSelect(){
+    const sel = $(cfg.modelSel); sel.innerHTML = "";
+    forMode().forEach(m => {
+      const o = document.createElement("option");
+      o.value = m.id; o.textContent = m.name + (m.tentative ? "  · (verifying)" : "");
+      sel.appendChild(o);
+    });
+    if (!forMode().some(m => m.id === state.model.id)) state.model = forMode()[0];
+    sel.value = state.model.id;
+    $(cfg.modelNote).textContent = state.model.note || "";
+  }
+  function addOpt(box, o){
+    state.opts[o.k] = o.def;
+    const wrap = document.createElement("div"); wrap.className = "opt";
+    if (o.type === "toggle"){
+      const lab = document.createElement("label"); lab.className = "toggle";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!o.def;
+      cb.onchange = () => state.opts[o.k] = cb.checked;
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(o.label));
+      wrap.appendChild(lab);
+    } else if (o.type === "pills"){
+      const t = document.createElement("span"); t.textContent = o.label; wrap.appendChild(t);
+      const row = document.createElement("div"); row.className = "pills";
+      o.choices.forEach(c => {
+        const b = document.createElement("button"); b.textContent = c; b.className = (c === o.def ? "on":"");
+        b.onclick = () => { state.opts[o.k] = c; row.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+        row.appendChild(b);
+      });
+      wrap.appendChild(row);
+    } else {
+      const t = document.createElement("span"); t.textContent = o.label; wrap.appendChild(t);
+      const s = document.createElement("select"); s.className = "sel"; s.style.minWidth = "120px";
+      o.choices.forEach(c => {
+        const val = Array.isArray(c) ? c[0] : c, lab = Array.isArray(c) ? c[1] : c;
+        const op = document.createElement("option"); op.value = val; op.textContent = lab; s.appendChild(op);
+      });
+      s.value = o.def; s.onchange = () => state.opts[o.k] = s.value;
+      wrap.appendChild(s);
+    }
+    box.appendChild(wrap);
+  }
+  function renderOpts(){
+    const box = $(cfg.optsBox); box.innerHTML = ""; state.opts = {};
+    (state.model.opts || []).forEach(o => addOpt(box, o));
+    if (cfg.hasCount){
+      const wrap = document.createElement("div"); wrap.className = "opt";
+      const t = document.createElement("span"); t.textContent = "COUNT"; wrap.appendChild(t);
+      const row = document.createElement("div"); row.className = "pills";
+      [1,2,3,4].forEach(n => {
+        const b = document.createElement("button"); b.textContent = n; b.className = (n === state.count ? "on":"");
+        b.onclick = () => { state.count = n; row.querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+        row.appendChild(b);
+      });
+      wrap.appendChild(row); box.appendChild(wrap);
+    }
+    // negative prompt field (video models that support it)
+    if (cfg.negWrap) $(cfg.negWrap).style.display = state.model.negPrompt ? "block" : "none";
+  }
+  function renderInputs(){
+    const box = $(cfg.inputsBox);
+    const show = (state.mode === cfg.refMode) && state.model.inputs && state.model.inputs.length;
+    box.style.display = show ? "flex" : "none";
+    box.innerHTML = "";
+    $(cfg.badge).textContent = cfg.badgeText(state.mode);
+    if (!show) return;
+    state.model.inputs.forEach(inp => {
+      state.media[inp.field] = state.media[inp.field] || [];
+      const slot = document.createElement("div"); slot.className = "slot";
+      const lab = document.createElement("div"); lab.className = "uplabel";
+      lab.textContent = inp.label.toUpperCase() + (inp.required ? " *" : " · optional"); slot.appendChild(lab);
+      const btn = document.createElement("label"); btn.className = "upbtn" + (inp.required ? " req" : "");
+      btn.innerHTML = `<span class="ico">${inp.icon || "📎"}</span><span>${(inp.required ? "Add " : "+ ") + inp.label.toLowerCase()}</span>`;
+      const fi = document.createElement("input"); fi.type = "file"; fi.accept = inp.accept || "image/*"; fi.hidden = true;
+      if (inp.multiple) fi.multiple = true;
+      fi.onchange = (e) => {
+        const max = inp.multiple ? (inp.max || 6) : 1;
+        Array.from(e.target.files || []).slice(0, max - state.media[inp.field].length).forEach(f => {
+          const rd = new FileReader();
+          rd.onload = () => {
+            if (!inp.multiple) state.media[inp.field] = [];
+            state.media[inp.field].push({ src: rd.result, name: f.name, img: (f.type || "").startsWith("image/") });
+            renderInputs();
+          };
+          rd.readAsDataURL(f);
+        });
+        e.target.value = "";
+      };
+      btn.appendChild(fi); slot.appendChild(btn);
+      if (state.media[inp.field].length){
+        const tw = document.createElement("div"); tw.className = "upthumbs";
+        state.media[inp.field].forEach((m, i) => {
+          const d = document.createElement("div"); d.className = "rt";
+          d.innerHTML = m.img
+            ? `<img src="${m.src}" alt=""/><button class="x">✕</button>`
+            : `<span class="file">${(m.name || "file").slice(0,16)}<button class="x">✕</button></span>`;
+          d.querySelector(".x").onclick = () => { state.media[inp.field].splice(i,1); renderInputs(); };
+          tw.appendChild(d);
+        });
+        slot.appendChild(tw);
+      }
+      box.appendChild(slot);
+    });
+  }
+  function setMode(m){
+    state.mode = m;
+    document.querySelectorAll(`#${cfg.modesBox} button`).forEach(b => b.classList.toggle("on", b.dataset.m === m));
+    renderModelSelect(); renderOpts(); renderInputs();
+  }
+
+  document.querySelectorAll(`#${cfg.modesBox} button`).forEach(b => b.onclick = () => setMode(b.dataset.m));
+  $(cfg.modelSel).onchange = (e) => {
+    state.model = cfg.catalog.find(m => m.id === e.target.value) || forMode()[0];
+    $(cfg.modelNote).textContent = state.model.note || "";
+    renderOpts(); renderInputs();
+  };
+
+  function cell(box, cls){ const c = document.createElement("div"); c.className = "cell " + (cls||""); box.prepend(c); return c; }
+
+  $(cfg.genBtn).onclick = async () => {
+    const prompt = $(cfg.promptEl).value.trim();
+    const needRef = (state.mode === cfg.refMode);
+    if (!keySaved){ $(cfg.statusEl).textContent = "⚠ save your Atlas Cloud key up top first."; return; }
+    if (!prompt && !needRef){ $(cfg.statusEl).textContent = "✍️ write a prompt first."; return; }
+    // required uploads present?
+    if (needRef){
+      const missing = (state.model.inputs || []).filter(inp => inp.required && !(state.media[inp.field] || []).length);
+      if (missing.length){ $(cfg.statusEl).textContent = "⚠ add: " + missing.map(m => m.label).join(", "); return; }
+    }
+
+    let modelId = state.model.id;
+    if (needRef && state.model.editId) modelId = state.model.editId;   // nano banana → /edit in i2i
+
+    // collect media (only in ref mode)
+    const media = {};
+    if (needRef){
+      (state.model.inputs || []).forEach(inp => {
+        const arr = (state.media[inp.field] || []).map(m => m.src);
+        if (arr.length) media[inp.field] = inp.multiple ? arr : arr[0];
+      });
+    }
+    // options (+ negative prompt if shown)
+    const optsOut = { ...state.opts };
+    if (cfg.negEl && state.model.negPrompt){ const nv = $(cfg.negEl).value.trim(); if (nv) optsOut.negative_prompt = nv; }
+
+    const payload = { provider: $("provider").value, kind: cfg.kind, model: modelId, mode: state.mode,
+                      prompt, options: optsOut, media };
+
+    const n = (cfg.kind === "image" && cfg.hasCount) ? state.count : 1;
+    $(cfg.genBtn).disabled = true;
+    $(cfg.statusEl).textContent = `generating ${n>1 ? n+" " : ""}${cfg.kind}${n>1?"s":""}… cloud takes ~10–60s (video longer). billed to your key.`;
+
+    const jobs = Array.from({length:n}, () => {
+      const c = cell($(cfg.resultsEl), "load");
+      return fetch("/api/cloud/generate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(j => {
+          c.classList.remove("load");
+          if (j.ok && j.outputs && j.outputs[0]){
+            const url = j.outputs[0];
+            c.innerHTML = cfg.kind === "video"
+              ? `<video src="${url}" controls loop muted playsinline></video>`
+              : `<a href="${url}" target="_blank"><img src="${url}" alt=""/></a>`;
+          } else { c.classList.add("err"); c.textContent = "⚠ " + (j.error || "failed"); }
+        })
+        .catch(e => { c.classList.remove("load"); c.classList.add("err"); c.textContent = "⚠ " + e.message; });
+    });
+    await Promise.allSettled(jobs);
+    $(cfg.genBtn).disabled = false;
+    $(cfg.statusEl).textContent = "done.";
+  };
+
+  setMode(state.mode);
+
+  // ── ROOM CONTROL surface — the in-room agent drives this panel through here ──
+  const api = {
+    kind: cfg.kind,
+    setPrompt(t){ $(cfg.promptEl).value = t || ""; },
+    setMode(m){ if (cfg.modes.includes(m)) setMode(m); },
+    pickModel(hint){
+      const h = (hint || "").toLowerCase();
+      const c = forMode().find(m => (m.id + " " + m.name).toLowerCase().includes(h)) || forMode()[0];
+      if (c){ state.model = c; $(cfg.modelSel).value = c.id; $(cfg.modelNote).textContent = c.note || ""; renderOpts(); renderInputs(); }
+    },
+    setOpt(k, v){ state.opts[k] = v; },
+    setCount(n){ if (cfg.hasCount && [1,2,3,4].includes(n)) state.count = n; },
+    generate(){ $(cfg.genBtn).click(); },
+  };
+  return api;
+}
+
+const imagePanel = makePanel({ kind:"image", modes:["t2i","i2i"], refMode:"i2i", catalog: IMG_MODELS, hasCount:true,
+  modesBox:"imgModes", modelSel:"imgModel", modelNote:"imgModelNote", optsBox:"imgOpts", inputsBox:"imgInputs",
+  promptEl:"imgPrompt", negWrap:"imgNegWrap", negEl:"imgNeg",
+  genBtn:"imgGen", statusEl:"imgStatus", resultsEl:"imgResults", badge:"imgBadge",
+  badgeText: (m) => m === "i2i" ? "image → image" : "text → image" });
+
+const videoPanel = makePanel({ kind:"video", modes:["t2v","i2v"], refMode:"i2v", catalog: VID_MODELS, hasCount:false,
+  modesBox:"vidModes", modelSel:"vidModel", modelNote:"vidModelNote", optsBox:"vidOpts", inputsBox:"vidInputs",
+  promptEl:"vidPrompt", negWrap:"vidNegWrap", negEl:"vidNeg",
+  genBtn:"vidGen", statusEl:"vidStatus", resultsEl:"vidResults", badge:"vidBadge",
+  badgeText: (m) => m === "i2v" ? "image → video" : "text → video" });
+
+/* ── ROOM CONTROL — the in-room agent (Tiff/Kit) drives the cloud generator: she writes the prompt,
+   the room picks the best model for the kind, then generates. ── */
+window.RoomAPI = {
+  room: "imagine-cloud",
+  hasKey(){ return !!keySaved; },
+  async run(o){
+    o = o || {};
+    const kind = (o.kind === "video") ? "video" : "image";
+    const p = (kind === "video") ? videoPanel : imagePanel;
+    p.setMode(kind === "video" ? "t2v" : "t2i");
+    p.pickModel(kind === "video" ? "wan-2.5" : "nano banana");   // sensible default per kind
+    if (o.prompt) p.setPrompt(o.prompt);
+    if (kind === "image"){
+      if (o.aspect) p.setOpt("aspect_ratio", o.aspect);
+      if (o.count) p.setCount(o.count);
+    } else {
+      if (o.seconds) p.setOpt("duration", o.seconds);
+    }
+    p.generate();
+  }
+};
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

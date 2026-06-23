@@ -1,14 +1,14 @@
-# ARKITECT - smart setup + launcher
+# DeMartinville - smart setup + launcher
 # Double-clicked via "START HERE.bat". Auto-installs everything it can,
 # detects the PC's specs to recommend/download the right model, then runs.
 $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-# ---------- SINGLE INSTANCE — a 2nd double-click shouldn't spawn a 2nd ARKITECT ----------
+# ---------- SINGLE INSTANCE — a 2nd double-click shouldn't spawn a 2nd DeMartinville ----------
 # A PORT CHECK (not a mutex — a mutex can deadlock a real relaunch): if the server is already
 # listening on 7777, this launch just brings the existing window to the front (or reopens one)
-# and exits — it never starts a duplicate. "RESTART ARKITECT.bat" frees the port first, so it
+# and exits — it never starts a duplicate. "RESTART DeMartinville.bat" frees the port first, so it
 # always relaunches cleanly onto the latest code.
 $alreadyUp = $false
 try { $alreadyUp = [bool](Get-NetTCPConnection -LocalPort 7777 -State Listen -ErrorAction SilentlyContinue) } catch { }
@@ -21,7 +21,7 @@ public class ArkWin {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
 }
 '@
-    $w = Get-Process msedge,chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*ARKITECT*' } | Select-Object -First 1
+    $w = Get-Process msedge,chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*DeMartinville*' } | Select-Object -First 1
     if ($w) { [ArkWin]::ShowWindow($w.MainWindowHandle, 9) | Out-Null; [ArkWin]::SetForegroundWindow($w.MainWindowHandle) | Out-Null }
     else { Start-Process 'http://localhost:7777' }   # window was closed but server's up → reopen one
   } catch { }
@@ -46,7 +46,7 @@ if ((Test-Path $pending) -and (Test-Path $staged)) {
   $ver = "?"
   try { $info = Get-Content $pending -Raw | ConvertFrom-Json; if ($info.version) { $ver = $info.version } } catch { }
   Write-Host ""
-  Head "Installing ARKITECT update (v$ver)..."
+  Head "Installing DeMartinville update (v$ver)..."
   if ((Test-Path (Join-Path $staged "app.py")) -and (Test-Path (Join-Path $staged "static"))) {
     try {
       $ts = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -77,7 +77,7 @@ if ((Test-Path $pending) -and (Test-Path $staged)) {
 
 Write-Host ""
 Head "=================================================="
-Head "        ARKITECT  -  setup + launch"
+Head "        DeMartinville  -  setup + launch"
 Head "=================================================="
 Info  "  (If Windows ever asks for permission, click YES.)"
 Write-Host ""
@@ -174,7 +174,7 @@ if ($AppliedUpdate) {                       # an update may have changed require
 $LMS = "$env:USERPROFILE\.lmstudio\bin\lms.exe"
 if($weak){
   Warn "Skipping the local AI engine on this machine - it'd be too slow to use."
-  Info "When ARKITECT opens, add your own API key for fast AI (free options) - or just use the studio."
+  Info "When DeMartinville opens, add your own API key for fast AI (free options) - or just use the studio."
 } elseif(-not (Test-Path $LMS)){
   Warn "LM Studio (Tiff's engine) isn't installed - installing it for you..."
   if($haveWinget){
@@ -202,7 +202,7 @@ if(-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)){
   }
   if(-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)){
     Warn "Couldn't auto-install ffmpeg - the video editor's exports need it. Get it from ffmpeg.org"
-    Warn "(or run 'winget install Gyan.FFmpeg'), then restart ARKITECT. Everything else still works."
+    Warn "(or run 'winget install Gyan.FFmpeg'), then restart DeMartinville. Everything else still works."
   } else { Good "Video/audio engine (ffmpeg): ready." }
 } else { Good "Video/audio engine (ffmpeg): ready." }
 
@@ -219,11 +219,11 @@ if(-not $weak){
   Good "Brain: loaded."
 }
 
-# ---------- 5.5 desktop shortcut → the native ARKITECT app (its own icon, pins to taskbar) ----------
-# Points at ARKITECT.exe when it's been built (the real program), else at the launcher.
+# ---------- 5.5 desktop shortcut → the native DeMartinville app (its own icon, pins to taskbar) ----------
+# Points at DeMartinville.exe when it's been built (the real program), else at the launcher.
 try {
-  $lnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "ARKITECT.lnk"
-  $exe = Join-Path $Root "ARKITECT.exe"
+  $lnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "DeMartinville.lnk"
+  $exe = Join-Path $Root "DeMartinville.exe"
   $target = if (Test-Path $exe) { $exe } else { Join-Path $Root "START HERE.bat" }
   $ws = New-Object -ComObject WScript.Shell
   $sc = $ws.CreateShortcut($lnk)            # always (re)create so an old browser-shortcut updates
@@ -232,25 +232,25 @@ try {
   $ico = Join-Path $Root "static\app-icon.ico"
   if(-not (Test-Path $ico)){ $ico = Join-Path $Root "static\kit.ico" }
   if(Test-Path $ico){ $sc.IconLocation = $ico }
-  $sc.Description = "ARKITECT - your local AI creative studio"
+  $sc.Description = "DeMartinville - your local AI creative studio"
   $sc.Save()
-  Good "ARKITECT shortcut is on your desktop."
+  Good "DeMartinville shortcut is on your desktop."
 } catch { }
 
 # ---------- 6. launch ----------
 Write-Host ""
 $arkUrl  = "http://localhost:7777"
-$arkExe  = Join-Path $Root "ARKITECT.exe"
+$arkExe  = Join-Path $Root "DeMartinville.exe"
 $isDev   = Test-Path (Join-Path $Root ".git")
 $launch  = $null
 
-# SHIPPED install with the native app present: let ARKITECT.exe run the engine IN ITS OWN
+# SHIPPED install with the native app present: let DeMartinville.exe run the engine IN ITS OWN
 # WINDOW and hand off — so there's NO leftover terminal (the thing that confused people).
 # Launch it, then watch the port: if the .exe brings the engine up itself, this window's job
 # is done and it CLOSES. If it doesn't (an older .exe that expects an external server), we
 # fall through and host the engine here — the original behavior — so nothing ever breaks.
 if ((Test-Path $arkExe) -and (-not $isDev)) {
-  Good "Opening ARKITECT in its own window..."
+  Good "Opening DeMartinville in its own window..."
   Start-Process $arkExe
   $up = $false
   for($i=0; $i -lt 25; $i++){
@@ -259,7 +259,7 @@ if ((Test-Path $arkExe) -and (-not $isDev)) {
   }
   if ($up) {
     Write-Host ""
-    Good "ARKITECT is running in its own window."
+    Good "DeMartinville is running in its own window."
     Good "You can close this terminal - it's not needed. Next time, just use the desktop icon."
     Start-Sleep 3
     exit
@@ -269,13 +269,13 @@ if ((Test-Path $arkExe) -and (-not $isDev)) {
 }
 elseif (Test-Path $arkExe) {
   # dev checkout: host here + attach the native window (keeps --reload working)
-  Good "Opening ARKITECT (native window)..."
+  Good "Opening DeMartinville (native window)..."
   $launch = "Start-Sleep 7; Start-Process '$arkExe'"
 }
 else {
   # no native app: a chrome-less browser app-window onto the server we host here
-  Good "Opening ARKITECT..."
-  $arkProf = "$env:LOCALAPPDATA\ARKITECT\app-window"
+  Good "Opening DeMartinville..."
+  $arkProf = "$env:LOCALAPPDATA\DeMartinville\app-window"
   $arkEdge = @("$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe","${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
   $arkChrome = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe","${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe","$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
   $arkBrowser = if($arkEdge){ $arkEdge } elseif($arkChrome){ $arkChrome } else { $null }
@@ -284,12 +284,12 @@ else {
 }
 if ($launch) { Start-Process "powershell" -ArgumentList "-NoProfile","-Command",$launch -WindowStyle Hidden }
 # last guard: if the .exe already bound the port, don't double-host (just close out cleanly)
-try { if (Get-NetTCPConnection -LocalPort 7777 -State Listen -ErrorAction SilentlyContinue) { Write-Host ""; Good "ARKITECT is running in its own window - you can close this terminal."; Start-Sleep 3; exit } } catch {}
+try { if (Get-NetTCPConnection -LocalPort 7777 -State Listen -ErrorAction SilentlyContinue) { Write-Host ""; Good "DeMartinville is running in its own window - you can close this terminal."; Start-Sleep 3; exit } } catch {}
 Write-Host ""
 Head "=================================================="
-Head "  ARKITECT is running."
+Head "  DeMartinville is running."
 Head "  Keep this window open while you use it (it runs the engine)."
-Head "  Tip: next time, open ARKITECT from the desktop icon - no terminal needed."
+Head "  Tip: next time, open DeMartinville from the desktop icon - no terminal needed."
 Head "=================================================="
 Write-Host ""
 # On the DEV machine (a git checkout) auto-reload on .py edits, so code changes apply WITHOUT a

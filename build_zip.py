@@ -1,7 +1,7 @@
-"""Build a clean ARKITECT distributable zip (excludes venv/data/.git/dev junk).
+"""Build a clean DeMartinville distributable zip (excludes venv/data/.git/dev junk).
 
 Usage:  python build_zip.py [output.zip]
-        (no arg -> writes to your Desktop\\ARKITECT.zip)
+        (no arg -> writes to your Desktop\\DeMartinville.zip)
 """
 import os
 import sys
@@ -9,7 +9,7 @@ import zipfile
 import fnmatch
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.expanduser("~"), "Desktop", "ARKITECT.zip")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.expanduser("~"), "Desktop", "DeMartinville.zip")
 
 EXCLUDE_DIRS = {
     "venv", "data", ".git", ".claude", "studio-research", "_update",
@@ -55,7 +55,7 @@ with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
             rel = os.path.relpath(full, ROOT)
             if skip(rel):
                 continue
-            arc = "ARKITECT/" + rel.replace("\\", "/")
+            arc = "DeMartinville/" + rel.replace("\\", "/")
             z.write(full, arc)
             n += 1
             total += os.path.getsize(full)

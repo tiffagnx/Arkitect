@@ -14,7 +14,8 @@
   const path = location.pathname.toLowerCase();
   const ROOMS = {
     studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
-    editor: "LePrince Visual Labs", images: "Imagination Station", draw: "Sketch Pad",
+    editor: "LePrince Visual Labs", images: "Imagination Station", "imagine-cloud": "Imagination Station",
+    draw: "Sketch Pad",
   };
   let room = null;
   for (const k in ROOMS) { if (path.includes(k + ".html")) { room = k; break; } }
@@ -29,7 +30,9 @@
     if (brain === "kit" || brain === "tiff") broughtId = brain;
     else { const cid = sp.get("char"); if (cid) broughtId = cid; }
   } catch (_) {}
-  if (!broughtId) return;            // nobody dragged in → this room stays empty
+  // remembered from a previous room/page (so a dragged-in agent rides the local→cloud switch + room hops)
+  if (!broughtId) { try { broughtId = localStorage.getItem("dmv_active_brain") || null; } catch (_) {} }
+  if (!broughtId) return;            // nobody dragged in (and none remembered) → this room stays empty
   window.__kit = true;
 
   // ── the two built-in helpers, and the ONLY pre-made characters: Kit (the in-room build-bot)
@@ -137,6 +140,18 @@
   .kit-go { flex:none; width:40px; border:none; border-radius:10px; cursor:pointer;
     background:linear-gradient(180deg,#6FC0D8,#3E9CB8); color:#08171c; font-size:15px; }
   .kit-go:disabled { opacity:.5; cursor:default; }
+  .kit-up { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
+  .kit-up:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-pic { display:none; align-items:center; gap:8px; padding:8px 11px 0; }
+  .kit-pic img { max-width:84px; max-height:84px; border-radius:9px; border:1px solid rgba(120,182,205,.5); display:block; }
+  .kit-picx { background:#E0245E; border:none; color:#fff; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:10px; flex:none; }
+  .kit-dock { background:rgba(0,0,0,.28); border:none; color:#9FCFDD; width:22px; height:22px; border-radius:6px; cursor:pointer; font-size:12px; margin-left:4px; }
+  .kit-dock:hover { background:rgba(62,156,184,.3); color:#fff; }
+  .kit-win:not(.docked) { resize:both; min-width:300px; min-height:300px; }   /* drag the bottom-right corner to reshape: square / rectangle / long */
+  .kit-win.docked { position:static; left:auto; right:auto; top:auto; bottom:auto; width:100%; max-width:none; max-height:420px;
+    margin:0 0 14px; border-radius:14px; box-shadow:0 2px 14px rgba(0,0,0,.4); animation:none; }
+  .agent-dock { width:100%; }
+  .agent-dock:empty { display:none; }
   @media (max-width:680px){ .kit-win { right:8px; left:8px; width:auto; } }
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
@@ -199,11 +214,30 @@
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
      <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-pipe" title="Run a pipeline — each character does their part in order, handing the work down the line">⛓</button><button class="kit-go" title="ask">➤</button></div>`;
+     <div class="kit-pic"></div>
+     <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-pipe" title="Run a pipeline — each character does their part in order, handing the work down the line">⛓</button><button class="kit-go" title="ask">➤</button></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
         body = win.querySelector(".kit-body"), input = win.querySelector(".kit-in"), go = win.querySelector(".kit-go");
+
+  // ── 📎 image upload — so the agent can SEE what you show her and write the prompt from it ──
+  let pendingImage = "";
+  const picRow = win.querySelector(".kit-pic"), upBtn = win.querySelector(".kit-up");
+  function renderPic(){
+    if (!picRow) return;
+    if (pendingImage){
+      picRow.innerHTML = '<img src="' + pendingImage + '" alt=""><button class="kit-picx" title="remove">✕</button>';
+      picRow.style.display = "flex";
+      const x = picRow.querySelector(".kit-picx"); if (x) x.onclick = () => { pendingImage = ""; renderPic(); };
+    } else { picRow.innerHTML = ""; picRow.style.display = "none"; }
+  }
+  if (upBtn) upBtn.onclick = () => {
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return;
+      const rd = new FileReader(); rd.onload = () => { pendingImage = rd.result; renderPic(); }; rd.readAsDataURL(f); };
+    inp.click();
+  };
 
   function fmt(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
   function addMsg(who, text) {
@@ -224,6 +258,7 @@
   }
   function setActive(ch, announce) {
     active = ch;
+    try { localStorage.setItem("dmv_active_brain", ch.id); } catch (_) {}   // remember across room/page hops
     [...roster.children].forEach(c => c.classList.toggle("on", c._id === ch.id));
     paintHost();
     if (announce) { body.innerHTML = ""; addMsg("kit", (ch.intro ? ch.intro(ROOMS[room]) : `${ch.name} is in. ${ROOMS[room]}.`)); }
@@ -285,10 +320,31 @@
   const fabSpr = makeSprite(28, 3);
   const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Your in-room agent — tap to open, drag your crew in";
   fab.appendChild(fabSpr.cv); const fabLabel = document.createElement("span"); fabLabel.textContent = "Yo, Kit"; fab.appendChild(fabLabel);
-  const _bar = document.querySelector(".kit-mount, .top");
+  const _bar = document.querySelector(".kit-mount") || document.querySelector(".top");
   if (_bar) { fab.classList.add("in-bar"); win.classList.add("from-bar"); _bar.appendChild(fab); } else { document.body.appendChild(fab); }
-  fab.onclick = () => { win.classList.toggle("open"); if (win.classList.contains("open")) input.focus(); };
+  // The FAB is now a PASSIVE name-chip — it just shows WHO's in the room, it isn't a button.
+  // The single "Summon agent" button (injected by pinkroom-nav.js) is what opens / switches the agent.
+  fab.style.cursor = "default"; fab.title = "Who's in this room";
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
+  window.__kitOpen = () => { win.classList.add("open"); input.focus(); };   // opener used by the "Summon agent" button
+
+  // ── DOCK — rooms with a dock slot (image / cloud) can DOCK the agent into the layout (part of the
+  //    room, above the generator) instead of floating. Reversible toggle + remembered. Other rooms
+  //    (no #agentDock) only ever float, so dense layouts (studio/beats/editor) are never touched. ──
+  const dockSlot = document.getElementById("agentDock");
+  let docked = false;
+  if (dockSlot) {
+    const db = document.createElement("button"); db.className = "kit-dock"; db.textContent = "⤵"; db.title = "Dock me into the room";
+    win.querySelector(".kit-bar").insertBefore(db, win.querySelector(".kit-x"));
+    const setDocked = (on) => {
+      docked = on;
+      if (on) { win.style.left = win.style.top = win.style.width = win.style.height = ""; dockSlot.appendChild(win); win.classList.add("docked", "open"); db.textContent = "⤴"; db.title = "Undock — float me again"; }
+      else { document.body.appendChild(win); win.classList.remove("docked"); db.textContent = "⤵"; db.title = "Dock me into the room"; }
+      try { localStorage.setItem("dmv_agent_docked", on ? "1" : "0"); } catch (_) {}
+    };
+    db.onclick = () => setDocked(!docked);
+    try { if (localStorage.getItem("dmv_agent_docked") === "1") setDocked(true); } catch (_) {}
+  }
 
   // ── BRAIN TIER: Local / Private overdrive / Max Drive. Switching UP into a cloud lane
   //    recolors the window + dings, so you ALWAYS know you've left local-private. (Actually
@@ -313,6 +369,7 @@
   function setTier(t, announce){
     const goingUp = (tier === "local" && t !== "local");
     tier = t;
+    try { localStorage.setItem("dmv_brain_tier", t); } catch (_) {}
     win.classList.toggle("tier-private", t === "private");
     win.classList.toggle("tier-max", t === "max");
     [...win.querySelectorAll(".kt-pill")].forEach(p => p.classList.toggle("on", p.dataset.tier === t));
@@ -320,7 +377,7 @@
   }
   [...win.querySelectorAll(".kt-pill")].forEach(p => { p.title = TIER_NOTE[p.dataset.tier]; p.onclick = () => setTier(p.dataset.tier, true); });
   { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
-  setTier("local", false);
+  { let _t = "local"; try { _t = localStorage.getItem("dmv_brain_tier") || "local"; } catch (_) {} setTier(_t, false); }
 
   // ── merge in user-made characters, paint the roster, then default to Kit ──
   function refreshRoster(reactivate) {
@@ -347,14 +404,20 @@
   // ── ask the active character (carries `character`; backend may route per-character later) ──
   let busy = false;
   async function ask() {
-    const q = input.value.trim(); if (!q || busy) return;
+    const q = input.value.trim(); if ((!q && !pendingImage) || busy) return;   // allow an image-only ask
     busy = true; go.disabled = true;
-    addMsg("you", q); input.value = ""; input.style.height = "auto";
+    const sentImage = pendingImage;
+    addMsg("you", q || "(image)");
+    if (sentImage) { const im = document.createElement("img"); im.src = sentImage;
+      im.style.cssText = "max-width:130px;border-radius:9px;margin-top:5px;display:block;border:1px solid rgba(120,182,205,.4);";
+      body.appendChild(im); body.scrollTop = body.scrollHeight; }
+    input.value = ""; input.style.height = "auto"; pendingImage = ""; renderPic();
     const think = addMsg("kit", active.name + "'s on it…"); think.classList.add("think"); winSpr.setSpeed(9);
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q, character: active.id, tier };
+      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier };
+      if (sentImage) payload.image = sentImage;
       if (active.mine) {
         payload.persona = active.persona || "";
         payload.knowledge = active.knowledge || "";
@@ -366,6 +429,20 @@
       let reply = j.reply || "Hm, I blanked — ask me again?";
       if (active.preview && !active.mine) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
       addMsg("kit", reply);
+      // ── the agent DRIVES the room: run a server-validated action through the room's window.RoomAPI ──
+      if (j.action && window.RoomAPI && typeof window.RoomAPI.run === "function") {
+        const a = j.action;
+        if (window.RoomAPI.room === "imagine-cloud" && window.RoomAPI.hasKey && !window.RoomAPI.hasKey()) {
+          addMsg("kit", "Drop your cloud key in the key box up top first, then ask me again — I'll fire it.");
+        } else {
+          addMsg("kit", "⚙ " + (a.action === "generate_video" ? "Generating that video…" : "Dropping the prompt in + generating…"));
+          try {
+            window.RoomAPI.run(a.action === "generate_video"
+              ? { kind: "video", prompt: a.prompt, seconds: a.seconds }
+              : { kind: "image", prompt: a.prompt, mode: a.mode, size: a.size, realism: a.realism, aspect: a.aspect, count: a.count });
+          } catch (err) { addMsg("kit", "(couldn't drive the room — " + err.message + ")"); }
+        }
+      }
     } catch (e) { think.remove(); addMsg("kit", "Connection hiccup — try me again."); }
     finally { busy = false; go.disabled = false; winSpr.setSpeed(3); input.focus(); }
   }
@@ -459,7 +536,7 @@
 
   // ── drag the window by its header ──
   win.querySelector(".kit-bar").addEventListener("mousedown", (e) => {
-    if (e.target.closest(".kit-x")) return; e.preventDefault();
+    if (e.target.closest(".kit-x") || e.target.closest(".kit-dock") || win.classList.contains("docked")) return; e.preventDefault();
     const r = win.getBoundingClientRect();
     win.style.right = "auto"; win.style.bottom = "auto"; win.style.left = r.left + "px"; win.style.top = r.top + "px";
     const ox = e.clientX - r.left, oy = e.clientY - r.top;
