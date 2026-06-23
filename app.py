@@ -414,16 +414,17 @@ def relevant_memories(query: str, mem: list[dict], k: int = 6, budget: int = 700
     return out
 
 
-# When Tiff hands B something he'll COPY as a unit (an image/video PROMPT, JSON, code, a block of
-# settings), she wraps ONLY that in a fenced ``` block so the chat renders a one-click copy button on
-# just that block — her hype/notes stay outside it. Static text, so the cacheable persona prefix stays
-# byte-identical. (Renderer side already gives every fenced block its own copy button.)
-COPYABLE_BLOCK_RULE = (
-    "\n\nCOPYABLE BLOCKS: When you give B something he'll want to COPY as one unit — an image or video "
-    "PROMPT, JSON, code, or a block of settings — put ONLY that content inside a fenced triple-backtick "
-    "block, and keep your own words (hype, \"here you go\", notes) OUTSIDE the block. He gets a one-click "
-    "copy button on the block so he can grab JUST the prompt. Never fence normal conversation — only the "
-    "exact thing he'd copy. Example: a hype line, then the prompt in its own ``` block, then your closing line."
+# SHARED AGENT TOOLBELT — baseline "how to operate inside DeMartinville" knowledge that EVERY agent
+# gets (Tiff, Kit, AND every user-built agent), kept SEPARATE from their persona. Injected into the
+# main chat (build_system) AND the in-room agent path (kit_help), so any agent — built-in or user-made,
+# for any user — formats things the app understands. Grows over time; for now: copyable blocks. Static
+# text, so the cacheable persona prefix stays byte-identical.
+AGENT_TOOL_RULES = (
+    "\n\nCOPYABLE BLOCKS: When you give the user something they'll want to COPY as one unit — an image or "
+    "video PROMPT, JSON, code, or a block of settings — put ONLY that content inside a fenced triple-backtick "
+    "block, and keep your own words (hype, \"here you go\", notes) OUTSIDE the block. They get a one-click "
+    "copy button on that block, so they grab JUST the prompt. Never fence normal conversation — only the "
+    "exact thing they'd copy. Example: a hype line, then the prompt in its own ``` block, then your closing line."
 )
 
 
@@ -433,7 +434,7 @@ def build_system(mode: str = "chat") -> str:
     re-read every message. The changing MEMORY rides in the last user message
     (see memory_block + chat()), so it no longer invalidates the cache. Was the #2
     speed cost after VRAM crowding (verified 2026-06-13)."""
-    return (WRITER_PERSONA if mode == "write" else PERSONA) + COPYABLE_BLOCK_RULE
+    return (WRITER_PERSONA if mode == "write" else PERSONA) + AGENT_TOOL_RULES
 
 
 def _content_text(content) -> str:
@@ -4515,6 +4516,7 @@ async def kit_help(req: Request):
     #                  honoring the "private, on your machine" promise).
     #    private/max → use a configured cloud brain if there is one, else fall back to local.
     #    (private vs max share one cloud path today — slots carry no privacy tier yet.) ──
+    system += AGENT_TOOL_RULES        # the SHARED toolbelt — every in-room agent (built-in + user-made) gets it
     system += _actions_prompt(room)   # let the agent DRIVE this room via a validated action block
     if image:
         system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
