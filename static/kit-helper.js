@@ -525,26 +525,43 @@
     const micBtn = win.querySelector(".kit-mic"); if (!micBtn) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { micBtn.disabled = true; micBtn.title = "Talk-to-type isn't available in this build"; return; }
-    let rec = null, listening = false, got = false;
+    let rec = null, listening = false, manualStop = false, committed = "", lastFinal = "", got = false;
     const reset = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; };
     const errText = c => ({
       "not-allowed": "mic is blocked — allow the microphone for the app, then try again",
       "service-not-allowed": "Windows is blocking the mic — check Settings ▸ Privacy ▸ Microphone",
-      "no-speech": "didn't catch anything — get closer to the mic and try again",
       "audio-capture": "no microphone found on this machine",
       "network": "speech needs an internet connection — check you're online",
     }[c] || ("mic hiccup (" + c + ") — try again"));
+    // accumulate ALL finalized speech (committed) + the live interim words; survives pauses.
+    function startRec(){
+      rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true; lastFinal = "";
+      rec.onresult = e => {
+        let fin = "", interim = "";
+        for (let i = 0; i < e.results.length; i++){ const seg = e.results[i][0].transcript; if (e.results[i].isFinal) fin += seg; else interim += seg; }
+        lastFinal = fin;                                  // this session's finalized text (folded in on restart)
+        const full = committed + fin + interim;
+        if (full.trim()) got = true;
+        input.value = full; input.dispatchEvent(new Event("input"));
+      };
+      rec.onerror = ev => { const err = ev && ev.error;
+        if (err === "no-speech" || err === "aborted") return;   // transient (a pause) — let onend auto-restart
+        manualStop = true; reset(); addMsg("kit", "🎙 " + errText(err)); };
+      rec.onend = () => {
+        committed += lastFinal; lastFinal = "";            // keep what was said before the pause/restart
+        if (committed && !/\s$/.test(committed)) committed += " ";
+        if (!manualStop && listening) { try { startRec(); return; } catch (_) {} }   // keep listening through pauses
+        reset();
+        if (!got) addMsg("kit", "🎙 didn't catch anything — press the mic and talk; your words land in the box as you go.");
+      };
+      try { rec.start(); } catch (err) { reset(); addMsg("kit", "🎙 couldn't start the mic — " + ((err && err.message) || err)); }
+    }
     micBtn.onclick = () => {
-      if (listening) { rec && rec.stop(); return; }
-      rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true; got = false;
-      const base = input.value ? input.value.replace(/\s*$/, "") + " " : "";
-      rec.onresult = e => { let t = ""; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
-        if (t.trim()) got = true; input.value = base + t; input.dispatchEvent(new Event("input")); };
-      rec.onerror = ev => { reset(); addMsg("kit", "🎙 " + errText(ev && ev.error)); };
-      rec.onend = () => { const was = listening; reset();
-        if (was && !got) addMsg("kit", "🎙 didn't catch anything — press the mic and talk; your words land in the box as you go."); };
-      try { rec.start(); listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; input.focus(); }
-      catch (err) { reset(); addMsg("kit", "🎙 couldn't start the mic — " + ((err && err.message) || err)); }
+      if (listening) { manualStop = true; rec && rec.stop(); return; }   // press again = stop (it never sends; you read it + hit ➤)
+      manualStop = false; got = false;
+      committed = input.value ? input.value.replace(/\s*$/, "") + " " : "";   // start from whatever's already typed
+      listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; micBtn.title = "Listening… press to stop"; input.focus();
+      startRec();
     };
   })();
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
