@@ -2681,6 +2681,21 @@ window.addEventListener('beforeunload', autosave);
 fetch('/api/plugins/bundle.js').then(r=>r.ok?r.text():'').then(js=>{ if(js){ try{ (new Function(js))(); }catch(e){} } }).catch(()=>{});
 // shared room chrome: back-pill style + Kit (the in-room brain) + feedback buddy
 (function(){const s=document.createElement('script');s.src='/static/pinkroom-nav.js';document.body.appendChild(s);})();
+// ── WEB-DEMO banner — shows ONLY on the public site (demartinlabs.com), never in the local app ──
+(function(){
+  var h=location.hostname||"";
+  if(/^(localhost|127\.|0\.0\.0\.0|\[?::1)/.test(h)) return;          // running in the app/dev → no banner
+  try{ if(localStorage.getItem("dmv_beatdemo_x")==="1") return; }catch(e){}
+  var b=document.createElement("div");
+  b.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:99999;display:flex;align-items:center;gap:12px;max-width:min(720px,94vw);padding:10px 14px;border-radius:14px;background:linear-gradient(180deg,#1b1c22,#141519);border:1px solid rgba(120,182,205,.42);box-shadow:0 14px 44px rgba(0,0,0,.55);color:#E7E9EE;font:500 12.5px/1.45 Inter,system-ui,sans-serif";
+  b.innerHTML='<span style="font-size:18px;line-height:1">🥁</span>'
+    +'<span style="flex:1;min-width:0">You\'re playing <b>Beat Lab</b> free, right in your browser — nothing to install. This is <b>one room</b> of DeMartinville.</span>'
+    +'<a href="/" style="flex:none;text-decoration:none;border-radius:9px;padding:8px 13px;font:700 12px Inter;color:#0c0d10;background:linear-gradient(120deg,#7BF0E4,#3E9CB8)">⬇ Get the full studio</a>'
+    +'<a href="mailto:koonce47@gmail.com?subject=Beat%20Lab%20feedback" style="flex:none;text-decoration:none;font:600 10px \'Space Mono\',monospace;letter-spacing:.04em;color:#9FCFDD">early · feedback</a>'
+    +'<button id="dmvBeatX" title="dismiss" style="flex:none;cursor:pointer;border:0;background:none;color:#9AA0AC;font-size:17px;line-height:1;padding:0 2px">×</button>';
+  document.body.appendChild(b);
+  var x=document.getElementById("dmvBeatX"); if(x) x.onclick=function(){ try{localStorage.setItem("dmv_beatdemo_x","1");}catch(e){} b.remove(); };
+})();
 </script>
 </body>
 </html>
