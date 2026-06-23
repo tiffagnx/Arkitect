@@ -1269,5 +1269,32 @@ window.arkCapNudge = function(cap){
 };
 (function(){ fetch('/api/capability').then(function(r){return r.json();}).then(window.arkCapNudge).catch(function(){}); })();
 </script>
+<style>
+/* composer redesign (owner): model picker + modes + depth slider in a slim row BELOW the input */
+.modebar.compbar-below{margin:9px 4px 2px;gap:11px;flex-wrap:wrap;align-items:center;border-top:1px solid rgba(255,255,255,.06);padding-top:9px}
+.compbar-below .mode{font-size:10.5px;padding:3px 10px}
+.compbar-below .elever{padding:4px 9px}
+.compbar-below .el-track{width:84px}
+.compbar-below .el-end{font-size:7.5px}
+.compbar-below #model{font-size:11px;padding:4px 8px;max-width:185px;margin-left:auto}
+.compbar-below #modelRefresh{font-size:12px}
+</style>
+<script>
+(function(){
+  function go(){
+    var dockin=document.querySelector(".dockin"); if(!dockin) return;
+    var modebar=document.querySelector(".modebar"), ir=document.getElementById("inputrow");
+    if(!modebar||!ir) return;
+    var model=document.getElementById("model"), mr=document.getElementById("modelRefresh");
+    if(model) modebar.appendChild(model);
+    if(mr) modebar.appendChild(mr);
+    modebar.classList.add("compbar-below");
+    dockin.appendChild(modebar);              /* move the whole row BELOW the input */
+    try{ window.dispatchEvent(new Event("resize")); }catch(e){}
+    setTimeout(function(){ try{ window.dispatchEvent(new Event("resize")); }catch(e){} }, 250);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",go); else go();
+})();
+</script>
 </body>
 </html>
