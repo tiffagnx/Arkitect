@@ -25,6 +25,16 @@ if ($app2 -eq $app) { Write-Host "Couldn't find APP_VERSION in app.py" -Foregrou
 Set-Content $appPath $app2 -NoNewline -Encoding UTF8
 Good "version -> $Version"
 
+# 1b) mirror the version into static/studio.html — its in-browser updater keeps its OWN copy,
+#     so if this isn't bumped too the Studio reports a stale version (the "jumped up" mismatch).
+$stPath = Join-Path $Root "static\studio.html"
+if (Test-Path $stPath) {
+  $st = Get-Content $stPath -Raw
+  $st2 = [regex]::Replace($st, 'const APP_VERSION\s*=\s*"[^"]*"', "const APP_VERSION = `"$Version`"", 1)
+  if ($st2 -ne $st) { Set-Content $stPath $st2 -NoNewline -Encoding UTF8; Good "studio.html version -> $Version" }
+  else { Write-Host "  (studio.html APP_VERSION not found — check it didn't move)" -ForegroundColor Yellow }
+}
+
 # 2) rebuild the .exe so the release carries the current code, then 3) package the zip
 if (-not (Test-Path (Join-Path $Root "venv\Scripts\pyinstaller.exe"))) { Step "installing pyinstaller..."; & $VENV -m pip install --quiet pyinstaller }
 Step "building ARKITECT.exe..."
@@ -38,7 +48,7 @@ Step "packaging distributable..."
 Good "zip built"
 
 # 4) commit the version bump + push
-& git add app.py *> $null
+& git add app.py static/studio.html *> $null
 & git commit -m "Release $Tag" *> $null
 & git push *> $null
 Good "pushed"
