@@ -576,17 +576,18 @@ function copyMsg(btn) {
     .copyblk:hover{background:rgba(255,255,255,.2);color:#fff}
   </style>`);
 })();
+const COPY_ICON = '<svg class="ic-copy" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="ic-check" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 function addMsg(role, text, atts) {
   $("hello")?.remove();
   { var _cs = $("charsw"); if (_cs) _cs.style.display = "none"; }   // switcher appears once you're chatting
   { var _sh = $("charshelf"); if (_sh) _sh.classList.remove("hide"); }  // ...and the big shelf collapses into it
   const d = document.createElement("div");
   d.className = `msg ${role === "user" ? "you" : "tiff"}`;
-  d.innerHTML = `<div class="tag${role === "user" ? "" : (activeBrain === "kit" ? " kit" : " tiff")}">${role === "user" ? "B" : (activeBrain === "kit" ? "K" : "T")}</div><div class="bubble"></div>`;
+  d.innerHTML = `<div class="tag${role === "user" ? "" : (activeBrain === "kit" ? " kit" : " tiff")}">${role === "user" ? "B" : (activeBrain === "kit" ? "K" : "T")}</div><div class="msgcol"><div class="bubble"></div><div class="msgacts"><button class="gcopy" type="button" title="Copy" aria-label="Copy" data-copy="msg">${COPY_ICON}</button></div></div>`;
   const bub = d.querySelector(".bubble");
   bub._raw = text || "";
   bub.innerHTML = md(text || "");
-  if (true) {                               // every message gets a copy button (yours too)
+  if (false) {                              // OLD copy button OFF (owner hated it) - rebuilding tiny ghost icon; right-click menu still copies
     const cp = document.createElement("button");
     cp.className = "copymsg"; cp.type = "button"; cp.textContent = "⧉ copy"; cp.title = "Copy this message";
     cp.onclick = () => copyMsg(cp);

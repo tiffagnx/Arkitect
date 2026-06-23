@@ -25,7 +25,15 @@
     ".cax-toast{position:fixed;z-index:2147483641;left:50%;bottom:30px;transform:translateX(-50%) translateY(10px);" +
     "background:rgba(20,26,32,.96);color:#CFE6EE;border:1px solid rgba(120,182,205,.6);border-radius:10px;padding:7px 14px;" +
     "font:700 12px Oxanium,system-ui,sans-serif;letter-spacing:.04em;box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;}" +
-    ".cax-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}";
+    ".cax-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}" +
+    /* per-message ghost copy icon (Claude Code style): tiny, no bg/border, row below the bubble, hover-reveal, check on copy */
+    ".msgcol{display:flex;flex-direction:column;min-width:0;max-width:78%}.msg.you .msgcol{align-items:flex-end}.msgcol .bubble{max-width:100%}" +
+    ".msgacts{display:flex;gap:2px;justify-content:flex-end;margin-top:3px;height:20px;opacity:0;transition:opacity .16s ease}" +
+    ".msg:hover .msgacts,.msg:focus-within .msgacts{opacity:1}" +
+    ".gcopy{display:inline-flex;align-items:center;justify-content:center;width:26px;height:20px;padding:0;background:none;border:none;border-radius:6px;color:rgba(255,255,255,.5);cursor:pointer;transition:color .12s,background .12s}" +
+    ".gcopy:hover{color:#E4F1F5;background:rgba(255,255,255,.08)}.gcopy:active{transform:scale(.9)}" +
+    ".gcopy .ic-check{display:none;color:#3FD98A}.gcopy.is-copied .ic-copy{display:none}.gcopy.is-copied .ic-check{display:inline}.gcopy.is-copied{color:#3FD98A}" +
+    "@media (hover:none){.msgacts{opacity:1}}";
   (document.head || document.documentElement).appendChild(st);
 
   let toastEl = null, toastT = null;
@@ -105,5 +113,14 @@
       { label: "Select All", key: "Ctrl+A", on: true, run: () => { if (field) { field.focus(); field.select && field.select(); } else { selectNode(blockNode(tgt)); } } },
     ];
     openMenu(e.clientX, e.clientY, items);
+  });
+
+  // ── per-message ghost copy icon (the .gcopy in .msgacts, rendered below each bubble) ──
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest && e.target.closest(".gcopy[data-copy]"); if (!btn) return;
+    const msg = btn.closest(".msg"), bub = msg && msg.querySelector(".bubble");
+    let text = bub ? (typeof bub._raw === "string" ? bub._raw : (bub.innerText || bub.textContent || "")) : "";
+    text = (text || "").trim(); if (!text) return;
+    if (writeClip(text)) { btn.classList.add("is-copied"); clearTimeout(btn._t); btn._t = setTimeout(() => btn.classList.remove("is-copied"), 2000); }
   });
 })();
