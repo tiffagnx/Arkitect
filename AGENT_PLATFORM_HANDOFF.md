@@ -7,9 +7,11 @@
 ---
 
 ## TL;DR — what tonight was
-We **proved the platform thesis**: an agent you drag into a room *runs the tool*, and an agent you talk to *builds another agent*. It's not a chatbot in a corner — it drives the app. All committed + pushed to `master`, exe rebuilt + staged.
+We **proved the platform thesis**: an agent you drag into a room *runs the tool*, and an agent you talk to *builds another agent*. It's not a chatbot in a corner — it drives the app. All committed + pushed to `master`, **and SHIPPED as `v1.9.0`** — the live Mac + PC download everyone now gets (the version tag auto-triggers the free GitHub Actions Mac build).
 
-**Commits (master):** `cd0a716` (cloud gen + agent-drives-the-room + DeMartinville rename + encrypted keys) → `a996b66` (Agent Forge onboarding) → (+ a FAB-icon fix being committed with this handoff).
+**Commits (master):** `cd0a716` (cloud gen + agent-drives-the-room + DeMartinville rename + encrypted keys) → `a996b66` (Agent Forge onboarding) → `43861b5` (FAB fix + this handoff) → v1.9.0 version-bump + release.
+
+> ⚠️ **v1.9.0 shipped WITH the cloud generator untested against a real Atlas key** (owner's explicit call — he wanted it out). It fails gracefully (error message, never crashes; needs the user's own key; local generation unaffected). **First job next session: live-test cloud gen with B's real key** (see NEXT #2). If it's broken, hotfix + cut v1.9.1.
 
 ---
 
