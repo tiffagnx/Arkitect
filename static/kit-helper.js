@@ -15,7 +15,7 @@
   const ROOMS = {
     studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
     editor: "LePrince Visual Labs", images: "Imagination Station", "imagine-cloud": "Imagination Station",
-    draw: "Sketch Pad",
+    draw: "Sketch Pad", character: "Agent Forge",
   };
   let room = null;
   for (const k in ROOMS) { if (path.includes(k + ".html")) { room = k; break; } }
@@ -30,8 +30,9 @@
     if (brain === "kit" || brain === "tiff") broughtId = brain;
     else { const cid = sp.get("char"); if (cid) broughtId = cid; }
   } catch (_) {}
-  // remembered from a previous room/page (so a dragged-in agent rides the local→cloud switch + room hops)
-  if (!broughtId) { try { broughtId = localStorage.getItem("dmv_active_brain") || null; } catch (_) {} }
+  // remembered from a previous room/page (so a dragged-in agent rides the local→cloud switch + room hops).
+  // The Agent Forge stays CLEAN until you hit "Start here" — so don't auto-restore an agent there.
+  if (!broughtId && room !== "character") { try { broughtId = localStorage.getItem("dmv_active_brain") || null; } catch (_) {} }
   if (!broughtId) return;            // nobody dragged in (and none remembered) → this room stays empty
   window.__kit = true;
 
@@ -42,7 +43,9 @@
     { id: "kit",  name: "Kit",  tag: "creative partner · build", color: "#7BB6CD", sprite: true,
       intro: r => `Yo — I'm Kit. I know my way around ${r}. Stuck on anything? Ask me and I'll walk you through it.` },
     { id: "tiff", name: "Tiff", tag: "your creative partner",  color: "#E58FB5",
-      intro: r => `Hey — it's Tiff. I usually live up in the main chat, but I'm here in ${r} too. Talk to me about the song, the vision, the words — the creative side of what you're making.` },
+      intro: r => r === "Agent Forge"
+        ? `Hey — welcome! First time forging an agent? Here's the cool part: I'm one, so this is a live demo of how it works. Tell me what you do and I'll walk you through the whole thing — you talk, I do the rest. (Or just fill it in yourself below.) Want me to run you through it?`
+        : `Hey — it's Tiff. I usually live up in the main chat, but I'm here in ${r} too. Talk to me about the song, the vision, the words — the creative side of what you're making.` },
   ];
   let CHARACTERS = CHARACTERS_BUILTIN.slice();   // merged cast (built-in + user-made); rebuilt on load/refresh
   let active = CHARACTERS[0];
@@ -390,6 +393,15 @@
     if (reactivate) paintHost();   // refresh header label/avatar in case readiness/name changed
   }
   refreshRoster(false);
+  // Agent Forge = a SOLO guided build (only Tiff). Hide the roster/switcher (Kit + "+ Build" just confuse
+  // a first-timer), the "drag an agent in" hint, and the multi-agent riff/pipeline buttons — so it's just
+  // "talk to Tiff," with room to type.
+  if (room === "character") {
+    if (roster) roster.style.display = "none";
+    const _h = win.querySelector(".kit-hint"); if (_h) _h.style.display = "none";
+    const _rb = win.querySelector(".kit-riff"); if (_rb) _rb.style.display = "none";
+    const _pb = win.querySelector(".kit-pipe"); if (_pb) _pb.style.display = "none";
+  }
   // bring in ONLY the character dragged here from the front page (kit/tiff, or a user-built one)
   const bring = CHARACTERS.find(c => c.id === broughtId) || CHARACTERS[0];
   win.classList.add("open");
@@ -432,7 +444,10 @@
       // ── the agent DRIVES the room: run a server-validated action through the room's window.RoomAPI ──
       if (j.action && window.RoomAPI && typeof window.RoomAPI.run === "function") {
         const a = j.action;
-        if (window.RoomAPI.room === "imagine-cloud" && window.RoomAPI.hasKey && !window.RoomAPI.hasKey()) {
+        if (a.action === "fill_agent") {
+          try { window.RoomAPI.run(a); addMsg("kit", "✍️ Filling that in for you…"); }
+          catch (err) { addMsg("kit", "(couldn't fill the form — " + err.message + ")"); }
+        } else if (window.RoomAPI.room === "imagine-cloud" && window.RoomAPI.hasKey && !window.RoomAPI.hasKey()) {
           addMsg("kit", "Drop your cloud key in the key box up top first, then ask me again — I'll fire it.");
         } else {
           addMsg("kit", "⚙ " + (a.action === "generate_video" ? "Generating that video…" : "Dropping the prompt in + generating…"));

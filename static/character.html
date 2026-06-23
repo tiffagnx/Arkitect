@@ -388,6 +388,8 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
         <span class="etch">Lives in 4 rooms</span>
       </div>
       <div class="herorule"><span class="tick"></span><span class="ln"></span></div>
+      <button id="forgeStart" style="margin-top:16px; padding:11px 20px; border-radius:12px; cursor:pointer; border:1px solid rgba(120,182,205,.55); background:linear-gradient(135deg,#6FC0D8,#3E9CB8); color:#08171c; font:800 13px Oxanium,sans-serif; letter-spacing:.06em; box-shadow:0 0 20px rgba(62,156,184,.4);">⚡ Start here — I'll walk you through it</button>
+      <div style="margin-top:7px; font:500 11px 'Space Mono',monospace; color:rgba(170,180,190,.55);">first time? Tiff runs you through it — talk to her, she does the rest. or just fill it in below.</div>
     </div>
   </div>
 
@@ -1126,6 +1128,27 @@ window.addEventListener("dmv-characters-changed", renderRoster);
 setTab("pixel");
 render();
 renderRoster();
+
+// ── ROOM CONTROL — lets Tiff (in her window) FILL this builder as she learns what you do ──
+window.RoomAPI = {
+  room: "character",
+  run(a){
+    if (!a || a.action !== "fill_agent") return;
+    if (a.name){ $("name").value = a.name; state.name = a.name; }
+    if (a.tagline){ $("tagline").value = a.tagline; state.tagline = a.tagline; }
+    if (a.notes){ $("knowledge").value = a.notes; }
+    if (a.craft && typeof craftOf === "function" && craftOf(a.craft) && typeof pickCraft === "function") pickCraft(a.craft);
+    if (a.vibe && typeof voiceOf === "function" && voiceOf(a.vibe)){ state.voice = a.vibe; if (typeof markVoice === "function") markVoice(a.vibe); }
+    if (typeof render === "function") render();
+  }
+};
+
+// Forge onboarding — "Start here" brings Tiff in + opens her (a live demo of how an agent works, while you build one)
+{ const fs = document.getElementById("forgeStart"); if (fs) fs.onclick = () => {
+    if (window.__kit && window.__kitOpen) window.__kitOpen();
+    else location.href = location.pathname + "?brain=tiff";
+  }; }
 </script>
+<script src="/static/kit-helper.js" data-kit="1"></script>
 </body>
 </html>

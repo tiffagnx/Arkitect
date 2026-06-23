@@ -4303,6 +4303,13 @@ ROOM_HELP = {
 - Pick a tool up top: Pen, Marker, Pencil, or Eraser — plus an ink color and a brush size.
 - Draw with a mouse, finger, or stylus; stylus pressure (and speed) changes the line weight.
 - Undo / Redo, Clear, and the PNG button to download your sketch. It autosaves to this machine as you draw.""",
+  "character": """Agent Forge — where you BUILD your own AI agent (a custom creative brain that then lives in your rooms).
+- The FACE: drop a photo and make an avatar — pixel, your own upload, or a color circle.
+- THE CRAFT: pick their lane (the room they're best in).
+- THEIR VIBE: how they talk — Chill Mentor, Precise/Technical, Hype, or Zen Teacher.
+- TEACH THEM HOW YOU WORK: your own notes / moves / rules (optional) — fed straight to their brain.
+- Readiness shows how trained they are; when you save, they join your roster and you can drag them into any room.
+You (Tiff) are giving a LIVE demo of how an agent works — be warm, move fast, do the heavy lifting, keep it easy.""",
 }
 
 async def _kit_local(system: str, user: str, image: str = "") -> str:
@@ -4353,6 +4360,13 @@ ROOM_ACTIONS = {
         "generate_image": {"prompt": "str", "aspect": ["1:1", "16:9", "9:16", "4:3", "3:4"], "count": [1, 2, 3, 4]},
         "generate_video": {"prompt": "str", "seconds": [5, 10]},
     },
+    "character": {   # the Agent Forge — Tiff FILLS the builder form as she learns what the user does
+        "fill_agent": {
+            "name": "str", "tagline": "str", "notes": "str",
+            "craft": ["producer", "mix", "beatmaker", "writer", "editor", "builder"],
+            "vibe": ["chill-mentor", "precise-tech", "hype", "zen-teacher"],
+        },
+    },
 }
 
 
@@ -4373,6 +4387,9 @@ def _validate_action(room: str, raw):
             if not v:
                 return None
             out["prompt"] = v[:2000]
+        elif kind == "str":
+            if isinstance(v, str) and v.strip():
+                out[k] = v.strip()[:600]
         elif isinstance(kind, list):
             if v in kind:
                 out[k] = v
@@ -4383,6 +4400,8 @@ def _validate_action(room: str, raw):
                         break
         elif kind == "bool" and v is not None:
             out[k] = bool(v)
+    if len(out) <= 1:   # nothing valid beyond the action name → ignore
+        return None
     return out
 
 
@@ -4397,18 +4416,29 @@ def _actions_prompt(room: str) -> str:
         for k, kind in fields.items():
             if k == "prompt":
                 parts.append('"prompt":"<a vivid, complete description>"')
+            elif kind == "str":
+                parts.append(f'"{k}":"<text>"')
             elif isinstance(kind, list):
                 parts.append(f'"{k}": one of {kind}')
             elif kind == "bool":
                 parts.append(f'"{k}": true or false')
         lines.append(f"  - {act}: {{ {', '.join(parts)} }}")
+    catalog = "\n".join(lines)
+    if room == "character":
+        return (
+            "\n\nYOU BUILD THE AGENT *FOR* THEM. This is the Agent Forge — as you chat and learn what they do, "
+            "FILL the builder in the background by emitting a fenced action block, EXACTLY:\n"
+            "```action\n{\"action\":\"fill_agent\",\"name\":\"...\",\"craft\":\"producer\",\"vibe\":\"hype\"}\n```\n"
+            "Include ONLY the fields you actually know so far — send more later as you learn more. Pick the craft + "
+            "vibe that best fit what they tell you. Keep talking warmly the whole time; the block just fills the form. Fields:\n" +
+            catalog
+        )
     return (
         "\n\nYOU CAN DRIVE THIS ROOM. When the user asks you to actually MAKE something here "
         "(generate an image or video), reply with ONE short hype line AND a fenced action block, EXACTLY:\n"
         "```action\n{\"action\":\"generate_image\",\"prompt\":\"...\"}\n```\n"
         "Write the VIVID, complete prompt yourself — name the subject, setting, light, lens/film stock, "
-        "mood (you're an expert prompt-writer). Use ONLY these actions and fields:\n" +
-        "\n".join(lines) +
+        "mood (you're an expert prompt-writer). Use ONLY these actions and fields:\n" + catalog +
         "\nIf the user is just chatting or asking a question, do NOT emit a block — just talk."
     )
 
