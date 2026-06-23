@@ -557,16 +557,16 @@ function copyMsg(btn) {
   const bub = msg.querySelector(".bubble");
   const text = (bub && typeof bub._raw === "string") ? bub._raw : ((msg.querySelector(".ans") || bub || msg).innerText || "");
   navigator.clipboard.writeText(text.trim()).then(() => {
-    btn.textContent = "✓ copied"; setTimeout(() => btn.textContent = "⧉ copy", 1200);
+    btn.textContent = "✓ copied"; btn.classList.add("done"); const _b = msg.querySelector(".bubble"); if (_b) { _b.classList.remove("copied"); void _b.offsetWidth; _b.classList.add("copied"); setTimeout(() => _b.classList.remove("copied"), 650); } setTimeout(() => { btn.textContent = "⧉ copy"; btn.classList.remove("done"); }, 1300);
   }).catch(() => { btn.textContent = "⚠ blocked"; setTimeout(() => btn.textContent = "⧉ copy", 1400); });
 }
 (function injectChatCSS(){
   document.head.insertAdjacentHTML("beforeend", `<style>
     .msg{position:relative}
-    .copymsg{position:absolute;bottom:5px;right:7px;opacity:0;transition:opacity .12s;background:rgba(255,255,255,.06);
-      border:1px solid rgba(255,255,255,.14);color:#aeb4bf;border-radius:7px;font:600 11px Inter,system-ui,sans-serif;
+    .copymsg{position:absolute;bottom:5px;right:7px;opacity:.5;transition:opacity .16s,transform .16s,box-shadow .16s,background .16s;background:linear-gradient(180deg,rgba(62,156,184,.2),rgba(40,48,58,.92));
+      border:1px solid rgba(120,182,205,.42);color:#CFE6EE;border-radius:9px;font:600 11px Inter,system-ui,sans-serif;
       padding:3px 9px;cursor:pointer;z-index:4}
-    .msg:hover .copymsg{opacity:.85}.copymsg:hover{opacity:1;background:rgba(255,255,255,.13);color:#fff}
+    .msg:hover .copymsg{opacity:1}.copymsg:hover{opacity:1;background:linear-gradient(180deg,rgba(62,156,184,.45),rgba(40,48,58,.97));border-color:rgba(150,210,228,.95);color:#fff;box-shadow:0 0 15px rgba(62,156,184,.55);transform:translateY(-1px)}.copymsg:active{transform:scale(.9)}.copymsg.done{background:linear-gradient(180deg,rgba(57,217,138,.4),rgba(40,48,58,.97));border-color:rgba(57,217,138,.95);color:#EAFFF4;box-shadow:0 0 16px rgba(57,217,138,.6)}.bubble.copied{animation:copyflash .62s ease-out}@keyframes copyflash{0%{box-shadow:0 0 0 0 rgba(62,156,184,0)}15%{box-shadow:0 0 0 2px rgba(120,182,205,.9),0 0 24px rgba(62,156,184,.65);filter:brightness(1.25)}45%{box-shadow:0 0 0 2px rgba(230,193,106,.55),0 0 16px rgba(230,193,106,.4);filter:brightness(1.1)}100%{box-shadow:0 0 0 0 rgba(62,156,184,0);filter:brightness(1)}}
     .bubble a{color:#7CC7DC;text-decoration:underline;text-underline-offset:2px;word-break:break-word}
     .bubble a:hover{color:#A6E6F2}
     .codeblock{position:relative;margin:9px 0;border:1px solid rgba(255,255,255,.13);border-radius:10px;background:rgba(0,0,0,.30)}
