@@ -563,7 +563,7 @@ function copyMsg(btn) {
 (function injectChatCSS(){
   document.head.insertAdjacentHTML("beforeend", `<style>
     .msg{position:relative}
-    .copymsg{position:absolute;bottom:5px;right:7px;opacity:.5;transition:opacity .16s,transform .16s,box-shadow .16s,background .16s;background:linear-gradient(180deg,rgba(62,156,184,.2),rgba(40,48,58,.92));
+    .copymsg{flex:none;align-self:flex-end;margin:0 2px 5px;opacity:.4;transition:opacity .16s,transform .16s,box-shadow .16s,background .16s;background:linear-gradient(180deg,rgba(62,156,184,.2),rgba(40,48,58,.92));
       border:1px solid rgba(120,182,205,.42);color:#CFE6EE;border-radius:9px;font:600 11px Inter,system-ui,sans-serif;
       padding:3px 9px;cursor:pointer;z-index:4}
     .msg:hover .copymsg{opacity:1}.copymsg:hover{opacity:1;background:linear-gradient(180deg,rgba(62,156,184,.45),rgba(40,48,58,.97));border-color:rgba(150,210,228,.95);color:#fff;box-shadow:0 0 15px rgba(62,156,184,.55);transform:translateY(-1px)}.copymsg:active{transform:scale(.9)}.copymsg.done{background:linear-gradient(180deg,rgba(57,217,138,.4),rgba(40,48,58,.97));border-color:rgba(57,217,138,.95);color:#EAFFF4;box-shadow:0 0 16px rgba(57,217,138,.6)}.bubble.copied{animation:copyflash .62s ease-out}@keyframes copyflash{0%{box-shadow:0 0 0 0 rgba(62,156,184,0)}15%{box-shadow:0 0 0 2px rgba(120,182,205,.9),0 0 24px rgba(62,156,184,.65);filter:brightness(1.25)}45%{box-shadow:0 0 0 2px rgba(230,193,106,.55),0 0 16px rgba(230,193,106,.4);filter:brightness(1.1)}100%{box-shadow:0 0 0 0 rgba(62,156,184,0);filter:brightness(1)}}
@@ -590,7 +590,7 @@ function addMsg(role, text, atts) {
     const cp = document.createElement("button");
     cp.className = "copymsg"; cp.type = "button"; cp.textContent = "⧉ copy"; cp.title = "Copy this message";
     cp.onclick = () => copyMsg(cp);
-    bub.appendChild(cp);
+    d.appendChild(cp);
   }
   if (atts && atts.length) {
     const row = document.createElement("div"); row.className = "att";
