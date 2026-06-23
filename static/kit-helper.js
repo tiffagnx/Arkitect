@@ -165,6 +165,11 @@
     96% { transform:translate(-50%,-50%); filter:none; }
   }
   @media (prefers-reduced-motion: reduce) { .kl-fill, .kl-thumb { animation:none !important; } }
+  /* honest dial: tiers that need a cloud key are dimmed + locked until one exists */
+  .kl-lock { font-size:9px; margin-left:1px; opacity:.75; display:none; cursor:pointer; }
+  .kt-lever.cloud-locked .kl-track { opacity:.5; }
+  .kt-lever.cloud-locked .kl-name { color:rgba(170,180,190,.6) !important; text-shadow:none !important; }
+  .kt-lever.cloud-locked .kl-lock { display:inline; }
   .kit-win.tier-private { border-color:rgba(217,164,65,.5); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(217,164,65,.28), 0 0 26px rgba(217,164,65,.12), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-foot { display:flex; gap:8px; padding:10px 11px; border-top:1px solid rgba(255,255,255,.07); }
@@ -249,7 +254,7 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><div class="kt-lever t1" id="ktLever"><span class="kl-track" id="ktTrack"><span class="kl-fill" id="ktFill"></span><span class="kl-thumb" id="ktThumb"></span></span><span class="kl-name" id="ktName">Local</span></div><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><div class="kt-lever t1" id="ktLever"><span class="kl-track" id="ktTrack"><span class="kl-fill" id="ktFill"></span><span class="kl-thumb" id="ktThumb"></span></span><span class="kl-name" id="ktName">Local</span><span class="kl-lock" id="ktLock" title="Private &amp; Max Drive need a cloud key — tap 🔑">🔒</span></div><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
      <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="ask">➤</button></div>`;
@@ -404,8 +409,9 @@
   const TIERS = [{ v:"local", t:"Local", cls:"t1" }, { v:"private", t:"Private", cls:"t2" }, { v:"max", t:"Max Drive", cls:"t3" }];
   const lever = win.querySelector("#ktLever"), klTrack = win.querySelector("#ktTrack"),
         klFill = win.querySelector("#ktFill"), klThumb = win.querySelector("#ktThumb"), klName = win.querySelector("#ktName");
-  let tierIdx = 0;
+  let tierIdx = 0, maxIdx = TIERS.length - 1, cloudOk = true, hintedLock = false;
   function applyTier(i, announce){
+    i = Math.min(i, maxIdx);   // never land on a tier the active brain can't actually run
     const goingUp = i > tierIdx;
     tierIdx = Math.max(0, Math.min(TIERS.length - 1, i));
     const s = TIERS[tierIdx], frac = TIERS.length > 1 ? tierIdx / (TIERS.length - 1) : 0, w = (klTrack && klTrack.clientWidth) || 90;
@@ -422,7 +428,10 @@
   function tierFromX(clientX){
     const r = klTrack.getBoundingClientRect();
     let frac = r.width ? (clientX - r.left) / r.width : 0; frac = Math.max(0, Math.min(1, frac));
-    applyTier(Math.round(frac * (TIERS.length - 1)), true);
+    const want = Math.round(frac * (TIERS.length - 1));
+    if (want > maxIdx && !hintedLock) { hintedLock = true;
+      addMsg("kit", "🔒 Private & Max Drive run on a cloud brain — tap the 🔑 to add a free key, then they unlock."); }
+    applyTier(want, true);   // applyTier clamps to maxIdx
   }
   if (klTrack) {
     klTrack.addEventListener("mousedown", e => { e.preventDefault(); tierFromX(e.clientX);
@@ -437,6 +446,24 @@
     const si = TIERS.findIndex(s => s.v === _t); applyTier(si >= 0 ? si : 0, false); }
   requestAnimationFrame(() => applyTier(tierIdx, false));   // fix px positions once the window is laid out
   window.addEventListener("resize", () => applyTier(tierIdx, false));
+
+  // ── HONEST DIAL — only let the lever reach tiers that actually DO something. Private/Max Drive
+  //    need a cloud brain; with none configured /api/kit silently falls back to local, so LOCK them
+  //    (dimmed + 🔒) until a cloud key exists. /api/models lists enabled cloud slots in `.cloud`. ──
+  const ktLock = win.querySelector("#ktLock");
+  function setCap(ok){
+    cloudOk = !!ok; maxIdx = cloudOk ? TIERS.length - 1 : 0;
+    if (cloudOk) hintedLock = false;
+    if (lever) lever.classList.toggle("cloud-locked", !cloudOk);
+    if (tierIdx > maxIdx) applyTier(maxIdx, false);
+  }
+  function refreshCap(){
+    fetch("/api/models").then(r => r.json()).then(j => setCap(!!(j && Array.isArray(j.cloud) && j.cloud.length))).catch(() => {});
+  }
+  if (ktLock) ktLock.onclick = () => { if (window.openKeys) window.openKeys("brain"); };
+  refreshCap();
+  window.addEventListener("ark:providers-changed", () => setTimeout(refreshCap, 80));
+  window.addEventListener("focus", refreshCap);
 
   // ── merge in user-made characters, paint the roster, then default to Kit ──
   function refreshRoster(reactivate) {
