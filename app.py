@@ -414,13 +414,26 @@ def relevant_memories(query: str, mem: list[dict], k: int = 6, budget: int = 700
     return out
 
 
+# When Tiff hands B something he'll COPY as a unit (an image/video PROMPT, JSON, code, a block of
+# settings), she wraps ONLY that in a fenced ``` block so the chat renders a one-click copy button on
+# just that block — her hype/notes stay outside it. Static text, so the cacheable persona prefix stays
+# byte-identical. (Renderer side already gives every fenced block its own copy button.)
+COPYABLE_BLOCK_RULE = (
+    "\n\nCOPYABLE BLOCKS: When you give B something he'll want to COPY as one unit — an image or video "
+    "PROMPT, JSON, code, or a block of settings — put ONLY that content inside a fenced triple-backtick "
+    "block, and keep your own words (hype, \"here you go\", notes) OUTSIDE the block. He gets a one-click "
+    "copy button on the block so he can grab JUST the prompt. Never fence normal conversation — only the "
+    "exact thing he'd copy. Example: a hype line, then the prompt in its own ``` block, then your closing line."
+)
+
+
 def build_system(mode: str = "chat") -> str:
     """STABLE system prompt — persona only, byte-identical every turn so LM Studio's
     prompt cache stays warm and the ~4.8K-token persona is processed ONCE, not
     re-read every message. The changing MEMORY rides in the last user message
     (see memory_block + chat()), so it no longer invalidates the cache. Was the #2
     speed cost after VRAM crowding (verified 2026-06-13)."""
-    return WRITER_PERSONA if mode == "write" else PERSONA
+    return (WRITER_PERSONA if mode == "write" else PERSONA) + COPYABLE_BLOCK_RULE
 
 
 def _content_text(content) -> str:
