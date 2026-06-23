@@ -476,7 +476,7 @@ function makePanel(cfg){
     const jobs = Array.from({length:n}, () => {
       const c = cell($(cfg.resultsEl), "load");
       return fetch("/api/cloud/generate", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) })
-        .then(r => r.json())
+        .then(async r => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch(_){ throw new Error(txt.slice(0,160) || ("server error " + r.status)); } if (!r.ok) throw new Error(j.error || ("server error " + r.status)); return j; })
         .then(j => {
           c.classList.remove("load");
           if (j.ok && j.outputs && j.outputs[0]){
@@ -507,6 +507,13 @@ function makePanel(cfg){
     },
     setOpt(k, v){ state.opts[k] = v; },
     setCount(n){ if (cfg.hasCount && [1,2,3,4].includes(n)) state.count = n; },
+    setRefImage(src){   // drop a reference image into the model's image slot (for agent-driven i2i)
+      if (!src) return;
+      const inp = (state.model.inputs || []).find(i => /image/i.test(i.field));
+      const field = inp ? inp.field : "images";
+      state.media[field] = [{ src, name: "from your agent", img: true }];
+      renderInputs();
+    },
     generate(){ $(cfg.genBtn).click(); },
   };
   return api;
@@ -533,10 +540,12 @@ window.RoomAPI = {
     o = o || {};
     const kind = (o.kind === "video") ? "video" : "image";
     const p = (kind === "video") ? videoPanel : imagePanel;
-    p.setMode(kind === "video" ? "t2v" : "t2i");
+    const wantI2I = kind === "image" && !!o.image;   // she handed us a reference image → image → image
+    p.setMode(kind === "video" ? "t2v" : (wantI2I ? "i2i" : "t2i"));
     p.pickModel(kind === "video" ? "wan-2.5" : "nano banana");   // sensible default per kind
     if (o.prompt) p.setPrompt(o.prompt);
     if (kind === "image"){
+      if (wantI2I) p.setRefImage(o.image);
       if (o.aspect) p.setOpt("aspect_ratio", o.aspect);
       if (o.count) p.setCount(o.count);
     } else {

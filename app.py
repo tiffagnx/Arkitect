@@ -2649,7 +2649,8 @@ async def cloud_generate(req: Request):
         return JSONResponse({"error": "No API key — save your Atlas Cloud key up top first."}, status_code=400)
     if not model:
         return JSONResponse({"error": "No model selected."}, status_code=400)
-    if not prompt and not refs:
+    has_media = isinstance(media, dict) and any(media.values())
+    if not prompt and not has_media:
         return JSONResponse({"error": "Write a prompt first."}, status_code=400)
 
     # Build the body Atlas expects: model + prompt + model-specific options + refs.
@@ -2660,8 +2661,12 @@ async def cloud_generate(req: Request):
         if v is None or v == "":
             continue
         body[k] = v
-    if ref_field and refs:
-        body[ref_field] = refs if ref_field == "images" else refs[0]
+    # merge any attached reference media into the body — the frontend already shapes each field
+    # correctly (a list for multi-image inputs like "images", a single URL for "image"/"last_image").
+    if isinstance(media, dict):
+        for field, val in media.items():
+            if val:
+                body[field] = val
 
     endpoint = "/model/generateVideo" if kind == "video" else "/model/generateImage"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}

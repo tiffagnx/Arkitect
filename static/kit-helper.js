@@ -454,7 +454,7 @@
           try {
             window.RoomAPI.run(a.action === "generate_video"
               ? { kind: "video", prompt: a.prompt, seconds: a.seconds }
-              : { kind: "image", prompt: a.prompt, mode: a.mode, size: a.size, realism: a.realism, aspect: a.aspect, count: a.count });
+              : { kind: "image", prompt: a.prompt, mode: a.mode, size: a.size, realism: a.realism, aspect: a.aspect, count: a.count, image: sentImage });
           } catch (err) { addMsg("kit", "(couldn't drive the room — " + err.message + ")"); }
         }
       }
