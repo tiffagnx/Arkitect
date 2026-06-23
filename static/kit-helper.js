@@ -207,6 +207,19 @@
     d.textContent = ((ch.name && ch.name[0]) || "?").toUpperCase();
     return d;
   }
+  // a small round FAB icon for a non-Kit character (their uploaded face, or a color+initial chip)
+  function fabAvatar(ch) {
+    if (ch.avatar && ch.avatarType && ch.avatarType !== "color") {
+      const im = document.createElement("img"); im.src = ch.avatar; im.alt = ch.name || "";
+      im.className = "fab-av" + (ch.avatarType === "pixel" ? " px" : "");
+      im.style.cssText = "border-radius:50%; object-fit:cover;";
+      return im;
+    }
+    const d = document.createElement("div"); d.className = "fab-av";
+    d.style.cssText = "border-radius:50%; display:grid; place-items:center; font:800 11px Oxanium; color:#10131a; background:radial-gradient(circle at 35% 30%," + ch.color + "," + ch.color + "99);";
+    d.textContent = ((ch.name && ch.name[0]) || "?").toUpperCase();
+    return d;
+  }
 
   // ── window ──
   const winSpr = makeSprite(34, 3);
@@ -257,7 +270,12 @@
     titleEl.textContent = active.name.toUpperCase();
     subEl.textContent = active.mine ? Math.round(active.readiness || 0) + "% · " + ROOMS[room]
                        : active.preview ? "PREVIEW · " + ROOMS[room] : ROOMS[room];
-    fab && fabLabel && (fabLabel.textContent = active.name === "Kit" ? "Yo, Kit" : active.name);
+    if (fab && fabLabel) {
+      const ic = active.sprite ? fabSpr.cv : fabAvatar(active);   // FAB icon = Kit's animated sprite, or the active character's face
+      if (fab.firstChild && fab.firstChild !== ic) fab.replaceChild(ic, fab.firstChild);
+      else if (!fab.firstChild) fab.insertBefore(ic, fabLabel);
+      fabLabel.textContent = active.name === "Kit" ? "Yo, Kit" : active.name;
+    }
   }
   function setActive(ch, announce) {
     active = ch;
