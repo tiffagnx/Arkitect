@@ -430,7 +430,7 @@
         <div class="stepwrap"><div id="chans"></div>
           <div class="add-chan"><button class="tb solid" id="addChan">＋ Add instrument</button><span class="rh-s">or drag an audio file in to load a sampler</span></div>
         </div>
-        <div class="graphed on" id="graphed"><div class="gh"><b id="geName">VELOCITY</b><span>drag bars · selected channel</span></div><div class="gbars" id="gbars"></div></div>
+        <div class="graphed on" id="graphed"><div class="gh"><b id="geName">VELOCITY</b><span id="geHint">how hard each hit plays — louder ↕ softer · not pitch</span></div><div class="gbars" id="gbars"></div></div>
       </div>
     </div>
     <div class="flrz"></div>
@@ -1620,7 +1620,7 @@ function renderRack(){
         const s=d.steps[i];
         const sd=el('div','step'+(Math.floor(i/4)%2===0?' beat':'')+(s.on?' on':'')+(ch.melodic?' melodic':'')); sd.dataset.i=i;
         if(s.on) sd.style.setProperty('--v', s.vel);
-        sd.onmousedown=e=>{ if(e.button===2)return; resumeAudio(); s.on=!s.on; if(s.on){ s.vel=s.vel||0.8; triggerChannel(ch,ctx.currentTime,s.vel);} sd.classList.toggle('on',s.on); sd.style.setProperty('--v',s.vel); if(ch.id===selChId) renderGraph(); };
+        sd.onmousedown=e=>{ if(e.button===2)return; snap(); resumeAudio(); s.on=!s.on; if(s.on){ s.vel=s.vel||0.8; triggerChannel(ch,ctx.currentTime,s.vel);} sd.classList.toggle('on',s.on); sd.style.setProperty('--v',s.vel); if(ch.id===selChId) renderGraph(); };
         sd.oncontextmenu=e=>{ e.preventDefault(); s.on=false; sd.classList.remove('on'); if(ch.id===selChId)renderGraph(); };
         body.append(sd);
         if(i%4===3 && i<pat.len-1) body.append(el('div','grp'));
@@ -1635,6 +1635,7 @@ function renderGraph(){
   const ch=selChannel(); if(!ch){ $('#graphed').classList.remove('on'); return; }
   $('#graphed').classList.add('on');
   $('#geName').textContent='VELOCITY — '+ch.name;
+  { const gh=$('#geHint'); if(gh) gh.textContent = ch.melodic ? 'how hard each note hits · open 🎹 Piano to set the pitch / melody' : 'how hard each hit plays — louder ↕ softer (not pitch)'; }
   const pat=curPat(), d=patData(pat,ch), host=$('#gbars'); host.innerHTML='';
   for(let i=0;i<pat.len;i++){
     const s=d.steps[i];
@@ -1647,14 +1648,14 @@ function renderGraph(){
 /* knobs / bars helpers */
 function setMini(node,val,min,max){ const a=(val-min)/(max-min)*270-135; node.style.setProperty('--a',a+'deg'); }
 function bindMini(node,get,set,min,max){
-  node.onmousedown=e=>{ e.preventDefault(); const y0=e.clientY, v0=get();
+  node.onmousedown=e=>{ e.preventDefault(); snap(); const y0=e.clientY, v0=get();
     const mv=ev=>{ let v=clamp(v0+(y0-ev.clientY)/160*(max-min),min,max); set(v); setMini(node,v,min,max); };
     const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up); };
   node.ondblclick=()=>{ /* reset handled by caller defaults */ };
 }
 function bindBar(node,get,set){
-  node.onmousedown=e=>{ e.preventDefault(); const y0=e.clientY, v0=get();
+  node.onmousedown=e=>{ e.preventDefault(); snap(); const y0=e.clientY, v0=get();
     const mv=ev=>{ set(clamp(v0+(y0-ev.clientY)/60,0,1)); };
     const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up); };
@@ -2277,6 +2278,9 @@ const STATIC_MENUS={
     {l:'Back to DeMartinville',ic:'←',act:()=>location.href='/'},
   ],
   edit:()=>[
+    {l:'Undo',ic:'↶',sc:'Ctrl+Z',act:undo},
+    {l:'Redo',ic:'↷',sc:'Ctrl+Shift+Z',act:redo},
+    {sep:1},
     {l:'Clear this channel',ic:'🧹',act:clearSelChannel},
     {l:'Clear whole pattern',ic:'🗑',act:clearPattern},
     {sep:1},
@@ -2342,11 +2346,34 @@ function addCh(type){ const c=newChannel(type); project.channels.push(c); selChI
 function setPatLabel(){ $('#patSel').textContent='◆ '+curPat().name+' ▾'; }
 function selectPattern(i){ project.cur=i; setPatLabel(); renderRack(); renderGraph(); if(winShown('piano'))renderPiano(); refreshTopNums(); }
 function newPattern(){ const p=blankPattern('Pattern '+(project.patterns.length+1)); project.patterns.push(p); selectPattern(project.patterns.length-1); }
-function duplicatePattern(){ const src=curPat(); const p=blankPattern(src.name+' copy'); p.len=src.len; p.data=JSON.parse(JSON.stringify(src.data)); project.patterns.push(p); selectPattern(project.patterns.length-1); }
-function clearPattern(){ const pat=curPat(); pat.data={}; project.channels.forEach(c=>patData(pat,c)); renderRack(); renderGraph(); if(winShown('piano'))renderPiano(); toast('Pattern cleared'); }
-function clearSelChannel(){ const ch=selChannel(); if(!ch)return; const d=patData(curPat(),ch); d.steps.forEach(s=>s.on=false); d.notes=[]; renderRack(); renderGraph(); if(winShown('piano'))renderPiano(); toast('Cleared '+ch.name); }
-function randomizePattern(){ const pat=curPat(); project.channels.forEach(ch=>{ const d=patData(pat,ch); const prob=ch.type==='kick'?0.22:ch.type==='snare'?0.12:ch.type==='hat'?0.6:ch.type==='ohat'?0.13:ch.melodic?0.12:0.25; for(let i=0;i<pat.len;i++){ d.steps[i].on=Math.random()<prob||(ch.type==='kick'&&i===0); d.steps[i].vel=0.5+Math.random()*0.5; } d.notes=[]; }); renderRack(); renderGraph(); toast('🎲 Randomized'); }
-function humanizePattern(){ const pat=curPat(); project.channels.forEach(ch=>{ const d=patData(pat,ch); d.steps.forEach(s=>{ if(s.on) s.vel=clamp(s.vel+(Math.random()-0.5)*0.3,0.2,1); }); }); renderRack(); renderGraph(); toast('Velocities humanized'); }
+/* ── UNDO / REDO ───────────────────────────────────────────────────────────
+   Snapshots the musical state (patterns + per-channel settings) — NOT the audio
+   buffers, so undo is cheap and never drops a sample you loaded. Covers step hits,
+   velocity, piano-roll notes, knobs, clears, randomize/humanize. snap() is called
+   at the START of each edit gesture to capture the state *before* the change. ── */
+let _undo=[], _redo=[];
+function _snapState(){ try{ return JSON.stringify({
+    patterns: project.patterns.map(p=>({id:p.id,name:p.name,len:p.len,data:p.data})),
+    cur: project.cur,
+    chans: project.channels.map(c=>({id:c.id,params:c.params,vol:c.vol,pan:c.pan,mute:c.mute,solo:c.solo,root:c.root}))
+  }); }catch(e){ return null; } }
+function snap(){ const s=_snapState(); if(s==null)return; _undo.push(s); if(_undo.length>80)_undo.shift(); _redo.length=0; }
+function _restore(j){ try{ const s=JSON.parse(j);
+    project.patterns = s.patterns.map(p=>({id:p.id,name:p.name,len:p.len||16,data:p.data||{}}));
+    if(!project.patterns.length) project.patterns=[blankPattern()];
+    project.cur = Math.max(0, Math.min(s.cur||0, project.patterns.length-1));
+    (s.chans||[]).forEach(cs=>{ const c=project.channels.find(x=>x.id===cs.id); if(c){ c.params=Object.assign({},cs.params); c.vol=cs.vol; c.pan=cs.pan; c.mute=!!cs.mute; c.solo=!!cs.solo; if(cs.root!=null)c.root=cs.root; } });
+    setPatLabel(); refreshTopNums(); renderRack(); renderGraph();
+    if(winShown('piano'))renderPiano(); if(winShown('mixer'))renderMixer();
+    autosave();
+  }catch(e){} }
+function undo(){ if(!_undo.length){ toast('Nothing to undo'); return; } const cur=_snapState(); if(cur!=null)_redo.push(cur); _restore(_undo.pop()); toast('↶ Undo'); }
+function redo(){ if(!_redo.length){ toast('Nothing to redo'); return; } const cur=_snapState(); if(cur!=null)_undo.push(cur); _restore(_redo.pop()); toast('↷ Redo'); }
+function duplicatePattern(){ snap(); const src=curPat(); const p=blankPattern(src.name+' copy'); p.len=src.len; p.data=JSON.parse(JSON.stringify(src.data)); project.patterns.push(p); selectPattern(project.patterns.length-1); }
+function clearPattern(){ snap(); const pat=curPat(); pat.data={}; project.channels.forEach(c=>patData(pat,c)); renderRack(); renderGraph(); if(winShown('piano'))renderPiano(); toast('Pattern cleared'); }
+function clearSelChannel(){ const ch=selChannel(); if(!ch)return; snap(); const d=patData(curPat(),ch); d.steps.forEach(s=>s.on=false); d.notes=[]; renderRack(); renderGraph(); if(winShown('piano'))renderPiano(); toast('Cleared '+ch.name); }
+function randomizePattern(){ snap(); const pat=curPat(); project.channels.forEach(ch=>{ const d=patData(pat,ch); const prob=ch.type==='kick'?0.22:ch.type==='snare'?0.12:ch.type==='hat'?0.6:ch.type==='ohat'?0.13:ch.melodic?0.12:0.25; for(let i=0;i<pat.len;i++){ d.steps[i].on=Math.random()<prob||(ch.type==='kick'&&i===0); d.steps[i].vel=0.5+Math.random()*0.5; } d.notes=[]; }); renderRack(); renderGraph(); toast('🎲 Randomized'); }
+function humanizePattern(){ snap(); const pat=curPat(); project.channels.forEach(ch=>{ const d=patData(pat,ch); d.steps.forEach(s=>{ if(s.on) s.vel=clamp(s.vel+(Math.random()-0.5)*0.3,0.2,1); }); }); renderRack(); renderGraph(); toast('Velocities humanized'); }
 function newProjectConfirm(){ if(confirm('Start a new empty project? Save first (File ▸ Save) if you want to keep this one.')){ defaultProject(); afterLoad(); } }
 function saveToFile(){ downloadBlob(new Blob([JSON.stringify(serialize(true))],{type:'application/json'}),'beat-project.dmvbeat'); toast('Saved ✓'); }
 function helpToast(){ toast('Each panel is its own window — drag the title bar to move, drag the corner to resize, ▢ maximize, — minimize, ✕ close, click one to bring it forward. Toggle them in View or the toolbar. Open any instrument/effect and tap 🧠 to talk to its brain.'); }
@@ -2383,6 +2410,8 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
   // Smart Pads: play with the computer keyboard while the Pads window is open
   if(winShown('pads') && !e.metaKey && !e.ctrlKey){ const i=PAD_KEYS.indexOf(e.key.toLowerCase()); if(i>=0){ e.preventDefault(); if(!e.repeat) padHit(i,_padEls[i]); return; } }
+  if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); return; }
+  if((e.ctrlKey||e.metaKey) && (e.key==='y'||e.key==='Y')){ e.preventDefault(); redo(); return; }
   if(e.code==='Space'){ e.preventDefault(); togglePlay(); }
   if(e.key==='Escape'){ closeMenus(); }
 });
@@ -2453,7 +2482,7 @@ function renderPiano(){
   (d.notes||[]).forEach(nt=>lanes.append(prNoteEl(ch,d,nt)));
   // scroll to the channel's root octave on first open
   const scroller=lanes.closest('.pr-scroll'); if(scroller && !lanes.dataset.scrolled){ lanes.dataset.scrolled=1; scroller.scrollTop=((PR_HI-(ch.root||60))*PR_ROWH)-180; }
-  lanes.onmousedown=e=>{ if(!(e.target===lanes||e.target.classList.contains('pr-row')||e.target.classList.contains('pr-bar'))) return; if(e.button!==0)return;
+  lanes.onmousedown=e=>{ if(!(e.target===lanes||e.target.classList.contains('pr-row')||e.target.classList.contains('pr-bar'))) return; if(e.button!==0)return; snap();
     const rect=lanes.getBoundingClientRect(); const lx=e.clientX-rect.left, ly=e.clientY-rect.top;
     let step=clamp(Math.floor(lx/PR_COLW),0,pat.len-1); let key=clamp(PR_HI-Math.floor(ly/PR_ROWH),PR_LO,PR_HI);
     if(snapOn() && !inScale(key)) key=nearestInScale(key);
@@ -2468,15 +2497,15 @@ function prNoteEl(ch,d,nt){
   ne.innerHTML='<div class="vh"></div><div class="rs"></div>'; place();
   const vh=()=>ne.querySelector('.vh').style.height=(2+(nt.vel||0.9)*12)+'px'; vh();
   const sel=()=>{ document.querySelectorAll('.pr-note.sel').forEach(x=>x.classList.remove('sel')); ne.classList.add('sel'); };
-  ne.querySelector('.rs').addEventListener('mousedown',e=>{ e.stopPropagation(); e.preventDefault(); sel();
+  ne.querySelector('.rs').addEventListener('mousedown',e=>{ e.stopPropagation(); e.preventDefault(); sel(); snap();
     const x0=e.clientX,l0=nt.len; const mv=ev=>{ nt.len=clamp(Math.round(l0+(ev.clientX-x0)/PR_COLW),1,pat.len-nt.start); prLastLen=nt.len; place(); };
     const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);renderRack();}; document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up); });
   ne.addEventListener('mousedown',e=>{ if(e.button!==0)return; e.stopPropagation(); sel();
     const x0=e.clientX,y0=e.clientY,s0=nt.start,k0=nt.key; let moved=false;
-    const mv=ev=>{ moved=true; nt.start=clamp(s0+Math.round((ev.clientX-x0)/PR_COLW),0,pat.len-1); let nk=clamp(k0-Math.round((ev.clientY-y0)/PR_ROWH),PR_LO,PR_HI); if(snapOn()&&!inScale(nk))nk=nearestInScale(nk); nt.key=nk; place(); };
+    const mv=ev=>{ if(!moved)snap(); moved=true; nt.start=clamp(s0+Math.round((ev.clientX-x0)/PR_COLW),0,pat.len-1); let nk=clamp(k0-Math.round((ev.clientY-y0)/PR_ROWH),PR_LO,PR_HI); if(snapOn()&&!inScale(nk))nk=nearestInScale(nk); nt.key=nk; place(); };
     const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up); if(moved){renderRack(); if(prAudition){resumeAudio();triggerNote(ch,ctx.currentTime,nt.vel||0.9,nt.key);} }}; document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up); });
-  ne.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); const i=d.notes.indexOf(nt); if(i>=0)d.notes.splice(i,1); ne.remove(); renderRack(); });
-  ne.addEventListener('wheel',e=>{ e.preventDefault(); nt.vel=clamp((nt.vel||0.9)+(e.deltaY<0?0.06:-0.06),0.05,1); vh(); },{passive:false});
+  ne.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); const i=d.notes.indexOf(nt); if(i>=0){ snap(); d.notes.splice(i,1); } ne.remove(); renderRack(); });
+  ne.addEventListener('wheel',e=>{ e.preventDefault(); if(!ne._wsnap){ snap(); ne._wsnap=1; setTimeout(()=>{ne._wsnap=0;},500); } nt.vel=clamp((nt.vel||0.9)+(e.deltaY<0?0.06:-0.06),0.05,1); vh(); },{passive:false});
   return ne;
 }
 
