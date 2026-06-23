@@ -136,6 +136,35 @@
   .kt-pill.on[data-tier="max"] { border-color:rgba(240,90,120,.9); background:rgba(240,90,120,.22); color:#FFB4C4; }
   .kt-keylink { margin-left:auto; font:700 9px 'Space Mono',monospace; letter-spacing:.06em; color:#9FCFDD; background:none; border:none; cursor:pointer; padding:3px 4px; }
   .kt-keylink:hover { color:#CFE6EE; text-decoration:underline; }
+  /* BRAIN LEVER — a slider (not buttons): Local → Private → Max Drive. The fill "charges up" toward Max
+     with a slow GLITCH-charging vibe (RGB-split jitter), not a fast bright pulse. */
+  .kt-lever { display:flex; align-items:center; gap:7px; flex:1; }
+  .kl-track { position:relative; flex:1; min-width:64px; height:7px; border-radius:99px; background:rgba(255,255,255,.1); cursor:pointer; }
+  .kl-fill { position:absolute; left:0; top:0; bottom:0; width:7px; border-radius:99px;
+    background:linear-gradient(90deg,#2E8FAE,#7BB6CD 45%,#3E9CB8 75%,#2E8FAE); background-size:300% 100%;
+    animation:klflow 5s linear infinite; box-shadow:0 0 6px rgba(120,182,205,.38); transition:width .2s cubic-bezier(.4,0,.2,1); }
+  @keyframes klflow { to { background-position:-300% 0; } }
+  .kl-thumb { position:absolute; top:50%; left:0; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#fff,#CFE6EE 58%,#7BB6CD); box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 8px rgba(120,182,205,.5); cursor:grab; transition:left .2s cubic-bezier(.4,0,.2,1); }
+  .kl-thumb:active { cursor:grabbing; }
+  .kl-name { font:700 9px Oxanium; letter-spacing:.03em; color:#9FCFDD; min-width:50px; text-align:right; white-space:nowrap; }
+  /* Private — warmer, slow glitch */
+  .kt-lever.t2 .kl-fill { animation-duration:4s; background:linear-gradient(90deg,#3E9CB8,#7BB6CD 35%,#E6C16A 70%,#3E9CB8); box-shadow:0 0 9px rgba(217,164,65,.45); }
+  .kt-lever.t2 .kl-thumb { animation:klglitch 3.6s steps(1,end) infinite; }
+  .kt-lever.t2 .kl-name { color:#F0CE8C; }
+  /* Max Drive — full-spectrum "God Particle" charge: cooler but hotter, faster glitch */
+  .kt-lever.t3 .kl-fill { animation-duration:3s; background:linear-gradient(90deg,#3E9CB8,#7BB6CD 20%,#E6C16A 45%,#E94B9C 66%,#7BB6CD 86%,#3E9CB8); background-size:340% 100%; box-shadow:0 0 12px rgba(233,75,156,.5),0 0 6px rgba(230,193,106,.45); }
+  .kt-lever.t3 .kl-thumb { animation:klglitch 2.3s steps(1,end) infinite; box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 13px rgba(233,75,156,.7); }
+  .kt-lever.t3 .kl-name { color:#FFD9EC; text-shadow:0 0 8px rgba(233,75,156,.5); }
+  /* glitch-charging: mostly still, then a quick digital RGB-split jitter — a charge surge, not a glow throb */
+  @keyframes klglitch {
+    0%,80%,100% { transform:translate(-50%,-50%); filter:none; }
+    84% { transform:translate(calc(-50% - 1.6px),-50%); filter:drop-shadow(1.6px 0 #E94B9C) drop-shadow(-1.6px 0 #3E9CB8); }
+    88% { transform:translate(calc(-50% + 1.4px),-50%); filter:none; }
+    92% { transform:translate(calc(-50% - 1px),-50%); filter:drop-shadow(-1.6px 0 #E94B9C) drop-shadow(1.6px 0 #3E9CB8); }
+    96% { transform:translate(-50%,-50%); filter:none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .kl-fill, .kl-thumb { animation:none !important; } }
   .kit-win.tier-private { border-color:rgba(217,164,65,.5); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(217,164,65,.28), 0 0 26px rgba(217,164,65,.12), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-foot { display:flex; gap:8px; padding:10px 11px; border-top:1px solid rgba(255,255,255,.07); }
@@ -220,7 +249,7 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><div class="kt-lever t1" id="ktLever"><span class="kl-track" id="ktTrack"><span class="kl-fill" id="ktFill"></span><span class="kl-thumb" id="ktThumb"></span></span><span class="kl-name" id="ktName">Local</span></div><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
      <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="ask">➤</button></div>`;
@@ -372,18 +401,42 @@
       o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.3);
     } catch (e) {}
   }
-  function setTier(t, announce){
-    const goingUp = (tier === "local" && t !== "local");
-    tier = t;
-    try { localStorage.setItem("dmv_brain_tier", t); } catch (_) {}
-    win.classList.toggle("tier-private", t === "private");
-    win.classList.toggle("tier-max", t === "max");
-    [...win.querySelectorAll(".kt-pill")].forEach(p => p.classList.toggle("on", p.dataset.tier === t));
-    if (announce && goingUp) ding();
+  const TIERS = [{ v:"local", t:"Local", cls:"t1" }, { v:"private", t:"Private", cls:"t2" }, { v:"max", t:"Max Drive", cls:"t3" }];
+  const lever = win.querySelector("#ktLever"), klTrack = win.querySelector("#ktTrack"),
+        klFill = win.querySelector("#ktFill"), klThumb = win.querySelector("#ktThumb"), klName = win.querySelector("#ktName");
+  let tierIdx = 0;
+  function applyTier(i, announce){
+    const goingUp = i > tierIdx;
+    tierIdx = Math.max(0, Math.min(TIERS.length - 1, i));
+    const s = TIERS[tierIdx], frac = TIERS.length > 1 ? tierIdx / (TIERS.length - 1) : 0, w = (klTrack && klTrack.clientWidth) || 90;
+    tier = s.v;
+    try { localStorage.setItem("dmv_brain_tier", tier); } catch (_) {}
+    if (lever) { lever.classList.remove("t1","t2","t3"); lever.classList.add(s.cls); lever.title = TIER_NOTE[tier]; }
+    if (klName) klName.textContent = s.t;
+    if (klFill) klFill.style.width = Math.max(7, frac * w) + "px";
+    if (klThumb) klThumb.style.left = (frac * w) + "px";
+    win.classList.toggle("tier-private", tier === "private");
+    win.classList.toggle("tier-max", tier === "max");
+    if (announce && goingUp && tier !== "local") ding();
   }
-  [...win.querySelectorAll(".kt-pill")].forEach(p => { p.title = TIER_NOTE[p.dataset.tier]; p.onclick = () => setTier(p.dataset.tier, true); });
+  function tierFromX(clientX){
+    const r = klTrack.getBoundingClientRect();
+    let frac = r.width ? (clientX - r.left) / r.width : 0; frac = Math.max(0, Math.min(1, frac));
+    applyTier(Math.round(frac * (TIERS.length - 1)), true);
+  }
+  if (klTrack) {
+    klTrack.addEventListener("mousedown", e => { e.preventDefault(); tierFromX(e.clientX);
+      const mv = e2 => tierFromX(e2.clientX);
+      const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+    });
+    klTrack.addEventListener("touchmove", e => { if (e.touches[0]) tierFromX(e.touches[0].clientX); }, { passive:true });
+  }
   { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
-  { let _t = "local"; try { _t = localStorage.getItem("dmv_brain_tier") || "local"; } catch (_) {} setTier(_t, false); }
+  { let _t = "local"; try { _t = localStorage.getItem("dmv_brain_tier") || "local"; } catch (_) {}
+    const si = TIERS.findIndex(s => s.v === _t); applyTier(si >= 0 ? si : 0, false); }
+  requestAnimationFrame(() => applyTier(tierIdx, false));   // fix px positions once the window is laid out
+  window.addEventListener("resize", () => applyTier(tierIdx, false));
 
   // ── merge in user-made characters, paint the roster, then default to Kit ──
   function refreshRoster(reactivate) {
