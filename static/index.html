@@ -136,7 +136,7 @@
   .msg { display: flex; gap: 12px; animation: rise .25s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
   .msg.you { flex-direction: row-reverse; }
-  .bubble { max-width: 78%; padding: 12px 16px; border-radius: 18px; font-size: 14.5px; line-height: 1.62; white-space: pre-wrap; word-break: break-word; }
+  .bubble { position:relative; max-width: 78%; padding: 12px 16px; border-radius: 18px; font-size: 14.5px; line-height: 1.62; white-space: pre-wrap; word-break: break-word; }
   .msg.you .bubble { background: linear-gradient(135deg, rgba(62,156,184,.22), rgba(124,138,165,.16));
     border: 1px solid rgba(62,156,184,.3); border-bottom-right-radius: 6px; }
   .msg.tiff .bubble { background: var(--panel); border: 1px solid var(--hairline); border-bottom-left-radius: 6px;
@@ -563,7 +563,7 @@ function copyMsg(btn) {
 (function injectChatCSS(){
   document.head.insertAdjacentHTML("beforeend", `<style>
     .msg{position:relative}
-    .copymsg{position:absolute;top:0;right:0;opacity:0;transition:opacity .12s;background:rgba(255,255,255,.06);
+    .copymsg{position:absolute;bottom:5px;right:7px;opacity:0;transition:opacity .12s;background:rgba(255,255,255,.06);
       border:1px solid rgba(255,255,255,.14);color:#aeb4bf;border-radius:7px;font:600 11px Inter,system-ui,sans-serif;
       padding:3px 9px;cursor:pointer;z-index:4}
     .msg:hover .copymsg{opacity:.85}.copymsg:hover{opacity:1;background:rgba(255,255,255,.13);color:#fff}
@@ -578,8 +578,8 @@ function copyMsg(btn) {
 })();
 function addMsg(role, text, atts) {
   $("hello")?.remove();
-  { var _cs = $("charsw"); if (_cs) _cs.style.display = "flex"; }   // switcher appears once you're chatting
-  { var _sh = $("charshelf"); if (_sh) _sh.classList.add("hide"); }  // ...and the big shelf collapses into it
+  { var _cs = $("charsw"); if (_cs) _cs.style.display = "none"; }   // switcher appears once you're chatting
+  { var _sh = $("charshelf"); if (_sh) _sh.classList.remove("hide"); }  // ...and the big shelf collapses into it
   const d = document.createElement("div");
   d.className = `msg ${role === "user" ? "you" : "tiff"}`;
   d.innerHTML = `<div class="tag${role === "user" ? "" : (activeBrain === "kit" ? " kit" : " tiff")}">${role === "user" ? "B" : (activeBrain === "kit" ? "K" : "T")}</div><div class="bubble"></div>`;
@@ -590,7 +590,7 @@ function addMsg(role, text, atts) {
     const cp = document.createElement("button");
     cp.className = "copymsg"; cp.type = "button"; cp.textContent = "⧉ copy"; cp.title = "Copy this message";
     cp.onclick = () => copyMsg(cp);
-    d.appendChild(cp);
+    bub.appendChild(cp);
   }
   if (atts && atts.length) {
     const row = document.createElement("div"); row.className = "att";
