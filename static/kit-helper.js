@@ -123,9 +123,11 @@
   .kit-msg.kit b { color:#9FCFDD; }
   .kit-msg.think { color:rgba(198,201,208,.6); font-style:italic; }
   .kit-msg.riff .riff-who { font:800 11px Oxanium; letter-spacing:.04em; }
-  .kit-riff, .kit-pipe { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
-  .kit-riff:hover, .kit-pipe:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
-  .kit-riff:disabled, .kit-pipe:disabled { opacity:.5; cursor:default; }
+  .kit-mic { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
+  .kit-mic:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-mic:disabled { opacity:.45; cursor:default; }
+  .kit-mic.rec { border-color:#E0245E; background:rgba(224,36,94,.22); color:#fff; animation:kitmic 1.1s ease-in-out infinite; }
+  @keyframes kitmic { 0%,100%{ box-shadow:0 0 0 0 rgba(224,36,94,.5);} 50%{ box-shadow:0 0 0 7px rgba(224,36,94,0);} }
   .kit-tier { display:flex; align-items:center; gap:5px; padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.12); }
   .kit-tier .kt-l { font:700 8.5px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:rgba(170,180,190,.5); margin-right:3px; }
   .kt-pill { font:700 9.5px Oxanium; letter-spacing:.04em; padding:3px 9px; border-radius:20px; cursor:pointer; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03); color:#C6CBD3; }
@@ -148,8 +150,11 @@
   .kit-pic { display:none; align-items:center; gap:8px; padding:8px 11px 0; }
   .kit-pic img { max-width:84px; max-height:84px; border-radius:9px; border:1px solid rgba(120,182,205,.5); display:block; }
   .kit-picx { background:#E0245E; border:none; color:#fff; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:10px; flex:none; }
-  .kit-dock { background:rgba(0,0,0,.28); border:none; color:#9FCFDD; width:22px; height:22px; border-radius:6px; cursor:pointer; font-size:12px; margin-left:4px; }
-  .kit-dock:hover { background:rgba(62,156,184,.3); color:#fff; }
+  .kit-dock { display:inline-flex; align-items:center; gap:5px; margin-left:auto; height:25px; padding:0 10px; border-radius:8px; cursor:pointer;
+    border:1px solid rgba(120,182,205,.7); background:rgba(62,156,184,.22); color:#DCEFF5; font:800 9.5px Oxanium; letter-spacing:.1em;
+    box-shadow:0 0 10px rgba(62,156,184,.25); animation:kitdockglow 2.4s ease-in-out infinite; }
+  .kit-dock:hover { background:rgba(62,156,184,.42); border-color:rgba(140,200,220,.95); color:#fff; box-shadow:0 0 16px rgba(62,156,184,.55); }
+  @keyframes kitdockglow { 0%,100%{ box-shadow:0 0 8px rgba(62,156,184,.2);} 50%{ box-shadow:0 0 15px rgba(62,156,184,.45);} }
   .kit-win:not(.docked) { resize:both; min-width:300px; min-height:300px; }   /* drag the bottom-right corner to reshape: square / rectangle / long */
   .kit-win.docked { position:static; left:auto; right:auto; top:auto; bottom:auto; width:100%; max-width:none; max-height:420px;
     margin:0 0 14px; border-radius:14px; box-shadow:0 2px 14px rgba(0,0,0,.4); animation:none; }
@@ -231,7 +236,7 @@
      <div class="kit-tier"><span class="kt-l">Brain</span><button class="kt-pill" data-tier="local">Local</button><button class="kt-pill" data-tier="private">Private</button><button class="kt-pill" data-tier="max">Max Drive</button><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
-     <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask about this room…"></textarea><button class="kit-riff" title="Make the two of them talk to each other (the active character + the next one in the strip)">🎙</button><button class="kit-pipe" title="Run a pipeline — each character does their part in order, handing the work down the line">⛓</button><button class="kit-go" title="ask">➤</button></div>`;
+     <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="ask">➤</button></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -355,12 +360,12 @@
   const dockSlot = document.getElementById("agentDock");
   let docked = false;
   if (dockSlot) {
-    const db = document.createElement("button"); db.className = "kit-dock"; db.textContent = "⤵"; db.title = "Dock me into the room";
+    const db = document.createElement("button"); db.className = "kit-dock"; db.innerHTML = "⤵ DOCK"; db.title = "Dock me into the room (lock me into the layout)";
     win.querySelector(".kit-bar").insertBefore(db, win.querySelector(".kit-x"));
     const setDocked = (on) => {
       docked = on;
-      if (on) { win.style.left = win.style.top = win.style.width = win.style.height = ""; dockSlot.appendChild(win); win.classList.add("docked", "open"); db.textContent = "⤴"; db.title = "Undock — float me again"; }
-      else { document.body.appendChild(win); win.classList.remove("docked"); db.textContent = "⤵"; db.title = "Dock me into the room"; }
+      if (on) { win.style.left = win.style.top = win.style.width = win.style.height = ""; dockSlot.appendChild(win); win.classList.add("docked", "open"); db.innerHTML = "⤴ FLOAT"; db.title = "Undock — float me again"; }
+      else { document.body.appendChild(win); win.classList.remove("docked"); db.innerHTML = "⤵ DOCK"; db.title = "Dock me into the room (lock me into the layout)"; }
       try { localStorage.setItem("dmv_agent_docked", on ? "1" : "0"); } catch (_) {}
     };
     db.onclick = () => setDocked(!docked);
@@ -412,13 +417,10 @@
   }
   refreshRoster(false);
   // Agent Forge = a SOLO guided build (only Tiff). Hide the roster/switcher (Kit + "+ Build" just confuse
-  // a first-timer), the "drag an agent in" hint, and the multi-agent riff/pipeline buttons — so it's just
-  // "talk to Tiff," with room to type.
+  // a first-timer) and the "drag an agent in" hint — so it's just "talk to Tiff," with room to type.
   if (room === "character") {
     if (roster) roster.style.display = "none";
     const _h = win.querySelector(".kit-hint"); if (_h) _h.style.display = "none";
-    const _rb = win.querySelector(".kit-riff"); if (_rb) _rb.style.display = "none";
-    const _pb = win.querySelector(".kit-pipe"); if (_pb) _pb.style.display = "none";
   }
   // bring in ONLY the character dragged here from the front page (kit/tiff, or a user-built one)
   const bring = CHARACTERS.find(c => c.id === broughtId) || CHARACTERS[0];
@@ -479,91 +481,29 @@
     } catch (e) { think.remove(); addMsg("kit", "Connection hiccup — try me again."); }
     finally { busy = false; go.disabled = false; winSpr.setSpeed(3); input.focus(); }
   }
-  // ── ROUND TABLE — two characters actually talk to EACH OTHER (and you), all on the
-  //    local brain. Orchestrated client-side: alternate the active character + the next
-  //    one, feeding each the running transcript so they riff off one another. ──
-  function addRiffMsg(ch, text){
-    const d = document.createElement("div"); d.className = "kit-msg kit riff";
-    const who = document.createElement("span"); who.className = "riff-who"; who.textContent = ch.name + ": ";
-    who.style.color = ch.color || "#9FCFDD"; d.appendChild(who);
-    const span = document.createElement("span"); span.innerHTML = fmt(text); d.appendChild(span);
-    body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
-  }
-  let riffing = false, piping = false;
-  async function riff(){
-    if (riffing || piping) return;
-    const others = CHARACTERS.filter(c => c.id !== active.id);
-    if (!others.length){ addMsg("kit", "Bring in one more first — tap another in the strip up top, or hit + Build. Two of us and we'll talk."); return; }
-    const A = active, B = others[0];
-    const seed = input.value.trim() || ("Let's start something in " + ROOMS[room] + ".");
-    input.value = ""; input.style.height = "auto";
-    const rb = win.querySelector(".kit-riff");
-    riffing = true; go.disabled = true; if (rb) rb.disabled = true; winSpr.setSpeed(9);
-    addMsg("you", "🎙 " + A.name + " × " + B.name + " — " + seed);
-    const transcript = []; const ROUNDS = 4;
-    try {
-      for (let i = 0; i < ROUNDS; i++){
-        const speaker = (i % 2 === 0) ? A : B, other = (speaker === A) ? B : A;
-        const convo = transcript.map(t => t.name + ": " + t.text).join("\n");
-        const msg = (i === 0)
-          ? ("You're in " + ROOMS[room] + ", working with " + other.name + " (" + (other.tag || "") + "). Topic: " + seed +
-             "\n\nOpen it up as " + speaker.name + " in 1-2 sentences — real, in your lane, then leave room for " + other.name + ".")
-          : ("You're in " + ROOMS[room] + " with " + other.name + ". Conversation so far:\n" + convo +
-             "\n\nRespond as " + speaker.name + " — react to what " + other.name + " just said and build on it, 1-2 sentences, don't repeat yourself.");
-        const think = addMsg("kit", speaker.name + " is thinking…"); think.classList.add("think");
-        const payload = { room, message: msg, character: speaker.id, tier };
-        if (speaker.mine){ payload.persona = speaker.persona || ""; payload.knowledge = speaker.knowledge || ""; payload.charName = speaker.name; payload.charCraft = speaker.craftLabel || speaker.craft || ""; }
-        let reply = "";
-        try { const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const j = await r.json(); reply = (j.reply || "").trim(); }
-        catch(e){ reply = ""; }
-        think.remove();
-        if (!reply){ addMsg("kit", "(thread dropped — local model hiccup. Hit the mic again.)"); break; }
-        transcript.push({ name: speaker.name, text: reply });
-        addRiffMsg(speaker, reply);
-      }
-    } finally { riffing = false; go.disabled = false; if (rb) rb.disabled = false; winSpr.setSpeed(3); }
-  }
-
-  // ── PIPELINE — each character does their part IN ORDER, handing the work down the line
-  //    (e.g. producer → artist → engineer). Same local-brain orchestration as the round
-  //    table, but sequential + role-handoff instead of free back-and-forth. ──
-  async function pipeline(){
-    if (riffing || piping) return;
-    const line = [active, ...CHARACTERS.filter(c => c.id !== active.id)];
-    if (line.length < 2){ addMsg("kit", "Need at least two of us for a pipeline — bring in another, or hit + Build."); return; }
-    const seed = input.value.trim() || ("Make something in " + ROOMS[room] + ".");
-    input.value = ""; input.style.height = "auto";
-    const pb = win.querySelector(".kit-pipe");
-    piping = true; go.disabled = true; if (pb) pb.disabled = true; winSpr.setSpeed(9);
-    addMsg("you", "⛓ Pipeline — " + line.map(c => c.name).join(" → ") + " — " + seed);
-    const transcript = [];
-    try {
-      for (let i = 0; i < line.length; i++){
-        const speaker = line[i], isLast = (i === line.length - 1);
-        const done = transcript.map(t => t.name + ": " + t.text).join("\n");
-        const msg = (i === 0)
-          ? ("You're FIRST in a pipeline in " + ROOMS[room] + " working toward: " + seed +
-             "\n\nLay the groundwork as " + speaker.name + " in your lane, 1-2 sentences, then hand off to " + line[1].name + ".")
-          : ("Pipeline in " + ROOMS[room] + " toward: " + seed + "\nDone so far:\n" + done +
-             "\n\nYou're " + speaker.name + ". Take the handoff and add YOUR part in your lane, 1-2 sentences" +
-             (isLast ? ", then wrap it up." : ", then hand to " + line[i + 1].name + "."));
-        const think = addMsg("kit", speaker.name + " is working…"); think.classList.add("think");
-        const payload = { room, message: msg, character: speaker.id, tier };
-        if (speaker.mine){ payload.persona = speaker.persona || ""; payload.knowledge = speaker.knowledge || ""; payload.charName = speaker.name; payload.charCraft = speaker.craftLabel || speaker.craft || ""; }
-        let reply = "";
-        try { const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const j = await r.json(); reply = (j.reply || "").trim(); }
-        catch(e){ reply = ""; }
-        think.remove();
-        if (!reply){ addMsg("kit", "(pipeline stalled — local model hiccup. Run it again.)"); break; }
-        transcript.push({ name: speaker.name, text: reply });
-        addRiffMsg(speaker, reply);
-      }
-    } finally { piping = false; go.disabled = false; if (pb) pb.disabled = false; winSpr.setSpeed(3); }
-  }
+  // (Retired: the riff/pipeline "two agents talking in one window" experiment — owner's call,
+  //  it's confusing. The model is now ONE agent per window; bring in more by stacking windows.)
 
   go.onclick = ask;
-  { const _rb = win.querySelector(".kit-riff"); if (_rb) _rb.onclick = riff; }
-  { const _pb = win.querySelector(".kit-pipe"); if (_pb) _pb.onclick = pipeline; }
+
+  // ── 🎙 TALK-TO-TYPE — press, speak, it types into the box (browser speech, same as the chat).
+  //    Press again to stop. Each agent window gets its own, so in a stack you talk to one, then the next. ──
+  (function setupMic(){
+    const micBtn = win.querySelector(".kit-mic"); if (!micBtn) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { micBtn.disabled = true; micBtn.title = "Talk-to-type isn't available here"; return; }
+    let rec = null, listening = false;
+    micBtn.onclick = () => {
+      if (listening) { rec && rec.stop(); return; }
+      rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;
+      const base = input.value ? input.value.replace(/\s*$/, "") + " " : "";
+      rec.onresult = e => { let t = ""; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+        input.value = base + t; input.dispatchEvent(new Event("input")); };
+      rec.onend = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; };
+      rec.onerror = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; };
+      try { rec.start(); listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; input.focus(); } catch(_){}
+    };
+  })();
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(90, input.scrollHeight) + "px"; });
 
