@@ -121,6 +121,14 @@
   .kit-msg.you { align-self:flex-end; background:rgba(62,156,184,.18); color:#DCEEF4; border:1px solid rgba(62,156,184,.3); }
   .kit-msg.kit { align-self:flex-start; background:rgba(255,255,255,.04); color:#D7DCE4; border:1px solid rgba(255,255,255,.07); }
   .kit-msg.kit b { color:#9FCFDD; }
+  /* fenced copy-block inside an agent message (matches the chat): own ghost copy icon, hover-reveal */
+  .kblk { position:relative; margin:7px 0; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:rgba(0,0,0,.32); }
+  .kblk pre { margin:0; padding:10px 34px 10px 11px; white-space:pre-wrap; word-break:break-word; font:12px 'Space Mono',ui-monospace,monospace; line-height:1.5; color:#e7e9ee; }
+  .kblk-copy { position:absolute; top:5px; right:5px; display:inline-flex; align-items:center; justify-content:center; width:24px; height:20px; padding:0; background:none; border:none; border-radius:6px; color:rgba(255,255,255,.5); cursor:pointer; opacity:0; transition:opacity .15s,color .12s,background .12s; }
+  .kblk:hover .kblk-copy { opacity:1; }
+  .kblk-copy:hover { color:#E4F1F5; background:rgba(255,255,255,.08); }
+  .kblk-copy .ic-check { display:none; color:#3FD98A; }
+  .kblk-copy.done .ic-copy { display:none; } .kblk-copy.done .ic-check { display:inline; } .kblk-copy.done { color:#3FD98A; }
   .kit-msg.think { color:rgba(198,201,208,.6); font-style:italic; }
   .kit-msg.riff .riff-who { font:800 11px Oxanium; letter-spacing:.04em; }
   .kit-mic { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
@@ -262,6 +270,15 @@
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
         body = win.querySelector(".kit-body"), input = win.querySelector(".kit-in"), go = win.querySelector(".kit-go");
+  // copy a fenced block (prompt/JSON) inside an agent message → swap the icon to a check
+  body.addEventListener("click", function (e) {
+    const b = e.target.closest && e.target.closest(".kblk-copy"); if (!b) return;
+    const pre = b.parentElement.querySelector("pre"); if (!pre) return;
+    const text = pre.innerText;
+    try { navigator.clipboard.writeText(text); }
+    catch (_) { const ta = document.createElement("textarea"); ta.value = text; ta.style.cssText = "position:fixed;opacity:0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); }
+    b.classList.add("done"); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove("done"), 1600);
+  });
 
   // ── 📎 image upload — so the agent can SEE what you show her and write the prompt from it ──
   let pendingImage = "";
@@ -281,7 +298,19 @@
     inp.click();
   };
 
-  function fmt(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+  const KCOPY_SVG = '<svg class="ic-copy" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="ic-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  function fmt(t) {
+    t = t || "";
+    const blocks = [];
+    // pull fenced ``` blocks out first → render each as its own copyable block (a prompt/JSON gets a copy button)
+    t = t.replace(/```[a-zA-Z0-9]*\n?([\s\S]*?)```/g, function (m, code) { blocks.push(code.replace(/\s+$/, "")); return "B" + (blocks.length - 1) + ""; });
+    t = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    t = t.replace(/B(\d+)/g, function (m, i) {
+      const esc = blocks[+i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return '<div class="kblk"><button class="kblk-copy" type="button" title="Copy this">' + KCOPY_SVG + '</button><pre>' + esc + '</pre></div>';
+    });
+    return t;
+  }
   function addMsg(who, text) {
     const d = document.createElement("div"); d.className = "kit-msg " + who;
     if (who === "kit") d.innerHTML = fmt(text); else d.textContent = text;
