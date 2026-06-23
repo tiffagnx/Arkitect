@@ -209,6 +209,11 @@ def main():
                 pass
         return
 
+    # Auto-grant the microphone (no "Allow" prompt every launch) so talk-to-type works out of the
+    # box. WebView2 reads extra Chromium switches from this env var; --use-fake-ui-for-media-stream
+    # silently approves getUserMedia using the REAL mic (it's the user's own machine + our localhost UI).
+    os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--use-fake-ui-for-media-stream")
+
     import webview
     threading.Thread(target=set_window_icon, daemon=True).start()
     try:

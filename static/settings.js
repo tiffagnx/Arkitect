@@ -211,7 +211,11 @@
     const tag = rel && (rel.tag_name || rel.name);
     if (sec) sec.style.display = "";
     if (tag && cmpVer(tag, cur) > 0) {
-      const zip = (rel.assets || []).find(a => /\.zip$/i.test(a.name || ""));
+      // Pick the WINDOWS distributable specifically. The release also carries Mac .app zips
+      // (e.g. DeMartinville-mac-arm64.zip) and "-mac-" sorts BEFORE ".zip", so a naive first-zip
+      // grab downloaded the Mac build → staging failed ("no app.py / static"). Exclude platform builds.
+      const zips = (rel.assets || []).filter(a => /\.zip$/i.test(a.name || ""));
+      const zip = zips.find(a => !/-(mac|intel|arm64|universal|darwin)/i.test(a.name || "")) || zips[0];
       const url = (zip && zip.browser_download_url) || rel.zipball_url || ("https://github.com/" + UPD_REPO + "/releases/latest");
       const ver = String(tag).replace(/^v/i, "");
       _updInfo = { cur, ver, url, notes: (rel.body || "") };

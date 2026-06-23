@@ -71,15 +71,15 @@
   function rebuildCharacters() { return CHARACTERS_BUILTIN.concat(loadMine()); }
 
   const css = `
+  /* PASSIVE presence chip — a small green "online" dot + the agent's name. NOT a button (no hover lift). */
   .kit-fab { position:fixed; right:18px; bottom:18px; z-index:9996; display:flex; align-items:center; gap:7px;
-    height:42px; padding:0 15px 0 9px; border-radius:21px; cursor:pointer; border:1px solid rgba(120,182,205,.4);
-    background:linear-gradient(180deg,rgba(42,46,54,.96),rgba(22,24,30,.96)); color:#CFE6EE;
-    font:700 12px Oxanium,sans-serif; letter-spacing:.06em; box-shadow:0 6px 20px rgba(0,0,0,.5); transition:transform .14s,box-shadow .14s; }
-  .kit-fab:hover { transform:translateY(-2px); box-shadow:0 9px 26px rgba(62,156,184,.4); border-color:rgba(120,182,205,.75); }
-  .kit-fab canvas { width:28px; height:28px; display:block; }
-  .kit-fab .fab-av { width:26px; height:26px; }
-  .kit-fab.in-bar { position:static; height:34px; border-radius:10px; padding:0 12px 0 7px; margin-left:6px; flex:none; box-shadow:none; }
-  .kit-fab.in-bar canvas, .kit-fab.in-bar .fab-av { width:24px; height:24px; }
+    height:30px; padding:0 12px; border-radius:15px; cursor:default; border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(180deg,rgba(42,46,54,.92),rgba(22,24,30,.92)); color:#CFE6EE;
+    font:700 11px Oxanium,sans-serif; letter-spacing:.05em; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .kit-fab.in-bar { position:static; height:24px; border-radius:13px; padding:0 11px; margin-left:6px; flex:none; box-shadow:none; background:rgba(255,255,255,.04); }
+  .fab-dot { width:8px; height:8px; border-radius:50%; flex:none; background:#39D98A; box-shadow:0 0 6px rgba(57,217,138,.85); animation:fabpulse 2.4s ease-in-out infinite; }
+  @keyframes fabpulse { 0%,100%{ box-shadow:0 0 5px rgba(57,217,138,.55);} 50%{ box-shadow:0 0 9px rgba(57,217,138,.95);} }
+  .fab-lbl { line-height:1; }
   .kit-win.from-bar { bottom:auto; top:62px; }
   .kit-win { position:fixed; right:18px; bottom:70px; z-index:9997; width:344px; max-width:92vw; display:none; flex-direction:column;
     max-height:min(600px,82vh); border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
@@ -212,19 +212,6 @@
     d.textContent = ((ch.name && ch.name[0]) || "?").toUpperCase();
     return d;
   }
-  // a small round FAB icon for a non-Kit character (their uploaded face, or a color+initial chip)
-  function fabAvatar(ch) {
-    if (ch.avatar && ch.avatarType && ch.avatarType !== "color") {
-      const im = document.createElement("img"); im.src = ch.avatar; im.alt = ch.name || "";
-      im.className = "fab-av" + (ch.avatarType === "pixel" ? " px" : "");
-      im.style.cssText = "border-radius:50%; object-fit:cover;";
-      return im;
-    }
-    const d = document.createElement("div"); d.className = "fab-av";
-    d.style.cssText = "border-radius:50%; display:grid; place-items:center; font:800 11px Oxanium; color:#10131a; background:radial-gradient(circle at 35% 30%," + ch.color + "," + ch.color + "99);";
-    d.textContent = ((ch.name && ch.name[0]) || "?").toUpperCase();
-    return d;
-  }
 
   // ── window ──
   const winSpr = makeSprite(34, 3);
@@ -275,12 +262,7 @@
     titleEl.textContent = active.name.toUpperCase();
     subEl.textContent = active.mine ? Math.round(active.readiness || 0) + "% · " + ROOMS[room]
                        : active.preview ? "PREVIEW · " + ROOMS[room] : ROOMS[room];
-    if (fab && fabLabel) {
-      const ic = active.sprite ? fabSpr.cv : fabAvatar(active);   // FAB icon = Kit's animated sprite, or the active character's face
-      if (fab.firstChild && fab.firstChild !== ic) fab.replaceChild(ic, fab.firstChild);
-      else if (!fab.firstChild) fab.insertBefore(ic, fabLabel);
-      fabLabel.textContent = active.name === "Kit" ? "Yo, Kit" : active.name;
-    }
+    if (fabLabel) fabLabel.textContent = active.name;   // passive presence chip — just the name (the green dot stays)
   }
   function setActive(ch, announce) {
     active = ch;
@@ -342,15 +324,13 @@
   });
   document.addEventListener("dragend", () => { document.body.classList.remove("room-drop", "armed"); rmFlash(); });
 
-  // ── floating launcher (labelled with the active character) ──
-  const fabSpr = makeSprite(28, 3);
-  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Your in-room agent — tap to open, drag your crew in";
-  fab.appendChild(fabSpr.cv); const fabLabel = document.createElement("span"); fabLabel.textContent = "Yo, Kit"; fab.appendChild(fabLabel);
+  // ── passive presence chip (a green "online" dot + the active agent's name) ──
+  const fab = document.createElement("div"); fab.className = "kit-fab"; fab.title = "Who's in this room";
+  fab.innerHTML = '<span class="fab-dot"></span><span class="fab-lbl"></span>';
+  const fabLabel = fab.querySelector(".fab-lbl");
   const _bar = document.querySelector(".kit-mount") || document.querySelector(".top");
   if (_bar) { fab.classList.add("in-bar"); win.classList.add("from-bar"); _bar.appendChild(fab); } else { document.body.appendChild(fab); }
-  // The FAB is now a PASSIVE name-chip — it just shows WHO's in the room, it isn't a button.
-  // The single "Summon agent" button (injected by pinkroom-nav.js) is what opens / switches the agent.
-  fab.style.cursor = "default"; fab.title = "Who's in this room";
+  // It is NOT a button — the single "Summon agent" button (pinkroom-nav.js) opens the window.
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
   window.__kitOpen = () => { win.classList.add("open"); input.focus(); };   // opener used by the "Summon agent" button
 
@@ -491,17 +471,27 @@
   (function setupMic(){
     const micBtn = win.querySelector(".kit-mic"); if (!micBtn) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { micBtn.disabled = true; micBtn.title = "Talk-to-type isn't available here"; return; }
-    let rec = null, listening = false;
+    if (!SR) { micBtn.disabled = true; micBtn.title = "Talk-to-type isn't available in this build"; return; }
+    let rec = null, listening = false, got = false;
+    const reset = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; };
+    const errText = c => ({
+      "not-allowed": "mic is blocked — allow the microphone for the app, then try again",
+      "service-not-allowed": "Windows is blocking the mic — check Settings ▸ Privacy ▸ Microphone",
+      "no-speech": "didn't catch anything — get closer to the mic and try again",
+      "audio-capture": "no microphone found on this machine",
+      "network": "speech needs an internet connection — check you're online",
+    }[c] || ("mic hiccup (" + c + ") — try again"));
     micBtn.onclick = () => {
       if (listening) { rec && rec.stop(); return; }
-      rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;
+      rec = new SR(); rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true; got = false;
       const base = input.value ? input.value.replace(/\s*$/, "") + " " : "";
       rec.onresult = e => { let t = ""; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
-        input.value = base + t; input.dispatchEvent(new Event("input")); };
-      rec.onend = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; };
-      rec.onerror = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; };
-      try { rec.start(); listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; input.focus(); } catch(_){}
+        if (t.trim()) got = true; input.value = base + t; input.dispatchEvent(new Event("input")); };
+      rec.onerror = ev => { reset(); addMsg("kit", "🎙 " + errText(ev && ev.error)); };
+      rec.onend = () => { const was = listening; reset();
+        if (was && !got) addMsg("kit", "🎙 didn't catch anything — press the mic and talk; your words land in the box as you go."); };
+      try { rec.start(); listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; input.focus(); }
+      catch (err) { reset(); addMsg("kit", "🎙 couldn't start the mic — " + ((err && err.message) || err)); }
     };
   })();
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
