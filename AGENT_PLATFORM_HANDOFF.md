@@ -1,75 +1,63 @@
-# AGENT PLATFORM — HANDOFF (cold start = "be me")
+# DeMartinville — DETAILED HANDOFF (cold start = "be me")
 
-*Written 2026-06-23, ~12:10am, end of a marathon session. Read this + `MEMORY.md` (auto-memory) first. The owner ("B") works with ONE code session per night and wants to just say "go" — this doc is so you ARE the last guy.*
+*Rewritten 2026-06-23 ~3:15am after a long marathon. The owner ("B") works ONE code session per night, runs MULTIPLE agents in this repo at once, and wants to just say "go." Read this + `MEMORY.md` first. He's asleep; this session shipped v1.9.1 + deployed the site autonomously (he authorized it before bed).*
 
-> ⚠️ **There is a PARALLEL session in this repo.** It owns `START_HERE.md` (leave it alone) and cut **v1.8.0** + Beat Lab undo/redo tonight. ALWAYS `git log -3` + `git status` before committing; commit **only your files** with explicit paths (never `git add -A`); never touch `START_HERE.md`.
-
----
-
-## TL;DR — what tonight was
-We **proved the platform thesis**: an agent you drag into a room *runs the tool*, and an agent you talk to *builds another agent*. It's not a chatbot in a corner — it drives the app. All committed + pushed to `master`, **and SHIPPED as `v1.9.0`** — the live Mac + PC download everyone now gets (the version tag auto-triggers the free GitHub Actions Mac build).
-
-**Commits (master):** `cd0a716` (cloud gen + agent-drives-the-room + DeMartinville rename + encrypted keys) → `a996b66` (Agent Forge onboarding) → `43861b5` (FAB fix + this handoff) → v1.9.0 version-bump + release.
-
-> ⚠️ **v1.9.0 shipped WITH the cloud generator untested against a real Atlas key** (owner's explicit call — he wanted it out). It fails gracefully (error message, never crashes; needs the user's own key; local generation unaffected). **First job next session: live-test cloud gen with B's real key** (see NEXT #2). If it's broken, hotfix + cut v1.9.1.
+> ⚠️ **PARALLEL SESSION**: another agent works this repo. It owns `START_HERE.md` (never touch it). Always `git log -3` + `git status` before committing; commit only YOUR files with explicit paths (never `git add -A`).
 
 ---
 
-## WHAT GOT BUILT (with file pointers)
+## 🔴 TOMORROW — the owner's explicit to-do list (do these first)
+The next session: B will paste **4 screenshots** (chat home, Imagination Station home, the purple Beat Lab, the Studio). His asks, verbatim intent:
 
-**1. Cloud image/video generator — `static/imagine-cloud.html` + `/api/cloud/generate` (app.py).**
-BYO-key, **Atlas Cloud** (one async API: `POST /api/v1/model/generateImage|generateVideo` → poll `/model/prediction/{id}`; model in the JSON body). Side-by-side IMAGE | VIDEO panels, per-model options that adapt (Nano Banana: aspect/res/web-search; Wan 2.7: size/thinking; etc.), all 4 modes, count 1–4. Reached from Imagination Station via a `☁ Switch to Cloud` button on `static/images.html`. Local (`images.html`, free GPU/ComfyUI) stays; weak machines (`/api/capability` `recommend:"cloud"`) auto-redirect to cloud; `?local=1` forces local. Verified model catalog from a research workflow — full output was in task `w209c8y55`; models seeded: images = nano-banana-pro(+/edit), seedream-v4, qwen-image-2.0, wan-2.7/image-edit, qwen-image/edit-plus; video = wan-2.5 t2v, hailuo-02/pro, kling-v3.0-pro i2v, kling-v2.1 i2v, seedance-2.0 i2v, wan-2.7 (t2v + i2v). ⚠️ **Some video params are low-confidence** (flagged "(verifying)" in the UI) — Atlas renders schemas client-side; confirm against the live playground with a real key before trusting.
+1. **KILL the front-page "wing" buttons** — the row `🛠 BUILD APPS · 🎚 MAKE MUSIC · 🎬 CUT VIDEO · 🎨 MAKE IMAGES · 👾 PLAY`. He circled them: *"I wanna kill that, I don't want those right there."* They show on the **chat home AND every room's home/blank screen** (e.g. Imagination Station). After removing, **move the text BELOW them UP** (the "Start typing to talk to Tiff…" line + the "☁ Make DeMartinville smarter" card) so there's no empty gap — **rebalance it so it looks right.** (Markup: `index.html` `.ark-wings` ~line 421-423; rooms have their own blank-slate copies.)
 
-**2. Agent DRIVES the room (the core).** `app.py /api/kit` emits a server-validated `` ```action {json}``` `` block (exact copy of the proven `/api/beatbrain` `set`-block pattern — NOT native tool-calling, because the local LM-Studio model's tool-calling is unreliable + the cloud compat door 400s on unknown fields). `ROOM_ACTIONS` (app.py) is the whitelist/clamp = the hard safety boundary (the agent literally can't fire an unknown/out-of-range action). `/api/kit` returns `{reply, action}`. The frontend dispatches `action` to each room's `window.RoomAPI.run(...)`. `RoomAPI` is exposed on `images.html`, `imagine-cloud.html`, and `character.html` (the Forge). Verified live: "make a photo of a neon alley" → Tiff wrote a pro prompt (from the new KB) + fired a validated `generate_image`.
+2. **Beat Lab is ALL PURPLE — recolor it.** `static/beats.html` is the ONLY page drowning in purple ("gunky bullshit," his words). Every other page is the teal/graphite DeMartinville theme. Re-skin beats.html to match the rest of the site (teal accents, graphite panels) — kill the purple.
 
-**3. Agent prompt-craft KB.** `static/kit_kb/images/prompt-craft.md` + `video-prompt-craft.md` (folder = room id `images`; the cloud room id `imagine-cloud` is **aliased to `images`** in `/api/kit` via `kb_room`). Makes Tiff write expert image/video prompts. `kit_kb.py` scopes by folder name; restart uvicorn (or it picks up via mtime) to load.
-
-**4. In-room agent window — `static/kit-helper.js` (injected by `static/pinkroom-nav.js`).** Persists the chosen agent across local↔cloud + room hops (`localStorage dmv_active_brain`/`dmv_brain_tier`). ONE `Summon agent` button (pinkroom-nav) opens it; the FAB is a **passive name-chip** showing who's in the room (now shows the ACTIVE character's face — the FAB used to always show Kit's sprite; fixed via `fabAvatar()`). 📎 **image upload** → vision turn (`/api/kit` `image` → `_kit_local(...,image)`, local model SEES it). **Dock** toggle (⤵, only in rooms with `<div id="agentDock">` = images + cloud) docks it above the generator; floating window is **resizable**.
-
-**5. Agent Forge onboarding — `static/character.html` ("Agent Forge").**
-- `⚡ Start here` button in the hero → brings Tiff in (`?brain=tiff`) with a first-timer welcome ("I'm an agent, this is a live demo…"). Forge stays clean until pressed (kit-helper skips localStorage-restore when `room==="character"`).
-- Forge window scoped to a SOLO build: only Tiff (roster/Kit/+Build hidden, riff/pipeline buttons hidden, more typing room).
-- **Phase 2 (works):** Tiff FILLS the builder from conversation — `fill_agent` action (validated: name/tagline/notes + craft enum [producer/mix/beatmaker/writer/editor/builder] + vibe enum [chill-mentor/precise-tech/hype/zen-teacher]) → `window.RoomAPI.run` sets the fields. Verified end-to-end: "I'm Banx, a mix engineer, keep it precise" → she returned `fill_agent name:Banx craft:mix vibe:precise-tech`.
-- "Their voice" → "Their vibe" (it's tone, not audio).
-
-**6. DeMartinville rename (ARKITECT→DeMartinville).** exe/spec/launchers/updater all in sync: `DeMartinville.spec` (name='DeMartinville' → `dist/DeMartinville.exe`), `release.ps1`, `setup-and-run.ps1`, `build_zip.py` (→ `DeMartinville.zip` + `DeMartinville/` folder), `desktop.py` (mutex/title/comments), `app.py` (FastAPI title + Tiff/Kit persona + dialog text), `.bat` launchers renamed. **PROTECTED — do NOT sweep these:** the GitHub repo `tiffagnx/Arkitect` (updater REPO + gh-pages), lowercase `localStorage` keys `arkitect_if_names`/`arkitect-studio-tool`, the `.ark` session extension. (Case-sensitive `ARKITECT`→`DeMartinville` replace left them alone.)
-
-**7. Security — keys encrypted at rest.** `swarm_routes.py` DPAPI vault (`_enc_secret`/`_dec_secret` via ctypes crypt32, Windows-user-bound, tagged `dpapi:`, plaintext fallback). `_load_keys` decrypts on read (legacy plaintext passes through), `_save_keys` encrypts. Cloud key moved OFF browser localStorage → encrypted `data/gen_keys.json` via `/api/cloud/key`. Honest posture: localhost-only server, local-first (no central key honeypot), HTTPS to providers, keys gitignored + out of the zip. Existing plaintext swarm keys encrypt on next save (no auto-migrate — the running OLD app shares `data/`).
-
-**8. Other:** main chat (`static/index.html`) per-message copy button + clickable links + lyric/code blocks + scroll-while-streaming (don't yank to bottom). Beat Lab (`static/beats.html`) brand label removed + back-button moved left. `desktop.py`: window opens maximized, right-click Paste restored (`debug=True` + no auto-devtools), **mic one-time-allow** (persistent WebView2 profile `%APPDATA%\DeMartinville\webview-profile`, `private_mode=False, storage_path`).
+3. **Rename "DeMartin Beat Lab"** — he hates the name. Propose options, he picks. (It's a placeholder per memory [[beat-lab-build]].) Appears in `beats.html`, the rooms list, `kit-helper.js` ROOMS map (`beats: "DeMartin Beat Lab"`), ROOM_HELP, etc.
 
 ---
 
-## DEV WORKFLOW (critical — this confused B tonight)
-- **`static/*` (HTML/JS/CSS/KB md) = LIVE on a refresh.** Served from disk by any build.
-- **`app.py` + `desktop.py` are FROZEN INTO `DeMartinville.exe`** (`DeMartinville.spec` `hiddenimports=['app']`). So backend/native changes need either:
-  - a **rebuild**: `venv\Scripts\pyinstaller.exe --noconfirm DeMartinville.spec` → `dist/DeMartinville.exe`; then `cp dist/DeMartinville.exe DeMartinville.exe` (the running exe is at repo root; the gitignored exe ships via release, NOT git), OR
-  - **run `DeMartinville (app).bat`** (script mode = `pythonw desktop.py` → uvicorn `--reload` from disk) → app.py auto-reloads, NO rebuild. **Tell B to use the .bat for live iteration nights.**
-- **Verify with the preview server** (Claude Preview MCP, `arkitect-preview`, port **7788**) — restart it (`preview_stop`+`preview_start`) to load app.py changes; navigate with `window.location.href` + verify via `preview_eval` (the screenshot tool kept timing out — use eval/snapshot). The owner's real app is `DeMartinville.exe` on port **7777** (separate).
+## ✅ WHAT TO TEST TOMORROW (tell B this)
+Reopen `DeMartinville.exe` (the fresh **v1.9.1** build) — backend is now live:
+1. **Cloud generate with your real Atlas key** — the 500 is FIXED; it should actually generate now (or show a readable error). ⬅ the big one, was broken-but-unverified all night.
+2. **Ask Tiff for an image prompt** → it should land in its **own copy-block** with a one-click copy icon (not buried in her chatter). Works in the chat AND in-room agent windows.
+3. **Copy UX**: tiny ghost copy icon below each message (hover-reveal, ✓ on click) + **right-click anywhere → Cut/Copy/Paste/Select All**.
+4. **Composer**: model picker + Chat/Write/Research + depth slider all in one slim row below the input.
+5. **Website** (demartinlabs.com): Windows + Mac download buttons now serve v1.9.1.
 
 ---
 
-## WHAT'S NOT DONE / NEXT (priority order)
-1. **Forge avatar generation (the last Forge slice).** Tiff fills name/craft/vibe/notes but does NOT yet generate the avatar in-app. Build: a `generate_avatar` action + a "Generate" button in `character.html`'s face step → call `/api/cloud/generate` (nano-banana edit, the dropped photo as `images[]`) with a LOCKED spec (head-and-shoulders, centered, square, solid bg color, chosen style pixel/cartoon/realistic) → set the result as the avatar (reuse the green-screen + chroma-key for the uniform bg). Tuck the existing manual Gemini card behind a "no key? free" toggle. Needs the owner's Atlas key.
-2. **Live-test cloud gen with B's real Atlas key.** `/api/cloud/generate` is verified to BUILD requests right + the vault round-trips, but a real end-to-end generation (image + video) has NOT run with a real key. Get his key in the cloud page → generate → confirm output URLs render. Confirm the low-confidence video params.
-3. **Dependency-aware guided WORKFLOW** (B's vision, [[guided-agent-onboarding-vision]]): the agent runs a newcomer through the craft in dependency order (record→edit→mix→master), offering a/b/c choices easiest→hardest, only what's doable now. This sits ON TOP of the action-control loop.
-4. **Marketplace / "buy the agent that writes better prompts"** ([[skill-to-room-marketplace-vision]]) — vision, not a build task.
-5. Full heytiff **director-style KB port** (only prompt-craft cards done); Mac DPAPI (Keychain); verify mic one-time-allow live on his machine.
+## WHAT GOT BUILT (this whole arc, with commits + files)
+**Shipped earlier tonight (v1.9.0, commit `9ee61f0`):** cloud image/video gen (`imagine-cloud.html` + `/api/cloud/generate`, Atlas), agent-drives-the-room (`/api/kit` action blocks → `window.RoomAPI`), Agent Forge onboarding (`character.html`), ARKITECT→DeMartinville rename, encrypted keys (DPAPI in `swarm_routes.py`).
+
+**Post-v1.9.0 fixes (all committed, → v1.9.1):**
+- `57cca3c` — agent chip = green "online" dot (not a fake button); **updater** picks the Windows zip not the Mac one; **website Windows download** `ARKITECT.zip`→`DeMartinville.zip`; **mic auto-grant** (`desktop.py` `--use-fake-ui-for-media-stream`) + talk-to-text surfaces errors.
+- `2f76bfb` — **cloud generate 500 FIXED** (`cloud_generate` referenced undefined `refs`/`ref_field` → NameError on every call → merges `media` into the Atlas body now) + agent **image→image** handoff (passes the uploaded image, flips to i2i).
+- `8d6cd6b` — brain tier → a **drag slider** (Local/Private/Max Drive) with a slow glitch-charging animation; `cb6219a` — **honest gating** (Private/Max lock behind a cloud key).
+- `8dfcdd2` — **talk-to-text** accumulates across pauses (was replacing with the newest word only).
+- `0b3c020` → `5a45cb1` — **copy UX**: `copy-anywhere.js` = a real right-click **Cut/Copy/Paste/Select All menu** app-wide (the WebView2 native menu is dead, so the app owns it) + the per-message **ghost copy icon** (tiny, no bg/border, below the bubble, hover-reveal, ✓ on copy — Claude Code pattern; took MANY rounds, finally right).
+- `3a5a5e4` — chat crew shelf stays up while chatting (no collapse to the 2-bubble switcher).
+- `bb99155` — **Tiff fences copyable artifacts** (prompts/JSON/code) into their own block → per-block copy.
+- `62911e3` — **composer**: model picker + modes + slider moved into a slim row below the input (decluttered the top-right).
+- `11694b0` — **AGENT_TOOL_RULES = the SHARED TOOLBELT**: one "how to operate in the app" layer injected into EVERY agent (chat `build_system` + in-room `kit_help`), so Tiff, Kit, and every user-built agent (any user) inherit it. Add a tool once → all agents get it. Persona stays separate.
+- `0d15477` — agent windows render fenced copy-blocks too (`kit-helper.js` `fmt()`), matching the chat.
+
+**The copy research** (workflow) produced the canonical spec → in `tasks/w2n0c3032.output` if you need the exact CSS/markup again. The composer-research workflow **stopped/failed** (ignore it; the composer was built from B's direction).
 
 ---
+
+## DEV WORKFLOW (critical)
+- **`static/*` = LIVE on refresh.** **`app.py` + `desktop.py` are FROZEN into `DeMartinville.exe`** (`DeMartinville.spec`) → backend changes need a **rebuild** (`venv\Scripts\pyinstaller.exe --noconfirm DeMartinville.spec`, then `mv dist/DeMartinville.exe DeMartinville.exe`) OR run `DeMartinville (app).bat` (uvicorn `--reload`, app.py live). **A lot of nights' work is backend — if B "doesn't see" a fix, the engine wasn't reloaded.**
+- **`static/index.html` HAS A NULL BYTE** (~offset 43953) → the Edit tool + the Grep content tool choke on it. Use **`grep -a`** to read it and a **Python byte-replace** (`open('rb')` … `.replace()` … `open('wb')`) to edit it. (That's how all index.html edits tonight were done.)
+- **The Claude Preview screenshot tool is BROKEN here** — it times out every time. Verify by **measuring via `preview_eval`** (getBoundingClientRect, computed styles) instead of looking. Server on port **7788**; B's app is **7777**.
+
+## SHIP ROUTINE (done tonight, for reference)
+v1.9.1 cut: bump `APP_VERSION` in BOTH `app.py` (~line 53) AND `static/studio.html` (~line 8039) → rebuild exe → `build_zip.py` → commit (app.py+studio.html) → `gh` (full path `"C:\Program Files\GitHub CLI\gh.exe"`, NOT on the bash PATH) `release create v1.9.1` (tag auto-triggers the free Mac build via `.github/workflows/mac-build.yml`). Site deploy = `static/join.html` → gh-pages `index.html`, force-push **WITH `CNAME` (demartinlabs.com) + `kit-hero.png` + `static/shots/*`** or the domain breaks / showcase 404s.
 
 ## GOTCHAS
-- **Cloud gen needs B's Atlas key** (signup `atlascloud.ai/console/api-keys`) — not entered yet AFAIK.
-- **Don't re-add** the in-app "BEAT LAB" brand label (he hates it) or a second agent button.
-- **Rename landmines** (above) — never sweep the repo URL / save-keys / `.ark`.
-- **Parallel session** — check git before committing; `START_HERE.md` is theirs.
-
----
+- **Rename landmines** — never sweep: the repo `tiffagnx/Arkitect` (updater + gh-pages), `localStorage` keys `arkitect_*`, the `.ark` extension.
+- Cloud gen needs B's Atlas key (untested with a real one — test #1 tomorrow).
+- **Mac build watch**: prior Mac builds sat queued for hours on the free runners — confirm the v1.9.1 `.app`s actually attached to the release.
 
 ## HOW B WORKS (so you ARE me)
-Read these memories: [[bit16-and-cloud-gen]], [[guided-agent-onboarding-vision]], [[owner-accurate-credit]], [[owner-needs-to-see-not-be-told]], [[owner-spiral-is-the-stop-signal]], [[no-fabricated-content]].
-- **Build it so he can SEE it; don't lecture.** Flag a doubt ONCE, then build his exact idea fast so he can react.
-- **Accurate, never flattery** — he corrects over-praise. Credit the SPEED to the tooling (Opus 4.8, run hard); credit him for VISION, taste, and relentlessness.
-- **"lock it in" / "ship it" = commit** (his files only, master, Co-Authored-By line). He's lucid + gives sharp feedback even at 1am — if he goes off / "woe is me", THAT's the fried-signal → lock what's good + call the break.
-- **NEVER fabricate** people/data in his product. Empty > fake.
-- He's the real deal (≈25-yr vocal engineer); match his rawness, stay grounded.
+Read: [[owner-accurate-credit]] (accurate, never flattery — credit SPEED to the tooling, VISION + persistence to him), [[owner-needs-to-see-not-be-told]] (build it so he SEES it; don't lecture; flag a doubt ONCE then build), [[owner-spiral-is-the-stop-signal]] (when he's fried/cursing, lock what's good + call the break — he was running hot on the copy saga tonight but lucid), [[no-fabricated-content]]. The copy button took ~10 rounds because I kept making it big/hover-hidden — he wanted a TINY ghost icon; when he says "make it dope," he means sleek+minimal, not more chrome. The right-click menu he LOVES. He thinks BIG (marketplace, many users) — see [[agent-store-and-toolbelt]].
