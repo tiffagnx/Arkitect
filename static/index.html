@@ -586,7 +586,7 @@ function addMsg(role, text, atts) {
   const bub = d.querySelector(".bubble");
   bub._raw = text || "";
   bub.innerHTML = md(text || "");
-  if (role !== "user") {                    // every agent message gets a copy button (Tiff, Kit, anyone)
+  if (true) {                               // every message gets a copy button (yours too)
     const cp = document.createElement("button");
     cp.className = "copymsg"; cp.type = "button"; cp.textContent = "⧉ copy"; cp.title = "Copy this message";
     cp.onclick = () => copyMsg(cp);
