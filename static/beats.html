@@ -2696,6 +2696,23 @@ fetch('/api/plugins/bundle.js').then(r=>r.ok?r.text():'').then(js=>{ if(js){ try
   document.body.appendChild(b);
   var x=document.getElementById("dmvBeatX"); if(x) x.onclick=function(){ try{localStorage.setItem("dmv_beatdemo_x","1");}catch(e){} b.remove(); };
 })();
+// ── WEB-DEMO first-time onboarding — a newcomer doesn't know to hit Play; point them at it (public site only, once) ──
+(function(){
+  var h=location.hostname||"";
+  if(/^(localhost|127\.|0\.0\.0\.0|\[?::1)/.test(h)) return;
+  try{ if(localStorage.getItem("dmv_beatseen")==="1") return; }catch(e){}
+  var st=document.createElement("style");
+  st.textContent="@keyframes dmvpp{0%,100%{box-shadow:0 0 0 0 rgba(123,240,228,.55)}50%{box-shadow:0 0 0 9px rgba(123,240,228,0)}}#bPlay.dmv-pulse{animation:dmvpp 1.1s ease-out infinite;border-color:#7BF0E4!important}";
+  document.head.appendChild(st);
+  var pb=document.getElementById("bPlay"); if(pb) pb.classList.add("dmv-pulse");
+  var hint=document.createElement("div");
+  hint.style.cssText="position:fixed;left:50%;transform:translateX(-50%);top:56px;z-index:99998;padding:9px 15px;border-radius:12px;background:linear-gradient(180deg,#1b1c22,#141519);border:1px solid rgba(123,240,228,.5);box-shadow:0 12px 36px rgba(0,0,0,.5);color:#E7E9EE;font:600 12.5px Inter,system-ui,sans-serif;max-width:92vw;text-align:center";
+  hint.innerHTML='👆 New here? Hit <b style="color:#7BF0E4">▶ Play</b> to hear the beat — then click the squares to make it your own.';
+  document.body.appendChild(hint);
+  function done(){ try{localStorage.setItem("dmv_beatseen","1");}catch(e){} if(pb)pb.classList.remove("dmv-pulse"); if(hint)hint.remove(); }
+  if(pb) pb.addEventListener("click", done, {once:true});
+  setTimeout(done, 14000);
+})();
 </script>
 </body>
 </html>
