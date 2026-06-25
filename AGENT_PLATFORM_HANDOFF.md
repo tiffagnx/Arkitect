@@ -6,14 +6,22 @@
 
 ---
 
-## 🔴 TOMORROW — the owner's explicit to-do list (do these first)
-The next session: B will paste **4 screenshots** (chat home, Imagination Station home, the purple Beat Lab, the Studio). His asks, verbatim intent:
+## ✅ DONE 2026-06-23 (morning session) — yesterday's 3 fixes are SHIPPED to the live files
+All three are **static edits, live on refresh** (⚠️ but NOT in the frozen `DeMartinville.exe` — it serves a BUNDLED copy; B sees them via refresh of the dev app / preview, or after a rebuild):
+1. ✅ **Wings killed + rebalanced** — removed both `<div class="ark-wings">` blocks in `static/index.html` (the static hero ~line 421 AND the JS welcome-rebuild template ~line 856). Removing the div naturally pulled the "Start typing…" line + smarter card up. Dead `.ark-wings` CSS (~220-221) left in place, harmless. (B confirmed on-screen.)
+2. ✅ **The Kitchen de-purpled** — swept ~60 purple values in `static/beats.html` → teal/graphite (`--acc #B36CFF→#3E9CB8`, `--mag #E25CC0→#5FB4CE`, `179,108,255→62,156,184` ×53, all the light-purple hexes + bg tints). Zero purple left.
+3. ✅ **Renamed "DeMartin Beat Lab" → "The Kitchen"** (B picked it — producer "cook up a beat" slang, Boogie-friendly). 33 display-string swaps across 7 files (beats.html, index.html, kit-helper.js, studio.html, join.html, market.html, feedback-buddy.js). Internal `beats` room id UNTOUCHED.
 
-1. **KILL the front-page "wing" buttons** — the row `🛠 BUILD APPS · 🎚 MAKE MUSIC · 🎬 CUT VIDEO · 🎨 MAKE IMAGES · 👾 PLAY`. He circled them: *"I wanna kill that, I don't want those right there."* They show on the **chat home AND every room's home/blank screen** (e.g. Imagination Station). After removing, **move the text BELOW them UP** (the "Start typing to talk to Tiff…" line + the "☁ Make DeMartinville smarter" card) so there's no empty gap — **rebalance it so it looks right.** (Markup: `index.html` `.ark-wings` ~line 421-423; rooms have their own blank-slate copies.)
+## 🔴 NEXT UP (when B's weekly limit resets ~2am)
+- **B's SLIDE-THE-RAIL idea (his big new UI ask, NOT yet built — do it fresh, don't half-wire nav blind):** the left rooms rail should **slide fully out of the way** (button or drag), and the moment it's gone, a **room dock drops down right under the crew strip** (Tiff/Kit/Build-your-own) so rooms sit inches from where you drop them — drag straight in. TWO ways to grab a room; when one shows the other hides; toggle. (He'll re-explain in more detail; he already showed it with orange-annotated screenshots.)
+- **The "⚡ Power Up" page (compute pool doorway)** — see `COMPUTE_POOL_RESEARCH.md` + memory [[capability-aware-rented-gpu-vision]]. ⚠️ READ THE CORRECTED CONCEPT: it's a **Netflix-password community pool** — DeMartinville pays $0, hosts nothing. A crew rents a box on THEIR account, splits it themselves; the app's only job = "Join Pool" button → admin pastes the shared endpoint → route requests. Plus a "do it solo vs community" fork + a dummy-proof step-by-step playbook with DEEP-LINKS to RunPod/Vast/Salad + exact "where's the API key" hand-holding.
+- **Cloud-gen live test** — #1 on the test list, NEEDS B's real Atlas key in hand (can't be done autonomously).
+- Optional tiny copy nit (B said FORGET it for now): hero still reads "…step into a wing on the left" — wings gone, points at rail. Left intentionally.
 
-2. **Beat Lab is ALL PURPLE — recolor it.** `static/beats.html` is the ONLY page drowning in purple ("gunky bullshit," his words). Every other page is the teal/graphite DeMartinville theme. Re-skin beats.html to match the rest of the site (teal accents, graphite panels) — kill the purple.
-
-3. **Rename "DeMartin Beat Lab"** — he hates the name. Propose options, he picks. (It's a placeholder per memory [[beat-lab-build]].) Appears in `beats.html`, the rooms list, `kit-helper.js` ROOMS map (`beats: "DeMartin Beat Lab"`), ROOM_HELP, etc.
+## ⚠️ TODAY'S STRATEGIC DECISIONS (locked in memory — don't relitigate)
+- ⛔ **NO free model on B's Atlas key, ever.** Everything gen = **BYO-key only** (or user-funded pool). His account/money never exposed. See [[ai-generation-roadmap]].
+- 💰 **Right-sized money goal: ~$600/mo self-sustaining** (cover his Claude plan + ~$100/wk), NOT a business. Free-to-user is load-bearing. DON'T over-engineer monetization (no Stripe empire). See [[monetization-arsenal-model]].
+- 🛑 **Cost lesson:** a mis-scoped 100-agent deep-research run torched a big chunk of B's weekly usage on a question he already knew. ALWAYS flag agent/workflow SCALE before launching. He runs Opus on a $200 plan; respect the meter.
 
 ---
 

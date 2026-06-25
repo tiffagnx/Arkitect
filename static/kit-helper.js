@@ -13,7 +13,7 @@
   if (window.__kit) return;
   const path = location.pathname.toLowerCase();
   const ROOMS = {
-    studio: "DeMartin Audio Labs", beats: "DeMartin Beat Lab", build: "Blueprint Builds",
+    studio: "DeMartin Audio Labs", beats: "The Kitchen", build: "Blueprint Builds",
     editor: "LePrince Visual Labs", images: "Imagination Station", "imagine-cloud": "Imagination Station",
     draw: "Sketch Pad", character: "Agent Forge",
   };
@@ -97,7 +97,7 @@
   .kit-x { margin-left:auto; background:rgba(0,0,0,.28); border:none; color:#9FCFDD; width:22px; height:22px; border-radius:6px; cursor:pointer; font-size:12px; }
   .kit-x:hover { background:rgba(62,156,184,.3); color:#fff; }
   /* the roster strip — the cast you can drag into the room */
-  .kit-roster { display:flex; gap:6px; overflow-x:auto; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.18); }
+  .kit-roster { display:flex; gap:6px; overflow-x:auto; padding:6px 10px 5px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.18); }
   .kit-roster::-webkit-scrollbar { height:0; }
   .kit-chip { flex:none; display:flex; align-items:center; gap:6px; padding:4px 9px 4px 4px; border-radius:20px; cursor:grab;
     border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.03); transition:border-color .12s, background .12s, transform .1s; }
@@ -111,7 +111,7 @@
   .kit-chip-build { cursor:pointer; border-style:dashed; border-color:rgba(120,182,205,.4); padding:4px 11px; }
   .kit-chip-build:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.12); }
   .kit-chip-build .cn { color:#9FCFDD; }
-  .kit-hint { font:500 8.5px 'Space Mono'; letter-spacing:.08em; color:rgba(170,180,190,.45); padding:0 11px 7px; background:rgba(0,0,0,.18); }
+  .kit-hint { font:500 8.5px 'Space Mono'; letter-spacing:.08em; color:rgba(170,180,190,.45); padding:0 11px 5px; background:rgba(0,0,0,.18); }
   .room-drop { outline:2px dashed rgba(120,182,205,.0); transition:outline-color .15s; }
   .room-drop.armed { outline:2px dashed rgba(120,182,205,.8); outline-offset:-10px; }
   .drop-flash { position:fixed; z-index:9998; pointer-events:none; font:800 13px Oxanium; letter-spacing:.05em; color:#CFE6EE;
@@ -131,12 +131,12 @@
   .kblk-copy.done .ic-copy { display:none; } .kblk-copy.done .ic-check { display:inline; } .kblk-copy.done { color:#3FD98A; }
   .kit-msg.think { color:rgba(198,201,208,.6); font-style:italic; }
   .kit-msg.riff .riff-who { font:800 11px Oxanium; letter-spacing:.04em; }
-  .kit-mic { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
+  .kit-mic { flex:none; width:36px; height:31px; border:1px solid rgba(120,182,205,.4); border-radius:9px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:14px; }
   .kit-mic:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
   .kit-mic:disabled { opacity:.45; cursor:default; }
   .kit-mic.rec { border-color:#E0245E; background:rgba(224,36,94,.22); color:#fff; animation:kitmic 1.1s ease-in-out infinite; }
   @keyframes kitmic { 0%,100%{ box-shadow:0 0 0 0 rgba(224,36,94,.5);} 50%{ box-shadow:0 0 0 7px rgba(224,36,94,0);} }
-  .kit-tier { display:flex; align-items:center; gap:5px; padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.12); }
+  .kit-tier { display:flex; align-items:center; gap:5px; padding:5px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.12); }
   .kit-tier .kt-l { font:700 8.5px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:rgba(170,180,190,.5); margin-right:3px; }
   .kt-pill { font:700 9.5px Oxanium; letter-spacing:.04em; padding:3px 9px; border-radius:20px; cursor:pointer; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03); color:#C6CBD3; }
   .kt-pill.on[data-tier="local"] { border-color:rgba(120,182,205,.85); background:rgba(62,156,184,.18); color:#BFE6F2; }
@@ -180,15 +180,23 @@
   .kt-lever.cloud-locked .kl-lock { display:inline; }
   .kit-win.tier-private { border-color:rgba(217,164,65,.5); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(217,164,65,.28), 0 0 26px rgba(217,164,65,.12), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
-  .kit-foot { display:flex; gap:8px; padding:10px 11px; border-top:1px solid rgba(255,255,255,.07); }
-  .kit-in { flex:1; resize:none; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.1); border-radius:10px;
+  .kit-foot { display:flex; flex-direction:column; gap:7px; padding:9px 11px 11px; border-top:1px solid rgba(255,255,255,.07); }
+  .kit-in { width:100%; box-sizing:border-box; resize:none; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.1); border-radius:10px;
     color:#E9EAED; font:500 12.5px Inter; padding:9px 11px; outline:none; max-height:90px; }
   .kit-in:focus { border-color:rgba(62,156,184,.55); }
-  .kit-go { flex:none; width:40px; border:none; border-radius:10px; cursor:pointer;
+  .kit-go { flex:none; width:42px; height:31px; border:none; border-radius:9px; cursor:pointer;
     background:linear-gradient(180deg,#6FC0D8,#3E9CB8); color:#08171c; font-size:15px; }
   .kit-go:disabled { opacity:.5; cursor:default; }
-  .kit-up { flex:none; width:40px; border:1px solid rgba(120,182,205,.4); border-radius:10px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:15px; }
-  .kit-up:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-up, .kit-look, .kit-more { flex:none; width:36px; height:31px; border:1px solid rgba(120,182,205,.4); border-radius:9px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:14px; }
+  .kit-up:hover, .kit-look:hover, .kit-more:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-look.busy { opacity:.5; cursor:default; }
+  .kit-more { font-size:17px; line-height:1; color:#9FCFDD; }
+  /* tools live on their OWN row UNDER the input — agent-agnostic (built for ANY agent the user brings in) */
+  .kit-tools { display:flex; align-items:center; gap:6px; }
+  .kit-tools-sp { flex:1; }   /* spacer → leaves room on the LEFT for future tools (the + menu) */
+  .kit-more-menu { position:fixed; z-index:9998; min-width:154px; padding:5px; border-radius:10px; background:rgba(22,25,31,.98); border:1px solid rgba(120,182,205,.42); box-shadow:0 12px 32px rgba(0,0,0,.55); }
+  .kit-more-item { padding:7px 10px; border-radius:7px; cursor:pointer; font:600 12px Inter,system-ui,sans-serif; color:#D7DCE4; white-space:nowrap; }
+  .kit-more-item:hover { background:rgba(62,156,184,.22); color:#fff; }
   .kit-pic { display:none; align-items:center; gap:8px; padding:8px 11px 0; }
   .kit-pic img { max-width:84px; max-height:84px; border-radius:9px; border:1px solid rgba(120,182,205,.5); display:block; }
   .kit-picx { background:#E0245E; border:none; color:#fff; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:10px; flex:none; }
@@ -265,7 +273,7 @@
      <div class="kit-tier"><span class="kt-l">Brain</span><div class="kt-lever t1" id="ktLever"><span class="kl-track" id="ktTrack"><span class="kl-fill" id="ktFill"></span><span class="kl-thumb" id="ktThumb"></span></span><span class="kl-name" id="ktName">Local</span><span class="kl-lock" id="ktLock" title="Private &amp; Max Drive need a cloud key — tap 🔑">🔒</span></div><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
-     <div class="kit-foot"><button class="kit-up" title="Show me an image — I'll write the prompt from it">📎</button><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="ask">➤</button></div>`;
+     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -297,6 +305,123 @@
       const rd = new FileReader(); rd.onload = () => { pendingImage = rd.result; renderPic(); }; rd.readAsDataURL(f); };
     inp.click();
   };
+
+  // ── 👁 LOOK — the agent's eyes: HIDE the window (snap the screen BEHIND her, she's not in her own
+  //    shot), grab server-side (no browser "allow" prompt), then open the annotator to mark it up.
+  //    Generic on purpose — works for WHATEVER agent the user brought in. ──
+  const lookBtn = win.querySelector(".kit-look");
+  if (lookBtn) lookBtn.onclick = async () => {
+    if (lookBtn.classList.contains("busy")) return;
+    lookBtn.classList.add("busy"); lookBtn.textContent = "…";
+    const prevVis = win.style.visibility; win.style.visibility = "hidden";   // snap behind her
+    await new Promise(r => setTimeout(r, 90));                               // let the hide paint before the OS grab
+    let j = null;
+    try {
+      const r = await fetch("/api/screenshot", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      j = await r.json();
+    } catch (e) { j = null; }
+    win.style.visibility = prevVis;                                          // bring her back
+    lookBtn.classList.remove("busy"); lookBtn.textContent = "👁";
+    if (j && j.image) openAnnotator(j.image);
+    else if (typeof addMsg === "function") addMsg("kit", "Couldn't grab the screen just now — you can still paste or attach a screenshot with 📎. (If you're on a cloud brain, make sure the model can see images.)");
+  };
+
+  // ── "+" MORE TOOLS — the dropdown for extra/future tools. Add an entry to MORE_TOOLS and it shows up;
+  //    that's the room the slim tool row was built to leave. Agent-agnostic. ──
+  const moreBtn = win.querySelector(".kit-more");
+  const MORE_TOOLS = [
+    { label: "📋  Copy last reply", run: () => {
+        const msgs = body.querySelectorAll(".kit-msg.kit"); const last = msgs[msgs.length - 1];
+        const txt = last ? (last.innerText || last.textContent || "").trim() : "";
+        if (txt) { try { navigator.clipboard.writeText(txt); } catch (_) {} }
+      } },
+    { label: "🗑  Clear chat", run: () => { if (body) body.innerHTML = ""; } },
+  ];
+  let moreMenu = null;
+  function closeMore() { if (moreMenu) { moreMenu.remove(); moreMenu = null; document.removeEventListener("mousedown", onMoreDown, true); } }
+  function onMoreDown(e) { if (moreMenu && !moreMenu.contains(e.target) && e.target !== moreBtn) closeMore(); }
+  if (moreBtn) moreBtn.onclick = () => {
+    if (moreMenu) { closeMore(); return; }
+    moreMenu = document.createElement("div"); moreMenu.className = "kit-more-menu";
+    MORE_TOOLS.forEach(it => { const d = document.createElement("div"); d.className = "kit-more-item"; d.textContent = it.label;
+      d.onclick = () => { closeMore(); try { it.run(); } catch (_) {} }; moreMenu.appendChild(d); });
+    document.body.appendChild(moreMenu);
+    const r = moreBtn.getBoundingClientRect();
+    moreMenu.style.left = Math.max(6, r.left) + "px";
+    moreMenu.style.top = (r.top - moreMenu.offsetHeight - 6) + "px";   // pop ABOVE the tool row
+    setTimeout(() => document.addEventListener("mousedown", onMoreDown, true), 0);
+  };
+
+  // ── 👁 ANNOTATOR — mark up the captured shot (arrows / freehand, pick a color) to point at exactly
+  //    what you're explaining, THEN send it to whoever's in the room. Self-contained; styles inject once. ──
+  function openAnnotator(srcUrl) {
+    document.querySelectorAll(".ka-ov").forEach(o => o.remove());   // never stack two markup editors
+    if (!document.getElementById("ka-style")) {
+      const s = document.createElement("style"); s.id = "ka-style";
+      s.textContent =
+        ".ka-ov{position:fixed;inset:0;z-index:2147483646;background:rgba(8,10,14,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}" +
+        ".ka-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;background:rgba(20,25,31,.97);border:1px solid rgba(120,182,205,.35);border-radius:12px;padding:8px 12px;box-shadow:0 12px 40px rgba(0,0,0,.55)}" +
+        ".ka-ttl{font:700 11px Oxanium,system-ui,sans-serif;letter-spacing:.05em;color:#CFE6EE;margin-right:6px}" +
+        ".ka-tool,.ka-undo,.ka-cancel,.ka-send{font:700 12px Oxanium,system-ui,sans-serif;border-radius:8px;cursor:pointer;border:1px solid rgba(120,182,205,.4);background:rgba(255,255,255,.05);color:#CFE6EE;height:30px;padding:0 11px}" +
+        ".ka-tool{width:34px;padding:0;font-size:15px}.ka-tool.on{border-color:#6FC0D8;background:rgba(62,156,184,.22);color:#fff}" +
+        ".ka-tool:hover,.ka-undo:hover,.ka-cancel:hover{border-color:rgba(120,182,205,.8);background:rgba(62,156,184,.16)}" +
+        ".ka-cols{display:flex;gap:5px;margin:0 4px}" +
+        ".ka-col{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer;padding:0}.ka-col.on{border-color:#fff;transform:scale(1.12)}" +
+        ".ka-sp{flex:1;min-width:8px}" +
+        ".ka-send{border:none;background:linear-gradient(180deg,#6FC0D8,#3E9CB8);color:#08171c}" +
+        ".ka-stage{max-width:94vw;max-height:78vh;overflow:auto;border-radius:10px;border:1px solid rgba(120,182,205,.3);box-shadow:0 16px 50px rgba(0,0,0,.6)}" +
+        ".ka-cv{display:block;cursor:crosshair}";
+      document.head.appendChild(s);
+    }
+    const who = (typeof active !== "undefined" && active && active.name) ? active.name : "the agent";
+    const ov = document.createElement("div"); ov.className = "ka-ov";
+    ov.innerHTML =
+      '<div class="ka-bar"><span class="ka-ttl">Mark it up — point at what you mean</span>' +
+      '<button class="ka-tool on" data-tool="arrow" title="Arrow">↗</button>' +
+      '<button class="ka-tool" data-tool="pen" title="Draw freehand">✎</button>' +
+      '<span class="ka-cols"><button class="ka-col on" data-col="#FF3B30" style="background:#FF3B30"></button>' +
+      '<button class="ka-col" data-col="#FFD60A" style="background:#FFD60A"></button>' +
+      '<button class="ka-col" data-col="#34C759" style="background:#34C759"></button>' +
+      '<button class="ka-col" data-col="#0A84FF" style="background:#0A84FF"></button></span>' +
+      '<button class="ka-undo" title="Undo">↶ undo</button><span class="ka-sp"></span>' +
+      '<button class="ka-cancel">Cancel</button><button class="ka-send">Send to ' + who + '</button></div>' +
+      '<div class="ka-stage"><canvas class="ka-cv"></canvas></div>';
+    document.body.appendChild(ov);
+    const cv = ov.querySelector(".ka-cv"), ctx = cv.getContext("2d");
+    let tool = "arrow", color = "#FF3B30", shapes = [], drawing = null, scale = 1;
+    const img = new Image();
+    img.onload = () => {
+      const maxW = window.innerWidth * 0.92, maxH = window.innerHeight * 0.74;
+      scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      cv.width = img.width; cv.height = img.height;                                 // native res → crisp export
+      cv.style.width = (img.width * scale) + "px"; cv.style.height = (img.height * scale) + "px";
+      redraw();
+    };
+    img.src = srcUrl;
+    function redraw() { ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0); shapes.forEach(drawShape); if (drawing) drawShape(drawing); }
+    function drawShape(s) {
+      ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = Math.max(3, cv.width / 350); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      if (s.type === "arrow") {
+        ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+        const a = Math.atan2(s.y2 - s.y1, s.x2 - s.x1), h = Math.max(16, cv.width / 55);
+        ctx.beginPath(); ctx.moveTo(s.x2, s.y2);
+        ctx.lineTo(s.x2 - h * Math.cos(a - Math.PI / 7), s.y2 - h * Math.sin(a - Math.PI / 7));
+        ctx.lineTo(s.x2 - h * Math.cos(a + Math.PI / 7), s.y2 - h * Math.sin(a + Math.PI / 7));
+        ctx.closePath(); ctx.fill();
+      } else if (s.type === "pen") { ctx.beginPath(); s.pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
+    }
+    function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+    cv.onmousedown = e => { const p = pos(e); drawing = (tool === "arrow") ? { type:"arrow", color, x1:p.x, y1:p.y, x2:p.x, y2:p.y } : { type:"pen", color, pts:[p] }; };
+    cv.onmousemove = e => { if (!drawing) return; const p = pos(e); if (drawing.type === "arrow") { drawing.x2 = p.x; drawing.y2 = p.y; } else drawing.pts.push(p); redraw(); };
+    function up() { if (drawing) { shapes.push(drawing); drawing = null; redraw(); } }
+    window.addEventListener("mouseup", up);
+    ov.querySelectorAll(".ka-tool").forEach(b => b.onclick = () => { tool = b.dataset.tool; ov.querySelectorAll(".ka-tool").forEach(x => x.classList.toggle("on", x === b)); });
+    ov.querySelectorAll(".ka-col").forEach(b => b.onclick = () => { color = b.dataset.col; ov.querySelectorAll(".ka-col").forEach(x => x.classList.toggle("on", x === b)); });
+    ov.querySelector(".ka-undo").onclick = () => { shapes.pop(); redraw(); };
+    function close() { window.removeEventListener("mouseup", up); ov.remove(); }
+    ov.querySelector(".ka-cancel").onclick = close;
+    ov.querySelector(".ka-send").onclick = () => { pendingImage = cv.toDataURL("image/jpeg", 0.85); renderPic(); close(); if (input) input.focus(); };
+  }
 
   const KCOPY_SVG = '<svg class="ic-copy" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="ic-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
   function fmt(t) {
@@ -539,6 +664,8 @@
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
       const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier };
       if (sentImage) payload.image = sentImage;
+      // session-aware: if this room exposes a live snapshot (the studio does), hand the agent the REAL session
+      if (typeof window.dmvSessionSnapshot === "function") { const snap = window.dmvSessionSnapshot(); if (snap) payload.session = snap; }
       if (active.mine) {
         payload.persona = active.persona || "";
         payload.knowledge = active.knowledge || "";

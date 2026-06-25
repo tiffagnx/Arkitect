@@ -790,8 +790,8 @@
   <div class="tgroup"><span class="tg-l">FX</span>
     <button class="tb" id="throwToggle" onclick="toggleThrowBar()" title="FX Throw — print a tempo-synced delay/reverb throw onto the selected clip" style="width:auto;padding:0 10px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">⟿ THROW</button>
   </div>
-  <div class="tgroup"><span class="tg-l">BEAT LAB</span>
-    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open DeMartin Beat Lab as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 BEAT LAB</button>
+  <div class="tgroup"><span class="tg-l">THE KITCHEN</span>
+    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open The Kitchen as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 THE KITCHEN</button>
   </div>
   <div class="tgroup"><span class="tg-l">ZOOM · GRID</span>
     <div class="zoomctl">
@@ -1188,6 +1188,34 @@ function fxVariFi(buf, dir){
   return out;
 }
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
+// ── SESSION SNAPSHOT — a plain-English picture of the timeline RIGHT NOW, handed to Tiff/Kit so she
+//    answers about THIS mix (your real stems / inserts / tempo), not mixing in general. Free: it's just
+//    text appended to a message you're already sending. Exposed on window so the shared in-room bot
+//    file (kit-helper.js) can reach it; only the studio defines it, so every other room stays unchanged.
+window.dmvSessionSnapshot = function () {
+  try {
+    const bpm = Math.round(curTempo());
+    const key = (($("keyVal") || {}).textContent || "—").trim();
+    if (!Array.isArray(tracks) || tracks.length === 0)
+      return `SESSION: empty — no stems loaded yet. Tempo ${bpm} BPM, key ${key}.`;
+    const anySolo = tracks.some(t => t.solo);
+    const lines = tracks.map((t, i) => {
+      const flags = [];
+      if (t.muted) flags.push("MUTED");
+      if (t.solo)  flags.push("SOLO");
+      const fx = (t.inserts && t.inserts.length) ? t.inserts.map(x => x.name).join(" → ") : "no inserts";
+      const send = (t.send && t.send > 0) ? `, reverb send ${Math.round(t.send * 100)}%` : "";
+      const tag = flags.length ? ` [${flags.join(", ")}]` : "";
+      return `  ${i + 1}. ${t.name || "untitled"}${tag} — ${fx}${send}`;
+    });
+    return [
+      "SESSION STATE (what's on the timeline right now):",
+      `Tempo ${bpm} BPM · Key ${key} · ${tracks.length} track(s)` +
+        (anySolo ? " · (something is SOLO'd — muted-by-solo tracks won't be heard)" : ""),
+      ...lines
+    ].join("\n");
+  } catch (e) { return ""; }   // a snapshot error must never break the chat
+};
 
 // ── timeline viewport: zoom (magnify time) + horizontal scroll + tempo snap ──
 let zoom=1, scrollT=0, laneH=104, snapOn=true, gridNote=16, vZoom=1;
@@ -2073,6 +2101,312 @@ TIFF_PLUGINS.list.push(
       split.connect(dly, 1); dly.connect(merge, 0, 1);
       merge.connect(o);
       return { input: i, output: o, set(id, v) { dly.delayTime.value = v * 0.025; } };
+    } },
+  /* ── DeMartin Air — harmonic exciter: band-split → soft-saturate the highs → silky air-shelf,
+       blended on TOP of the dry. The "expensive sheen" pro vocals have, beyond a flat EQ boost.
+       All native nodes (HP + waveshaper@4x + highshelf + gain) → live insert AND offline-render safe. ── */
+  { name: "DeMartin Air",
+    subtitle: "Harmonic exciter — silk & sheen up top",
+    params: [
+      { id:"air",   label:"AIR",   min:0,    max:1,     value:0.35, fmt:v=>Math.round(v*100)+"%" },
+      { id:"freq",  label:"FOCUS", min:3000, max:12000, value:6500, fmt:v=>(v>=1000?(v/1000).toFixed(1)+"k":Math.round(v))+"Hz" },
+      { id:"drive", label:"DRIVE", min:0,    max:1,     value:0.4,  fmt:v=>Math.round(v*100)+"%" },
+      { id:"silk",  label:"SILK",  min:0,    max:8,     value:2.5,  fmt:v=>"+"+v.toFixed(1)+"dB" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dry = c.createGain(); dry.gain.value = 1;
+      const hp = c.createBiquadFilter(); hp.type = "highpass";  hp.frequency.value = 6500; hp.Q.value = 0.5;
+      const ws = c.createWaveShaper(); ws.oversample = "4x";    // oversample → harmonics without harsh aliasing
+      const hs = c.createBiquadFilter(); hs.type = "highshelf"; hs.frequency.value = 6500; hs.gain.value = 2.5;
+      const wet = c.createGain(); wet.gain.value = 0.35;
+      const setDrive = (d) => { const k = d * 8 + 0.6, n = 1024, curve = new Float32Array(n);
+        for (let j = 0; j < n; j++) { const x = (j / (n - 1)) * 2 - 1; curve[j] = Math.tanh(x * k); } ws.curve = curve; };
+      setDrive(0.4);
+      i.connect(dry); dry.connect(o);
+      i.connect(hp); hp.connect(ws); ws.connect(hs); hs.connect(wet); wet.connect(o);
+      const ramp = (p, v) => p.setTargetAtTime(v, c.currentTime, 0.02);
+      return { input: i, output: o,
+        set(id, v) { ({ air:()=>ramp(wet.gain, v),
+                        freq:()=>{ ramp(hp.frequency, v); ramp(hs.frequency, v); },
+                        drive:()=>setDrive(v),
+                        silk:()=>ramp(hs.gain, v) })[id]?.(); },
+        dispose() { try { i.disconnect(); o.disconnect(); dry.disconnect(); hp.disconnect(); ws.disconnect(); hs.disconnect(); wet.disconnect(); } catch(e){} } };
+    } },
+  /* ── DeMartin Doubler — 4 micro-detuned, time-offset copies panned hard L/R around the dry vocal:
+       instant width + thickness (the "stacked backing takes" sound). Each voice = a modulated delay
+       (LFO → delayTime = micro pitch-waver) + hard pan + high-pass to keep the doubles clean.
+       All native nodes → live insert AND offline-render safe. ── */
+  { name: "DeMartin Doubler",
+    subtitle: "Stacked vocal doubles — width & thickness",
+    params: [
+      { id:"amt",    label:"DOUBLE", min:0, max:1, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+      { id:"detune", label:"DETUNE", min:0, max:1, value:0.4, fmt:v=>Math.round(v*100)+"%" },
+      { id:"spread", label:"SPREAD", min:0, max:1, value:0.5, fmt:v=>Math.round(v*100)+"%" },
+      { id:"tone",   label:"TONE",   min:0, max:1, value:0.3, fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const dry = c.createGain(); dry.gain.value = 1;
+      const wet = c.createGain(); wet.gain.value = 0.5;
+      const hpS = c.createBiquadFilter(); hpS.type = "highpass"; hpS.frequency.value = 180;   // clean up the doubles only
+      i.connect(dry); dry.connect(o);
+      i.connect(hpS); wet.connect(o);
+      const pans  = [-0.95, -0.6, 0.6, 0.95];
+      const bases = [0.013, 0.019, 0.025, 0.031];
+      const rates = [0.11, 0.17, 0.13, 0.19];
+      const voices = [];
+      for (let v = 0; v < 4; v++) {
+        const dl = c.createDelay(0.12); dl.delayTime.value = bases[v];
+        const lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = rates[v];
+        const dep = c.createGain(); dep.gain.value = 0.0012;                 // LFO depth in seconds → pitch waver
+        const pan = c.createStereoPanner(); pan.pan.value = pans[v];
+        const vg = c.createGain(); vg.gain.value = 0.35;
+        lfo.connect(dep); dep.connect(dl.delayTime); lfo.start();
+        hpS.connect(dl); dl.connect(pan); pan.connect(vg); vg.connect(wet);
+        voices.push({ dl, dep, base: bases[v] });
+      }
+      const ramp = (p, val) => p.setTargetAtTime(val, c.currentTime, 0.03);
+      return { input: i, output: o,
+        set(id, val) { ({
+          amt:    () => ramp(wet.gain, val),
+          detune: () => voices.forEach(vo => ramp(vo.dep.gain, 0.0003 + val * 0.0022)),
+          spread: () => voices.forEach(vo => ramp(vo.dl.delayTime, vo.base * (0.5 + val * 1.1))),
+          tone:   () => ramp(hpS.frequency, 80 + val * 340),
+        })[id]?.(); },
+        dispose() { try { voices.forEach(vo => { vo.dl.disconnect(); vo.dep.disconnect(); }); i.disconnect(); o.disconnect(); dry.disconnect(); wet.disconnect(); hpS.disconnect(); } catch(e){} } };
+    } },
+  /* ── DeMartin Drive — hardware-modeled saturation (Ampex/EMI/Neve/triode/pentode), gain-compensated
+       so A/B is COLOR not volume, with a vocal tone shell (pre-sat Thump+Focus, post Air), Punish +18dB,
+       and true parallel Mix. All native (Biquad+WaveShaper@4x+Gain) → offline-render safe. Curve is
+       clamped to ±1 so the shaper can't add gain. ── */
+  { name: "DeMartin Drive",
+    subtitle: "Hardware saturation — color, not volume",
+    params: [
+      { id:"style",  label:"STYLE",  min:0,   max:4,   value:3,   step:1, fmt:v=>["AMPEX","EMI","NEVE","TRIODE","PENTODE"][Math.round(v)]||"NEVE" },
+      { id:"drive",  label:"DRIVE",  min:0,   max:100, value:28,  fmt:v=>Math.round(v)+"%" },
+      { id:"punish", label:"PUNISH", min:0,   max:1,   value:0,   step:1, fmt:v=>v>=0.5?"ON":"off" },
+      { id:"tone",   label:"TONE",   min:-100,max:100, value:12,  fmt:v=>(v>0?"+":"")+Math.round(v) },
+      { id:"thump",  label:"THUMP",  min:0,   max:9,   value:2,   fmt:v=>"+"+v.toFixed(1)+"dB" },
+      { id:"focus",  label:"FOCUS",  min:20,  max:300, value:80,  fmt:v=>Math.round(v)+"Hz" },
+      { id:"air",    label:"AIR",    min:0,   max:8,   value:2.5, fmt:v=>"+"+v.toFixed(1)+"dB" },
+      { id:"mix",    label:"MIX",    min:0,   max:1,   value:0.45,fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const focusHP = c.createBiquadFilter(); focusHP.type='highpass'; focusHP.frequency.value=80; focusHP.Q.value=0.707;
+      const thump   = c.createBiquadFilter(); thump.type='lowshelf';  thump.frequency.value=110; thump.gain.value=2;     // PRE-sat body
+      const toneLo  = c.createBiquadFilter(); toneLo.type='lowshelf';  toneLo.frequency.value=320;
+      const toneHi  = c.createBiquadFilter(); toneHi.type='highshelf'; toneHi.frequency.value=3200;
+      const driveGain = c.createGain(); driveGain.gain.value=1;
+      const shaper  = c.createWaveShaper(); shaper.oversample='4x';
+      const dcBlock = c.createBiquadFilter(); dcBlock.type='highpass'; dcBlock.frequency.value=12; dcBlock.Q.value=0.707;  // kills even-harmonic DC
+      const air     = c.createBiquadFilter(); air.type='highshelf'; air.frequency.value=10000; air.gain.value=2.5;
+      const trim    = c.createGain(); trim.gain.value=1;
+      const wet = c.createGain(), dry = c.createGain(); wet.gain.value=0.45; dry.gain.value=0.55;
+      i.connect(focusHP); focusHP.connect(thump); thump.connect(toneLo); toneLo.connect(toneHi);
+      toneHi.connect(driveGain); driveGain.connect(shaper); shaper.connect(dcBlock);
+      dcBlock.connect(air); air.connect(trim); trim.connect(wet); wet.connect(o);
+      i.connect(dry); dry.connect(o);   // true parallel dry
+      let style=3, drive=28, punish=0;
+      const N=8192;
+      // per-style even/odd recipe: asym=DC bias→2nd-order even harmonics; ord=blend toward odd cubic; hard=edge
+      const REC=[{asym:0.10,ord:0.15,hard:0.0},{asym:0.05,ord:0.30,hard:0.0},{asym:0.14,ord:0.35,hard:0.1},{asym:0.18,ord:0.05,hard:0.0},{asym:0.02,ord:0.85,hard:0.25}];
+      const makeCurve=(st,d)=>{ const cu=new Float32Array(N); const k=1+(d/100)*7; const r=REC[st]||REC[3];
+        const nrm=Math.tanh(k*(1+r.asym))||1;
+        for(let j=0;j<N;j++){ const x=(j/(N-1))*2-1; const xb=x+r.asym;
+          const soft=Math.tanh(k*xb)/nrm;
+          const xc=Math.max(-1,Math.min(1,k*x)); const cubic=(xc-(xc*xc*xc)/3)/(1-1/3);
+          const hardv=Math.max(-1,Math.min(1,xc));
+          let y=soft*(1-r.ord)+cubic*r.ord; y=y*(1-r.hard)+hardv*r.hard;
+          y=Math.max(-1,Math.min(1,y)); cu[j]=Number.isFinite(y)?y:0; }
+        return cu; };
+      const makeupTrim=(cu)=>{ let s=0; for(let j=0;j<cu.length;j++) s+=cu[j]*cu[j]; const rms=Math.sqrt(s/cu.length); return rms>1e-4?Math.min(1,0.5/rms):1; };
+      const rebuild=()=>{ const cu=makeCurve(style,drive); shaper.curve=cu; trim.gain.setTargetAtTime(makeupTrim(cu),c.currentTime,0.02); };
+      const applyDrive=()=>{ const boost=punish?Math.pow(10,18/20):1; const g=(1+(drive/100)*3)*boost; driveGain.gain.setTargetAtTime(g,c.currentTime,0.02); };
+      rebuild(); applyDrive();
+      return { input:i, output:o,
+        set(id,v){
+          const ramp=(prm,val,t=0.02)=>prm.setTargetAtTime(val,c.currentTime,t);
+          if(id==='style'){ style=Math.round(v); rebuild(); }
+          else if(id==='drive'){ drive=v; rebuild(); applyDrive(); }
+          else if(id==='punish'){ punish=v>=0.5?1:0; applyDrive(); }
+          else if(id==='tone'){ const t=v/100, amt=6; ramp(toneHi.gain,t*amt); ramp(toneLo.gain,-t*amt); }
+          else if(id==='thump'){ ramp(thump.gain,v); }
+          else if(id==='focus'){ ramp(focusHP.frequency,v); }
+          else if(id==='air'){ ramp(air.gain,v); }
+          else if(id==='mix'){ ramp(wet.gain,v); ramp(dry.gain,1-v); }
+        },
+        dispose(){ try{[i,o,focusHP,thump,toneLo,toneHi,driveGain,shaper,dcBlock,air,trim,wet,dry].forEach(n=>n.disconnect&&n.disconnect());}catch(e){} } };
+    } },
+  /* ── DeMartin Vocal Verb — ducked + tempo-synced vocal reverb. Reuses the proven tiff-compressor
+       worklet for the duck (DRY vocal keys the tail down so a soaked vocal stays intelligible),
+       the deterministic makeIR engine (bounce==monitor), and curTempo() for note-synced pre-delay.
+       No NEW worklet. LEAD / AD-LIB presets. ── */
+  { name: "DeMartin Vocal Verb",
+    subtitle: "Ducked, tempo-synced vocal reverb",
+    params: [
+      { id:"preset",  label:"MODE",     min:0,   max:1,     value:0,    step:1, fmt:v=>v>=0.5?"AD-LIB":"LEAD" },
+      { id:"size",    label:"SIZE",     min:0.4, max:6,     value:1.4,  fmt:v=>v.toFixed(2)+"s" },
+      { id:"tone",    label:"TONE",     min:800, max:14000, value:7000, fmt:v=>(v>=1000?(v/1000).toFixed(1)+"k":Math.round(v))+"Hz" },
+      { id:"presync", label:"PRE-SYNC", min:0,   max:4,     value:3,    step:1, fmt:v=>["FREE","1/32","1/16T","1/16","1/8"][Math.round(v)]||"1/16" },
+      { id:"pre",     label:"PRE-DLY",  min:0,   max:0.2,   value:0.03, fmt:v=>Math.round(v*1000)+"ms" },
+      { id:"duck",    label:"DUCK",     min:0,   max:1,     value:0.7,  fmt:v=>Math.round(v*100)+"%" },
+      { id:"width",   label:"WIDTH",    min:0,   max:1,     value:0,    fmt:v=>Math.round(v*100)+"%" },
+      { id:"ret",     label:"RETURN",   min:0,   max:1.5,   value:0.45, fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const i=c.createGain(), o=c.createGain(), dry=c.createGain();
+      const keyTap=c.createGain();                          // DRY vocal → sidechain key
+      const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=120;
+      const pre=c.createDelay(1.0);                          // 1s headroom: 1/8 @ 60BPM = 0.5s
+      const cv=c.createConvolver();
+      const damp=c.createBiquadFilter(); damp.type='highshelf'; damp.frequency.value=7000; damp.gain.value=-3;
+      const mod=c.createDelay(0.06), lfo=c.createOscillator(), lfoDepth=c.createGain();
+      lfo.type='sine'; lfo.frequency.value=0.6; lfoDepth.gain.value=0.0026; mod.delayTime.value=0.004;
+      lfo.connect(lfoDepth); lfoDepth.connect(mod.delayTime); try{lfo.start();}catch(e){}
+      const split=c.createChannelSplitter(2), merge=c.createChannelMerger(2), rDel=c.createDelay(0.05); // Haas width
+      const duck=new AudioWorkletNode(c,'tiff-compressor',{numberOfInputs:2,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',channelInterpretation:'speakers'});
+      const P=duck.parameters;
+      P.get('threshold').value=-28; P.get('knee').value=8; P.get('ratio').value=4; P.get('attack').value=6; P.get('release').value=220; P.get('makeup').value=0; P.get('mix').value=1;
+      P.get('detector').setValueAtTime(0,c.currentTime);     // 0=peak (responsive duck) — STEPPED, set once
+      const ret=c.createGain();
+      let size=1.4, tone=7000, bt=null;
+      const bake=()=>{ try{ cv.buffer=makeIR(c,size,tone); }catch(e){} };  // deterministic → bounce==monitor
+      bake(); dry.gain.value=1; keyTap.gain.value=1; pre.delayTime.value=0.03; ret.gain.value=0.45;
+      i.connect(dry); dry.connect(o);
+      i.connect(keyTap);
+      i.connect(hp); hp.connect(pre); pre.connect(cv); cv.connect(damp); damp.connect(mod);
+      mod.connect(split); split.connect(merge,0,0); split.connect(rDel,1); rDel.connect(merge,0,1);
+      merge.connect(duck,0,0); keyTap.connect(duck,0,1);     // DRY into sidechain input #1
+      duck.connect(ret); ret.connect(o);
+      const noteSec=k=>{ const spb=60/(curTempo()||120); const a=[null,spb/8,spb/6,spb/4,spb/2]; return a[Math.max(0,Math.min(4,Math.round(k)))]; };
+      let presync=3, freePre=0.03;
+      const applyPre=()=>{ const n=noteSec(presync); pre.delayTime.setTargetAtTime(Math.min(1.0,n!=null?n:freePre),c.currentTime,0.01); };
+      applyPre();
+      function setDuck(a){ P.get('threshold').setTargetAtTime(-18-18*a,c.currentTime,0.02); P.get('ratio').setTargetAtTime(2+4*a,c.currentTime,0.02); P.get('mix').setValueAtTime(a<=0?0:1,c.currentTime); }
+      setDuck(0.7);
+      function preset(adlib){
+        if(adlib){ size=4.2; tone=10000; presync=4; ret.gain.value=0.8; damp.gain.setTargetAtTime(-1.5,c.currentTime,0.02); rDel.delayTime.setTargetAtTime(0.013,c.currentTime,0.02); setDuck(0.45); }
+        else { size=1.4; tone=7000; presync=3; ret.gain.value=0.45; damp.gain.setTargetAtTime(-3,c.currentTime,0.02); rDel.delayTime.setTargetAtTime(0,c.currentTime,0.02); setDuck(0.7); }
+        clearTimeout(bt); bt=setTimeout(bake,140); applyPre();
+      }
+      return { input:i, output:o,
+        set(id,v){
+          if(id==='preset'){ preset(v>=0.5); }
+          else if(id==='size'){ size=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+          else if(id==='tone'){ tone=v; clearTimeout(bt); bt=setTimeout(bake,140); }
+          else if(id==='presync'){ presync=Math.round(v); applyPre(); }
+          else if(id==='pre'){ freePre=v; if(presync===0) applyPre(); }
+          else if(id==='duck'){ setDuck(v); }
+          else if(id==='width'){ rDel.delayTime.setTargetAtTime(0.018*v,c.currentTime,0.02); }
+          else if(id==='ret'){ ret.gain.setTargetAtTime(v,c.currentTime,0.01); }
+        },
+        dispose(){ clearTimeout(bt); try{lfo.stop();}catch(e){} try{lfo.disconnect();}catch(e){} try{duck.port.onmessage=null;}catch(e){} try{duck.disconnect();}catch(e){} try{[i,o,dry,keyTap,hp,pre,cv,damp,mod,lfoDepth,split,merge,rDel,ret].forEach(n=>n.disconnect&&n.disconnect());}catch(e){} }
+      };
+    } },
+  /* ── DeMartin Opto — LA-2A-style optical leveler (the "wrap, don't clamp" glue). One worklet
+       (demartin-opto): program-dependent two-stage release, level-dependent attack, HF-emphasized
+       detection on the key only. No ratio knob (true to hardware) — Peak Reduction + Gain + Comp/Limit.
+       Self-keys; host loads the worklet before build (like Compressor). Offline-render safe. ── */
+  { name: "DeMartin Opto",
+    subtitle: "Optical leveler — wrap, don't clamp",
+    params: [
+      { id:"reduction", label:"PEAK RED", min:0,   max:100, value:35, fmt:v=>Math.round(v)+"%" },
+      { id:"gain",      label:"GAIN",     min:-12, max:24,  value:4,  fmt:v=>(v>0?"+":"")+v.toFixed(1)+"dB" },
+      { id:"emphasis",  label:"EMPHASIS", min:0,   max:100, value:45, fmt:v=>Math.round(v)+"%" },
+      { id:"opto",      label:"OPTO",     min:0,   max:100, value:60, fmt:v=>Math.round(v)+"%" },
+      { id:"mix",       label:"MIX",      min:0,   max:1,   value:1,  fmt:v=>Math.round(v*100)+"%" },
+      { id:"limit",     label:"MODE",     min:0,   max:1,   value:0,  step:1, fmt:v=>v>=0.5?"LIMIT":"COMP" },
+    ],
+    create(c) {
+      const node = new AudioWorkletNode(c, 'demartin-opto', { numberOfInputs:2, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit', channelInterpretation:'speakers' });
+      node._gr = 0;
+      node.port.onmessage = e => { if (e.data && typeof e.data.gr === 'number') node._gr = e.data.gr; };
+      const STEPPED = { limit:true };
+      return { input:node, output:node, sidechainInput:node, sidechainInputIndex:1, meter:()=>node._gr,
+        set(id, val) { const p = node.parameters.get(id); if (!p) return;
+          if (STEPPED[id]) { try{p.cancelScheduledValues(c.currentTime);}catch(e){} p.setValueAtTime(id==='limit'?(val>=0.5?1:0):val, c.currentTime); }
+          else p.setTargetAtTime(val, c.currentTime, 0.02); },
+        dispose() { try{node.port.onmessage=null;}catch(e){} try{node.disconnect();}catch(e){} } };
+    } },
+  /* ── DeMartin FET-76 — the 1176. INPUT drives into a fixed internal threshold, RATIO snaps 4/8/12/20:1,
+       ALL-BTN = British "all-buttons" mode, COLOR = Class-A harmonic drive. One worklet (demartin-fet76);
+       host loads worklets before build; self-keys. Offline-render safe. ── */
+  { name: "DeMartin FET-76",
+    subtitle: "1176 FET comp — in-your-face vocals",
+    params: [
+      { id:"input",   label:"INPUT",   min:-12, max:36, value:12,   fmt:v=>(v>0?"+":"")+Math.round(v)+"dB" },
+      { id:"ratio",   label:"RATIO",   min:0,   max:3,  value:0,    step:1, fmt:v=>[4,8,12,20][Math.max(0,Math.min(3,Math.round(v)))]+":1" },
+      { id:"attack",  label:"ATTACK",  min:0,   max:1,  value:0.85, fmt:v=>Math.round(v*100)+"%" },
+      { id:"release", label:"RELEASE", min:0,   max:1,  value:0.55, fmt:v=>Math.round(v*100)+"%" },
+      { id:"allbtn",  label:"ALL-BTN", min:0,   max:1,  value:0,    step:1, fmt:v=>v>=0.5?"IN":"off" },
+      { id:"color",   label:"COLOR",   min:0,   max:1,  value:0.5,  fmt:v=>Math.round(v*100)+"%" },
+      { id:"output",  label:"OUTPUT",  min:-24, max:24, value:0,    fmt:v=>(v>0?"+":"")+v.toFixed(1)+"dB" },
+      { id:"mix",     label:"MIX",     min:0,   max:1,  value:1,    fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const input=c.createGain(), output=c.createGain();
+      const inGain=c.createGain(), outGain=c.createGain();
+      const wet=c.createGain(), dry=c.createGain();
+      const fet=new AudioWorkletNode(c,'demartin-fet76',{numberOfInputs:2,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit',channelInterpretation:'speakers'});
+      fet._gr=0; fet.port.onmessage=e=>{ if(e.data && typeof e.data.gr==='number') fet._gr=e.data.gr; };
+      input.connect(inGain); inGain.connect(fet,0,0); fet.connect(outGain); outGain.connect(wet); wet.connect(output);
+      input.connect(dry); dry.connect(output);
+      const snapRatio=i=>[4,8,12,20][Math.max(0,Math.min(3,Math.round(i)))];
+      return { input, output, sidechainInput:fet, sidechainInputIndex:1, meter:()=>fet._gr,
+        set(id,val){
+          const at=c.currentTime;
+          if(id==='input'){ inGain.gain.setTargetAtTime(Math.pow(10,val/20),at,0.01); const p=fet.parameters.get('drive'); if(p) p.setTargetAtTime(val,at,0.01); return; }
+          if(id==='output'){ outGain.gain.setTargetAtTime(Math.pow(10,val/20),at,0.01); return; }
+          if(id==='mix'){ const m=Math.max(0,Math.min(1,val)); wet.gain.setTargetAtTime(m,at,0.01); dry.gain.setTargetAtTime(1-m,at,0.01); return; }
+          if(id==='color'){ const p=fet.parameters.get('color'); if(p) p.setTargetAtTime(val,at,0.01); return; }
+          if(id==='ratio'){ const p=fet.parameters.get('ratio'); if(!p) return; try{p.cancelScheduledValues(at);}catch(e){} p.setValueAtTime(snapRatio(val),at); return; }
+          if(id==='allbtn'){ const p=fet.parameters.get('allbtn'); if(!p) return; try{p.cancelScheduledValues(at);}catch(e){} p.setValueAtTime(val>=0.5?1:0,at); return; }
+          if(id==='attack'){ const us=20*Math.pow(40,1-Math.max(0,Math.min(1,val))); const p=fet.parameters.get('attackMs'); if(p) p.setTargetAtTime(us/1000,at,0.01); return; }   // CW = fastest
+          if(id==='release'){ const ms=50*Math.pow(22,1-Math.max(0,Math.min(1,val))); const p=fet.parameters.get('releaseMs'); if(p) p.setTargetAtTime(ms,at,0.01); return; }       // CW = fastest
+        },
+        dispose(){ try{fet.port.onmessage=null;}catch(e){} try{[fet,input,inGain,outGain,wet,dry].forEach(n=>n.disconnect&&n.disconnect());}catch(e){} } };
+    } },
+  /* ── DeMartin Spectra — 4-band DYNAMIC EQ (Boom/Harsh/Presence/Ess). Each band moves ONLY when its
+       own frequency spikes (band-local detection), so it tames problems and leaves the body alone.
+       THR at top = AUTO (rides a 300ms RMS). One worklet (spectra-dyneq). Offline-render safe. ── */
+  { name: "DeMartin Spectra",
+    subtitle: "4-band dynamic EQ — fix spikes, keep the body",
+    params: [
+      { id:"b1_freq",  label:"BOOM Hz",   min:80,   max:350,   value:200,  fmt:v=>Math.round(v)+"Hz" },
+      { id:"b1_gain",  label:"BOOM dB",   min:-6,   max:6,     value:0,    fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b1_range", label:"BOOM DYN",  min:-12,  max:6,     value:-4,   fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b1_thr",   label:"BOOM THR",  min:-48,  max:0,     value:0,    fmt:v=>v>=-0.5?"AUTO":Math.round(v)+"dB" },
+      { id:"b2_freq",  label:"HARSH Hz",  min:1500, max:5000,  value:3000, fmt:v=>(v/1000).toFixed(1)+"k" },
+      { id:"b2_gain",  label:"HARSH dB",  min:-6,   max:6,     value:0,    fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b2_range", label:"HARSH DYN", min:-12,  max:6,     value:-5,   fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b2_thr",   label:"HARSH THR", min:-48,  max:0,     value:0,    fmt:v=>v>=-0.5?"AUTO":Math.round(v)+"dB" },
+      { id:"b3_freq",  label:"PRES Hz",   min:3000, max:8000,  value:5000, fmt:v=>(v/1000).toFixed(1)+"k" },
+      { id:"b3_gain",  label:"PRES dB",   min:-6,   max:6,     value:0,    fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b3_range", label:"PRES DYN",  min:-12,  max:6,     value:2,    fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b3_thr",   label:"PRES THR",  min:-48,  max:0,     value:0,    fmt:v=>v>=-0.5?"AUTO":Math.round(v)+"dB" },
+      { id:"b4_freq",  label:"ESS Hz",    min:5000, max:12000, value:7500, fmt:v=>(v/1000).toFixed(1)+"k" },
+      { id:"b4_gain",  label:"ESS dB",    min:-6,   max:6,     value:0,    fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b4_range", label:"ESS DYN",   min:-12,  max:6,     value:-6,   fmt:v=>(v>0?"+":"")+v.toFixed(1) },
+      { id:"b4_thr",   label:"ESS THR",   min:-48,  max:0,     value:0,    fmt:v=>v>=-0.5?"AUTO":Math.round(v)+"dB" },
+      { id:"q",        label:"Q",         min:0.5,  max:8,     value:2.5,  fmt:v=>v.toFixed(1) },
+      { id:"atk",      label:"ATTACK",    min:0.2,  max:50,    value:3,    fmt:v=>v.toFixed(1)+"ms" },
+      { id:"rel",      label:"RELEASE",   min:30,   max:400,   value:120,  fmt:v=>Math.round(v)+"ms" },
+      { id:"mix",      label:"MIX",       min:0,    max:1,     value:1,    fmt:v=>Math.round(v*100)+"%" },
+    ],
+    create(c) {
+      const input=c.createGain(), output=c.createGain();
+      const node=new AudioWorkletNode(c,'spectra-dyneq',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:'explicit'});
+      input.connect(node); node.connect(output);
+      node._gr=null;
+      node.port.onmessage=e=>{ if(e.data && e.data.gr) node._gr=e.data.gr; };
+      const P=node.parameters;
+      return { input, output, meter:()=>node._gr,
+        set(id,val){ const p=P.get(id); if(!p) return; const t=c.currentTime;
+          const glide=(id==='mix'||id.endsWith('_gain')||id==='atk'||id==='rel');
+          if(glide) p.setTargetAtTime(val,t,0.01); else p.setValueAtTime(val,t); },   // freq/range/thr/q snap (k-rate)
+        dispose(){ try{node.port.onmessage=null;}catch(e){} try{input.disconnect();}catch(e){} try{node.disconnect();}catch(e){} } };
     } },
   /* ── DeMartin Delay — feedback delay w/ tape-darkened repeats (live insert; reverse-render in the
        DeMartin Suite = REVERSE DELAY, the repeats swell INTO the hit). ── */
@@ -3342,6 +3676,203 @@ registerProcessor('transient-shaper', class extends AudioWorkletProcessor {
     return true;
   }
 });
+/* ── demartin-opto — LA-2A optical leveler: program-dependent two-stage release + level-dependent
+     attack + HF-emphasized detection on the KEY only. Self-keys (sidechain on input 1 optional). ── */
+registerProcessor('demartin-opto', class extends AudioWorkletProcessor {
+  static get parameterDescriptors(){ return [
+    {name:'reduction', defaultValue:35, minValue:0,   maxValue:100, automationRate:'a-rate'},
+    {name:'gain',      defaultValue:4,  minValue:-12, maxValue:24,  automationRate:'a-rate'},
+    {name:'emphasis',  defaultValue:45, minValue:0,   maxValue:100, automationRate:'a-rate'},
+    {name:'opto',      defaultValue:60, minValue:0,   maxValue:100, automationRate:'a-rate'},
+    {name:'mix',       defaultValue:1,  minValue:0,   maxValue:1,   automationRate:'a-rate'},
+    {name:'limit',     defaultValue:0,  minValue:0,   maxValue:1,   automationRate:'k-rate'},
+  ]; }
+  constructor(){ super(); this._cellDb=0; this._slowDb=0; this._mem=0; this._keyHs=[]; this._peakGr=0; this._post=0; }
+  process(inputs,outputs,params){
+    const inp=inputs[0], sc=inputs[1], out=outputs[0];
+    if(!inp||!inp.length||!out||!out.length) return true;
+    const nch=inp.length, len=out[0].length; if(!len) return true;
+    const key=(sc&&sc.length&&sc[0]&&sc[0].length)?sc:inp; const kch=key.length;
+    while(this._keyHs.length<kch) this._keyHs.push(0);
+    const redA=params.reduction, gA=params.gain, emA=params.emphasis, opA=params.opto, mxA=params.mix;
+    const limit=params.limit[0]>=0.5;
+    const LOG2DB=20/Math.LN10, DB2LIN=Math.LN10/20, DENORM=1e-20;
+    const tc=ms=>Math.exp(-1/(sampleRate*(Math.max(ms,0.05)/1000)));
+    const hpCoef=Math.exp(-2*Math.PI*1800/sampleRate);
+    let cell=this._cellDb, slow=this._slowDb, mem=this._mem, peak=this._peakGr;
+    for(let i=0;i<len;i++){
+      const red=redA.length>1?redA[i]:redA[0];
+      const em=(emA.length>1?emA[i]:emA[0])/100;
+      const op=(opA.length>1?opA[i]:opA[0])/100;
+      let kmax=0;
+      for(let cc=0;cc<kch;cc++){ const kc=key[cc]; if(!kc) continue;
+        const x=kc[i]; const lp=x+hpCoef*(this._keyHs[cc]-x); this._keyHs[cc]=lp;
+        const hp=x-lp; const kk=x+em*3.0*hp; const a=Math.abs(kk); if(a>kmax)kmax=a; }   // HF emphasis on KEY only
+      const L=kmax>1e-9?Math.log(kmax)*LOG2DB:-180;
+      const thr=-6-(red/100)*28;                                   // Peak Reduction → moving threshold (-6..-34dB)
+      const over=L-thr; const slope=limit?(1-1/10):(1-1/3); const knee=6; let target;
+      if(over<=-knee/2) target=0; else if(over>=knee/2) target=slope*over;
+      else { const t=over+knee/2; target=slope*(t*t)/(2*knee); }   // soft optical knee
+      if(target<0) target=0;
+      const driveTgt=Math.min(1,target/8); const memCoef=driveTgt>mem?tc(120):tc(2500); mem=driveTgt+memCoef*(mem-driveTgt); if(mem<DENORM)mem=0;
+      const atkMs=Math.max(5,10-7.5*Math.min(1,Math.max(0,over/18)));   // level-dependent attack, 5ms floor
+      const slowMs=300+op*(2000+mem*9500);                         // program-dependent slow tail
+      const fastRelMs=60-op*20;
+      if(target>cell){ const ca=tc(atkMs); cell=target+ca*(cell-target); if(target>slow) slow=target; }
+      else { const cs=tc(slowMs); slow=cs*slow; if(slow<target) slow=target;
+             const cf=tc(fastRelMs); cell=slow+cf*(cell-slow); }
+      if(cell<DENORM)cell=0; if(cell!==cell)cell=0; if(cell>peak)peak=cell;
+      const g=(gA.length>1?gA[i]:gA[0]); let mix=(mxA.length>1?mxA[i]:mxA[0]); if(mix<0)mix=0; else if(mix>1)mix=1;
+      const redG=Math.exp(-cell*DB2LIN), mkLin=Math.exp(g*DB2LIN);   // makeup applies POST-mix to whole signal
+      for(let cc=0;cc<nch;cc++){ const ic=inp[cc], oc=out[cc]; if(!oc) continue; const dry=ic?ic[i]:0; let y=dry+mix*(dry*redG-dry); y*=mkLin; if(y!==y)y=0; oc[i]=y; }
+    }
+    for(let cc=nch;cc<out.length;cc++){ if(out[cc]&&out[0]) out[cc].set(out[0]); }   // mono → fill stereo
+    this._cellDb=cell; this._slowDb=slow; this._mem=mem; this._peakGr=peak;
+    this._post++; if(this._post>=8){ this._post=0; this.port.postMessage({gr:peak}); this._peakGr=0; }
+    return true;
+  }
+});
+/* ── demartin-fet76 — 1176 FET comp: sub-ms attack, fixed-ratio snap, ALL-BUTTONS bite, dual-TC
+     release, level-dependent Class-A color. INPUT/drive keys the DETECTOR only (audio pre-raised by inGain). ── */
+registerProcessor('demartin-fet76', class extends AudioWorkletProcessor {
+  static get parameterDescriptors(){ return [
+    {name:'drive',     defaultValue:12,   minValue:-12,  maxValue:36,   automationRate:'a-rate'},
+    {name:'ratio',     defaultValue:4,    minValue:4,    maxValue:20,   automationRate:'a-rate'},
+    {name:'attackMs',  defaultValue:0.05, minValue:0.02, maxValue:0.8,  automationRate:'a-rate'},
+    {name:'releaseMs', defaultValue:250,  minValue:50,   maxValue:1100, automationRate:'a-rate'},
+    {name:'color',     defaultValue:0.5,  minValue:0,    maxValue:1,    automationRate:'a-rate'},
+    {name:'allbtn',    defaultValue:0,    minValue:0,    maxValue:1,    automationRate:'k-rate'},
+  ]; }
+  constructor(){ super(); this._env=0; this._hold=0; this._meterPeak=0; this._post=0; }
+  process(inputs,outputs,params){
+    const inp=inputs[0], sc=inputs[1], out=outputs[0];
+    if(!inp||!inp.length||!out||!out.length) return true;
+    const key=(sc&&sc[0]&&sc[0].length)?sc:inp; const nch=inp.length, len=out[0].length; if(!len) return true;
+    const all=params.allbtn[0]>=0.5; const THR=-18;
+    const LOG2DB=20/Math.LN10, DB2LIN=Math.LN10/20;
+    let env=this._env, hold=this._hold, mPk=this._meterPeak;
+    for(let i=0;i<len;i++){
+      let kmax=0; for(let cc=0;cc<key.length;cc++){ const k=key[cc]; if(k){ const a=Math.abs(k[i]); if(a>kmax)kmax=a; } }
+      const drv=params.drive.length>1?params.drive[i]:params.drive[0];
+      const Llin=kmax*Math.exp(drv*DB2LIN);                 // INPUT drive on the DETECTOR ONLY
+      const L=Llin>1e-9?Math.log(Llin)*LOG2DB:-180;
+      let ratio=all?13:(params.ratio.length>1?params.ratio[i]:params.ratio[0]); if(ratio<1)ratio=1;
+      const slope=1-1/ratio, knee=6, o=L-THR; let gr;
+      if(o<=-knee/2) gr=0; else if(o>=knee/2) gr=slope*o; else { const t=o+knee/2; gr=slope*(t*t)/(2*knee); } if(gr<0)gr=0;
+      let atkMs=params.attackMs.length>1?params.attackMs[i]:params.attackMs[0];
+      const relMs=params.releaseMs.length>1?params.releaseMs[i]:params.releaseMs[0];
+      if(all) atkMs*=4;                                     // ALL-BUTTONS: lag the attack → transients clip through
+      const atkC=Math.exp(-1/(sampleRate*(Math.max(atkMs,0.005)/1000)));
+      const fastRelC=Math.exp(-1/(sampleRate*(Math.max(relMs*0.4,5)/1000)));
+      const slowRelC=Math.exp(-1/(sampleRate*(Math.max(relMs*2.2,50)/1000)));
+      if(gr>env){ env=gr+atkC*(env-gr); hold=Math.min(hold+1,sampleRate*0.5); }
+      else { const heldFrac=Math.min(1,hold/(sampleRate*0.15)); const relC=fastRelC+(slowRelC-fastRelC)*heldFrac; env=gr+relC*(env-gr); hold*=0.9995; }
+      if(env<1e-20)env=0; if(env!==env)env=0; if(env>mPk)mPk=env;
+      const gainLin=Math.exp(-env*DB2LIN);
+      const col=params.color.length>1?params.color[i]:params.color[0];
+      for(let cc=0;cc<nch;cc++){ const ic=inp[cc], oc=out[cc]; if(!oc)continue;
+        const x=(ic?ic[i]:0)*gainLin;                       // audio already inGain-raised; GR only here
+        const amt=col*(0.4+0.6*Math.min(env/12,1));         // more GR → more bite
+        const bias=0.12*amt;
+        const s=Math.tanh((x+bias)*(1+2.2*amt))-Math.tanh(bias*(1+2.2*amt));   // even via bias asym, odd via tanh, DC re-centered
+        let y=x+amt*(s-x); if(y!==y)y=0;
+        oc[i]=y;
+      }
+    }
+    for(let cc=nch;cc<out.length;cc++){ if(out[cc]&&out[0]) out[cc].set(out[0]); }   // mono → fill stereo
+    this._env=env; this._hold=hold; this._meterPeak=mPk;
+    this._post++; if(this._post>=8){ this._post=0; this.port.postMessage({gr:mPk}); this._meterPeak=0; }
+    return true;
+  }
+});
+/* ── spectra-dyneq — 4-band dynamic EQ. Each band keys off its OWN narrow bandpass copy (band-local
+     detection) and reshapes via additive Regalia-Mitra (out = x + slice*(gLin-1)) = click-free scalar
+     gain, no coeff thrash. Per channel/band biquad state, NaN-guarded, all coeffs sampleRate-derived. ── */
+registerProcessor('spectra-dyneq', class extends AudioWorkletProcessor {
+  static get parameterDescriptors(){
+    const p=[]; const fd=[200,3000,5000,7500], rd=[-4,-5,2,-6];
+    for(let b=1;b<=4;b++){
+      p.push({name:'b'+b+'_freq',  defaultValue:fd[b-1], minValue:40,  maxValue:16000, automationRate:'k-rate'});
+      p.push({name:'b'+b+'_gain',  defaultValue:0,       minValue:-12, maxValue:12,    automationRate:'k-rate'});
+      p.push({name:'b'+b+'_range', defaultValue:rd[b-1], minValue:-18, maxValue:12,    automationRate:'k-rate'});
+      p.push({name:'b'+b+'_thr',   defaultValue:0,       minValue:-60, maxValue:0,     automationRate:'k-rate'});
+    }
+    p.push({name:'q',   defaultValue:2.5, minValue:0.3, maxValue:12,  automationRate:'k-rate'});
+    p.push({name:'atk', defaultValue:3,   minValue:0.1, maxValue:80,  automationRate:'k-rate'});
+    p.push({name:'rel', defaultValue:120, minValue:20,  maxValue:600, automationRate:'k-rate'});
+    p.push({name:'mix', defaultValue:1,   minValue:0,   maxValue:1,   automationRate:'k-rate'});
+    return p;
+  }
+  constructor(){ super(); this.env=[]; this.gdb=[]; this.auto=[]; this.keySt=[]; this.slcSt=[];
+    this._meterGR=new Float32Array(4); this._post=0; this._lastFreq=[0,0,0,0]; this._lastQ=-1;
+    this.K=[null,null,null,null]; this.S=[null,null,null,null]; }
+  _bp(freq,Q){
+    const w0=2*Math.PI*Math.min(freq, sampleRate*0.49)/sampleRate;
+    const alpha=Math.sin(w0)/(2*Math.max(0.05,Q));
+    const a0=1+alpha;
+    return { b0:alpha/a0, b2:-alpha/a0, a1:(-2*Math.cos(w0))/a0, a2:(1-alpha)/a0 };   // RBJ bandpass, 0dB peak (b1=0)
+  }
+  _ensure(nch){
+    while(this.env.length<nch){
+      this.env.push([-120,-120,-120,-120]); this.gdb.push([0,0,0,0]); this.auto.push([0,0,0,0]);
+      const mk=()=>[{x1:0,x2:0,y1:0,y2:0},{x1:0,x2:0,y1:0,y2:0},{x1:0,x2:0,y1:0,y2:0},{x1:0,x2:0,y1:0,y2:0}];
+      this.keySt.push(mk()); this.slcSt.push(mk());
+    }
+  }
+  process(inputs,outputs,params){
+    const inp=inputs[0], out=outputs[0];
+    if(!inp||!inp.length||!out||!out.length) return true;
+    const nch=inp.length, len=out[0].length; if(!len) return true;
+    this._ensure(nch);
+    const LOG2DB=20/Math.LN10, DB2LIN=Math.LN10/20;
+    const Q=Math.max(0.3, params.q[0]), atkMs=Math.max(0.1, params.atk[0]), relMs=Math.max(5, params.rel[0]);
+    const mix=Math.max(0,Math.min(1, params.mix[0]));
+    const freq=[params.b1_freq[0],params.b2_freq[0],params.b3_freq[0],params.b4_freq[0]];
+    const gain=[params.b1_gain[0],params.b2_gain[0],params.b3_gain[0],params.b4_gain[0]];
+    const rng =[params.b1_range[0],params.b2_range[0],params.b3_range[0],params.b4_range[0]];
+    const thr =[params.b1_thr[0],params.b2_thr[0],params.b3_thr[0],params.b4_thr[0]];
+    const aAtk=Math.exp(-1/(sampleRate*(atkMs/1000))), aRel=Math.exp(-1/(sampleRate*(relMs/1000)));
+    const autoCoef=Math.exp(-1/(sampleRate*0.300)), halfKnee=6;
+    let changed=(Q!==this._lastQ); for(let b=0;b<4;b++){ if(freq[b]!==this._lastFreq[b]) changed=true; }
+    if(changed || !this.K[0]){
+      for(let b=0;b<4;b++){ this.K[b]=this._bp(freq[b], Q*1.6); this.S[b]=this._bp(freq[b], Q); }   // KEY narrower than SLICE
+      this._lastQ=Q; for(let b=0;b<4;b++) this._lastFreq[b]=freq[b];
+    }
+    const mGR=this._meterGR;
+    for(let c=0;c<nch;c++){
+      const ic=inp[c], oc=out[c]; if(!oc) continue;
+      const env=this.env[c], gdb=this.gdb[c], auto=this.auto[c], kSt=this.keySt[c], sSt=this.slcSt[c];
+      for(let i=0;i<len;i++){
+        const x=ic?ic[i]:0; let o=x;
+        for(let b=0;b<4;b++){
+          const K=this.K[b], S=this.S[b], ks=kSt[b], ss=sSt[b];
+          let yk=K.b0*x + K.b2*ks.x2 - K.a1*ks.y1 - K.a2*ks.y2; if(yk!==yk)yk=0;
+          ks.x2=ks.x1; ks.x1=x; ks.y2=ks.y1; ks.y1=yk;
+          const det=Math.abs(yk), dDb=det>1e-9?Math.log(det)*LOG2DB:-120;
+          let e=env[b]; e=(dDb>e)?(dDb+aAtk*(e-dDb)):(dDb+aRel*(e-dDb)); if(e!==e)e=-120; env[b]=e;
+          let useThr;
+          if(thr[b]>=-0.5){ const d2=det*det; auto[b]=d2+autoCoef*(auto[b]-d2); if(auto[b]<0||auto[b]!==auto[b])auto[b]=0;
+            useThr=(auto[b]>1e-12?Math.log(Math.sqrt(auto[b]))*LOG2DB:-120)+6; }
+          else useThr=thr[b];
+          const over=e-useThr; const t=(over+halfKnee)/(2*halfKnee);
+          const amt=t<=0?0:(t>=1?1:(t*t*(3-2*t)));   // smoothstep knee
+          const target=rng[b]*amt;
+          let gd=gdb[b]; const moreReduction=(rng[b]<0)?(target<gd):(target>gd);
+          const coef=moreReduction?aAtk:aRel; gd=target+coef*(gd-target); if(gd!==gd)gd=0; gdb[b]=gd;
+          const ag=gd<0?-gd:gd; if(ag>mGR[b])mGR[b]=ag;
+          const gLin=Math.exp((gain[b]+gd)*DB2LIN);
+          let ysl=S.b0*x + S.b2*ss.x2 - S.a1*ss.y1 - S.a2*ss.y2; if(ysl!==ysl)ysl=0;
+          ss.x2=ss.x1; ss.x1=x; ss.y2=ss.y1; ss.y1=ysl;
+          o += ysl*(gLin-1);   // ADDITIVE reconstruction
+        }
+        if(o!==o)o=0; oc[i]=x+mix*(o-x);
+      }
+    }
+    for(let c=nch;c<out.length;c++){ if(out[c]&&out[0]) out[c].set(out[0]); }
+    this._post++; if(this._post>=8){ this._post=0; this.port.postMessage({gr:Array.from(mGR)}); mGR.fill(0); }
+    return true;
+  }
+});
 `;
 function ensureWorklets(c) {
   if (!c._wlPromise) {
@@ -4153,13 +4684,13 @@ function makeDraggable(win, handle){
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   BEAT LAB AS A PLUGIN  —  load DeMartin Beat Lab in a floating window (a
+   THE KITCHEN AS A PLUGIN  —  load The Kitchen in a floating window (a
    same-origin <iframe>) and "Send to Studio" bounces the current beat onto a
-   new track. This is 100% Studio-side: it reaches into the embedded Beat Lab's
+   new track. This is 100% Studio-side: it reaches into the embedded The Kitchen's
    OWN renderPatternWav()/wavBase64() across the same-origin frame boundary, so
    beats.html is never modified. The embedded instance is also blocked from
    overwriting the shared `dmv_beats_auto` autosave slot, so it can't disturb
-   anyone working in the standalone Beat Lab room.
+   anyone working in the standalone The Kitchen room.
    ════════════════════════════════════════════════════════════════════════════ */
 function openBeatLab(){
   let w = document.getElementById('beatlab-win');
@@ -4173,7 +4704,7 @@ function openBeatLab(){
   w.style.boxShadow=`0 24px 70px rgba(0,0,0,.64), 0 0 0 1px ${hexA(col,.16)}, 0 0 52px ${hexA(col,.12)}`;
   w.innerHTML =
     `<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}">`+
-      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 BEAT LAB</span>`+
+      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 THE KITCHEN</span>`+
       `<span class="pw-track" style="max-width:none">plugin · cook a beat, then send it to a track</span>`+
       `<button class="bl-send" onmousedown="event.stopPropagation()" title="Bounce the current beat onto a new Studio track" `+
         `style="background:${hexA(col,.18)};border:1px solid ${hexA(col,.5)};color:${col};font:800 10px 'Space Mono',monospace;letter-spacing:.04em;padding:5px 11px;border-radius:7px;cursor:pointer">⤓ Send to Studio</button>`+
@@ -4185,7 +4716,7 @@ function openBeatLab(){
     `</div>`;
   document.body.appendChild(w);
   const frame = w.querySelector('.bl-frame');
-  // protect whoever's in the standalone Beat Lab: stop THIS embedded instance from
+  // protect whoever's in the standalone The Kitchen: stop THIS embedded instance from
   // ever writing the shared autosave key (best-effort, same-origin realm patch).
   frame.addEventListener('load', ()=>{
     try{
@@ -4205,23 +4736,23 @@ function openBeatLab(){
 
 async function beatlabSend(frame, btn){
   const bw = frame && frame.contentWindow;
-  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("Beat Lab's still warming up — give it a second"); return; }
+  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("The Kitchen's still warming up — give it a second"); return; }
   const label = btn ? btn.textContent : '';
   if(btn){ btn.disabled=true; btn.textContent='Bouncing…'; }
   try{
     if(typeof bw.stopPlay === 'function'){ try{ bw.stopPlay(); }catch(e){} }   // freeze playback before the offline render
-    const buf = await bw.renderPatternWav(4);              // Beat Lab's own offline bounce — 4 bars, bit-identical to playback
+    const buf = await bw.renderPatternWav(4);              // The Kitchen's own offline bounce — 4 bars, bit-identical to playback
     if(!buf) throw new Error('empty render');
     const b64 = await bw.wavBase64(buf);                   // AudioBuffer -> base64 WAV
     const bin = atob(b64), u = new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-    const name = 'Beat Lab ' + (tracks.filter(t=>/^Beat Lab/.test(t.name||'')).length + 1);
+    const name = 'The Kitchen ' + (tracks.filter(t=>/^The Kitchen/.test(t.name||'')).length + 1);
     const file = new File([u], name + '.wav', {type:'audio/wav'});
     await addFiles([file]);                                // reuse the proven import path → new track + lane
     flash('Beat dropped onto “' + name + '” ✦');
   }catch(err){
     console.error('[BeatLab→Studio] send failed', err);
-    flash("Couldn't bounce that beat — hit Play in Beat Lab first, then send");
+    flash("Couldn't bounce that beat — hit Play in The Kitchen first, then send");
   }finally{
     if(btn){ btn.disabled=false; btn.textContent = label || '⤓ Send to Studio'; }
   }
@@ -5784,6 +6315,15 @@ async function runVocalDoctor(t, btn){
 }
 function vdOpenPanel(t){
   if (!t._doctor) return;
+  if (!document.getElementById('vdoc-talk-style')) {
+    const _s = document.createElement('style'); _s.id = 'vdoc-talk-style';
+    _s.textContent = '.vdoc-talk{display:flex;gap:6px;padding:8px 10px 2px}'+
+      '.vdoc-talk-in{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#E9EAED;font:500 12px Inter,system-ui,sans-serif;padding:7px 10px;outline:none}'+
+      '.vdoc-talk-in:focus{border-color:rgba(62,156,184,.55)}'+
+      '.vdoc-talk-go{flex:none;width:36px;border:none;border-radius:8px;cursor:pointer;background:linear-gradient(180deg,#6FC0D8,#3E9CB8);color:#08171c;font-size:14px}'+
+      '.vdoc-reply{padding:3px 12px 4px;font:500 11.5px Inter,system-ui,sans-serif;color:#9FCFDD;min-height:13px}';
+    document.head.appendChild(_s);
+  }
   const id = 'vdoc-' + t.id;
   const old = document.getElementById(id); if (old) old.remove();
   const w = document.createElement('div'); w.className = 'plugwin vdoc'; w.id = id;
@@ -5793,6 +6333,8 @@ function vdOpenPanel(t){
       `<div class="ai-summary vdoc-honesty"><div class="ai-summary-h">🩺 what I heard &amp; built</div><div class="ai-summary-body"></div></div>`+
       `<div class="vdoc-edge-h">Your Edge — shape it, safely</div>`+
       `<div class="vdoc-rows"></div>`+
+      `<div class="vdoc-talk"><input type="text" class="vdoc-talk-in" placeholder="Talk to it — &quot;brighter&quot;, &quot;less harsh&quot;, &quot;more space&quot;…"><button class="vdoc-talk-go" title="ask">➤</button></div>`+
+      `<div class="vdoc-reply"></div>`+
       `<div class="vdoc-foot"><button class="vdoc-btn" data-a="reset">Reset to Doctor</button><button class="vdoc-btn" data-a="redo">Re-analyze</button></div>`+
     `</div>`;
   document.body.appendChild(w);
@@ -5802,17 +6344,40 @@ function vdOpenPanel(t){
   const rows = w.querySelector('.vdoc-rows');
   VDOC_MACROS.forEach(mac => {
     const u0 = (t._doctor.macroU[mac.id] != null) ? t._doctor.macroU[mac.id] : 0.5;
-    const row = document.createElement('div'); row.className = 'pw-row vdoc-row';
+    const row = document.createElement('div'); row.className = 'pw-row vdoc-row'; row.dataset.mac = mac.id;
     row.innerHTML = `<label></label><input type="range" min="0" max="1" step="0.01"><output></output>`;
     row.querySelector('label').textContent = mac.label;
     row.querySelector('label').title = mac.hint;
     const rng = row.querySelector('input'), out = row.querySelector('output');
     rng.value = String(u0);
-    const draw = (uu) => { out.textContent = vdMacroValue(t, mac, uu).readout; };
+    const draw = (uu) => { out.textContent = vdMacroValue(t, mac, uu).readout; }; row._draw = draw;
     rng.oninput = () => { const uu = parseFloat(rng.value); vdApplyMacro(t, mac, uu); draw(uu); };
     vdApplyMacro(t, mac, u0); draw(u0);   // assert the baseline (center = the Doctor's setting)
     rows.appendChild(row);
   });
+  // ── TALK TO IT — the AI vocal engineer moves the SAFE macros (clamped 0..1 → it physically can't wreck a mix) ──
+  const talkIn = w.querySelector('.vdoc-talk-in'), talkGo = w.querySelector('.vdoc-talk-go'), replyEl = w.querySelector('.vdoc-reply');
+  async function vdTalk(){
+    const q = (talkIn.value || '').trim(); if (!q || talkGo._busy) return;
+    talkGo._busy = true; talkGo.textContent = '…'; replyEl.textContent = '';
+    try {
+      const macros = VDOC_MACROS.map(m => ({ id:m.id, label:m.label, hint:m.hint, u:(t._doctor.macroU[m.id] != null ? t._doctor.macroU[m.id] : 0.5) }));
+      const r = await fetch('/api/vocalassist', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message:q, det:(t._doctor.det && t._doctor.det.type) || '', features:t._doctor.features || {}, macros, tier:(localStorage.getItem('dmv_brain_tier')||'local') }) });
+      const j = await r.json(); const set = (j && j.set) || {};
+      Object.keys(set).forEach(mid => {
+        const mac = VDOC_MACROS.find(m => m.id === mid); if (!mac) return;
+        let uu = +set[mid]; if (uu !== uu) return; uu = Math.max(0, Math.min(1, uu));
+        vdApplyMacro(t, mac, uu);
+        const row = w.querySelector('.vdoc-row[data-mac="'+mid+'"]');
+        if (row){ const rng = row.querySelector('input'); if (rng) rng.value = String(uu); if (row._draw) row._draw(uu); }
+      });
+      replyEl.textContent = (j && j.reply) || ''; talkIn.value = '';
+    } catch(e){ replyEl.textContent = "Couldn't reach the brain — try again."; }
+    finally { talkGo._busy = false; talkGo.textContent = '➤'; }
+  }
+  talkGo.onclick = vdTalk;
+  talkIn.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); vdTalk(); } };
   w.querySelector('.pw-x').onclick = () => w.remove();
   w.querySelector('[data-a="reset"]').onclick = () => {
     VDOC_MACROS.forEach(mac => vdApplyMacro(t, mac, 0.5));
@@ -8036,7 +8601,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "1.9.1";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "2.0.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;

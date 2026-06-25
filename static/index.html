@@ -105,7 +105,7 @@
     background:radial-gradient(circle at 38% 34%, #6FC0D8, #3E9CB8 60%, rgba(62,156,184,0) 76%);
     transition:opacity .2s, transform .2s, box-shadow .2s; }
   .wallegg:hover { opacity:1; transform:scale(1.25); box-shadow:0 0 9px rgba(62,156,184,.7); }
-  .wallegg::after { content:"sign the wall"; position:absolute; top:140%; right:-2px; white-space:nowrap; transform:rotate(-8deg); transform-origin:right top;
+  .wallegg::after { content:"sign the wall"; position:absolute; top:140%; right:-7px; white-space:nowrap; transform:rotate(-8deg); transform-origin:right top;
     font:700 8px 'Space Mono',monospace; letter-spacing:.09em; text-transform:uppercase; color:#9FCFDD; opacity:0; transition:opacity .2s; pointer-events:none; }
   .wallegg:hover::after { opacity:.95; }
   .arkhero .crew.active { border-color:rgba(62,156,184,.7); background:rgba(62,156,184,.1); box-shadow:0 0 0 1px rgba(62,156,184,.3); }
@@ -173,6 +173,11 @@
   .cstile.build { cursor:pointer; }
   .cstile.dragging { opacity:.35; }
   .cstile img { width:36px; height:36px; border-radius:11px; object-fit:contain; pointer-events:none; }
+  /* Lift Tiff a hair so HER feet meet Kit's. Tiff is sharp pixel-art (feet = the sneakers);
+     Kit is a smooth render with a ~2px soft SHADOW below his solid feet — aligning by the
+     lowest visible pixel lined her to his shadow, so she sat too low. Kit stays the anchor;
+     Tiff rises ~1.4px to Kit's SOLID feet. Tuned to THESE two PNGs — re-tune if art changes. */
+  .cstile.tiff img { transform: translateY(-1.4px); }
   .cstile .ct-n { font:700 12.5px Oxanium; letter-spacing:.02em; color:var(--text); display:block; line-height:1.1; }
   .cstile .ct-r { font:600 8.5px 'Space Mono',monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); display:block; margin-top:2px; }
   .cstile.tiff:hover { border-color:#E94B9C; box-shadow:0 0 13px rgba(233,75,156,.28); }
@@ -377,8 +382,8 @@
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
-      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>DeMartin Beat Lab</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
+      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>The Kitchen</span></a>
     </div>
     <div class="raillabel">More</div>
     <div class="roomrail">
@@ -418,9 +423,6 @@
         <div class="arkhero">
           <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
-          <div class="ark-wings">
-            <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
-          </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
@@ -439,7 +441,6 @@
           <span class="el-name" id="elName">⚡ Quick</span>
         </div>
         <input type="hidden" id="think" value="low">
-        <select class="think" id="researchType" title="Web = quick search · Swarm = your own free LLM keys dig deeper, then she merges it" style="display:none"><option value="web">🌐 Web</option><option value="swarm">🛰 Swarm</option></select>
         <span class="hint" id="hint" style="display:none">enter to send · shift+enter = new line</span>
       </div>
       <div class="chips" id="chips"></div>
@@ -775,7 +776,7 @@ async function send() {
           scrollDown();
         }
         if (ev.type === "step") {
-          if (!stepsEl) { stepsEl = addSteps(); $("col").insertBefore(stepsEl, bubble.parentElement); }
+          if (!stepsEl) { stepsEl = addSteps(); const m = bubble.closest(".msg"); if (m && m.parentElement === $("col")) $("col").insertBefore(stepsEl, m); }
           const st = document.createElement("div"); st.className = "step";
           st.innerHTML = `<span class="dotline"></span>${ev.icon || "·"} ${md(ev.text)}`;
           stepsEl.appendChild(st); scrollDown();
@@ -853,9 +854,6 @@ function newChat() {
         <div class="arkhero">
           <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
-          <div class="ark-wings">
-            <span>🛠 BUILD APPS</span><span>🎚 MAKE MUSIC</span><span>🎬 CUT VIDEO</span><span>🎨 MAKE IMAGES</span><span>👾 PLAY</span>
-          </div>
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
@@ -946,12 +944,10 @@ function setMode(m) {
   $("input").placeholder = m === "research" ? "What should she dig into?"
     : m === "write" ? "Drop your bars — she goes off what YOU wrote…"
     : "Talk to Tiff…";
-  const rt = $("researchType"); if (rt) rt.style.display = m === "research" ? "" : "none";
 }
 $("modeChat").onclick = () => setMode("chat");
 $("modeWrite").onclick = () => setMode("write");
 $("modeResearch").onclick = () => setMode("research");
-$("researchType").onchange = () => { swarmOn = $("researchType").value === "swarm"; };
 
 /* ── mic: tap to talk, PAUSE freely, tap again when done — YOU press send (never auto-sends) ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1106,7 +1102,7 @@ const ARK_TIPS = [
   { room: "Attach",      t: "Drag images, PDFs, or docs straight into the chat — Tiff sees the images and reads the rest before she answers." },
   { room: "Voice",       t: "Tap 🎙 to talk to Tiff out loud — pause as long as you need, tap again when you're done, then hit send." },
   { room: "DeMartin Audio Labs", t: "DeMartin is a full DAW — record, edit, mix, and bounce. Hit the 🩺 Vocal Doctor on a vocal track for an instant pro chain." },
-  { room: "DeMartin Beat Lab", t: "Beat Lab is where you make the beat — step-sequence drums, play 808s, and every instrument has an AI brain you can talk to that turns its own knobs." },
+  { room: "The Kitchen", t: "The Kitchen is where you make the beat — step-sequence drums, play 808s, and every instrument has an AI brain you can talk to that turns its own knobs." },
   { room: "LePrince Visual Labs", t: "LePrince cuts video on a real timeline — drop clips, layer text, render it out. No subscription, all on your machine." },
   { room: "Imagination Station",  t: "Imagination Station makes images locally with FLUX — just describe what you want; the engine spins itself up on the first ask." },
   { room: "Blueprint Builds",     t: "Blueprint Builds is where Kit turns your idea into a working app — describe the thing and watch him build it." },
@@ -1286,8 +1282,10 @@ window.arkCapNudge = function(cap){
     var modebar=document.querySelector(".modebar"), ir=document.getElementById("inputrow");
     if(!modebar||!ir) return;
     var model=document.getElementById("model"), mr=document.getElementById("modelRefresh");
+    var topbar=document.querySelector(".topbar"), gear=topbar&&topbar.querySelector(".as-gear");
     if(model) modebar.appendChild(model);
-    if(mr) modebar.appendChild(mr);
+    /* refresh button stays UP TOP, sitting just to the right of the settings gear (owner) */
+    if(mr && topbar){ if(gear) gear.after(mr); else topbar.appendChild(mr); }
     modebar.classList.add("compbar-below");
     dockin.appendChild(modebar);              /* move the whole row BELOW the input */
     try{ window.dispatchEvent(new Event("resize")); }catch(e){}

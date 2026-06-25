@@ -109,6 +109,64 @@ def start_server():
     return subprocess.Popen(args, cwd=ROOT, creationflags=flags)
 
 
+_PERMISSION_HANDLERS = []  # keep the .NET delegates alive for the process
+
+
+def wire_auto_permissions():
+    """Stop the 'Allow' nag for good.
+
+    DeMartinville runs inside WebView2 (Edge's engine). WebView2 treats our own localhost UI
+    like a random website, so every launch it re-asks 'Allow microphone?' and pops an 'allow
+    clipboard' bar at the top the first time anything reads the clipboard (right-click Paste,
+    paste-your-key, paste a screenshot). The mic env-var flag in main() doesn't help — pywebview
+    sets its OWN AdditionalBrowserArguments, which makes WebView2 ignore that env var.
+
+    The real fix is the documented one: handle CoreWebView2.PermissionRequested and auto-Allow.
+    It's the user's own machine + our own UI, so granting mic / camera / clipboard-read silently
+    is correct. Fully guarded — if anything here fails, the app just falls back to the old prompts,
+    it never blocks startup. Takes effect when run as a script (the .bat); the .exe picks it up on
+    its next rebuild.
+
+    Runs in a background thread: WebView2's core is created asynchronously, so we poll until it
+    exists, then marshal onto the UI thread (WinForms property access must happen there) to subscribe.
+    """
+    if sys.platform != "win32":
+        return
+
+    def _worker():
+        try:
+            from webview.platforms.winforms import BrowserView
+            from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+            from System import Action
+        except Exception:
+            return
+
+        def _grant(sender, args):
+            try:
+                args.State = CoreWebView2PermissionState.Allow
+                args.Handled = True
+            except Exception:
+                pass
+
+        for _ in range(200):                       # ~60s of grace while the window comes up
+            try:
+                insts = list(BrowserView.instances.values())
+                if insts:
+                    bv = insts[0]
+                    core = getattr(bv.browser.webview, "CoreWebView2", None)
+                    if core is not None:
+                        def _subscribe():
+                            core.PermissionRequested += _grant
+                            _PERMISSION_HANDLERS.append(_grant)
+                        bv.browser.webview.Invoke(Action(_subscribe))
+                        return
+            except Exception:
+                pass
+            time.sleep(0.3)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 def wait_up(timeout=60):
     end = time.time() + timeout
     while time.time() < end:
@@ -209,9 +267,10 @@ def main():
                 pass
         return
 
-    # Auto-grant the microphone (no "Allow" prompt every launch) so talk-to-type works out of the
-    # box. WebView2 reads extra Chromium switches from this env var; --use-fake-ui-for-media-stream
-    # silently approves getUserMedia using the REAL mic (it's the user's own machine + our localhost UI).
+    # (Belt-and-suspenders only.) This env var asks WebView2 to fake-approve getUserMedia, but
+    # pywebview sets its OWN AdditionalBrowserArguments on the environment, and WebView2 ignores
+    # this env var whenever that property is set — so it does NOT actually stop the mic prompt.
+    # The real fix is wire_auto_permissions() below (CoreWebView2.PermissionRequested → auto-Allow).
     os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--use-fake-ui-for-media-stream")
 
     import webview
@@ -241,6 +300,10 @@ def main():
             os.makedirs(WEBVIEW_PROFILE, exist_ok=True)
         except Exception:
             pass
+        # Auto-Allow WebView2's permission prompts (mic / camera / clipboard-read) so the app
+        # stops nagging "Allow" at the top every launch. Started before the blocking start() call;
+        # it polls for the WebView2 core and subscribes once it's up.
+        wire_auto_permissions()
         webview.start(gui=_gui, debug=True, private_mode=False, storage_path=WEBVIEW_PROFILE)
     except Exception:
         import traceback

@@ -108,7 +108,32 @@
     const items = [
       { label: "Cut",  key: "Ctrl+X", on: editable && !!fieldSel, run: () => { writeClip(fieldSel); spliceField(field, ""); toast("cut ✓"); } },
       { label: "Copy", key: "Ctrl+C", on: !!(selText || blockText), run: () => { writeClip(selText || blockText); toast("copied ✓"); } },
-      { label: "Paste", key: "Ctrl+V", on: editable, run: async () => { const t = await readClip(); if (t == null) { if (field) field.focus(); toast("press Ctrl+V to paste"); return; } spliceField(field, t); toast("pasted ✓"); } },
+      { label: "Paste", key: "Ctrl+V", on: editable, run: async () => {
+          if (field) field.focus();
+          // 1) text — the common case
+          const t = await readClip();
+          if (t) { spliceField(field, t); toast("pasted ✓"); return; }
+          // 2) image (e.g. a screenshot): read it and re-fire it as a REAL paste the composer
+          //    understands, so the picture actually lands instead of a silent "pasted ✓" lie.
+          try {
+            if (field && navigator.clipboard && navigator.clipboard.read) {
+              const items = await navigator.clipboard.read();
+              for (const it of items) {
+                const type = (it.types || []).find(ty => ty.startsWith("image/"));
+                if (!type) continue;
+                const blob = await it.getType(type);
+                const file = new File([blob], "pasted-image.png", { type: blob.type || "image/png" });
+                const dt = new DataTransfer(); dt.items.add(file);
+                const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+                const notCancelled = field.dispatchEvent(ev);   // false => a handler consumed it
+                if (!notCancelled) { toast("image pasted ✓"); return; }
+                break;   // had an image but nothing here accepts images → fall through honestly
+              }
+            }
+          } catch (_) {}
+          // 3) nothing we could place programmatically — native Ctrl+V still works for text AND images
+          toast("press Ctrl+V to paste");
+        } },
       { sep: true },
       { label: "Select All", key: "Ctrl+A", on: true, run: () => { if (field) { field.focus(); field.select && field.select(); } else { selectNode(blockNode(tgt)); } } },
     ];

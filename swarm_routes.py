@@ -53,7 +53,7 @@ _KEYS_LOCK = asyncio.Lock()                 # serialize key writes so concurrent
 # native_web flags whether the MODELS themselves can browse (almost none can — the
 # swarm feeds them pages either way; this is just guidance shown in the UI).
 PRESETS = [
-    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "meta-llama/llama-4-scout-17b-16e-instruct, openai/gpt-oss-120b, llama-3.3-70b-versatile", "free": "free ~1K/day, fastest · Llama 4 Scout = vision + tool use", "native_web": "no", "key_url": "https://console.groq.com/keys", "privacy": "🔒 Doesn't train on your inputs (inference-only provider)"},
+    {"name": "Groq",        "base_url": "https://api.groq.com/openai/v1",                  "models_hint": "openai/gpt-oss-120b, openai/gpt-oss-20b", "free": "free ~1K/day, fastest · GPT-OSS 120B = strong reasoning + tool use", "native_web": "no", "key_url": "https://console.groq.com/keys", "privacy": "🔒 Doesn't train on your inputs (inference-only provider)"},
     {"name": "Google Gemini","base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "models_hint": "gemini-3.5-flash, gemini-3-flash, gemini-2.5-pro, gemini-2.5-flash", "free": "big free budget · 3.5 Flash = vision + tools + 1M context", "native_web": "grounding (native API only)", "key_url": "https://aistudio.google.com/apikey", "privacy": "⚠️ Free tier may use your data to improve Google's products — a paid key doesn't"},
     {"name": "Claude (Anthropic)","base_url": "https://api.anthropic.com/v1", "models_hint": "claude-sonnet-4-6, claude-opus-4-8, claude-haiku-4-5", "free": "Pay-per-use, no free tier · Opus & Sonnet = top-tier reasoning + writing", "native_web": "no", "key_url": "https://console.anthropic.com/settings/keys", "privacy": "🔒 Doesn't train on your inputs (Anthropic doesn't use API data to train models)"},
     {"name": "Featherless", "base_url": "https://api.featherless.ai/v1",                   "models_hint": "moonshotai/Kimi-K2.6, deepseek-ai/DeepSeek-V4, zai-org/GLM-5.1, Qwen/Qwen3-235B-A22B", "free": "FLAT MONTHLY — unlimited tokens ($10 ≤15B / $25 all sizes)", "native_web": "no", "key_url": "https://featherless.ai/account/api-keys", "privacy": "☁ Your inputs go to this provider — check its data-use policy before sending sensitive work"},
@@ -171,19 +171,23 @@ class ProviderError(Exception):
 
 
 async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 700,
-                        temperature: float = 0.3) -> str:
+                        temperature: float = 0.3, image: str = "") -> str:
     """One non-streaming chat call to any OpenAI-compatible provider. This is the
     ONLY new primitive — everything else reuses the ARKITECT's existing helpers.
     Raises RateLimited on 429 (caller rotates to the next slot) and ProviderError
-    otherwise."""
+    otherwise. With `image` (a data URL) the user turn becomes multimodal so a vision-capable
+    CLOUD model SEES it — same image_url convention as the local path, so looking works on
+    either brain."""
     base = (slot["base_url"] or "").rstrip("/")
     url = f"{base}/chat/completions"
     headers = {"Authorization": f"Bearer {slot['api_key']}", "Content-Type": "application/json",
                # OpenRouter likes these for attribution; every other provider ignores them.
                "HTTP-Referer": "http://localhost", "X-Title": "Tiff ARKITECT"}
+    user_content = ([{"type": "text", "text": user or "Look at this image."},
+                     {"type": "image_url", "image_url": {"url": image}}] if image else user)
     body = {
         "model": slot["model"],
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_content}],
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -236,14 +240,15 @@ async def provider_stream(slot: dict, payload: dict):
 
 
 async def _call_with_fallback(slots: list[dict], system: str, user: str,
-                              max_tokens: int, temperature: float) -> tuple[str, str]:
+                              max_tokens: int, temperature: float, image: str = "") -> tuple[str, str]:
     """Try each slot in order; on a 429/error advance to the next so a single
     rate-limited free tier never sinks the whole agent. Returns (text, provider_name).
-    Agents start the list rotated so they don't all hammer the same provider first."""
+    Agents start the list rotated so they don't all hammer the same provider first.
+    `image` (a data URL) routes a VISION turn to the cloud model that can see it."""
     last_err = None
     for slot in slots:
         try:
-            txt = await provider_once(slot, system, user, max_tokens, temperature)
+            txt = await provider_once(slot, system, user, max_tokens, temperature, image)
             if txt:
                 return txt, slot["name"]
         except (RateLimited, ProviderError) as e:

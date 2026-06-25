@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "1.9.1"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "2.0.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -4462,12 +4462,33 @@ def _actions_prompt(room: str) -> str:
     )
 
 
+@app.post("/api/screenshot")
+async def screenshot(req: Request):
+    """The in-room agent's EYES (the 👁 button). Grab the screen SERVER-SIDE so any agent can SEE
+    what's on it — no browser 'allow' prompt. Downscaled + JPEG-compressed so the vision payload
+    (and its token cost) stays small. Returns a data URL the chat sends down the existing image path."""
+    try:
+        from PIL import ImageGrab
+        import io as _io, base64 as _b64
+        img = ImageGrab.grab()
+        max_w = 1280
+        if img.width > max_w:
+            img = img.resize((max_w, max(1, int(img.height * max_w / img.width))))
+        img = img.convert("RGB")
+        buf = _io.BytesIO()
+        img.save(buf, format="JPEG", quality=70)
+        return {"image": "data:image/jpeg;base64," + _b64.b64encode(buf.getvalue()).decode("ascii")}
+    except Exception as e:
+        return JSONResponse({"error": f"screen capture failed: {e}"}, status_code=500)
+
+
 @app.post("/api/kit")
 async def kit_help(req: Request):
     body = await req.json()
     room = (body.get("room") or "").strip().lower()
     msg = (body.get("message") or "").strip()
     image = (body.get("image") or "").strip()   # optional uploaded image → the agent LOOKS at it (vision)
+    session = (body.get("session") or "").strip()   # studio hands a live text snapshot of the timeline (free)
     if not msg and not image:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
     # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
@@ -4518,14 +4539,27 @@ async def kit_help(req: Request):
     #    (private vs max share one cloud path today — slots carry no privacy tier yet.) ──
     system += AGENT_TOOL_RULES        # the SHARED toolbelt — every in-room agent (built-in + user-made) gets it
     system += _actions_prompt(room)   # let the agent DRIVE this room via a validated action block
+    if session:
+        system += (
+            "\n\nLIVE SESSION — the ACTUAL project open in front of the user RIGHT NOW. When they ask "
+            "about 'this mix', 'the vocal', 'these stems', a track by number/name, what's muted, etc., "
+            "they mean THIS. Reference it directly and specifically; don't give generic advice when you "
+            "can see the real thing:\n" + session[:1500]
+        )
     if image:
         system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
                    "if they want to make something, write the generate prompt FROM the image.")
     tier = (body.get("tier") or "local").strip().lower()
     slots = _enabled_slots() if tier != "local" else []
     try:
-        if image:
-            text = await _kit_local(system, msg, image)                              # vision turn → local model SEES the image
+        if image and slots:
+            # VISION on the CLOUD brain (private/max tier + a key) → works "on the go".
+            try:
+                text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4, image=image)
+            except Exception:
+                text = await _kit_local(system, msg, image)                          # cloud vision failed → local eyes
+        elif image:
+            text = await _kit_local(system, msg, image)                              # VISION on the LOCAL brain (free)
         elif slots:
             text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # cloud brain, auto-fallback
         else:
@@ -4613,6 +4647,96 @@ async def beat_brain(req: Request):
         text = (text[:m.start()] + text[m.end():]).strip()
     if not text:
         text = "Done — tweaked it." if setvals else "Say that again?"
+    return {"reply": text, "set": setvals}
+
+
+# ── /api/vocalassist — the "TALK TO IT" brain on the Vocal Doctor panel. The evolved Vocal Doctor:
+#    the user talks plain ("brighter", "less harsh", "more space") and it moves the SAFE macro sliders
+#    (each 0..1, 0.5 = the Doctor's neutral). Every value is clamped to [0,1] here AND double-clamped
+#    client-side by vdApplyMacro to the macro band + the plugin's param range — so it physically can't
+#    wreck a mix. Cloud OR local brain; a keyword fallback makes it work with NO model at all.
+VOCALASSIST_SYSTEM = """You are the AI vocal engineer inside DeMartin Audio Labs' Vocal Doctor. The user already has a corrective chain on their vocal; you shape it through a few SAFE macro sliders (each 0..1, where 0.5 = the Doctor's neutral baseline). You're a sharp, friendly mix engineer — replies SHORT (1-2 sentences), plain talk, never a manual.
+
+When the user wants the vocal to change (brighter, closer, warmer, smoother, less harsh, more space, drier, more throw, etc.), pick new slider positions and output them as a fenced block EXACTLY like:
+```set
+{"macroId": 0.7, "macroId2": 0.3}
+```
+Rules: every value is 0..1; 0.5 is neutral; only move macros that help; only use the macro ids you're given. If it's just a question, answer it with NO set block. Always add one plain line about what you changed."""
+
+_VOCAL_KW = {   # keyword → (synonyms, target 0..1) so TALK-TO-IT works with no model loaded
+    "bright":  (["bright", "brighter", "airy", "air", "crisp", "open", "sparkle", "sheen", "shiny"], 0.78),
+    "warm":    (["warm", "warmer", "fuller", "thick", "thicker", "body", "rich", "fat", "round"], 0.74),
+    "smooth":  (["smooth", "smoother", "gentle", "tame", "controlled", "even", "glue", "consistent", "less dynamic"], 0.72),
+    "deess":   (["harsh", "sibilant", "sibilance", "ess", "essy", "sss", "sharp", "piercing", "de-ess", "deess", "harshness"], 0.78),
+    "space":   (["space", "reverb", "wet", "bigger", "ambience", "ambient", "room", "wider", "wide", "lush", "verb"], 0.72),
+    "throw":   (["throw", "delay", "echo", "slap", "bounce"], 0.7),
+}
+_VOCAL_KW_DOWN = {   # "closer/dry/upfront" pulls a macro DOWN
+    "space": (["closer", "close", "dry", "drier", "dryer", "upfront", "up front", "in your face", "intimate", "tighter", "less reverb", "less wet", "less space"], 0.25),
+}
+def _vocal_macro_heuristic(msg, ids):
+    low = (msg or "").lower()
+    out = {}
+    for mid, (kws, target) in _VOCAL_KW.items():
+        if mid in ids and any(k in low for k in kws):
+            out[mid] = target
+    for mid, (kws, target) in _VOCAL_KW_DOWN.items():
+        if mid in ids and any(k in low for k in kws):
+            out[mid] = target
+    return out, ("On it." if out else "")
+
+@app.post("/api/vocalassist")
+async def vocal_assist(req: Request):
+    body = await req.json()
+    msg = (body.get("message") or "").strip()
+    det = (body.get("det") or "").strip()
+    features = body.get("features") or {}
+    macros = body.get("macros") or []
+    ids = [m.get("id") for m in macros if m.get("id")]
+    if not msg:
+        return {"reply": "Tell me what you want it to do — brighter, closer, less harsh…", "set": {}}
+    lines = []
+    for m in macros:
+        mid = m.get("id")
+        if not mid:
+            continue
+        hint = (" — " + m.get("hint")) if m.get("hint") else ""
+        u = m.get("u")
+        lines.append(f"- {mid} ({m.get('label', mid)}): 0..1, now={u if u is not None else 0.5}{hint}")
+    feat_txt = ""
+    try:
+        if isinstance(features, dict) and features:
+            feat_txt = "\n\nMEASURED on this vocal: " + ", ".join(f"{k} {v}" for k, v in list(features.items())[:8])
+    except Exception:
+        feat_txt = ""
+    system = (VOCALASSIST_SYSTEM + (f"\n\nHeard a {det}." if det else "") + feat_txt +
+              "\n\nYOUR MACRO SLIDERS (id, current 0..1, what it does):\n" + "\n".join(lines))
+    slots = _enabled_slots()
+    try:
+        if slots:
+            text, _prov = await _call_with_fallback(slots, system, msg, 320, 0.5)
+        else:
+            text = await _kit_local(system, msg)
+    except Exception:
+        text = ""
+    setvals = {}
+    m2 = re.search(r"```(?:set)?\s*(\{.*?\})\s*```", text or "", re.S)
+    if m2:
+        try:
+            raw = json.loads(m2.group(1))
+            for k, v in (raw.items() if isinstance(raw, dict) else []):
+                if k in ids and isinstance(v, (int, float)):
+                    setvals[k] = max(0.0, min(1.0, float(v)))   # macros are ALWAYS 0..1
+        except Exception:
+            pass
+        text = (text[:m2.start()] + text[m2.end():]).strip()
+    if not setvals:   # model gave nothing usable (or no model) → keyword fallback
+        fb, fb_say = _vocal_macro_heuristic(msg, ids)
+        setvals.update(fb)
+        if not text:
+            text = fb_say
+    if not text:
+        text = "Done." if setvals else "Tell me the move — brighter, smoother, more space…"
     return {"reply": text, "set": setvals}
 
 
