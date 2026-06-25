@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<link rel="icon" href="/static/kit.ico" />
+<title>The Stream — DeMartinville</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#3E9CB8; --teal:#2BB6A8; --violet:#7C8AA5; --amber:#D9A441;
+          --bg0:#0C0D10; --bg1:#15161A; --panel:rgba(24,25,30,0.86);
+          --hairline:rgba(255,255,255,0.07); --text:#E9EAED; --dim:rgba(198,201,208,0.55);
+          --grad:linear-gradient(135deg,#6FC0D8,#3E9CB8); }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; }
+  body { display:flex; flex-direction:column; height:100vh; overflow:hidden;
+         font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1200px 700px at 30% -10%, #181922 0%, var(--bg1) 45%, var(--bg0) 100%); }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb { background:rgba(62,156,184,.25); border-radius:99px; }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(62,156,184,.45); }
+
+  /* ── header ── */
+  .top { display:flex; align-items:center; gap:12px; padding:11px 18px; border-bottom:1px solid var(--hairline); flex:none; }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em; white-space:nowrap;
+    background:linear-gradient(100deg,#8FD4E4,var(--pink) 40%,#7C8AA5); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .kit-mount { display:inline-flex; align-items:center; gap:6px; }
+  .sp { flex:1; }
+  .seg { display:inline-flex; gap:4px; padding:4px; background:var(--panel); backdrop-filter:blur(26px);
+         border:1px solid var(--hairline); border-radius:13px; }
+  .seg button { border:none; background:transparent; color:var(--dim); cursor:pointer; padding:7px 18px;
+    border-radius:9px; font:600 11.5px Oxanium; letter-spacing:.1em; transition:all .14s; display:inline-flex; align-items:center; gap:7px; }
+  .seg button:hover { color:var(--text); }
+  .seg button.on { color:#0B1417; background:var(--grad); box-shadow:0 0 14px rgba(62,156,184,.4); }
+  .pubBtn { height:36px; padding:0 16px; border:none; border-radius:11px; cursor:pointer; color:#0B1417;
+    background:var(--grad); font:700 11.5px Oxanium; letter-spacing:.07em; box-shadow:0 0 16px rgba(62,156,184,.4);
+    display:inline-flex; align-items:center; gap:7px; transition:transform .12s, box-shadow .12s; }
+  .pubBtn:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(62,156,184,.5); }
+
+  /* ── stage ── */
+  .stage { flex:1; overflow:auto; padding:22px 26px 120px; }
+  .view { display:none; max-width:1120px; margin:0 auto; }
+  .view.on { display:block; }
+  .secttl { font:700 12px Oxanium; letter-spacing:.16em; color:var(--dim); text-transform:uppercase; margin:4px 2px 14px; }
+  .slogan { font:400 13.5px Inter; font-style:italic; color:var(--dim); margin:-14px 2px 22px; }
+  .slogan b { color:var(--pink); font-style:normal; font-weight:600; }
+  .filterbar { display:flex; align-items:center; gap:10px; padding:10px 26px; border-bottom:1px solid var(--hairline); flex:none; }
+  .fsearch { flex:1; max-width:440px; display:flex; align-items:center; gap:8px; background:var(--panel); backdrop-filter:blur(20px); border:1px solid var(--hairline); border-radius:11px; padding:0 12px; transition:border-color .14s; }
+  .fsearch:focus-within { border-color:rgba(62,156,184,.55); }
+  .fsearch span { color:var(--dim); font-size:13px; }
+  .fsearch input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font:500 13px Inter; padding:9px 0; }
+  .fsearch input::placeholder { color:var(--dim); }
+  .sortSel { background:var(--panel); backdrop-filter:blur(20px); border:1px solid var(--hairline); border-radius:11px; color:var(--text); font:600 11px Oxanium; letter-spacing:.05em; padding:9px 11px; cursor:pointer; }
+  .chanbar { display:flex; align-items:center; gap:14px; padding:14px 16px; margin-bottom:18px; border-radius:16px;
+    background:linear-gradient(100deg, rgba(62,156,184,.16), rgba(24,25,30,.5)); border:1px solid rgba(62,156,184,.35); }
+  .chanbar .chav { width:52px; height:52px; min-width:52px; border-radius:50%; display:grid; place-items:center; font:700 21px Oxanium; color:#0B1417; background:var(--grad); }
+  .chanbar .chname { font:700 18px Oxanium; letter-spacing:.02em; }
+  .chanbar .chsub { color:var(--dim); font-size:12.5px; margin-top:2px; }
+  .chanbar .chclear { margin-left:auto; border:1px solid var(--hairline); background:rgba(255,255,255,.04); color:var(--text); cursor:pointer;
+    font:600 11px Oxanium; letter-spacing:.06em; padding:8px 14px; border-radius:10px; transition:all .12s; }
+  .chanbar .chclear:hover { border-color:rgba(62,156,184,.6); color:#9FE0EE; }
+  .byline { cursor:pointer; transition:color .12s; }
+  .byline:hover { color:#9FE0EE; text-decoration:underline; }
+
+  /* ── empty state ── */
+  .empty { text-align:center; padding:64px 20px; color:var(--dim); }
+  .empty .ico { font-size:46px; opacity:.5; filter:grayscale(.2); }
+  .empty h2 { font:700 18px Oxanium; letter-spacing:.04em; color:var(--text); margin:14px 0 8px; }
+  .empty p { font-size:13.5px; line-height:1.6; max-width:440px; margin:0 auto 18px; }
+  .empty .pubBtn { display:inline-flex; }
+
+  /* ── LISTEN: feature hero ── */
+  .feature { display:flex; gap:20px; align-items:center; padding:18px; margin-bottom:26px; border-radius:18px;
+    background:var(--panel); backdrop-filter:blur(26px); border:1px solid var(--hairline);
+    box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  .feature .art { width:128px; height:128px; border-radius:14px; flex:none; overflow:hidden; position:relative; }
+  .feature .meta { min-width:0; }
+  .feature .kick { font:600 10.5px Oxanium; letter-spacing:.18em; color:var(--pink); text-transform:uppercase; }
+  .feature .ftitle { font:700 26px Oxanium; letter-spacing:.01em; margin:5px 0 4px; line-height:1.1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .feature .fby { color:var(--dim); font-size:13px; }
+  .feature .fplay { margin-top:16px; height:44px; padding:0 22px; border:none; border-radius:24px; cursor:pointer;
+    color:#0B1417; background:var(--grad); font:700 12.5px Oxanium; letter-spacing:.08em;
+    box-shadow:0 0 18px rgba(62,156,184,.45); display:inline-flex; align-items:center; gap:9px; transition:transform .12s; }
+  .feature .fplay:hover { transform:translateY(-1px); }
+
+  /* ── LISTEN: track list ── */
+  .tracklist { display:flex; flex-direction:column; }
+  .trow { display:grid; grid-template-columns:30px 48px 1fr auto auto; align-items:center; gap:14px;
+    padding:9px 12px; border-radius:11px; cursor:pointer; transition:background .12s; }
+  .trow:hover { background:rgba(255,255,255,.04); }
+  .trow.playing { background:rgba(62,156,184,.12); }
+  .trow .num { color:var(--dim); font:400 13px Space Mono; text-align:center; }
+  .trow.playing .num { color:var(--pink); }
+  .trow .art { width:48px; height:48px; border-radius:9px; overflow:hidden; position:relative; flex:none; }
+  .trow .tmeta { min-width:0; }
+  .trow .tt { font:600 14px Inter; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trow.playing .tt { color:#9FE0EE; }
+  .trow .tb { color:var(--dim); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trow .tdur { color:var(--dim); font:400 12.5px Space Mono; }
+  .trow .tdel { opacity:0; border:none; background:transparent; color:var(--dim); cursor:pointer; font-size:15px;
+    padding:4px 7px; border-radius:7px; transition:all .12s; }
+  .trow:hover .tdel { opacity:1; }
+  .trow .tdel:hover { color:#FF6B6B; background:rgba(255,90,90,.12); }
+  .art .ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1.5em; color:rgba(255,255,255,.85); }
+  .art img, .art video { width:100%; height:100%; object-fit:cover; display:block; }
+
+  /* ── now-playing bar ── */
+  .nowbar { position:fixed; left:0; right:0; bottom:0; height:78px; display:flex; align-items:center; gap:18px;
+    padding:0 20px; background:rgba(14,15,19,.93); backdrop-filter:blur(30px); border-top:1px solid var(--hairline);
+    box-shadow:0 -8px 30px rgba(0,0,0,.4); transform:translateY(100%); transition:transform .26s cubic-bezier(.2,.8,.2,1); z-index:40; }
+  .nowbar.up { transform:translateY(0); }
+  .nb-left { display:flex; align-items:center; gap:12px; width:248px; min-width:0; }
+  .nb-art { width:50px; height:50px; border-radius:9px; overflow:hidden; flex:none; position:relative; }
+  .nb-info { min-width:0; }
+  .nb-t { font:600 13px Inter; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nb-b { color:var(--dim); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nb-mid { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; max-width:620px; margin:0 auto; }
+  .nb-ctrls { display:flex; align-items:center; gap:18px; }
+  .nb-ctrls button { border:none; background:transparent; color:var(--text); cursor:pointer; font-size:16px; padding:4px;
+    opacity:.85; transition:opacity .12s, transform .12s; }
+  .nb-ctrls button:hover { opacity:1; }
+  .nb-play { width:38px; height:38px; border-radius:50%; background:var(--text); color:#0B1417 !important;
+    display:flex; align-items:center; justify-content:center; font-size:15px !important; opacity:1 !important; transition:transform .12s; }
+  .nb-play:hover { transform:scale(1.06); }
+  .nb-seek { display:flex; align-items:center; gap:10px; width:100%; }
+  .nb-seek span { font:400 11px Space Mono; color:var(--dim); width:38px; text-align:center; flex:none; }
+  input[type=range].bar { -webkit-appearance:none; appearance:none; height:4px; border-radius:99px; flex:1;
+    background:rgba(255,255,255,.16); cursor:pointer; }
+  input[type=range].bar::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; border-radius:50%;
+    background:var(--text); box-shadow:0 0 0 4px rgba(62,156,184,0); transition:box-shadow .12s; }
+  input[type=range].bar:hover::-webkit-slider-thumb { box-shadow:0 0 0 5px rgba(62,156,184,.25); }
+  .nb-right { width:248px; display:flex; align-items:center; justify-content:flex-end; gap:9px; }
+  .nb-right .vico { color:var(--dim); font-size:14px; }
+  .nb-right input[type=range].bar { max-width:110px; flex:none; width:110px; }
+
+  /* ── WATCH: grid ── */
+  .vgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(252px,1fr)); gap:18px 16px; }
+  .vcard { cursor:pointer; }
+  .vthumb { position:relative; border-radius:13px; overflow:hidden; aspect-ratio:16/9; background:#0a0b0e;
+    border:1px solid var(--hairline); transition:transform .14s, border-color .14s, box-shadow .14s; }
+  .vcard:hover .vthumb { transform:translateY(-2px); border-color:rgba(62,156,184,.55); box-shadow:0 10px 26px rgba(0,0,0,.45); }
+  .vthumb img, .vthumb video { width:100%; height:100%; object-fit:cover; display:block; }
+  .vthumb .ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.4em; color:rgba(255,255,255,.8); }
+  .vthumb .play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .14s; }
+  .vcard:hover .vthumb .play { opacity:1; }
+  .vthumb .play span { width:52px; height:52px; border-radius:50%; background:rgba(11,20,23,.72); backdrop-filter:blur(6px);
+    border:1.5px solid rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff; padding-left:3px; }
+  .vthumb .dur { position:absolute; right:7px; bottom:7px; background:rgba(0,0,0,.8); color:#fff;
+    font:400 11px Space Mono; padding:1px 6px; border-radius:5px; }
+  .vthumb .vdel { position:absolute; right:7px; top:7px; opacity:0; border:none; cursor:pointer; width:28px; height:28px;
+    border-radius:8px; background:rgba(0,0,0,.6); color:#fff; font-size:14px; transition:opacity .12s, background .12s; }
+  .vcard:hover .vdel { opacity:1; }
+  .vdel:hover { background:rgba(224,36,94,.85); }
+  .vinfo { padding:10px 2px 0; }
+  .vinfo .vt { font:600 14px Inter; line-height:1.32; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .vinfo .vsub { color:var(--dim); font-size:12px; margin-top:3px; }
+
+  /* ── WATCH: theater ── */
+  .theater { position:fixed; inset:0; z-index:60; background:rgba(8,9,12,.93); backdrop-filter:blur(10px);
+    display:none; padding:26px; overflow:auto; }
+  .theater.on { display:block; }
+  .thwrap { max-width:1180px; margin:0 auto; display:grid; grid-template-columns:1fr 320px; gap:22px; align-items:start; }
+  .thclose { position:fixed; top:18px; right:20px; z-index:61; width:40px; height:40px; border-radius:50%; cursor:pointer;
+    border:1px solid var(--hairline); background:rgba(24,25,30,.9); color:var(--text); font-size:18px; }
+  .thclose:hover { border-color:rgba(62,156,184,.6); }
+  .thmain video { width:100%; border-radius:14px; background:#000; max-height:72vh; display:block; }
+  .thmeta { padding:16px 4px; }
+  .thmeta h2 { font:700 21px Oxanium; letter-spacing:.01em; line-height:1.2; }
+  .thmeta .thby { color:var(--pink); font-size:13px; margin-top:7px; font-weight:600; }
+  .thmeta .thwhen { color:var(--dim); font-size:12px; margin-top:2px; }
+  .thmeta .thdesc { color:var(--text); opacity:.85; font-size:13.5px; line-height:1.6; margin-top:14px; white-space:pre-wrap; }
+  .thup .secttl { margin-top:0; }
+  .upcard { display:flex; gap:11px; padding:7px; border-radius:11px; cursor:pointer; transition:background .12s; margin-bottom:4px; }
+  .upcard:hover { background:rgba(255,255,255,.05); }
+  .upthumb { width:108px; aspect-ratio:16/9; border-radius:8px; overflow:hidden; flex:none; position:relative; background:#0a0b0e; }
+  .upthumb img, .upthumb video { width:100%; height:100%; object-fit:cover; }
+  .upthumb .ph { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1.3em; color:rgba(255,255,255,.7); }
+  .upmeta { min-width:0; }
+  .upmeta .ut { font:600 12.5px Inter; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .upmeta .ub { color:var(--dim); font-size:11px; margin-top:3px; }
+  @media (max-width:880px){ .thwrap { grid-template-columns:1fr; } }
+
+  /* ── publish modal ── */
+  .modal { position:fixed; inset:0; z-index:80; background:rgba(8,9,12,.66); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal.on { display:flex; }
+  .sheet { width:min(480px,100%); background:linear-gradient(180deg,#1b1d23,#15161a); border:1px solid var(--hairline);
+    border-radius:18px; box-shadow:0 30px 80px rgba(0,0,0,.6); overflow:hidden; }
+  .sheet header { display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid var(--hairline); }
+  .sheet header h3 { font:700 14px Oxanium; letter-spacing:.08em; }
+  .sheet header .x { margin-left:auto; border:none; background:transparent; color:var(--dim); cursor:pointer; font-size:20px; }
+  .sheet header .x:hover { color:var(--text); }
+  .sbody { padding:20px; display:flex; flex-direction:column; gap:15px; }
+  .kindpick { display:flex; gap:10px; }
+  .kindpick label { flex:1; border:1px solid var(--hairline); border-radius:12px; padding:13px; cursor:pointer; text-align:center;
+    transition:all .14s; background:rgba(255,255,255,.02); }
+  .kindpick label:hover { border-color:rgba(62,156,184,.5); }
+  .kindpick input { display:none; }
+  .kindpick label.sel { border-color:var(--pink); background:rgba(62,156,184,.12); box-shadow:0 0 14px rgba(62,156,184,.2); }
+  .kindpick .ki { font-size:22px; }
+  .kindpick .kl { font:600 11px Oxanium; letter-spacing:.08em; margin-top:5px; }
+  .kindpick .kx { font-size:10.5px; color:var(--dim); margin-top:2px; }
+  .fld label { display:block; font:600 10.5px Oxanium; letter-spacing:.1em; color:var(--dim); text-transform:uppercase; margin-bottom:6px; }
+  .fld input[type=text], .fld textarea { width:100%; background:rgba(255,255,255,.04); border:1px solid var(--hairline);
+    border-radius:10px; color:var(--text); font:400 13.5px Inter; padding:10px 12px; resize:vertical; }
+  .fld input[type=text]:focus, .fld textarea:focus { outline:none; border-color:rgba(62,156,184,.6); }
+  .drop { border:1.5px dashed var(--hairline); border-radius:12px; padding:18px; text-align:center; cursor:pointer;
+    color:var(--dim); font-size:12.5px; transition:all .14s; }
+  .drop:hover, .drop.has { border-color:rgba(62,156,184,.6); color:var(--text); background:rgba(62,156,184,.06); }
+  .drop b { color:#9FE0EE; }
+  .coverdrop { display:flex; align-items:center; gap:12px; border:1.5px dashed var(--hairline); border-radius:12px; padding:9px 11px; cursor:pointer; transition:all .14s; }
+  .coverdrop:hover, .coverdrop.has { border-color:rgba(62,156,184,.6); background:rgba(62,156,184,.06); }
+  .coverdrop .cd-thumb { width:46px; height:46px; min-width:46px; border-radius:9px; display:grid; place-items:center; font-size:20px; background:rgba(255,255,255,.05); border:1px solid var(--hairline); overflow:hidden; }
+  .coverdrop .cd-thumb img { width:100%; height:100%; object-fit:cover; }
+  .coverdrop .cd-txt { font-size:12.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .coverdrop.has .cd-txt { color:var(--text); }
+  .nb-ctrls button.on { color:var(--pink) !important; opacity:1 !important; }
+  .pubGo { height:46px; border:none; border-radius:12px; cursor:pointer; color:#0B1417; background:var(--grad);
+    font:700 12.5px Oxanium; letter-spacing:.08em; box-shadow:0 0 18px rgba(62,156,184,.4); transition:transform .12s; }
+  .pubGo:hover { transform:translateY(-1px); } .pubGo:disabled { opacity:.5; cursor:default; transform:none; }
+  .hint { font-size:11px; color:var(--dim); text-align:center; line-height:1.5; }
+  .hint b { color:#9FE0EE; font-weight:600; }
+  .srcChip { height:36px; padding:0 12px; border-radius:11px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.04); border:1px solid var(--hairline); color:var(--dim); font:600 11px Oxanium; letter-spacing:.04em; transition:all .14s; max-width:200px; }
+  .srcChip:hover { color:var(--text); border-color:rgba(62,156,184,.5); }
+  .srcChip.shared { color:#9FE0EE; border-color:rgba(62,156,184,.5); background:rgba(62,156,184,.1); }
+  .srcChip b { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .srcopt { display:flex; align-items:center; gap:9px; padding:11px 12px; border:1px solid var(--hairline); border-radius:11px; cursor:pointer; font-size:13px; color:var(--text); margin-bottom:8px; transition:all .14s; }
+  .srcopt:hover { border-color:rgba(62,156,184,.45); }
+  .srcopt input { accent-color:var(--pink); }
+  .srcopt b { font-weight:600; }
+
+  .toast { position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:rgba(20,22,28,.96); border:1px solid var(--hairline); color:var(--text); padding:11px 20px; border-radius:12px;
+    font:600 12.5px Inter; box-shadow:0 12px 34px rgba(0,0,0,.5); z-index:120; transition:all .2s; pointer-events:none; }
+  .toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+  <div class="top">
+    <a class="pr-back" href="/" title="Back to DeMartinville"><span class="pr-ar">←</span></a>
+    <h1>📡 THE STREAM</h1>
+    <span class="kit-mount"></span>
+    <span class="sp"></span>
+    <div class="seg" id="seg">
+      <button data-tab="listen" class="on" title="Notifi — your music">🎵 NOTIFI</button>
+      <button data-tab="watch" title="Cratel — your video">🎬 CRATEL</button>
+    </div>
+    <button class="srcChip" id="srcChip" title="Stream settings — your handle + where The Stream lives">🏠 Local</button>
+    <button class="pubBtn" id="pubBtn">＋ Publish</button>
+  </div>
+
+  <div class="filterbar">
+    <div class="fsearch"><span>⌕</span><input id="qSearch" type="search" placeholder="Search Notifi…" autocomplete="off" aria-label="Search The Stream" /></div>
+    <select class="sortSel" id="sortSel">
+      <option value="new">Newest</option>
+      <option value="old">Oldest</option>
+      <option value="az">A–Z</option>
+    </select>
+  </div>
+
+  <div class="stage">
+    <!-- LISTEN -->
+    <section class="view on" id="listen">
+      <div id="listenBody"></div>
+    </section>
+    <!-- WATCH -->
+    <section class="view" id="watch">
+      <div id="watchBody"></div>
+    </section>
+  </div>
+
+  <!-- now-playing bar -->
+  <div class="nowbar" id="nowbar">
+    <div class="nb-left">
+      <div class="nb-art" id="nbArt"></div>
+      <div class="nb-info"><div class="nb-t" id="nbT">—</div><div class="nb-b" id="nbB">Nothing playing</div></div>
+    </div>
+    <div class="nb-mid">
+      <div class="nb-ctrls">
+        <button id="nbShuf" title="Shuffle">🔀</button>
+        <button id="nbPrev" title="Previous">⏮</button>
+        <button class="nb-play" id="nbPlay" title="Play/Pause">▶</button>
+        <button id="nbNext" title="Next">⏭</button>
+        <button id="nbRep" title="Repeat">🔁</button>
+      </div>
+      <div class="nb-seek">
+        <span id="nbCur">0:00</span>
+        <input type="range" class="bar" id="nbSeek" min="0" max="1000" value="0" />
+        <span id="nbDur">0:00</span>
+      </div>
+    </div>
+    <div class="nb-right">
+      <span class="vico">🔊</span>
+      <input type="range" class="bar" id="nbVol" min="0" max="100" value="100" />
+    </div>
+  </div>
+
+  <!-- watch theater -->
+  <div class="theater" id="theater">
+    <button class="thclose" id="thClose">✕</button>
+    <div class="thwrap">
+      <div class="thmain">
+        <video id="thVideo" controls playsinline></video>
+        <div class="thmeta">
+          <h2 id="thTitle"></h2>
+          <div class="thby" id="thBy"></div>
+          <div class="thwhen" id="thWhen"></div>
+          <div class="thdesc" id="thDesc"></div>
+        </div>
+      </div>
+      <div class="thup">
+        <div class="secttl">Up next</div>
+        <div id="thUp"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- publish modal -->
+  <div class="modal" id="pubModal">
+    <div class="sheet">
+      <header><h3>PUBLISH TO THE STREAM</h3><button class="x" id="pubX">✕</button></header>
+      <div class="sbody">
+        <div class="kindpick" id="kindPick">
+          <label class="sel" data-kind="music"><input type="radio" name="pk" value="music" checked /><div class="ki">🎵</div><div class="kl">NOTIFI</div><div class="kx">music · a track</div></label>
+          <label data-kind="video"><input type="radio" name="pk" value="video" /><div class="ki">🎬</div><div class="kl">CRATEL</div><div class="kx">video · a clip</div></label>
+        </div>
+        <div class="drop" id="drop"><span id="dropTxt">Click to choose a <b>music</b> file</span><input type="file" id="fileIn" accept="audio/*" style="display:none" /></div>
+        <div class="fld"><label>Title</label><input type="text" id="pTitle" placeholder="Name your work" maxlength="120" /></div>
+        <div class="fld"><label>Artist / creator</label><input type="text" id="pBy" placeholder="Your name" maxlength="80" /></div>
+        <div class="fld" id="coverFld"><label>Cover art <span style="opacity:.6;text-transform:none;font-weight:500">— optional</span></label>
+          <div class="coverdrop" id="coverDrop"><div class="cd-thumb" id="coverThumb">🎨</div><div class="cd-txt" id="coverTxt">Add album art for Notifi</div>
+            <input type="file" id="coverIn" accept="image/*" style="display:none" /></div></div>
+        <div class="fld" id="descFld" style="display:none"><label>Description</label><textarea id="pDesc" rows="2" placeholder="What's this video about? (optional)" maxlength="800"></textarea></div>
+        <button class="pubGo" id="pubGo">Publish it</button>
+        <div class="hint">Stored locally on this machine. Big videos take a moment to upload.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- stream settings: handle + where it lives -->
+  <div class="modal" id="setModal">
+    <div class="sheet">
+      <header><h3>STREAM SETTINGS</h3><button class="x" id="setX">✕</button></header>
+      <div class="sbody">
+        <div class="fld"><label>Your handle</label><input type="text" id="setHandle" placeholder="how you show up when you publish" maxlength="80" /></div>
+        <div class="fld"><label>Where The Stream lives</label>
+          <label class="srcopt"><input type="radio" name="src" value="local" /><span><b>This machine</b> — private, just you</span></label>
+          <label class="srcopt"><input type="radio" name="src" value="shared" /><span><b>Shared server</b> — join a public scene</span></label>
+        </div>
+        <div class="fld" id="urlFld" style="display:none"><label>Shared Stream URL</label><input type="text" id="setUrl" placeholder="https://your-demartinville-host" /></div>
+        <button class="pubGo" id="setSave">Save</button>
+        <div class="hint">Go live later: host DeMartinville with <b>DMV_SHARED=1</b>, then paste its URL here — everyone with the link shares one Stream.</div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio"></audio>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  // ── Stream source: LOCAL (this machine, private) or a SHARED hosted URL. Config is local. ──
+  function cfg(){ try{ return JSON.parse(localStorage.getItem("dmv_stream_cfg")||"{}"); }catch(_){ return {}; } }
+  function saveCfg(c){ try{ localStorage.setItem("dmv_stream_cfg", JSON.stringify(c)); }catch(_){} }
+  function base(){ const c=cfg(); return (c.mode==="shared" && c.url) ? c.url.replace(/\/+$/,"") : ""; }
+  function handle(){ try{ return localStorage.getItem("dmv_creator")||""; }catch(_){ return ""; } }
+  let api = base()+"/api/stream";
+  function refreshApi(){ api = base()+"/api/stream"; }
+  const media = f => base()+"/api/stream/media/" + encodeURIComponent(f);
+  let MUSIC = [], VIDEO = [], cur = -1, shuffle = false, repeat = "off", pubCover = null;
+  let filterCreator = null, query = "", sort = "new", queue = [], vqueue = [], theaterI = -1;
+  const audio = $("#audio");
+
+  /* ---------- helpers ---------- */
+  function esc(s){ return (s||"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function fmtTime(s){ s=Math.max(0,Math.floor(s||0)); const m=Math.floor(s/60), x=s%60; return m+":"+String(x).padStart(2,"0"); }
+  function ago(ts){ if(!ts) return ""; const d=Math.floor(Date.now()/1000)-ts;
+    if(d<60) return "just now"; if(d<3600) return Math.floor(d/60)+"m ago"; if(d<86400) return Math.floor(d/3600)+"h ago";
+    if(d<2592000) return Math.floor(d/86400)+"d ago"; return Math.floor(d/2592000)+"mo ago"; }
+  function hue(s){ let h=0; for(const c of (s||"x")) h=(h*31+c.charCodeAt(0))%360; return h; }
+  function ph(item, glyph){ const h=hue(item.id+item.title);
+    return `<div class="ph" style="background:linear-gradient(135deg,hsl(${h} 52% 42%),hsl(${(h+48)%360} 56% 30%))">${glyph}</div>`; }
+  function artMusic(it){ return it.cover ? `<img src="${media(it.cover)}" alt="">` : ph(it,"♪"); }
+  function thumbVideo(it){ return it.cover ? `<img src="${media(it.cover)}" alt="">`
+    : `<video src="${media(it.file)}#t=0.5" preload="metadata" muted></video>`; }
+  function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2600); }
+
+  function byline(c){ return `<span class="byline" data-creator="${esc(c)}">${esc(c)}</span>`; }
+  function applyView(arr){ let v = arr.map((it,i)=>({it,i}));
+    if(filterCreator) v = v.filter(o=>o.it.creator===filterCreator);
+    if(query){ const q=query.toLowerCase(); v = v.filter(o=>((o.it.title||"")+" "+(o.it.creator||"")).toLowerCase().includes(q)); }
+    if(sort==="old") v = v.slice().reverse();
+    else if(sort==="az") v = v.slice().sort((a,b)=>(a.it.title||"").localeCompare(b.it.title||""));
+    return v; }   // "new" = backend order (newest first)
+  function channelBanner(){ if(!filterCreator) return "";
+    const m=MUSIC.filter(x=>x.creator===filterCreator).length, v=VIDEO.filter(x=>x.creator===filterCreator).length;
+    return `<div class="chanbar"><div class="chav">${esc(((filterCreator||"·").trim()[0]||"·")).toUpperCase()}</div>
+      <div><div class="chname">${esc(filterCreator)}</div><div class="chsub">${m} track${m!==1?"s":""} · ${v} video${v!==1?"s":""} on The Stream</div></div>
+      <button class="chclear" id="chClear">✕ All</button></div>`; }
+  function noMatch(kind){ return `<div class="empty"><div class="ico">🔍</div><h2>Nothing here</h2><p>${
+    filterCreator ? "No "+kind+"s from "+esc(filterCreator)+" — try the other tab." : "No "+kind+"s match “"+esc(query)+"”."}</p></div>`; }
+  function wireChan(){ const c=$("#chClear"); if(c) c.onclick=clearChannel; }
+  function wireBylines(scope){ scope.querySelectorAll(".byline").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); setChannel(b.dataset.creator); })); }
+  function setChannel(c){ filterCreator=c; query=""; const qs=$("#qSearch"); if(qs) qs.value=""; renderListen(); renderWatch(); const st=$(".stage"); if(st) st.scrollTop=0; }
+  function clearChannel(){ filterCreator=null; renderListen(); renderWatch(); }
+
+  /* ---------- load ---------- */
+  async function load(){
+    try{ const r = await fetch(api); const j = await r.json(); MUSIC=j.music||[]; VIDEO=j.video||[]; }
+    catch(e){ MUSIC=[]; VIDEO=[]; }
+    renderListen(); renderWatch();
+  }
+
+  /* ---------- LISTEN ---------- */
+  function renderListen(){
+    const body = $("#listenBody");
+    if(!MUSIC.length){ queue=[]; body.innerHTML = emptyState("🎧","Notifi's quiet — for now.",
+      "No tracks dropped yet. Bounce something in the Audio Labs or the Kitchen, hit Publish, and you're the first drop on Notifi.<br><span class='slogan' style='margin:0'>“Listen to Spotify?” — <b>not if I can help it.</b></span>","music"); wireEmpty(); return; }
+    const view = applyView(MUSIC); queue = view.map(o=>o.i);
+    if(!view.length){ body.innerHTML = channelBanner() + noMatch("track"); wireChan(); return; }
+    const feat = view[0].it, fi = view[0].i, clean = !filterCreator && !query && sort==="new";
+    let html = channelBanner() + `
+      <div class="feature">
+        <div class="art">${artMusic(feat)}</div>
+        <div class="meta">
+          <div class="kick">${filterCreator?esc(filterCreator):(clean?"Latest drop · Notifi":"Notifi")}</div>
+          <div class="ftitle">${esc(feat.title)}</div>
+          <div class="fby">${byline(feat.creator)}${feat.dur?" · "+fmtTime(feat.dur):""}</div>
+          <button class="fplay" data-i="${fi}">▶ Play</button>
+        </div>
+      </div>`;
+    if(clean) html += `<div class="slogan">“Listen to Spotify?” — <b>not if I can help it.</b></div>`;
+    html += `<div class="secttl">${filterCreator?esc(filterCreator):"On Notifi"} · ${view.length} track${view.length!==1?"s":""}${query?` · “${esc(query)}”`:""}</div><div class="tracklist">`;
+    view.forEach((o,n)=>{ const it=o.it, i=o.i; html += `
+      <div class="trow" data-i="${i}" data-id="${it.id}">
+        <div class="num">${n+1}</div>
+        <div class="art">${artMusic(it)}</div>
+        <div class="tmeta"><div class="tt">${esc(it.title)}</div><div class="tb">${byline(it.creator)} · ${ago(it.ts)}</div></div>
+        <div class="tdur">${it.dur?fmtTime(it.dur):"—"}</div>
+        <button class="tdel" data-del="${it.id}" title="Remove">🗑</button>
+      </div>`; });
+    html += `</div>`;
+    body.innerHTML = html;
+    body.querySelectorAll(".trow").forEach(r=>{ r.addEventListener("click", e=>{ if(e.target.closest("[data-del]")||e.target.closest(".byline")) return; playTrack(+r.dataset.i); }); });
+    body.querySelector(".fplay").addEventListener("click", e=>playTrack(+e.currentTarget.dataset.i));
+    body.querySelectorAll("[data-del]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); del(b.dataset.del,"track"); }));
+    wireChan(); wireBylines(body); markPlaying();
+  }
+
+  function playTrack(i){
+    if(i<0||i>=MUSIC.length) return;
+    cur = i; const it = MUSIC[i];
+    if(!$("#theater").classList.contains("on")) $("#thVideo").pause();
+    audio.src = media(it.file); audio.play().catch(()=>{});
+    $("#nbArt").innerHTML = artMusic(it);
+    $("#nbT").textContent = it.title; $("#nbB").textContent = it.creator;
+    $("#nowbar").classList.add("up");
+    markPlaying();
+  }
+  function markPlaying(){
+    document.querySelectorAll(".trow").forEach(r=> r.classList.toggle("playing", +r.dataset.i===cur && !audio.paused));
+  }
+  function pickNext(){ if(!queue.length) return -1;
+    if(shuffle && queue.length>1){ let n; do{ n=queue[Math.floor(Math.random()*queue.length)]; }while(n===cur); return n; }
+    const pos=queue.indexOf(cur); if(pos<0) return queue[0]; return queue[(pos+1)%queue.length]; }
+  function pickPrev(){ if(!queue.length) return -1; const pos=queue.indexOf(cur); if(pos<0) return queue[0]; return queue[(pos-1+queue.length)%queue.length]; }
+  function nextTrack(){ const n=pickNext(); if(n>=0) playTrack(n); }
+  function prevTrack(){ const n=pickPrev(); if(n>=0) playTrack(n); }
+  function onEnded(){ if(repeat==="one"){ audio.currentTime=0; audio.play().catch(()=>{}); return; }
+    const pos=queue.indexOf(cur);
+    if(!shuffle && repeat==="off" && pos>=0 && pos===queue.length-1){ audio.pause(); audio.currentTime=0; return; }   // end of the current list → stop
+    nextTrack(); }
+
+  /* ---------- WATCH ---------- */
+  function renderWatch(){
+    const body = $("#watchBody");
+    if(!VIDEO.length){ vqueue=[]; body.innerHTML = emptyState("🎬","Cratel's empty — go create.",
+      "Cut something in the LePrince Visual Labs, publish it here, and your Cratel channel starts with one upload.","video"); wireEmpty(); return; }
+    const view = applyView(VIDEO); vqueue = view.map(o=>o.i);
+    if(!view.length){ body.innerHTML = channelBanner() + noMatch("video"); wireChan(); return; }
+    let html = channelBanner() + `<div class="secttl">${filterCreator?esc(filterCreator):"On Cratel"} · ${view.length} video${view.length!==1?"s":""}${query?` · “${esc(query)}”`:""}</div><div class="vgrid">`;
+    view.forEach(o=>{ const it=o.it, i=o.i; html += `
+      <div class="vcard" data-i="${i}">
+        <div class="vthumb">
+          ${thumbVideo(it)}
+          <div class="play"><span>▶</span></div>
+          ${it.dur?`<div class="dur">${fmtTime(it.dur)}</div>`:""}
+          <button class="vdel" data-del="${it.id}" title="Remove">🗑</button>
+        </div>
+        <div class="vinfo"><div class="vt">${esc(it.title)}</div><div class="vsub">${byline(it.creator)} · ${ago(it.ts)}</div></div>
+      </div>`; });
+    html += `</div>`;
+    body.innerHTML = html;
+    body.querySelectorAll(".vcard").forEach(c=> c.addEventListener("click", e=>{ if(e.target.closest("[data-del]")||e.target.closest(".byline")) return; openTheater(+c.dataset.i); }));
+    body.querySelectorAll("[data-del]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); del(b.dataset.del,"video"); }));
+    wireChan(); wireBylines(body);
+  }
+
+  function openTheater(i){
+    const it = VIDEO[i]; if(!it) return; theaterI = i;
+    audio.pause(); $("#nbPlay").textContent="▶"; markPlaying();
+    $("#thVideo").src = media(it.file); $("#thVideo").play().catch(()=>{});
+    $("#thTitle").textContent = it.title; $("#thBy").innerHTML = byline(it.creator);
+    $("#thWhen").textContent = ago(it.ts) + (it.dur?" · "+fmtTime(it.dur):"");
+    $("#thDesc").textContent = it.desc || "";
+    const up = $("#thUp");
+    const order = vqueue.length ? vqueue : VIDEO.map((_,j)=>j);
+    const others = order.filter(j=>j!==i).map(j=>({v:VIDEO[j],j}));
+    up.innerHTML = others.length ? others.map(o=>`
+      <div class="upcard" data-j="${o.j}">
+        <div class="upthumb">${thumbVideo(o.v)}</div>
+        <div class="upmeta"><div class="ut">${esc(o.v.title)}</div><div class="ub">${esc(o.v.creator)} · ${ago(o.v.ts)}</div></div>
+      </div>`).join("") : `<div style="color:var(--dim);font-size:12px;padding:6px 2px">Nothing else yet.</div>`;
+    up.querySelectorAll(".upcard").forEach(c=> c.addEventListener("click", ()=>openTheater(+c.dataset.j)));
+    const tb = $("#thBy").querySelector(".byline");
+    if(tb) tb.addEventListener("click", ()=>{ const c=tb.dataset.creator; closeTheater(); setChannel(c); document.querySelector('.seg button[data-tab="watch"]').click(); });
+    $("#theater").classList.add("on");
+  }
+  function closeTheater(){ theaterI=-1; $("#theater").classList.remove("on"); const v=$("#thVideo"); v.pause(); v.removeAttribute("src"); v.load(); }
+
+  function emptyState(ico,h,p,kind){ return `<div class="empty"><div class="ico">${ico}</div><h2>${h}</h2><p>${p}</p>
+    <button class="pubBtn" data-empty="${kind}">＋ Publish to ${kind==="music"?"Notifi":"Cratel"}</button></div>`; }
+  function wireEmpty(){ document.querySelectorAll("[data-empty]").forEach(b=> b.addEventListener("click", ()=>openPublish(b.dataset.empty))); }
+
+  /* ---------- delete ---------- */
+  async function del(id,label){
+    if(!confirm("Remove this "+label+" from The Stream? This deletes the file from your machine.")) return;
+    try{ const r=await fetch(api+"/"+id,{method:"DELETE"}); if(!r.ok) throw 0;
+      if(MUSIC[cur] && MUSIC[cur].id===id){ audio.pause(); audio.removeAttribute("src"); cur=-1; $("#nowbar").classList.remove("up"); }
+      toast("Removed"); await load();
+    }catch(e){ toast("Couldn't remove it"); }
+  }
+
+  /* ---------- tabs ---------- */
+  $("#seg").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return;
+    document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on", x===b));
+    const t=b.dataset.tab;
+    $("#listen").classList.toggle("on", t==="listen"); $("#watch").classList.toggle("on", t==="watch");
+    $("#qSearch").placeholder = t==="watch" ? "Search Cratel…" : "Search Notifi…";
+  });
+
+  /* ---------- now-playing wiring ---------- */
+  $("#nbPlay").addEventListener("click", ()=>{ if(!audio.src) { if(MUSIC.length) playTrack(0); return; }
+    if(audio.paused) audio.play(); else audio.pause(); });
+  $("#nbNext").addEventListener("click", nextTrack);
+  $("#nbPrev").addEventListener("click", ()=>{ if(audio.currentTime>3){ audio.currentTime=0; } else prevTrack(); });
+  audio.addEventListener("play", ()=>{ $("#nbPlay").textContent="⏸"; markPlaying(); });
+  audio.addEventListener("pause", ()=>{ $("#nbPlay").textContent="▶"; markPlaying(); });
+  audio.addEventListener("ended", onEnded);
+  audio.addEventListener("loadedmetadata", ()=>{ $("#nbDur").textContent=fmtTime(audio.duration); });
+  audio.addEventListener("timeupdate", ()=>{ $("#nbCur").textContent=fmtTime(audio.currentTime);
+    if(audio.duration) $("#nbSeek").value = Math.round(audio.currentTime/audio.duration*1000); });
+  $("#nbSeek").addEventListener("input", ()=>{ if(audio.duration) audio.currentTime = $("#nbSeek").value/1000*audio.duration; });
+  $("#nbVol").addEventListener("input", ()=>{ audio.volume = $("#nbVol").value/100; try{ localStorage.setItem("dmv_stream_vol", $("#nbVol").value); }catch(_){} });
+  $("#nbShuf").addEventListener("click", ()=>{ shuffle=!shuffle; $("#nbShuf").classList.toggle("on",shuffle); toast(shuffle?"Shuffle on":"Shuffle off"); });
+  $("#nbRep").addEventListener("click", ()=>{ repeat = repeat==="off"?"all":(repeat==="all"?"one":"off");
+    $("#nbRep").textContent = repeat==="one"?"🔂":"🔁"; $("#nbRep").classList.toggle("on", repeat!=="off");
+    toast(repeat==="off"?"Repeat off":(repeat==="all"?"Repeat all":"Repeat one")); });
+  (function(){ let v=100; try{ const s=localStorage.getItem("dmv_stream_vol"); if(s!=null) v=parseInt(s,10); }catch(_){} if(isNaN(v))v=100; audio.volume=v/100; $("#nbVol").value=v; })();
+
+  $("#thClose").addEventListener("click", closeTheater);
+  $("#thVideo").addEventListener("ended", ()=>{ if(vqueue.length>1 && theaterI>=0){ const pos=vqueue.indexOf(theaterI); if(pos>=0){ const nx=vqueue[(pos+1)%vqueue.length]; if(nx!==theaterI) openTheater(nx); } } });
+  $("#qSearch").addEventListener("input", e=>{ query=e.target.value.trim(); renderListen(); renderWatch(); });
+  $("#sortSel").addEventListener("change", e=>{ sort=e.target.value; renderListen(); renderWatch(); });
+
+  /* ---------- stream settings (handle + local/shared source) ---------- */
+  function updateChip(){ const c=cfg(), h=handle(), chip=$("#srcChip");
+    if(c.mode==="shared" && c.url){ chip.classList.add("shared"); chip.innerHTML = `🌐 <b>${esc(h||"Shared")}</b>`; chip.title = "Shared Stream"+(h?` · @${h}`:"")+" — click to change"; }
+    else { chip.classList.remove("shared"); chip.innerHTML = h ? `🏠 <b>${esc(h)}</b>` : "🏠 Local"; chip.title = "Local (private)"+(h?` · @${h}`:"")+" — click to change"; } }
+  function openSettings(){ const c=cfg(); $("#setHandle").value = handle();
+    const mode = c.mode==="shared" ? "shared" : "local";
+    const radio = document.querySelector(`input[name="src"][value="${mode}"]`); if(radio) radio.checked = true;
+    $("#setUrl").value = c.url || ""; $("#urlFld").style.display = mode==="shared" ? "block" : "none";
+    $("#setModal").classList.add("on"); $("#setHandle").focus(); }
+  $("#srcChip").addEventListener("click", openSettings);
+  $("#setX").addEventListener("click", ()=>$("#setModal").classList.remove("on"));
+  $("#setModal").addEventListener("click", e=>{ if(e.target===$("#setModal")) $("#setModal").classList.remove("on"); });
+  document.querySelectorAll('input[name="src"]').forEach(r=> r.addEventListener("change", ()=>{ const sel=document.querySelector('input[name="src"]:checked'); $("#urlFld").style.display = sel && sel.value==="shared" ? "block" : "none"; }));
+  $("#setSave").addEventListener("click", ()=>{
+    const h = $("#setHandle").value.trim(); try{ localStorage.setItem("dmv_creator", h); }catch(_){}
+    const sel = document.querySelector('input[name="src"]:checked'), mode = sel ? sel.value : "local";
+    let url = $("#setUrl").value.trim(); if(mode==="shared" && url && !/^https?:\/\//i.test(url)) url = "https://"+url;
+    if(mode==="shared" && !url){ toast("Paste a Stream URL, or pick This machine"); return; }
+    saveCfg(mode==="shared" ? { mode:"shared", url } : { mode:"local" });
+    refreshApi(); updateChip(); $("#setModal").classList.remove("on");
+    toast(mode==="shared" ? "Joined the shared Stream" : "Using your local Stream");
+    cur=-1; audio.pause(); audio.removeAttribute("src"); $("#nowbar").classList.remove("up"); load();
+  });
+  updateChip();
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ closeTheater(); $("#pubModal").classList.remove("on"); $("#setModal").classList.remove("on"); }
+    if(e.key===" " && audio.src && !$("#pubModal").classList.contains("on") && !$("#theater").classList.contains("on")
+       && !/INPUT|TEXTAREA/.test((e.target.tagName||""))){ e.preventDefault(); audio.paused?audio.play():audio.pause(); } });
+
+  /* ---------- publish ---------- */
+  let pubKind = "music", pubFile = null;
+  function openPublish(kind){ setKind(kind||"music"); pubFile=null; pubCover=null; $("#fileIn").value=""; $("#coverIn").value="";
+    $("#dropTxt").innerHTML = `Click to choose a <b>${pubKind}</b> file`; $("#drop").classList.remove("has");
+    $("#coverDrop").classList.remove("has"); $("#coverThumb").textContent="🎨"; $("#coverTxt").textContent="Add album art for Notifi";
+    $("#pTitle").value=""; $("#pBy").value=handle(); $("#pDesc").value=""; $("#pubModal").classList.add("on"); $("#pTitle").focus(); }
+  function setKind(k){ pubKind=k;
+    document.querySelectorAll("#kindPick label").forEach(l=> l.classList.toggle("sel", l.dataset.kind===k));
+    $("#kindPick").querySelector(`input[value="${k}"]`).checked=true;
+    $("#fileIn").accept = k==="video" ? "video/*" : "audio/*";
+    $("#descFld").style.display = k==="video" ? "block" : "none";
+    $("#coverFld").style.display = k==="video" ? "none" : "block";
+    if(!pubFile) $("#dropTxt").innerHTML = `Click to choose a <b>${k}</b> file`;
+  }
+  $("#pubBtn").addEventListener("click", ()=>openPublish(document.querySelector(".seg button.on").dataset.tab==="watch"?"video":"music"));
+  $("#pubX").addEventListener("click", ()=>$("#pubModal").classList.remove("on"));
+  $("#pubModal").addEventListener("click", e=>{ if(e.target===$("#pubModal")) $("#pubModal").classList.remove("on"); });
+  document.querySelectorAll("#kindPick label").forEach(l=> l.addEventListener("click", ()=>setKind(l.dataset.kind)));
+  $("#drop").addEventListener("click", ()=>$("#fileIn").click());
+  $("#fileIn").addEventListener("change", ()=>{ pubFile=$("#fileIn").files[0]||null;
+    if(pubFile){ $("#dropTxt").innerHTML=`<b>${esc(pubFile.name)}</b>`; $("#drop").classList.add("has");
+      if(!$("#pTitle").value) $("#pTitle").value = pubFile.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," "); } });
+  $("#coverDrop").addEventListener("click", ()=>$("#coverIn").click());
+  $("#coverIn").addEventListener("change", ()=>{ pubCover=$("#coverIn").files[0]||null;
+    if(pubCover){ const u=URL.createObjectURL(pubCover); $("#coverThumb").innerHTML=`<img src="${u}" alt="">`; $("#coverTxt").textContent=pubCover.name; $("#coverDrop").classList.add("has"); }
+    else { $("#coverThumb").textContent="🎨"; $("#coverTxt").textContent="Add album art for Notifi"; $("#coverDrop").classList.remove("has"); } });
+
+  function readAsDataURL(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); }); }
+  function probeDur(f,kind){ return new Promise(res=>{ try{ const el=document.createElement(kind==="video"?"video":"audio");
+    el.preload="metadata"; el.onloadedmetadata=()=>{ const d=el.duration||0; URL.revokeObjectURL(el.src); res(isFinite(d)?d:0); };
+    el.onerror=()=>res(0); el.src=URL.createObjectURL(f); }catch(e){ res(0); } }); }
+
+  $("#pubGo").addEventListener("click", async ()=>{
+    if(!pubFile){ toast("Pick a "+pubKind+" file first"); return; }
+    const title=$("#pTitle").value.trim(); if(!title){ toast("Give it a title"); $("#pTitle").focus(); return; }
+    const go=$("#pubGo"); go.disabled=true; go.textContent="Publishing…";
+    try{
+      const dur = await probeDur(pubFile, pubKind);
+      const file = await readAsDataURL(pubFile);
+      const body = { kind:pubKind, title, creator:$("#pBy").value.trim(), file, dur,
+        ext:(pubFile.name.split(".").pop()||"").toLowerCase(), desc: pubKind==="video"?$("#pDesc").value.trim():"" };
+      if(pubKind==="music" && pubCover){ try{ body.cover = await readAsDataURL(pubCover); }catch(_){} }
+      try{ localStorage.setItem("dmv_creator", body.creator); }catch(_){}
+      const r = await fetch(api+"/publish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const j = await r.json();
+      if(!r.ok || j.error) throw new Error(j.error||"failed");
+      $("#pubModal").classList.remove("on");
+      toast("Published to The Stream ✓");
+      // jump to the tab it landed in
+      const tab = pubKind==="video" ? "watch" : "listen";
+      document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on", x.dataset.tab===tab));
+      $("#listen").classList.toggle("on", tab==="listen"); $("#watch").classList.toggle("on", tab==="watch");
+      await load();
+    }catch(e){ toast("Publish failed — "+(e.message||"try again")); }
+    finally{ go.disabled=false; go.textContent="Publish it"; }
+  });
+
+  load();
+})();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

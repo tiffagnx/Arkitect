@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "2.0.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "2.2.1"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -71,11 +71,22 @@ def _fire(coro):                # create_task with no ref can be GC'd before it 
 _mem_lock = asyncio.Lock()      # serialize memory.json read-modify-write (no clobber)
 _brain_lock = asyncio.Lock()    # only one LM Studio boot attempt at a time (no double-launch → OOM)
 _engine_lock = asyncio.Lock()   # only one ComfyUI boot attempt at a time
+_agent_lock = asyncio.Lock()    # serialize per-agent knowledge-pack writes (no clobber of learned entries)
 
 DATA.mkdir(exist_ok=True)
 SESS_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="DeMartinville", docs_url=None, redoc_url=None)
+
+# ── Going-live switch for The Stream ──────────────────────────────────────────
+# By DEFAULT this is a private localhost app — no cross-origin access, nothing open.
+# When you HOST it as the shared Stream server, set env DMV_SHARED=1: that opens CORS
+# so other people's browsers/apps can read + publish to the shared feed. Off locally =
+# no new exposure; the switch is the ONLY thing that makes it public.
+if os.environ.get("DMV_SHARED"):
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
+                       allow_methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["*"])
 
 
 # ── Never serve a stale page. The browser was caching old HTML/JS/CSS, so B kept
@@ -1081,15 +1092,17 @@ async def fetch_page(url: str, cap: int = 6000) -> str:
         return ""
 
 
-async def lm_once(model: str, system: str, user: str, max_tokens: int = 900) -> str:
+async def lm_once(model: str, system: str, user: str, max_tokens: int = 900, temperature: float = 0.4) -> str:
     # reasoning_effort 'low' stops small "thinking" models (gemma, qwen) from
     # burning the whole token budget on hidden reasoning and returning a blank
     # answer — the #1 cause of "nothing came back" in this room.
+    # temperature is overridable: structured-extraction callers (e.g. the agent-pack
+    # distiller) pass a LOW temp so a tiny 4B model emits clean, parseable output.
     async with httpx.AsyncClient(timeout=180) as cx:
         r = await cx.post(f"{LM}/chat/completions", json={
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": 0.4,
+            "temperature": temperature,
             "max_tokens": max_tokens,
             "reasoning_effort": "low",
         })
@@ -1427,6 +1440,13 @@ STUDIO_DIR = DATA / "studio_projects"  # saved Studio mixes
 STUDIO_DIR.mkdir(exist_ok=True)
 PLUGINS_DIR = DATA / "plugins"         # Builder-made Studio plugins (.js + meta), auto-loadable by the Studio
 PLUGINS_DIR.mkdir(exist_ok=True)
+AGENTS_DIR = DATA / "agents"           # per-agent server-side knowledge packs (user-built "mine" agents); gitignored, PRIVATE
+AGENTS_DIR.mkdir(exist_ok=True)
+STREAM_DIR = DATA / "stream"           # The Stream — the in-app Spotify+YouTube: published music/video feed
+STREAM_DIR.mkdir(exist_ok=True)
+STREAM_MEDIA = STREAM_DIR / "media"    # the actual published audio/video/cover files
+STREAM_MEDIA.mkdir(exist_ok=True)
+STREAM_FEED = STREAM_DIR / "feed.json" # the manifest (one JSON list of every published item)
 
 BUILD_SYSTEM = (
     "You are an elite front-end engineer. You output ONE complete, self-contained HTML file and "
@@ -1796,6 +1816,242 @@ async def build_del(bid: str):
     if f.exists():
         f.unlink()
     return {"ok": True}
+
+
+# ════════════════════════════════════════════════════════════════════════════════════════
+#  AGENT KNOWLEDGE PACKS — per-agent server-side stores for user-built ("mine") agents.
+#  An agent is NOT a fine-tuned model: it's a growing LOCAL knowledge pack (distilled REAL
+#  rules) that the chosen LLM reads. "Training" = a CAPTURE pipeline (work / watch / feed →
+#  distill via the LOCAL model → dedupe → append → injected into /api/kit's system prompt).
+#  Packs live under DATA/agents/<id>.json — gitignored, PRIVATE, never committed/published.
+#  Mirrors the per-file builds/sessions CRUD idiom (sanitized filename, _atomic_write,
+#  mtime-sorted glob). The pack stores NO readiness number — trainedScore (0..20) is DERIVED
+#  from real entries on every read so it can never drift from real content.
+# ════════════════════════════════════════════════════════════════════════════════════════
+
+def _agent_path(aid: str) -> Path:
+    # SAME sanitizer the builds/sessions stores use (id → safe filename).
+    return AGENTS_DIR / (re.sub(r"[^a-zA-Z0-9-]", "", aid or "") + ".json")
+
+
+def _load_pack(aid: str) -> dict:
+    """Load an agent's pack, or a fresh empty pack on miss / parse-fail. Never raises."""
+    f = _agent_path(aid)
+    if f.exists():
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            if isinstance(d, dict):
+                d.setdefault("id", aid)
+                d.setdefault("entries", [])
+                return d
+        except Exception:
+            pass
+    return {"id": aid, "entries": []}
+
+
+def _save_pack(pack: dict) -> None:
+    """Stamp the last-write time and atomically write the pack to its sanitized path."""
+    pack["ts"] = int(time.time())
+    _atomic_write(_agent_path(pack["id"]), json.dumps(pack, indent=1))
+
+
+def _trained_score(entries: list) -> int:
+    """SERVER-AUTHORITATIVE trained score (0..20), derived ONLY from real pack evidence —
+    never a client value, never faked. 1 pt per real distilled rule (cap 16) + 2 pt per
+    DISTINCT capture method used (cap +4). Reaching 20 needs ~16 real rules across >=2
+    methods. Empty pack => 0, hard."""
+    n = len(entries)
+    if n <= 0:
+        return 0
+    base = min(16, n)                                              # 1 pt per REAL distilled rule, cap 16
+    methods = len({e.get("source") for e in entries if e.get("source") in ("work", "watch", "feed")})
+    diversity = min(4, 2 * methods)                               # +2 per DISTINCT method used, cap +4
+    return min(20, base + diversity)
+
+
+def _pack_counts(entries: list) -> dict:
+    """Per-source tallies the training-log filter chips read."""
+    c = {"work": 0, "watch": 0, "feed": 0}
+    for e in entries:
+        s = e.get("source")
+        if s in c:
+            c[s] += 1
+    return c
+
+
+async def _distill_rules(raw: str, kind: str, craft: str, context: str) -> list:
+    """Run the LOCAL model to distill RAW evidence into durable reusable RULES. Returns a
+    list of {text,kind,evidence} dicts — or [] when nothing durable is supported. LOCAL ONLY
+    (lm_once → local /chat/completions): capture NEVER spends the owner's cloud key. Extracts
+    only what the input genuinely supports; on no-JSON / parse-fail / any error returns []."""
+    try:
+        loaded = await _loaded_models()
+        model = (loaded[0] if loaded else DEFAULT_MODEL)
+    except Exception:
+        return []
+    system = (
+        'Distill how this specific creator works into durable, reusable RULES for an assistant '
+        'that should work like them. Output ONLY a JSON array of objects '
+        '{"text":"<one rule, <=160 chars, imperative, in their voice>",'
+        '"kind":"rule|move|taste|fact","evidence":"<<=120-char quote from the source>"}. '
+        'No code fences, no prose. Extract only what the input genuinely supports. '
+        'If nothing durable, output [].'
+    )
+    user = f"Craft: {craft or 'creator'}. Room: {context or 'studio'}. Method: {kind}.\n\nEVIDENCE:\n{raw[:6000]}"
+    # A tiny local 4B model is INCONSISTENT at structured output — the same input distills
+    # cleanly one call and returns junk the next. Retry up to 3x and take the first real
+    # result; still honest (truly-empty input yields [] after all tries — nothing written).
+    for _ in range(3):
+        try:
+            out = await lm_once(model, system, user, max_tokens=1200, temperature=0.15)
+        except Exception:
+            continue
+        text = (out or "").strip()
+        rules = []
+        # Parse each flat {...} object on its OWN — survives ```json code fences AND a response
+        # truncated mid-array: complete objects are kept, a half-written trailing object skipped.
+        for o in re.findall(r"\{[^{}]*\}", text, re.S):
+            try:
+                obj = json.loads(o)
+            except Exception:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            t = str(obj.get("text", "")).strip()
+            if not t:
+                continue
+            k = str(obj.get("kind", "rule")).strip().lower()
+            if k not in ("rule", "move", "taste", "fact"):
+                k = "rule"
+            ev = (str(obj.get("evidence", "")).strip() or raw.strip()[:120])[:120]
+            rules.append({"text": t[:200], "kind": k, "evidence": ev})
+        # Fallback: a model that ignored JSON and just listed rules as plain lines.
+        if not rules:
+            ev = raw.strip()[:120]
+            for line in text.splitlines():
+                s = re.sub(r'^[\-\*•\d\.\)\s"]+', "", line.strip()).strip().strip('"').strip()
+                low = s.lower()
+                if len(s) < 8 or len(s) > 240 or s.upper() == "NONE":
+                    continue
+                if low.startswith(("here are", "rules", "sure", "okay", "based on", "the creator", "```", "json")):
+                    continue
+                rules.append({"text": s[:200], "kind": "rule", "evidence": ev})
+                if len(rules) >= 8:
+                    break
+        if rules:
+            return rules[:12]
+    return []
+
+
+@app.get("/api/agents")
+async def agents_list():
+    """List packs (slim — no entry bodies). Glob + mtime-sort like the builds list."""
+    out = []
+    for f in sorted(AGENTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            ents = d.get("entries", [])
+            out.append({"id": d.get("id", f.stem), "name": d.get("name", ""),
+                        "craft": d.get("craft", ""), "entries": len(ents),
+                        "trained": _trained_score(ents), "ts": d.get("ts", 0)})
+        except Exception:
+            continue
+    return {"agents": out}
+
+
+@app.get("/api/agents/{aid}")
+async def agent_get(aid: str):
+    """Read one pack with DERIVED trained + per-source counts. Missing => 404."""
+    f = _agent_path(aid)
+    if not f.exists():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    pack = _load_pack(aid)
+    ents = pack.get("entries", [])
+    return {"id": pack.get("id", aid), "name": pack.get("name", ""), "craft": pack.get("craft", ""),
+            "craftLabel": pack.get("craftLabel", ""), "ts": pack.get("ts", 0),
+            "entries": ents, "trained": _trained_score(ents), "counts": _pack_counts(ents)}
+
+
+@app.post("/api/agents")
+async def agent_save(req: Request):
+    """Upsert pack METADATA (name/craft) so the server knows the agent exists. MERGES — never
+    clobbers learned entries on a metadata save. Returns DERIVED trained + entry count."""
+    body = await req.json()
+    aid = re.sub(r"[^a-zA-Z0-9-]", "", (body.get("id") or "").strip()) or str(uuid.uuid4())
+    async with _agent_lock:
+        pack = _load_pack(aid)            # PRESERVE existing entries
+        pack["id"] = aid
+        pack["name"] = (body.get("name") or pack.get("name", "")).strip()
+        pack["craft"] = (body.get("craft") or pack.get("craft", "")).strip()
+        pack["craftLabel"] = (body.get("craftLabel") or pack.get("craftLabel", "")).strip()
+        _save_pack(pack)
+        ents = pack.get("entries", [])
+    return {"ok": True, "id": aid, "trained": _trained_score(ents), "entries": len(ents)}
+
+
+@app.delete("/api/agents/{aid}")
+async def agent_del(aid: str):
+    """Delete a pack (idempotent)."""
+    f = _agent_path(aid)
+    if f.exists():
+        f.unlink()
+    return {"ok": True}
+
+
+@app.post("/api/agents/{aid}/train")
+async def agent_train(aid: str, req: Request):
+    """TRAIN (all 3 methods: work | watch | feed). Distills RAW evidence into durable rules via
+    the LOCAL model, dedupes vs existing, appends ONLY real entries. HONESTY GUARANTEE: if the
+    model finds nothing durable, added=0, NOTHING is written, the bar never moves."""
+    body = await req.json()
+    aid = re.sub(r"[^a-zA-Z0-9-]", "", (body.get("id") or aid or "").strip()) or str(uuid.uuid4())
+    kind = (body.get("kind") or "").strip().lower()
+    raw = (body.get("raw") or "").strip()
+    if kind not in ("work", "watch", "feed") or not raw:
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    context = (body.get("context") or "").strip()
+    craft = (body.get("craft") or "").strip()
+    rules = await _distill_rules(raw, kind, craft, context)
+    new_entries = []
+    async with _agent_lock:
+        pack = _load_pack(aid)
+        pack["id"] = aid
+        if body.get("name"):
+            pack["name"] = str(body.get("name")).strip()
+        if craft:
+            pack["craft"] = craft
+        if body.get("craftLabel"):
+            pack["craftLabel"] = str(body.get("craftLabel")).strip()
+        ents = pack.setdefault("entries", [])
+        seen = {e.get("text", "").lower() for e in ents}
+        for r in rules:
+            tl = r["text"].lower()
+            if not tl or tl in seen:
+                continue
+            entry = {"id": "e-" + str(uuid.uuid4()), "text": r["text"][:200], "source": kind,
+                     "kind": r.get("kind", "rule"), "evidence": (r.get("evidence", "") or "")[:120],
+                     "room": context, "ts": int(time.time())}
+            ents.append(entry)
+            new_entries.append(entry)
+            seen.add(tl)
+        if new_entries:                   # HONESTY: only write when a REAL entry was added
+            _save_pack(pack)
+        trained = _trained_score(ents)
+        counts = _pack_counts(ents)
+        total = len(ents)
+    return {"ok": True, "added": len(new_entries), "trained": trained, "entries": total,
+            "counts": counts, "new": new_entries}
+
+
+@app.get("/api/agents/{aid}/readiness")
+async def agent_readiness(aid: str):
+    """Cheap in-room sync — DERIVED trained + entry count, no entry bodies. Absent pack => zeros
+    (untrained, NOT a 404)."""
+    f = _agent_path(aid)
+    if not f.exists():
+        return {"trained": 0, "entries": 0}
+    ents = _load_pack(aid).get("entries", [])
+    return {"trained": _trained_score(ents), "entries": len(ents)}
 
 
 # ── PLUGIN STORE ── plugins the Builder makes live here. The Builder's "Send to
@@ -4318,10 +4574,11 @@ ROOM_HELP = {
 - "Polish" rewrites your prompt richer. Set aspect ratio / size up top.
 - First image after a cold start takes a minute or two while the engine wakes; after that it's quick. Finished images drop into the gallery below.
 - "free memory" clears the image engine out of VRAM if things get heavy.""",
-  "draw": """Sketch Pad — a clean drawing canvas (ported from heytiff's NapkinPad, rebuilt native).
-- Pick a tool up top: Pen, Marker, Pencil, or Eraser — plus an ink color and a brush size.
-- Draw with a mouse, finger, or stylus; stylus pressure (and speed) changes the line weight.
-- Undo / Redo, Clear, and the PNG button to download your sketch. It autosaves to this machine as you draw.""",
+  "stream": """The Stream — DeMartinville's own Spotify + YouTube: where finished work goes to be heard and seen.
+- Two tabs up top: LISTEN (music) and WATCH (video). Press play on anything; the player bar at the bottom keeps going while you browse.
+- Hit "+ Publish" to drop your own finished track or video into the feed — give it a title and your name and it goes live.
+- You can also publish straight from the Audio Labs (after a bounce) and the Visual Labs (after an export).
+- Everything streams from this machine — local and private until you choose to share it.""",
   "character": """Agent Forge — where you BUILD your own AI agent (a custom creative brain that then lives in your rooms).
 - The FACE: drop a photo and make an avatar — pixel, your own upload, or a color circle.
 - THE CRAFT: pick their lane (the room they're best in).
@@ -4331,11 +4588,11 @@ ROOM_HELP = {
 You (Tiff) are giving a LIVE demo of how an agent works — be warm, move fast, do the heavy lifting, keep it easy.""",
 }
 
-async def _kit_local(system: str, user: str, image: str = "") -> str:
+async def _kit_local(system: str, user: str, image: str = "", model: str = "") -> str:
     if not await brain_up():
         await ensure_brain()
     loaded = await _loaded_models()
-    model = (loaded[0] if loaded else DEFAULT_MODEL)
+    model = model or (loaded[0] if loaded else DEFAULT_MODEL)
     user_content = user
     if image:   # vision turn — the local model LOOKS at the attached image (mirrors the chat's image_url convention)
         user_content = [{"type": "text", "text": user or "Describe this image."},
@@ -4512,6 +4769,24 @@ async def kit_help(req: Request):
         knowledge = (body.get("knowledge") or "").strip()
         if knowledge:
             system += ("\n\nYOUR OWN NOTES / HOW YOU WORK (use when relevant):\n" + knowledge[:1500])
+        # ── LEARNED PACK — server-side accumulated craft for this "mine" agent. Distilled
+        #    from REAL moves they made (work/watch/feed → /api/agents/{id}/train). ADDITIVE:
+        #    absent agentId => byte-for-byte the path above. A SEPARATE labeled block from the
+        #    static notes so the model treats earned rules distinctly. Persona/pack ONLY — it
+        #    must NOT touch AGENT_TOOL_RULES (the shared toolbelt, appended far below).
+        agent_id = (body.get("agentId") or "").strip()
+        if agent_id:
+            try:
+                pf = _agent_path(agent_id)
+                if pf.exists():
+                    pack = json.loads(pf.read_text(encoding="utf-8"))
+                    ents = pack.get("entries", [])
+                    lines = "\n".join("- " + e.get("text", "") for e in ents[-40:] if e.get("text"))
+                    if lines:
+                        system += ("\n\nLEARNED FROM REAL SESSIONS (how this creator actually works — "
+                                   "distilled from real moves they made; lean on these):\n" + lines[:2400])
+            except Exception:
+                pass
     else:
         system = KIT_SYSTEM + room_help
     # Kit's brain: pull the few most relevant knowledge slices for THIS question
@@ -4549,21 +4824,33 @@ async def kit_help(req: Request):
     if image:
         system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
                    "if they want to make something, write the generate prompt FROM the image.")
+    # PER-AGENT MODEL PICK (frozen field "model"): each in-room agent carries its own choice.
+    #   "cloud:<slot>" → route THIS one specific cloud slot (mirror /api/chat's lookup);
+    #   a bare local id → force local with THAT model; absent/"auto" → legacy tier behavior.
+    chosen = (body.get("model") or "auto").strip()
     tier = (body.get("tier") or "local").strip().lower()
-    slots = _enabled_slots() if tier != "local" else []
+    local_model = ""                      # a specific local model id to honor, if picked
+    if chosen.startswith("cloud:"):
+        slot = next((s for s in _enabled_slots() if s["id"] == chosen[6:]), None)   # mirror /api/chat 833
+        slots = [slot] if slot else []     # 1-element list → _call_with_fallback targets THIS slot only; gone → local
+    elif chosen and chosen != "auto":
+        slots = []                         # a bare LOCAL id was picked → force local with that model
+        local_model = chosen
+    else:
+        slots = _enabled_slots() if tier != "local" else []   # UNCHANGED legacy/tier default behavior
     try:
         if image and slots:
             # VISION on the CLOUD brain (private/max tier + a key) → works "on the go".
             try:
                 text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4, image=image)
             except Exception:
-                text = await _kit_local(system, msg, image)                          # cloud vision failed → local eyes
+                text = await _kit_local(system, msg, image, model=local_model)       # cloud vision failed → local eyes
         elif image:
-            text = await _kit_local(system, msg, image)                              # VISION on the LOCAL brain (free)
+            text = await _kit_local(system, msg, image, model=local_model)           # VISION on the LOCAL brain (free)
         elif slots:
             text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # cloud brain, auto-fallback
         else:
-            text = await _kit_local(system, msg)                                     # local (default, or no cloud key set)
+            text = await _kit_local(system, msg, model=local_model)                  # local (default, or no cloud key set)
     except Exception:
         text = "I glitched for a sec — try me again. (Tip: drop a free cloud key in Settings (the gear) and I'll think a lot faster.)"
     # LEARN how you work — pull durable prefs/facts from this exchange into the shared memory
@@ -4910,6 +5197,164 @@ async def character_prompt(req: Request):
     if len(prompt) < 20:
         return JSONResponse({"error": "Your model didn't write one — open LM Studio (a vision model works best) and try again."})
     return {"ok": True, "prompt": prompt, "vision": used_vision}
+
+
+# ───────────────────────── The Stream — in-app Spotify + YouTube ─────────────────────────
+# A consumption/discovery layer over everything made in the rooms: finished tracks + videos
+# get PUBLISHED here, then anyone can stream/watch them. Files live in data/stream/media/ and
+# the feed is one JSON manifest (data/stream/feed.json), mirroring the app's storage idioms.
+_STREAM_EXT = {
+    "music": {"audio/wav": "wav", "audio/x-wav": "wav", "audio/mpeg": "mp3", "audio/mp3": "mp3",
+              "audio/ogg": "ogg", "audio/webm": "weba", "audio/aac": "aac", "audio/flac": "flac",
+              "audio/x-m4a": "m4a", "audio/mp4": "m4a"},
+    "video": {"video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov", "video/x-matroska": "mkv"},
+}
+
+
+def _load_stream_feed() -> list:
+    if STREAM_FEED.exists():
+        try:
+            return json.loads(STREAM_FEED.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def _save_stream_feed(items: list) -> None:
+    # the feed is "what everybody published" — keep a .bak then write atomically (never half-written)
+    if STREAM_FEED.exists():
+        try:
+            STREAM_FEED.with_name("feed.json.bak").write_text(STREAM_FEED.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            pass
+    _atomic_write(STREAM_FEED, json.dumps(items, indent=1))
+
+
+@app.get("/api/stream")
+async def stream_feed():
+    """The whole feed, split into the two tabs (music = LISTEN, video = WATCH), newest first."""
+    items = _load_stream_feed()
+    return {
+        "music": [i for i in items if i.get("kind") == "music"],
+        "video": [i for i in items if i.get("kind") == "video"],
+        "count": len(items),
+    }
+
+
+@app.post("/api/stream/publish")
+async def stream_publish(req: Request):
+    """Publish a finished track/video. Media comes EITHER as an inline data URI (`file` — the
+    in-room uploader, Beat Lab blob, a browser export) OR as a server-side `path` already written
+    to disk by a Studio bounce / editor render (efficient, no base64). Optional `cover` data URI."""
+    body = await req.json()
+    kind = body.get("kind")
+    if kind not in ("music", "video"):
+        return JSONResponse({"error": "kind must be 'music' or 'video'"}, status_code=400)
+    title = (body.get("title") or "").strip()[:120] or "Untitled"
+    creator = (body.get("creator") or "").strip()[:80] or "Anonymous"
+    mid = re.sub(r"[^a-zA-Z0-9-]", "", body.get("id") or str(uuid.uuid4()))[:40] or uuid.uuid4().hex[:12]
+
+    raw = None
+    ext = re.sub(r"[^a-z0-9]", "", (body.get("ext") or "").lower())[:5]
+    file_uri = body.get("file") or ""
+    src_path = body.get("path") or ""
+    # Visual Labs publishes by export job id — resolve it to the rendered file on disk (no base64)
+    ejid = body.get("editor_jid")
+    if ejid and not file_uri and not src_path:
+        job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", ejid))
+        op = job.get("out_path") if job else None
+        if op and os.path.isfile(op):
+            src_path = op
+        else:
+            return JSONResponse({"error": "editor export not found — re-render and try again"}, status_code=404)
+    if file_uri:
+        head, _, b64 = file_uri.partition(",")
+        if not b64:
+            return JSONResponse({"error": "malformed file data URI"}, status_code=400)
+        try:
+            raw = base64.b64decode(b64)
+        except Exception:
+            return JSONResponse({"error": "bad file data"}, status_code=400)
+        if not ext:
+            m = re.search(r"data:([^;,]+)", head)
+            ext = _STREAM_EXT.get(kind, {}).get((m.group(1).lower() if m else ""), "")
+    elif src_path:
+        p = Path(src_path)
+        if not p.is_file():
+            return JSONResponse({"error": "source file not found on disk"}, status_code=404)
+        try:
+            raw = p.read_bytes()
+        except Exception as e:
+            return JSONResponse({"error": f"couldn't read source: {e}"}, status_code=500)
+        if not ext:
+            ext = re.sub(r"[^a-z0-9]", "", p.suffix.lstrip(".").lower())[:5]
+    else:
+        return JSONResponse({"error": "no media — provide 'file' (data URI) or 'path'"}, status_code=400)
+
+    if not ext:
+        ext = "mp4" if kind == "video" else "mp3"
+    fname = f"stream-{mid}.{ext}"
+    try:
+        (STREAM_MEDIA / fname).write_bytes(raw)
+    except Exception as e:
+        return JSONResponse({"error": f"save failed: {e}"}, status_code=500)
+
+    cover = None
+    cov_uri = body.get("cover") or ""
+    if cov_uri and "," in cov_uri:
+        try:
+            craw = base64.b64decode(cov_uri.split(",", 1)[1])
+            cm = re.search(r"data:image/([a-z0-9]+)", cov_uri)
+            cext = (re.sub(r"[^a-z0-9]", "", cm.group(1))[:4] if cm else "png") or "png"
+            cfname = f"cover-{mid}.{cext}"
+            (STREAM_MEDIA / cfname).write_bytes(craw)
+            cover = cfname
+        except Exception:
+            cover = None
+
+    try:
+        dur = float(body.get("dur") or 0) or None
+    except Exception:
+        dur = None
+    item = {
+        "id": mid, "kind": kind, "title": title, "creator": creator,
+        "file": fname, "cover": cover, "dur": dur,
+        "desc": (body.get("desc") or "").strip()[:800] or None,
+        "meta": body.get("meta") if isinstance(body.get("meta"), dict) else None,
+        "ts": int(time.time()),
+    }
+    items = [i for i in _load_stream_feed() if i.get("id") != mid]  # replace if re-publishing same id
+    items.insert(0, item)
+    _save_stream_feed(items)
+    return {"ok": True, "item": item}
+
+
+@app.get("/api/stream/media/{name}")
+async def stream_media(name: str):
+    safe = re.sub(r"[^a-zA-Z0-9_.-]", "", name)
+    f = STREAM_MEDIA / safe
+    if not f.is_file():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(f)  # Starlette serves Range requests → audio/video scrubbing works
+
+
+@app.delete("/api/stream/{sid}")
+async def stream_delete(sid: str):
+    sid = re.sub(r"[^a-zA-Z0-9-]", "", sid)
+    items = _load_stream_feed()
+    gone = [i for i in items if i.get("id") == sid]
+    if not gone:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    for i in gone:
+        for key in ("file", "cover"):
+            fn = i.get(key)
+            if fn:
+                try:
+                    (STREAM_MEDIA / fn).unlink(missing_ok=True)
+                except Exception:
+                    pass
+    _save_stream_feed([i for i in items if i.get("id") != sid])
+    return {"ok": True, "removed": sid}
 
 
 # check_dir=False so a missing static/ can never RuntimeError at import (it 404s instead);

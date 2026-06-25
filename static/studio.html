@@ -817,6 +817,7 @@
       <button class="tbtn" id="saveBtn" title="Save this mix (survives a refresh)">💾 Save mix</button>
       <button class="tbtn" id="loadBtn" title="Load a saved mix">📂 Load mix</button>
       <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
+      <button class="tbtn" id="pubNotifiBtn" title="Publish this mix to Notifi (The Stream)">📡 To Notifi</button>
       <div class="fm-sep"></div>
       <button class="tbtn" id="setupBtn" title="Output device · record · tempo · latency">⚙ Setup (audio)</button>
     </div>
@@ -6911,6 +6912,18 @@ function openBounceDialog() {
   };
 }
 $("exportBtn").onclick = () => openBounceDialog();
+// 📡 Publish to Notifi — render the full master mix and drop it on The Stream
+(function(){ const _pn=document.getElementById('pubNotifiBtn'); if(!_pn) return;
+  _pn.onclick = async () => {
+    if(!window.streamPublishDialog){ flash('The Stream is still loading…'); return; }
+    if(!contentDur()){ flash('Nothing to publish yet — record or import some audio first.'); return; }
+    flash('Rendering mix for Notifi…');
+    try{ const buf = await renderBounce({ source:'master', startT:0, endT:contentDur() });
+      const wav = bufferToWavBlob(buf, 24); let t='mix'; try{ t=_lastTitle||'mix'; }catch(_){}
+      window.streamPublishDialog({ kind:'music', title:t, blob:wav, ext:'wav' });
+    }catch(e){ flash('Render failed: ' + (e && e.message || e)); }
+  };
+})();
 
 /* ── TRACK OPS — Bounce a stem · Commit (print the inserts/EQ/comp to a new clip) ·
    Freeze (reversible Commit) · Make Inactive · Hide. Commit/Freeze reuse the offline
@@ -8601,7 +8614,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "2.0.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "2.2.1";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;

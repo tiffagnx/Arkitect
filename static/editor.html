@@ -619,6 +619,7 @@ body.mode-simple .director-only{display:none!important}
       <div class="actions">
         <button class="tbtn" id="expClose" style="flex:1;justify-content:center">Close</button>
         <a class="tbtn cta" id="expDownload" style="flex:1;justify-content:center;text-decoration:none" download>⤓ Download</a>
+        <button class="tbtn cta" id="pubCratel" style="flex:1;justify-content:center" title="Publish this video to Cratel (The Stream)">📡 To Cratel</button>
       </div>
     </div>
     <div id="expErr" style="display:none"><div class="err" id="expErrTxt"></div>
@@ -3890,7 +3891,7 @@ $('#expGo').onclick=async()=>{
   if(projectNeedsFrameServer(project)){
     $('#expPct').textContent='Frame-exact render (motion/effects)…';
     try{const jid=await exportViaFrameServer(tl);
-      if(jid){const url='/api/editor/export/'+jid+'/file';$('#expVideo').src=url;$('#expDownload').href=url;
+      if(jid){expJob=jid;const url='/api/editor/export/'+jid+'/file';$('#expVideo').src=url;$('#expDownload').href=url;
         showExp('done');$('#expSub').textContent='';toast('Render complete ✓');}
       else showExp('form');
     }catch(e){showExp('err');$('#expErrTxt').textContent='Frame render failed: '+String(e&&e.message||e);}
@@ -3917,6 +3918,11 @@ async function pollExport(){
 }
 $('#expAbort').onclick=async()=>{window.__expCancel=true;clearTimeout(expPoll);if(expJob)
   await fetch('/api/editor/export/'+expJob+'/cancel',{method:'POST'}).catch(()=>{});showExp('form');};
+// 📡 Publish to Cratel — drop the just-rendered video onto The Stream (by job id, no re-upload)
+if($('#pubCratel'))$('#pubCratel').onclick=()=>{ if(!window.streamPublishDialog){toast('The Stream is still loading…');return;}
+  if(!expJob){toast('Render a video first.');return;}
+  let dur=0; try{ dur=timelineFrames()/project.fps; }catch(_){}
+  window.streamPublishDialog({kind:'video',editor_jid:expJob,title:(project.title||'video'),dur}); };
 
 // ── COMPOSITION SETTINGS ───────────────────────────────────────────────
 const COMP_PRESETS=[

@@ -10,6 +10,10 @@ tmp_ret = collect_all('uvicorn')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('websockets')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+# `from PIL import ImageGrab` is a LAZY import inside /api/screenshot (the 👁 LOOK button),
+# so PyInstaller's static analysis misses it and the frozen exe 500s with
+# "cannot import name 'ImageGrab' from 'PIL'". Force it in. (venv/dev mode is unaffected.)
+hiddenimports += ['PIL.ImageGrab']
 
 
 a = Analysis(

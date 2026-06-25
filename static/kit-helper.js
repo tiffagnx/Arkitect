@@ -15,7 +15,7 @@
   const ROOMS = {
     studio: "DeMartin Audio Labs", beats: "The Kitchen", build: "Blueprint Builds",
     editor: "LePrince Visual Labs", images: "Imagination Station", "imagine-cloud": "Imagination Station",
-    draw: "Sketch Pad", character: "Agent Forge",
+    stream: "The Stream", character: "Agent Forge",
   };
   let room = null;
   for (const k in ROOMS) { if (path.includes(k + ".html")) { room = k; break; } }
@@ -63,12 +63,26 @@
       id: c.id, name: c.name || "Agent", tag: c.tagline || c.craftLabel || "",
       color: c.color || "#7BB6CD", avatar: c.avatar || "", avatarType: c.avatarType || "color", mine: true,
       persona: c.persona || "", knowledge: c.knowledge || "",
+      model: c.model || "auto",                                       // per-agent brain (rides onto the mine object)
       craft: c.craft || "", craftLabel: c.craftLabel || "",
-      readiness: typeof c.readiness === "number" ? c.readiness : 0,
+      readiness: typeof c.readiness === "number" ? c.readiness : 0,   // BUILD score (0..80) — who they are
+      trained: typeof c.trained === "number" ? c.trained : 0,         // TRAINED score (0..20) — pack evidence
       intro: r => `${c.name || "I'm in"} — ${c.craftLabel || "your agent"} in ${r}. ${c.tagline || "Let's get to work."}`,
     }));
   }
   function rebuildCharacters() { return CHARACTERS_BUILTIN.concat(loadMine()); }
+  // COMBINED readiness shown everywhere in-room: build (<=80) + trained (<=20), clamped to 100.
+  function combinedPct(ch){ return Math.min(100, Math.round((ch.readiness || 0) + (ch.trained || 0))); }
+  // write the server-authoritative trained score back into the agent's dmv_characters entry
+  // (leaves its build `readiness` untouched), then fire the same repaint event a save would.
+  function persistTrained(id, trained){
+    try {
+      const arr = JSON.parse(localStorage.getItem("dmv_characters") || "[]");
+      const i = arr.findIndex(c => c && c.id === id);
+      if (i >= 0) { arr[i].trained = Math.min(20, trained | 0); localStorage.setItem("dmv_characters", JSON.stringify(arr));
+        window.dispatchEvent(new CustomEvent("dmv-characters-changed")); }
+    } catch (e) {}
+  }
 
   const css = `
   /* PASSIVE presence chip — a small green "online" dot + the agent's name. NOT a button (no hover lift). */
@@ -144,41 +158,15 @@
   .kt-pill.on[data-tier="max"] { border-color:rgba(240,90,120,.9); background:rgba(240,90,120,.22); color:#FFB4C4; }
   .kt-keylink { margin-left:auto; font:700 9px 'Space Mono',monospace; letter-spacing:.06em; color:#9FCFDD; background:none; border:none; cursor:pointer; padding:3px 4px; }
   .kt-keylink:hover { color:#CFE6EE; text-decoration:underline; }
-  /* BRAIN LEVER — a slider (not buttons): Local → Private → Max Drive. The fill "charges up" toward Max
-     with a slow GLITCH-charging vibe (RGB-split jitter), not a fast bright pulse. */
-  .kt-lever { display:flex; align-items:center; gap:7px; flex:1; }
-  .kl-track { position:relative; flex:1; min-width:64px; height:7px; border-radius:99px; background:rgba(255,255,255,.1); cursor:pointer; }
-  .kl-fill { position:absolute; left:0; top:0; bottom:0; width:7px; border-radius:99px;
-    background:linear-gradient(90deg,#2E8FAE,#7BB6CD 45%,#3E9CB8 75%,#2E8FAE); background-size:300% 100%;
-    animation:klflow 5s linear infinite; box-shadow:0 0 6px rgba(120,182,205,.38); transition:width .2s cubic-bezier(.4,0,.2,1); }
-  @keyframes klflow { to { background-position:-300% 0; } }
-  .kl-thumb { position:absolute; top:50%; left:0; width:14px; height:14px; border-radius:50%; transform:translate(-50%,-50%);
-    background:radial-gradient(circle at 35% 30%,#fff,#CFE6EE 58%,#7BB6CD); box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 8px rgba(120,182,205,.5); cursor:grab; transition:left .2s cubic-bezier(.4,0,.2,1); }
-  .kl-thumb:active { cursor:grabbing; }
-  .kl-name { font:700 9px Oxanium; letter-spacing:.03em; color:#9FCFDD; min-width:50px; text-align:right; white-space:nowrap; }
-  /* Private — warmer, slow glitch */
-  .kt-lever.t2 .kl-fill { animation-duration:4s; background:linear-gradient(90deg,#3E9CB8,#7BB6CD 35%,#E6C16A 70%,#3E9CB8); box-shadow:0 0 9px rgba(217,164,65,.45); }
-  .kt-lever.t2 .kl-thumb { animation:klglitch 3.6s steps(1,end) infinite; }
-  .kt-lever.t2 .kl-name { color:#F0CE8C; }
-  /* Max Drive — full-spectrum "God Particle" charge: cooler but hotter, faster glitch */
-  .kt-lever.t3 .kl-fill { animation-duration:3s; background:linear-gradient(90deg,#3E9CB8,#7BB6CD 20%,#E6C16A 45%,#E94B9C 66%,#7BB6CD 86%,#3E9CB8); background-size:340% 100%; box-shadow:0 0 12px rgba(233,75,156,.5),0 0 6px rgba(230,193,106,.45); }
-  .kt-lever.t3 .kl-thumb { animation:klglitch 2.3s steps(1,end) infinite; box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 13px rgba(233,75,156,.7); }
-  .kt-lever.t3 .kl-name { color:#FFD9EC; text-shadow:0 0 8px rgba(233,75,156,.5); }
-  /* glitch-charging: mostly still, then a quick digital RGB-split jitter — a charge surge, not a glow throb */
-  @keyframes klglitch {
-    0%,80%,100% { transform:translate(-50%,-50%); filter:none; }
-    84% { transform:translate(calc(-50% - 1.6px),-50%); filter:drop-shadow(1.6px 0 #E94B9C) drop-shadow(-1.6px 0 #3E9CB8); }
-    88% { transform:translate(calc(-50% + 1.4px),-50%); filter:none; }
-    92% { transform:translate(calc(-50% - 1px),-50%); filter:drop-shadow(-1.6px 0 #E94B9C) drop-shadow(1.6px 0 #3E9CB8); }
-    96% { transform:translate(-50%,-50%); filter:none; }
-  }
-  @media (prefers-reduced-motion: reduce) { .kl-fill, .kl-thumb { animation:none !important; } }
-  /* honest dial: tiers that need a cloud key are dimmed + locked until one exists */
-  .kl-lock { font-size:9px; margin-left:1px; opacity:.75; display:none; cursor:pointer; }
-  .kt-lever.cloud-locked .kl-track { opacity:.5; }
-  .kt-lever.cloud-locked .kl-name { color:rgba(170,180,190,.6) !important; text-shadow:none !important; }
-  .kt-lever.cloud-locked .kl-lock { display:inline; }
-  .kit-win.tier-private { border-color:rgba(217,164,65,.5); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(217,164,65,.28), 0 0 26px rgba(217,164,65,.12), inset 0 1px 0 rgba(255,255,255,.06); }
+  /* per-agent MODEL picker — a pill-styled <select>; each agent shows ITS own saved brain (honest, from /api/models) */
+  select.kt-model { flex:1; min-width:64px; max-width:100%; appearance:none; -webkit-appearance:none; outline:none;
+    font:700 9.5px Oxanium; letter-spacing:.04em; padding:3px 22px 3px 11px; border-radius:20px; cursor:pointer;
+    border:1px solid rgba(120,182,205,.5); background:rgba(62,156,184,.12); color:#BFE6F2;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%239FCFDD' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 8px center; }
+  select.kt-model:hover { border-color:rgba(120,182,205,.85); }
+  select.kt-model option { color:#1a1c22; }
+  /* God-Particle window glow — kept, now keyed to a top-tier Claude/Opus cloud model being selected. */
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-foot { display:flex; flex-direction:column; gap:7px; padding:9px 11px 11px; border-top:1px solid rgba(255,255,255,.07); }
   .kit-in { width:100%; box-sizing:border-box; resize:none; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.1); border-radius:10px;
@@ -270,10 +258,10 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><div class="kt-lever t1" id="ktLever"><span class="kl-track" id="ktTrack"><span class="kl-fill" id="ktFill"></span><span class="kl-thumb" id="ktThumb"></span></span><span class="kl-name" id="ktName">Local</span><span class="kl-lock" id="ktLock" title="Private &amp; Max Drive need a cloud key — tap 🔑">🔒</span></div><button class="kt-keylink" title="Get a cloud key — turns on Private / Max Drive">🔑 key</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
+     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -326,6 +314,45 @@
     else if (typeof addMsg === "function") addMsg("kit", "Couldn't grab the screen just now — you can still paste or attach a screenshot with 📎. (If you're on a cloud brain, make sure the model can see images.)");
   };
 
+  // ── ⏺ WATCH  +  📌 TEACH — the in-room TRAINERS. They sit right next to 👁 on purpose: 👁 looks ONCE,
+  //    ⏺/📌 look + LEARN. Both feed the active (mine) agent's pack, distilled server-side, honest about
+  //    empties (the bar NEVER moves without a real distilled rule). Only YOUR agents take a pack — the
+  //    built-ins (Kit/Tiff) don't, so these dim out unless one of your agents is the active brain. ──
+  const watchBtn = win.querySelector(".kit-watch"), teachBtn = win.querySelector(".kit-teach");
+  function syncTrainTools() {
+    const on = !!(active && active.mine);
+    [watchBtn, teachBtn].forEach(b => { if (b) b.style.opacity = on ? "" : ".3"; });
+  }
+  function trainMine(kind, raw, okWord) {
+    if (!(active && active.mine)) { addMsg("kit", "Bring one of YOUR agents in to train them — the built-ins (Kit/Tiff) don't take a pack."); return; }
+    if (!raw || !raw.trim()) return;
+    fetch("/api/agents/" + encodeURIComponent(active.id) + "/train", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: active.id, name: active.name, craft: active.craftLabel || active.craft || "", kind, raw, context: room })
+    }).then(r => r.json()).then(res => {
+      if (res && res.added > 0) {
+        active.trained = Math.min(20, res.trained | 0); persistTrained(active.id, res.trained); paintHost();
+        addMsg("kit", (okWord || "Banked") + " +" + res.added + " — " + res.trained + "/20 trained.");
+      } else { addMsg("kit", "Nothing concrete in that to bank yet — give me a real move + the why."); }
+    }).catch(() => {});
+  }
+  function captureMove() {
+    if (!(active && active.mine)) { addMsg("kit", "Bring one of your own agents in to train them first."); return; }
+    const note = prompt("📌 Teach this — what did you just do, and why? (becomes a rule)"); if (!note) return;
+    const snap = (typeof window.dmvSessionSnapshot === "function") ? (window.dmvSessionSnapshot() || "") : "";
+    trainMine("watch", note + (snap ? "\nROOM STATE:\n" + snap : ""), "Banked");
+  }
+  async function watchMe() {
+    if (!(active && active.mine)) { addMsg("kit", "Bring one of your own agents in to train them first."); return; }
+    const note = prompt("⏺ Watch me — talk me through what you're working on right now (the move + the why). I'll read your live session too."); if (!note) return;
+    if (watchBtn) { watchBtn.classList.add("busy"); watchBtn.textContent = "…"; }
+    const snap = (typeof window.dmvSessionSnapshot === "function") ? (window.dmvSessionSnapshot() || "") : "";
+    trainMine("watch", "NARRATION: " + note + (snap ? "\nROOM STATE:\n" + snap : ""), "Learned");
+    setTimeout(() => { if (watchBtn) { watchBtn.classList.remove("busy"); watchBtn.textContent = "⏺"; } }, 700);
+  }
+  if (teachBtn) teachBtn.onclick = captureMove;
+  if (watchBtn) watchBtn.onclick = watchMe;
+
   // ── "+" MORE TOOLS — the dropdown for extra/future tools. Add an entry to MORE_TOOLS and it shows up;
   //    that's the room the slim tool row was built to leave. Agent-agnostic. ──
   const moreBtn = win.querySelector(".kit-more");
@@ -336,6 +363,7 @@
         if (txt) { try { navigator.clipboard.writeText(txt); } catch (_) {} }
       } },
     { label: "🗑  Clear chat", run: () => { if (body) body.innerHTML = ""; } },
+    // (📌 Capture that move is promoted to the toolbar as the 📌 Teach button — next to 👁.)
   ];
   let moreMenu = null;
   function closeMore() { if (moreMenu) { moreMenu.remove(); moreMenu = null; document.removeEventListener("mousedown", onMoreDown, true); } }
@@ -448,16 +476,29 @@
     if (active.sprite) hostSlot.appendChild(winSpr.cv);
     else hostSlot.appendChild(avatar(active, "host"));
     titleEl.textContent = active.name.toUpperCase();
-    subEl.textContent = active.mine ? Math.round(active.readiness || 0) + "% · " + ROOMS[room]
+    subEl.textContent = active.mine ? combinedPct(active) + "% · " + ROOMS[room]
                        : active.preview ? "PREVIEW · " + ROOMS[room] : ROOMS[room];
     if (fabLabel) fabLabel.textContent = active.name;   // passive presence chip — just the name (the green dot stays)
+    if (typeof syncTrainTools === "function") syncTrainTools();
   }
   function setActive(ch, announce) {
     active = ch;
     try { localStorage.setItem("dmv_active_brain", ch.id); } catch (_) {}   // remember across room/page hops
     [...roster.children].forEach(c => c.classList.toggle("on", c._id === ch.id));
+    if (typeof syncModelToActive === "function") syncModelToActive();       // show THIS agent's own saved brain
     paintHost();
     if (announce) { body.innerHTML = ""; addMsg("kit", (ch.intro ? ch.intro(ROOMS[room]) : `${ch.name} is in. ${ROOMS[room]}.`)); }
+    // sync the TRAINED score from the server so the in-room % is truthful even if training
+    // happened in another tab. Best-effort, non-blocking — never breaks the sync render above.
+    if (ch.mine && ch.id) {
+      fetch("/api/agents/" + encodeURIComponent(ch.id) + "/readiness")
+        .then(r => r.json()).then(res => {
+          if (!res || typeof res.trained !== "number") return;
+          ch.trained = Math.min(20, res.trained | 0);
+          if (active && active.id === ch.id) { active.trained = ch.trained; paintHost(); }
+          persistTrained(ch.id, res.trained);
+        }).catch(() => {});
+    }
   }
 
   // build the roster strip (each chip is draggable "into the room"). Re-runnable so user-made
@@ -472,8 +513,8 @@
       const nm = document.createElement("span"); nm.className = "cn"; nm.textContent = ch.name; chip.appendChild(nm);
       if (ch.mine) {
         chip.classList.add("mine");
-        const p = document.createElement("span"); p.className = "cp"; p.textContent = Math.round(ch.readiness || 0) + "%"; chip.appendChild(p);
-        chip.title = (ch.tag || ch.name) + " — your agent (" + Math.round(ch.readiness || 0) + "% ready)";
+        const p = document.createElement("span"); p.className = "cp"; p.textContent = combinedPct(ch) + "%"; chip.appendChild(p);
+        chip.title = (ch.tag || ch.name) + " — your agent (" + combinedPct(ch) + "% ready)";
       } else if (ch.preview) {
         const p = document.createElement("span"); p.className = "cp"; p.textContent = "PREVIEW"; chip.appendChild(p);
         chip.title = ch.tag + " (preview agent)";
@@ -540,84 +581,87 @@
     try { if (localStorage.getItem("dmv_agent_docked") === "1") setDocked(true); } catch (_) {}
   }
 
-  // ── BRAIN TIER: Local / Private overdrive / Max Drive. Switching UP into a cloud lane
-  //    recolors the window + dings, so you ALWAYS know you've left local-private. (Actually
-  //    routing to a cloud brain rides the existing bring-your-own-cloud-model path; the tier
-  //    is passed to /api/kit so the backend can route when that lane is wired.) ──
-  let tier = "local";
-  const TIER_NOTE = {
-    local:   "Local — free · private · on your machine · slower",
-    private: "Private overdrive — fast · private by policy (leaves your machine, not used to train anyone)",
-    max:     "Max Drive — the smartest brains · NOT private (goes to a big provider)"
-  };
-  function ding(){
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-      const ac = ding._ac || (ding._ac = new AC());
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = "sine"; o.frequency.setValueAtTime(880, ac.currentTime); o.frequency.exponentialRampToValueAtTime(1320, ac.currentTime + 0.09);
-      g.gain.setValueAtTime(0.0001, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.16, ac.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.28);
-      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.3);
-    } catch (e) {}
-  }
-  const TIERS = [{ v:"local", t:"Local", cls:"t1" }, { v:"private", t:"Private", cls:"t2" }, { v:"max", t:"Max Drive", cls:"t3" }];
-  const lever = win.querySelector("#ktLever"), klTrack = win.querySelector("#ktTrack"),
-        klFill = win.querySelector("#ktFill"), klThumb = win.querySelector("#ktThumb"), klName = win.querySelector("#ktName");
-  let tierIdx = 0, maxIdx = TIERS.length - 1, cloudOk = true, hintedLock = false;
-  function applyTier(i, announce){
-    i = Math.min(i, maxIdx);   // never land on a tier the active brain can't actually run
-    const goingUp = i > tierIdx;
-    tierIdx = Math.max(0, Math.min(TIERS.length - 1, i));
-    const s = TIERS[tierIdx], frac = TIERS.length > 1 ? tierIdx / (TIERS.length - 1) : 0, w = (klTrack && klTrack.clientWidth) || 90;
-    tier = s.v;
-    try { localStorage.setItem("dmv_brain_tier", tier); } catch (_) {}
-    if (lever) { lever.classList.remove("t1","t2","t3"); lever.classList.add(s.cls); lever.title = TIER_NOTE[tier]; }
-    if (klName) klName.textContent = s.t;
-    if (klFill) klFill.style.width = Math.max(7, frac * w) + "px";
-    if (klThumb) klThumb.style.left = (frac * w) + "px";
-    win.classList.toggle("tier-private", tier === "private");
-    win.classList.toggle("tier-max", tier === "max");
-    if (announce && goingUp && tier !== "local") ding();
-  }
-  function tierFromX(clientX){
-    const r = klTrack.getBoundingClientRect();
-    let frac = r.width ? (clientX - r.left) / r.width : 0; frac = Math.max(0, Math.min(1, frac));
-    const want = Math.round(frac * (TIERS.length - 1));
-    if (want > maxIdx && !hintedLock) { hintedLock = true;
-      addMsg("kit", "🔒 Private & Max Drive run on a cloud brain — tap the 🔑 to add a free key, then they unlock."); }
-    applyTier(want, true);   // applyTier clamps to maxIdx
-  }
-  if (klTrack) {
-    klTrack.addEventListener("mousedown", e => { e.preventDefault(); tierFromX(e.clientX);
-      const mv = e2 => tierFromX(e2.clientX);
-      const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
-      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
-    });
-    klTrack.addEventListener("touchmove", e => { if (e.touches[0]) tierFromX(e.touches[0].clientX); }, { passive:true });
-  }
-  { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
-  { let _t = "local"; try { _t = localStorage.getItem("dmv_brain_tier") || "local"; } catch (_) {}
-    const si = TIERS.findIndex(s => s.v === _t); applyTier(si >= 0 ? si : 0, false); }
-  requestAnimationFrame(() => applyTier(tierIdx, false));   // fix px positions once the window is laid out
-  window.addEventListener("resize", () => applyTier(tierIdx, false));
+  // ── PER-AGENT BRAIN PICKER: each dragged-in agent (kit / tiff / a user-built one) gets its OWN
+  //    concrete model dropdown. The choice persists INDEPENDENTLY per agent — Tiff→Opus in Audio Lab
+  //    does NOT change Kit, and never touches the main chat. Options come HONESTLY from /api/models
+  //    (real local ids + real keyed cloud:slot ids only); no key → local + an "add a cloud model"
+  //    affordance, never a fabricated Opus. The chosen id ("auto" | bare local id | "cloud:<slot>")
+  //    rides every /api/kit call as `model`; the legacy `tier` field stays for backward-compat. ──
+  let tier = "local";   // kept ONLY as the backend's legacy fallback (no longer the primary control)
+  const modelSel = win.querySelector("#ktModel");
 
-  // ── HONEST DIAL — only let the lever reach tiers that actually DO something. Private/Max Drive
-  //    need a cloud brain; with none configured /api/kit silently falls back to local, so LOCK them
-  //    (dimmed + 🔒) until a cloud key exists. /api/models lists enabled cloud slots in `.cloud`. ──
-  const ktLock = win.querySelector("#ktLock");
-  function setCap(ok){
-    cloudOk = !!ok; maxIdx = cloudOk ? TIERS.length - 1 : 0;
-    if (cloudOk) hintedLock = false;
-    if (lever) lever.classList.toggle("cloud-locked", !cloudOk);
-    if (tierIdx > maxIdx) applyTier(maxIdx, false);
+  // per-agent storage — built-ins (kit/tiff, not in dmv_characters) use a per-id key; user (mine)
+  // agents carry the choice as a `model` field on their dmv_characters entry (persistTrained pattern).
+  function getAgentModel(ch){
+    if (!ch) return "auto";
+    if (ch.mine) return ch.model || "auto";
+    try { return localStorage.getItem("dmv_agent_model_" + ch.id) || "auto"; } catch (_) { return "auto"; }
   }
-  function refreshCap(){
-    fetch("/api/models").then(r => r.json()).then(j => setCap(!!(j && Array.isArray(j.cloud) && j.cloud.length))).catch(() => {});
+  function setAgentModel(ch, id){
+    if (!ch) return;
+    if (ch.mine) {
+      ch.model = id;
+      try {
+        const arr = JSON.parse(localStorage.getItem("dmv_characters") || "[]");
+        const i = arr.findIndex(c => c && c.id === ch.id);
+        if (i >= 0) { arr[i].model = id; localStorage.setItem("dmv_characters", JSON.stringify(arr));
+          window.dispatchEvent(new CustomEvent("dmv-characters-changed")); }
+      } catch (e) {}
+    } else {
+      try { localStorage.setItem("dmv_agent_model_" + ch.id, id); } catch (_) {}
+    }
   }
-  if (ktLock) ktLock.onclick = () => { if (window.openKeys) window.openKeys("brain"); };
-  refreshCap();
-  window.addEventListener("ark:providers-changed", () => setTimeout(refreshCap, 80));
-  window.addEventListener("focus", refreshCap);
+
+  // top-tier Claude/Opus cloud model selected → keep the God-Particle gold/pink window glow.
+  function isTopClaude(v){
+    if (!v || v.indexOf("cloud:") !== 0) return false;
+    const lbl = (modelSel && modelSel.selectedOptions && modelSel.selectedOptions[0]) ? modelSel.selectedOptions[0].textContent : "";
+    return /claude|opus/i.test(lbl);
+  }
+  function applyGlow(){
+    win.classList.toggle("tier-max", isTopClaude(modelSel ? modelSel.value : ""));
+    win.classList.remove("tier-private");   // private no longer applies (lever retired)
+  }
+
+  // rebuild the option list from /api/models: auto, then local 🖥, then cloud ☁ — or, when there's no
+  // cloud slot, a final "➕ Add a cloud model…" affordance that opens the key flow (never a fake model).
+  function populateModels(j){
+    if (!modelSel) return;
+    const locals = (j && Array.isArray(j.models)) ? j.models : [];
+    const clouds = (j && Array.isArray(j.cloud)) ? j.cloud : [];
+    let html = '<option value="auto">Auto (local)</option>';
+    locals.forEach(id => { html += '<option value="' + id + '">🖥 ' + id + '</option>'; });
+    clouds.forEach(c => { if (c && c.id) html += '<option value="' + c.id + '">' + (c.label || c.id) + '</option>'; });
+    if (!clouds.length) html += '<option value="__addkey">➕ Add a cloud model…</option>';
+    modelSel.innerHTML = html;
+    // show THIS agent's saved model; a stale/removed id falls back to "auto" (no phantom option)
+    const want = getAgentModel(active);
+    const has = [...modelSel.options].some(o => o.value === want);
+    modelSel.value = has ? want : "auto";
+    applyGlow();
+  }
+  function refreshModels(){
+    fetch("/api/models").then(r => r.json()).then(j => populateModels(j)).catch(() => populateModels(null));
+  }
+  // re-sync the dropdown to whatever agent is now active (called from setActive + refreshRoster)
+  function syncModelToActive(){
+    if (!modelSel) return;
+    const want = getAgentModel(active);
+    const has = [...modelSel.options].some(o => o.value === want);
+    modelSel.value = has ? want : "auto";
+    applyGlow();
+  }
+
+  if (modelSel) modelSel.onchange = () => {
+    const v = modelSel.value;
+    if (v === "__addkey") { if (window.openKeys) window.openKeys("brain"); modelSel.value = getAgentModel(active); return; }
+    setAgentModel(active, v);
+    applyGlow();
+  };
+  { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
+  refreshModels();
+  window.addEventListener("ark:providers-changed", () => setTimeout(refreshModels, 80));
+  window.addEventListener("focus", refreshModels);
 
   // ── merge in user-made characters, paint the roster, then default to Kit ──
   function refreshRoster(reactivate) {
@@ -627,6 +671,7 @@
     const still = CHARACTERS.find(c => c.id === prevId);
     if (still) active = still;
     buildRoster();
+    if (typeof syncModelToActive === "function") syncModelToActive();   // re-sync picker to the (possibly refreshed) active agent
     if (reactivate) paintHost();   // refresh header label/avatar in case readiness/name changed
   }
   refreshRoster(false);
@@ -662,7 +707,7 @@
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier };
+      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier, model: getAgentModel(active) };
       if (sentImage) payload.image = sentImage;
       // session-aware: if this room exposes a live snapshot (the studio does), hand the agent the REAL session
       if (typeof window.dmvSessionSnapshot === "function") { const snap = window.dmvSessionSnapshot(); if (snap) payload.session = snap; }
@@ -671,12 +716,28 @@
         payload.knowledge = active.knowledge || "";
         payload.charName = active.name || "";
         payload.charCraft = active.craftLabel || active.craft || "";
+        payload.agentId = active.id;   // backend loads this agent's distilled pack and injects its rules
       }
       const r = await fetch("/api/kit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json(); think.remove();
       let reply = j.reply || "Hm, I blanked — ask me again?";
       if (active.preview && !active.mine) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
       addMsg("kit", reply);
+      // ── LEARNS AS YOU WORK — fire-and-forget: distill this real exchange into the agent's pack.
+      //    Only for user (mine) agents with a real question (built-in Kit/Tiff NEVER write a user pack);
+      //    repaints ONLY when the model found genuine, durable rules (res.added > 0) — never on empties. ──
+      if (active.mine && q && q.trim().length >= 25) {
+        // provenance + signal: learn from what the USER said/did + the REAL room state — NEVER the agent's
+        // own reply (that'd bank the bot's advice as your rule), and skip trivial turns ("thanks", "ok").
+        const raw = "USER: " + q + (payload.session ? "\nROOM STATE:\n" + payload.session : "");
+        fetch("/api/agents/" + encodeURIComponent(active.id) + "/train", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: active.id, name: active.name, craft: active.craftLabel || active.craft || "", kind: "work", raw, context: room })
+        }).then(r => r.json()).then(res => {
+          if (res && res.added > 0) { active.trained = Math.min(20, res.trained | 0); persistTrained(active.id, res.trained);
+            addMsg("kit", "*(+" + res.added + " learned — " + res.trained + "/20 trained)*"); }
+        }).catch(() => {});
+      }
       // ── the agent DRIVES the room: run a server-validated action through the room's window.RoomAPI ──
       if (j.action && window.RoomAPI && typeof window.RoomAPI.run === "function") {
         const a = j.action;

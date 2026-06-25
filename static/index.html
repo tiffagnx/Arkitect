@@ -96,6 +96,23 @@
   .roomlink:hover { background: rgba(255,255,255,.045); color: var(--text); border-color: var(--hairline); transform: translateX(2px); }
   .roomlink .ri { width: 26px; height: 26px; min-width: 26px; display: grid; place-items: center; font-size: 13.5px; border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); transition: background .14s, border-color .14s; }
   .roomlink:hover .ri { background: rgba(62,156,184,.16); border-color: rgba(62,156,184,.45); }
+  /* The Stream — pinned, featured above the creation wings (it's the scene, not a tool) */
+  .roomlink.streampin { background: linear-gradient(100deg, rgba(62,156,184,.18), rgba(62,156,184,.04)); border-color: rgba(62,156,184,.4); color: var(--text); }
+  .roomlink.streampin:hover { background: linear-gradient(100deg, rgba(62,156,184,.26), rgba(62,156,184,.08)); border-color: rgba(62,156,184,.62); }
+  .roomlink.streampin .ri { background: rgba(62,156,184,.24); border-color: rgba(62,156,184,.6); }
+  .roomlink.streampin .pinhint { margin-left: auto; font: 700 8px 'Space Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--pink); opacity: .9; }
+  .streamfeat { display: flex; align-items: center; gap: 15px; max-width: 520px; margin: 22px auto 0; padding: 15px 18px; text-align: left;
+    border-radius: 16px; text-decoration: none; color: var(--text); cursor: pointer;
+    background: linear-gradient(100deg, rgba(62,156,184,.17), rgba(24,25,30,.55)); border: 1px solid rgba(62,156,184,.38);
+    box-shadow: 0 8px 28px rgba(0,0,0,.3); transition: transform .14s, border-color .14s, box-shadow .14s; }
+  .streamfeat:hover { transform: translateY(-2px); border-color: rgba(62,156,184,.66); box-shadow: 0 12px 34px rgba(62,156,184,.24); }
+  .streamfeat .sf-ic { font-size: 24px; width: 46px; height: 46px; min-width: 46px; display: grid; place-items: center; border-radius: 13px;
+    background: rgba(62,156,184,.2); border: 1px solid rgba(62,156,184,.42); }
+  .streamfeat .sf-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .streamfeat .sf-txt b { font: 700 15px Oxanium; letter-spacing: .04em; }
+  .streamfeat .sf-txt small { color: var(--dim); font: 500 12px Inter; line-height: 1.4; }
+  .streamfeat .sf-em { color: var(--pink); font-weight: 700; }
+  .streamfeat .sf-go { margin-left: auto; font: 700 11px Oxanium; letter-spacing: .08em; color: var(--pink); white-space: nowrap; }
   .roomsearch { display:flex; align-items:center; gap:7px; margin:10px 6px 6px; padding:7px 10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid var(--hairline); transition:border-color .14s, background .14s; }
   .roomsearch:focus-within { border-color:rgba(62,156,184,.5); background:rgba(62,156,184,.06); }
   .roomsearch .rs-ic { color:var(--dim); font-size:13px; }
@@ -381,6 +398,7 @@
     <div class="roomsearch"><span class="rs-ic">⌕</span><input id="roomSearch" type="search" placeholder="Search rooms…" autocomplete="off" aria-label="Search rooms" /></div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
+      <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
       <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>The Kitchen</span></a>
@@ -388,7 +406,6 @@
     <div class="raillabel">More</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
-      <a class="roomlink" href="/static/draw.html"><span class="ri">✏️</span><span>Sketch Pad</span></a>
       <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
       <a class="roomlink" href="/static/join.html"><span class="ri">🎭</span><span>For Creators</span></a>
     </div>
@@ -426,6 +443,11 @@
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
+        <a class="streamfeat" href="/static/stream.html">
+          <span class="sf-ic">📡</span>
+          <span class="sf-txt"><b>The Stream</b><small>Hear &amp; watch what's made here — <span class="sf-em">Notifi</span> music, <span class="sf-em">Cratel</span> video</small></span>
+          <span class="sf-go">Open →</span>
+        </a>
       </div>
     </div></div>
 
@@ -857,6 +879,11 @@ function newChat() {
           <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
+        <a class="streamfeat" href="/static/stream.html">
+          <span class="sf-ic">📡</span>
+          <span class="sf-txt"><b>The Stream</b><small>Hear &amp; watch what's made here — <span class="sf-em">Notifi</span> music, <span class="sf-em">Cratel</span> video</small></span>
+          <span class="sf-go">Open →</span>
+        </a>
       </div>`;
   clearAtts();
   const ta = $("input"); if (ta) { ta.value = ""; ta.style.height = "auto"; }

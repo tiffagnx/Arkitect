@@ -49,6 +49,9 @@
   if (!document.querySelector('script[data-keys]')) { const kys = document.createElement("script"); kys.src = "/static/keys.js"; kys.setAttribute("data-keys", "1"); document.body.appendChild(kys); }
   // COPY ANYWHERE — reliable right-click→copy in the native shell (where the OS menu is flaky)
   if (!document.querySelector('script[data-copy]')) { const cpy = document.createElement("script"); cpy.src = "/static/copy-anywhere.js"; cpy.setAttribute("data-copy", "1"); document.body.appendChild(cpy); }
+  // STREAM PUBLISH — window.publishToStream + window.streamPublishDialog so any lab can drop a
+  // finished track (→ Notifi) or video (→ Cratel) straight into The Stream.
+  if (!document.querySelector('script[data-strpub]')) { const sp = document.createElement("script"); sp.src = "/static/stream-publish.js"; sp.setAttribute("data-strpub", "1"); document.body.appendChild(sp); }
   // NO version badge in the rooms — owner's call: the version lives ONLY on the front page (the chat,
   // next to brain/engine). The corner badge here was cluttering the rooms, so it's intentionally gone.
 })();
