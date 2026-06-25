@@ -206,6 +206,8 @@
   function cmpVer(a, b) { const p = s => String(s || "").replace(/^v/i, "").split(/[.\-+]/).map(n => parseInt(n, 10) || 0); const A = p(a), B = p(b), n = Math.max(A.length, B.length); for (let i = 0; i < n; i++) { const d = (A[i] || 0) - (B[i] || 0); if (d) return d < 0 ? -1 : 1; } return 0; }
   async function checkAppUpdate() {
     const box = $("asUpd"), sec = $("asUpdSec"); if (!box) return;
+    // The WEB version auto-updates on refresh — the desktop "Update" button + badge don't belong here.
+    if (window.DMV_AI && DMV_AI.CLOUD_MODE) { if (sec) sec.style.display = "none"; try { gear.classList.remove("upd"); } catch (e) {} return; }
     let cur = "?"; try { cur = (await fetch("/api/version").then(r => r.json())).version || "?"; } catch (e) { }
     let rel = null; try { const r = await fetch("https://api.github.com/repos/" + UPD_REPO + "/releases/latest", { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" }); if (r.ok) rel = await r.json(); } catch (e) { }
     const tag = rel && (rel.tag_name || rel.name);

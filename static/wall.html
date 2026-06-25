@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0C0D10" />
+<title>The Wall — DeMartinville</title>
+<style>
+  :root{
+    --bg:#0C0D10; --bg1:#141519; --text:#E7E9EE; --dim:#9AA0AC; --hairline:rgba(255,255,255,.10);
+    --gold:#E6C16A; --gold2:#D9A441; --teal:#7BB6CD;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:Inter,-apple-system,system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+
+  /* ── top bar ── */
+  .wbar{height:54px;display:flex;align-items:center;gap:16px;padding:0 16px;
+    background:linear-gradient(180deg,#15161b,#0d0e12);border-bottom:1px solid var(--hairline);position:relative;z-index:20}
+  .wtitle{font:800 17px 'Oxanium',Inter,sans-serif;letter-spacing:.26em;color:var(--text);
+    text-shadow:0 0 18px rgba(230,193,106,.18)}
+  .wtitle b{color:var(--gold)}
+  .wnav{display:flex;align-items:center;gap:8px;margin-left:6px}
+  .wnav button{width:26px;height:26px;border-radius:8px;border:1px solid var(--hairline);background:rgba(255,255,255,.04);
+    color:var(--text);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .wnav button:hover{border-color:rgba(230,193,106,.5)}
+  .wnav button:disabled{opacity:.3;cursor:default}
+  #wLabel{font:600 11px 'Space Mono',monospace;letter-spacing:.08em;color:var(--dim);min-width:96px;text-align:center}
+  .spacer{flex:1}
+  .wcount{font:600 10.5px 'Space Mono',monospace;color:var(--dim);letter-spacing:.05em}
+  .wsign{height:34px;padding:0 16px;border:none;border-radius:10px;cursor:pointer;
+    font:700 12.5px Inter;letter-spacing:.02em;color:#1a1408;
+    background:linear-gradient(120deg,var(--gold),var(--gold2));box-shadow:0 4px 16px rgba(217,164,65,.32)}
+  .wsign:hover{filter:brightness(1.06)} .wsign:active{transform:translateY(1px)}
+  .wsign.arm{background:linear-gradient(120deg,#7be38f,#46c46a);color:#06210f;box-shadow:0 4px 16px rgba(70,196,106,.4)}
+
+  /* ── the wall ── */
+  .wall-frame{position:absolute;inset:54px 0 0 0;padding:20px;overflow:auto}
+  .wall-surface{position:relative;width:100%;min-height:calc(100vh - 94px);height:100%;border-radius:8px;overflow:hidden;
+    background:
+      radial-gradient(130% 80% at 50% -6%, rgba(255,250,238,.5) 0%, rgba(255,250,238,0) 42%),
+      radial-gradient(120% 100% at 50% 0%, #d9d3c6 0%, #c7c1b4 46%, #aaa493 100%);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25), inset 0 22px 60px rgba(255,255,255,.18),
+      inset 0 -40px 90px rgba(40,34,24,.30), 0 24px 60px rgba(0,0,0,.5);
+    cursor:default;}
+  .wall-surface.placing{cursor:none}
+  .wall-tex{position:absolute;inset:0;width:100%;height:100%;opacity:.55;mix-blend-mode:multiply;pointer-events:none}
+  .wall-stain{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;opacity:.5;
+    background:
+      radial-gradient(40% 30% at 18% 78%, rgba(70,58,40,.22), transparent 70%),
+      radial-gradient(34% 26% at 82% 22%, rgba(70,58,40,.16), transparent 70%),
+      radial-gradient(50% 40% at 60% 95%, rgba(40,34,24,.2), transparent 70%);}
+  .wall-vig{position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 120px rgba(30,24,16,.32);border-radius:8px}
+
+  /* a faint engraved studio plaque, part of the wall */
+  .wall-mark{position:absolute;left:50%;top:14px;transform:translateX(-50%);text-align:center;pointer-events:none;
+    font:800 12px 'Oxanium',sans-serif;letter-spacing:.34em;color:rgba(60,50,36,.34);
+    text-shadow:0 1px 0 rgba(255,255,255,.35)}
+  .wall-mark span{display:block;font:600 8px 'Space Mono',monospace;letter-spacing:.2em;color:rgba(60,50,36,.28);margin-top:3px}
+
+  /* ── signatures ── */
+  .sig{position:absolute;cursor:pointer;transition:transform .12s, filter .12s;filter:drop-shadow(0 2px 3px rgba(30,22,12,.34))}
+  .sig img{display:block;width:100%;height:100%;image-rendering:auto;-webkit-user-drag:none;user-select:none}
+  .sig .tag{position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);white-space:nowrap;
+    font:600 9.5px 'Space Mono',monospace;letter-spacing:.04em;color:rgba(48,40,28,.0);transition:color .12s}
+  .sig:hover{transform:scale(1.04);filter:drop-shadow(0 4px 7px rgba(30,22,12,.45))}
+  .sig:hover .tag{color:rgba(40,32,22,.78)}
+  .sig .rm{position:absolute;top:-9px;right:-9px;width:18px;height:18px;border-radius:50%;border:none;cursor:pointer;
+    background:#E5565B;color:#fff;font-size:11px;line-height:1;display:none;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .sig:hover .rm{display:flex}
+
+  .ghost{position:absolute;border:2px dashed rgba(70,196,106,.9);border-radius:6px;pointer-events:none;display:none;z-index:8;
+    background:rgba(123,227,143,.12);box-shadow:0 0 0 9999px rgba(10,10,12,.0)}
+  .ghost.bad{border-color:rgba(229,86,91,.95);background:rgba(229,86,91,.14)}
+  .ghost .gh-lbl{position:absolute;left:0;top:-22px;font:700 10px Inter;letter-spacing:.02em;color:#cdefd6;
+    background:rgba(12,16,12,.7);padding:2px 7px;border-radius:6px;white-space:nowrap}
+  .ghost.bad .gh-lbl{color:#ffd7d8;background:rgba(28,12,12,.72)}
+
+  .empty-cta{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+    font:700 16px Inter;color:rgba(52,44,30,.5);letter-spacing:.01em}
+  .empty-cta span{display:block;font:500 11.5px 'Space Mono',monospace;letter-spacing:.06em;color:rgba(52,44,30,.4);margin-top:7px}
+
+  .hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:30;
+    font:600 11.5px Inter;color:var(--text);background:rgba(16,18,22,.92);border:1px solid var(--hairline);
+    padding:8px 15px;border-radius:11px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+  .hint.on{display:block}
+
+  /* ── drawing pad ── */
+  .pad-ov{position:fixed;inset:0;z-index:100;background:rgba(6,7,10,.66);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center}
+  .pad-ov.on{display:flex}
+  .pad{width:520px;max-width:94vw;background:linear-gradient(180deg,#1b1d23,#131419);border:1px solid rgba(230,193,106,.32);
+    border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.7)}
+  .pad-h{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--hairline)}
+  .pad-h span{font:700 11px 'Space Mono',monospace;letter-spacing:.18em;color:var(--gold)}
+  .pad-h button{background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
+  .pad-cv-wrap{margin:14px 15px 0;border-radius:10px;overflow:hidden;border:1px solid var(--hairline);
+    background:
+      radial-gradient(130% 80% at 50% -6%, rgba(255,250,238,.5) 0%, rgba(255,250,238,0) 42%),
+      radial-gradient(120% 100% at 50% 0%, #d9d3c6 0%, #c7c1b4 46%, #aaa493 100%);}
+  #padCv{display:block;max-width:100%;max-height:52vh;width:auto;height:auto;margin:0 auto;cursor:crosshair;touch-action:none}
+  .pad-tools{display:flex;align-items:center;gap:12px;padding:11px 15px 4px}
+  .swatches{display:flex;gap:6px}
+  .sw{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.18)}
+  .sw.on{border-color:#fff;transform:scale(1.12)}
+  .pad-tools input[type=range]{flex:1;accent-color:var(--gold)}
+  .pad-tools button{font:600 11px Inter;padding:6px 11px;border-radius:8px;border:1px solid var(--hairline);
+    background:rgba(255,255,255,.05);color:var(--text);cursor:pointer}
+  .pad-tools button:hover{border-color:rgba(230,193,106,.5)}
+  .pad-handle{margin:8px 15px 0}
+  .pad-handle input{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--hairline);
+    background:rgba(0,0,0,.28);color:var(--text);font:500 12.5px Inter;outline:none}
+  .pad-handle input:focus{border-color:rgba(230,193,106,.5)}
+  .pad-foot{display:flex;justify-content:flex-end;gap:9px;padding:12px 15px 15px}
+  .pad-foot button{font:700 12px Inter;padding:9px 16px;border-radius:10px;cursor:pointer;border:none}
+  #padCancel{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--hairline)}
+  #padPlace{color:#1a1408;background:linear-gradient(120deg,var(--gold),var(--gold2))}
+  #padPlace:disabled{opacity:.45;cursor:default}
+</style>
+</head>
+<body>
+  <div class="wbar">
+    <a class="pr-back" href="/">←</a>
+    <div class="wtitle">THE&nbsp;<b>WALL</b></div>
+    <div class="wnav"><button id="wPrev" title="older wall">◀</button><span id="wLabel">Wall 1</span><button id="wNext" title="newer wall">▶</button></div>
+    <div class="spacer"></div>
+    <span class="wcount" id="wCount"></span>
+    <button class="wsign" id="wSign">✍ Sign the Wall</button>
+  </div>
+
+  <div class="wall-frame">
+    <div class="wall-surface" id="wall">
+      <svg class="wall-tex" preserveAspectRatio="none"><defs>
+        <filter id="plaster"><feTurbulence type="fractalNoise" baseFrequency="0.013 0.021" numOctaves="4" seed="7" result="n"/>
+          <feDiffuseLighting in="n" surfaceScale="2.1" diffuseConstant="1.02" lighting-color="#fff" result="l">
+            <feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting>
+          <feColorMatrix in="l" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.34 0.34 0.34 0 0"/></filter>
+        <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="g"/>
+          <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 0"/></filter>
+        <rect width="100%" height="100%" filter="url(#plaster)"/>
+      </defs><rect width="100%" height="100%" filter="url(#plaster)"/><rect width="100%" height="100%" filter="url(#grain)" opacity=".35"/></svg>
+      <div class="wall-stain"></div>
+      <div class="wall-mark">DEMARTIN AUDIO LABS<span>EST. — EVERY VOICE LEAVES A MARK</span></div>
+      <div class="sig-layer" id="sigLayer"></div>
+      <div class="ghost" id="ghost"><div class="gh-lbl"></div></div>
+      <div class="empty-cta" id="emptyCta">This wall’s empty.<span>Hit “Sign the Wall,” pick a spot, leave your mark.</span></div>
+    </div>
+  </div>
+
+  <div class="hint" id="hint"></div>
+
+  <div class="pad-ov" id="padOv">
+    <div class="pad">
+      <div class="pad-h"><span>LEAVE YOUR MARK</span><button id="padX" title="cancel">✕</button></div>
+      <div class="pad-cv-wrap"><canvas id="padCv" width="520" height="320"></canvas></div>
+      <div class="pad-tools">
+        <div class="swatches" id="swatches"></div>
+        <input type="range" id="brush" min="1" max="16" value="5" title="brush size">
+        <button id="padUndo" title="undo">↶</button>
+        <button id="padClear">Clear</button>
+      </div>
+      <div class="pad-handle"><input id="padHandle" placeholder="@yourtag — so people can find you (optional)" maxlength="24"></div>
+      <div class="pad-foot"><button id="padCancel">Cancel</button><button id="padPlace" disabled>Place on the Wall</button></div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.getElementById(s);   // all call-sites use bare ids
+/* ───────── data (local v1; the shared/Cloudflare backend is a drop-in later — see WALL_BACKEND.md) ───────── */
+const KEY = "ark_wall_v2";                              // v2 = variable-size, crop-to-ink, tight-pack
+const MAX_AREA = 26000, MAX_DIM = 340, MIN_DIM = 38;    // your space BUDGET: shape it any way (wide/tall/sideways), capped in area + reach; gaps can be small
+let DB = load(), curWall = DB.cur;
+function load(){
+  try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && d.walls) return d; }catch(e){}
+  return { cur:0, walls:[ { sigs:[] } ] };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
+const wall = i => DB.walls[i];
+const coverage = i => { const W=$("wall"), A=Math.max(1,W.clientWidth*W.clientHeight); return wall(i).sigs.reduce((s,g)=>s+g.w*g.h,0)/A; };   // bbox fill ratio → "wall full"
+
+/* ───────── render ───────── */
+function render(){
+  const w = wall(curWall), layer = $("sigLayer");
+  layer.innerHTML = "";
+  w.sigs.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "sig"; d.style.left = s.x+"px"; d.style.top = s.y+"px"; d.style.width = s.w+"px"; d.style.height = s.h+"px";
+    d.innerHTML = `<img src="${s.png}" alt="signature"><div class="tag">${s.handle?escapeHtml(s.handle):""}</div><button class="rm" title="remove this tag">✕</button>`;
+    d.querySelector(".rm").onclick = e => { e.stopPropagation(); if(confirm("Remove this tag from the wall?")){ w.sigs = w.sigs.filter(x=>x.id!==s.id); save(); render(); } };
+    layer.appendChild(d);
+  });
+  $("emptyCta").style.display = w.sigs.length ? "none" : "block";
+  $("wLabel").textContent = "Wall " + (curWall+1);
+  $("wCount").textContent = w.sigs.length + " tag" + (w.sigs.length===1?"":"s") + " · " + Math.round(coverage(curWall)*100) + "% full" + (DB.walls.length>1 ? "  ·  "+DB.walls.length+" walls" : "");
+  $("wPrev").disabled = curWall<=0;
+  $("wNext").disabled = curWall>=DB.walls.length-1;
+  const live = curWall === DB.cur;                    // only the newest wall is signable
+  $("wSign").style.display = live ? "" : "none";
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function toast(msg, ms){ const h=$("hint"); h.textContent=msg; h.classList.add("on"); clearTimeout(toast._t); if(ms!==0) toast._t=setTimeout(()=>h.classList.remove("on"), ms||2600); }
+
+$("wPrev").onclick = ()=>{ if(curWall>0){ curWall--; cancelPlacing(); render(); } };
+$("wNext").onclick = ()=>{ if(curWall<DB.walls.length-1){ curWall++; cancelPlacing(); render(); } };
+
+/* ───────── placement — DRAG OUT your space (any shape, capped budget), pack tight, never overlap ───────── */
+let placing = false, dragging = false, region = null;
+function rectsOverlap(a, b){ return !(a.x+a.w <= b.x || a.x >= b.x+b.w || a.y+a.h <= b.y || a.y >= b.y+b.h); }   // touching edges = NOT overlapping (scrunch allowed)
+function fits(r){
+  const W=$("wall");
+  if(r.w<MIN_DIM || r.h<MIN_DIM) return {ok:false, why:"a little bigger…"};
+  if(r.w>MAX_DIM || r.h>MAX_DIM) return {ok:false, why:"too long that way"};
+  if(r.w*r.h > MAX_AREA+1) return {ok:false, why:"that's your whole space budget"};
+  if(r.x<4 || r.y<4 || r.x+r.w>W.clientWidth-4 || r.y+r.h>W.clientHeight-4) return {ok:false, why:"off the wall"};
+  if(wall(curWall).sigs.some(s => rectsOverlap(r, s))) return {ok:false, why:"over someone — scrunch up beside them"};
+  return {ok:true};
+}
+$("wSign").onclick = ()=>{
+  if(coverage(DB.cur) > 0.66){ DB.walls.push({sigs:[]}); DB.cur = DB.walls.length-1; curWall = DB.cur; save(); toast("This wall’s packed — fresh wall’s up. Fill it."); render(); }
+  if(curWall !== DB.cur){ curWall = DB.cur; render(); }
+  placing = !placing;
+  $("wSign").classList.toggle("arm", placing);
+  $("wSign").textContent = placing ? "✕ Cancel" : "✍ Sign the Wall";
+  $("wall").classList.toggle("placing", placing);
+  if(placing) toast("Drag out your space on an empty spot — wide, tall, sideways, however you want. Smaller = tucks into tighter gaps.", 0);
+  else endRegion();
+};
+function cancelPlacing(){ if(placing){ placing=false; $("wSign").classList.remove("arm"); $("wSign").textContent="✍ Sign the Wall"; $("wall").classList.remove("placing"); endRegion(); $("hint").classList.remove("on"); } }
+function endRegion(){ dragging=false; region=null; $("ghost").style.display="none"; }
+function wallXY(e){ const r=$("wall").getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
+$("wall").addEventListener("mousedown", e=>{ if(!placing) return; e.preventDefault(); const p=wallXY(e); region={ ax:p.x, ay:p.y, x:p.x, y:p.y, w:0, h:0, _ok:false }; dragging=true; });
+$("wall").addEventListener("mousemove", e=>{
+  if(!placing || !dragging) return;
+  const p=wallXY(e); let w=p.x-region.ax, h=p.y-region.ay;
+  let aw=Math.min(Math.abs(w),MAX_DIM), ah=Math.min(Math.abs(h),MAX_DIM);
+  if(aw*ah>MAX_AREA){ if(aw>=ah) aw=MAX_AREA/ah; else ah=MAX_AREA/aw; }              // hold the area budget; YOU pick the shape
+  region.w=aw; region.h=ah;
+  region.x = w<0 ? region.ax-aw : region.ax; region.y = h<0 ? region.ay-ah : region.ay;
+  const f=fits(region), g=$("ghost");
+  g.style.display="block"; g.style.left=region.x+"px"; g.style.top=region.y+"px"; g.style.width=region.w+"px"; g.style.height=region.h+"px";
+  g.classList.toggle("bad", !f.ok);
+  g.querySelector(".gh-lbl").textContent = f.ok ? (Math.round(region.w)+"×"+Math.round(region.h)+" — let go to draw") : f.why;
+  region._ok=f.ok;
+});
+window.addEventListener("mouseup", ()=>{
+  if(!placing || !dragging) return; dragging=false;
+  if(region && region._ok){ const r={x:region.x,y:region.y,w:region.w,h:region.h}; endRegion(); openPad(r); }
+  else { const bad=region&&!region._ok; endRegion(); if(bad) toast("Drag out a bigger empty space.", 1500); }
+});
+
+/* ───────── drawing pad (sized to YOUR claimed space) ───────── */
+let curRegion = null;
+const cv = $("padCv"), pctx = cv.getContext("2d");
+const COLORS = ["#1c1a17","#ffffff","#E5565B","#E6C16A","#7BB6CD","#6fbf73","#9b7bd0"];
+let penColor = COLORS[0], penSize = 5, drawing=false, strokes=[], cur=null, dirty=false;
+(function buildSwatches(){
+  const wrap=$("swatches");
+  COLORS.forEach((c,i)=>{ const b=document.createElement("div"); b.className="sw"+(i===0?" on":""); b.style.background=c;
+    b.onclick=()=>{ penColor=c; [...wrap.children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); }; wrap.appendChild(b); });
+})();
+$("brush").oninput = e => penSize = +e.target.value;
+function padPos(e){ const r=cv.getBoundingClientRect(); const sx=cv.width/r.width, sy=cv.height/r.height;
+  const p = e.touches ? e.touches[0] : e; return { x:(p.clientX-r.left)*sx, y:(p.clientY-r.top)*sy }; }
+function redraw(){ pctx.clearRect(0,0,cv.width,cv.height);
+  for(const st of strokes){ pctx.strokeStyle=st.c; pctx.lineWidth=st.w; pctx.lineCap="round"; pctx.lineJoin="round";
+    pctx.beginPath(); st.pts.forEach((p,i)=> i?pctx.lineTo(p.x,p.y):pctx.moveTo(p.x,p.y)); if(st.pts.length===1){pctx.lineTo(st.pts[0].x+.1,st.pts[0].y);} pctx.stroke(); } }
+function startDraw(e){ e.preventDefault(); drawing=true; cur={c:penColor,w:penSize,pts:[padPos(e)]}; strokes.push(cur); dirty=true; $("padPlace").disabled=false; redraw(); }
+function moveDraw(e){ if(!drawing) return; e.preventDefault(); cur.pts.push(padPos(e)); redraw(); }
+function endDraw(){ drawing=false; cur=null; }
+cv.addEventListener("mousedown",startDraw); cv.addEventListener("mousemove",moveDraw); window.addEventListener("mouseup",endDraw);
+cv.addEventListener("touchstart",startDraw,{passive:false}); cv.addEventListener("touchmove",moveDraw,{passive:false}); window.addEventListener("touchend",endDraw);
+$("padUndo").onclick = ()=>{ strokes.pop(); dirty=strokes.length>0; $("padPlace").disabled=!dirty; redraw(); };
+$("padClear").onclick = ()=>{ strokes=[]; dirty=false; $("padPlace").disabled=true; redraw(); };
+
+function inkBBox(){                                       // tight bounds of the ACTUAL ink (in pad px)
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9,any=false;
+  for(const st of strokes){ const r=st.w/2+1; for(const p of st.pts){ any=true; minX=Math.min(minX,p.x-r); minY=Math.min(minY,p.y-r); maxX=Math.max(maxX,p.x+r); maxY=Math.max(maxY,p.y+r); } }
+  if(!any) return null;
+  minX=Math.max(0,Math.floor(minX)); minY=Math.max(0,Math.floor(minY)); maxX=Math.min(cv.width,Math.ceil(maxX)); maxY=Math.min(cv.height,Math.ceil(maxY));
+  return { x:minX, y:minY, w:Math.max(1,maxX-minX), h:Math.max(1,maxY-minY) };
+}
+function openPad(r){
+  curRegion = r;
+  const disp = Math.min(3.4, Math.max(1.5, 470/Math.max(r.w, r.h)));   // upscale small claims so they're comfortable to draw in
+  cv.width = Math.round(r.w*disp); cv.height = Math.round(r.h*disp);
+  strokes=[]; dirty=false; $("padHandle").value=""; $("padPlace").disabled=true; redraw(); $("padOv").classList.add("on");
+}
+function closePad(){ $("padOv").classList.remove("on"); curRegion=null; }
+$("padX").onclick = closePad; $("padCancel").onclick = closePad;
+$("padOv").addEventListener("mousedown", e=>{ if(e.target===$("padOv")) closePad(); });
+$("padPlace").onclick = ()=>{
+  if(!dirty || !curRegion) return;
+  const bb = inkBBox(); if(!bb) return;
+  const t=document.createElement("canvas"); t.width=bb.w; t.height=bb.h;          // CROP to the actual ink — unused space is freed for the next person
+  t.getContext("2d").drawImage(cv, bb.x,bb.y,bb.w,bb.h, 0,0,bb.w,bb.h);
+  const png = t.toDataURL("image/png");
+  const sx = curRegion.w/cv.width, sy = curRegion.h/cv.height;                     // pad-px → wall-px (uniform; the pad matches the region's aspect)
+  const sig = { id:"s"+Math.floor(performance.now())+"_"+wall(DB.cur).sigs.length,
+    handle: $("padHandle").value.trim().slice(0,24), png,
+    x: curRegion.x + bb.x*sx, y: curRegion.y + bb.y*sy, w: bb.w*sx, h: bb.h*sy, ts:Date.now() };
+  wall(DB.cur).sigs.push(sig);
+  DB.cur = DB.walls.length-1; curWall = DB.cur; save(); closePad(); render();
+  toast(sig.handle ? "Signed — "+sig.handle+" is on the wall. 🖋️" : "Signed — you’re on the wall. 🖋️");
+};
+window.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("padOv").classList.contains("on")) closePad(); else cancelPlacing(); } });
+
+render();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

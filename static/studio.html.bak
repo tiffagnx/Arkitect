@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Studio — Tiff’s Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --amber:#F5A623;
+          --bg0:#07050C; --bg1:#14101C; --panel:rgba(16,11,22,0.8);
+          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { height:100vh; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1100px 600px at 50% -15%, #1E1228 0%, var(--bg1) 50%, var(--bg0) 100%); }
+
+  .top { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); }
+  .top a { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .clock { font:600 13px 'Space Mono'; color:var(--teal); margin-left:8px; min-width:86px; }
+  .tbtn { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 12.5px Inter; transition:all .12s; }
+  .tbtn:hover { border-color:rgba(233,30,140,.5); }
+  .tbtn.hot { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent;
+    box-shadow:0 3px 14px rgba(233,30,140,.4); }
+  .tbtn.teal { color:#9BF0E8; } .tbtn.teal.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); }
+  .tbtn.rec { color:#FF8FA8; } .tbtn.rec.armed { border-color:rgba(255,90,110,.6); color:#FFB3C2; }
+  .tbtn.rec.live { background:linear-gradient(120deg,#FF5C7A,#E91E8C); color:#1A0410; border-color:transparent;
+    box-shadow:0 0 0 0 rgba(255,90,110,.5); animation:recpulse 1s infinite; }
+  @keyframes recpulse { 0%{box-shadow:0 0 0 0 rgba(255,90,110,.55)} 100%{box-shadow:0 0 0 9px rgba(255,90,110,0)} }
+  .countin { font:700 22px 'Space Mono'; color:#FFB3C2; min-width:30px; text-align:center; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .rec-warn { font:500 10px Inter; color:#FFC46B; line-height:1.45; margin-top:6px; }
+  .rec-warn.bad { color:#FF8FA8; }
+  .lat-grid { display:grid; grid-template-columns:1fr auto; gap:3px 8px; font:500 10px 'Space Mono'; }
+  .lat-grid .v { color:var(--teal); text-align:right; }
+  .lat-grid .lbl { color:var(--dim); }
+  .lat-grid .tot { color:#FF9DCE; } .lat-grid .tot .v { color:#FF9DCE; }
+  .ibtn { width:100%; padding:7px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 10.5px Inter; transition:all .12s; }
+  .ibtn:hover { border-color:rgba(233,30,140,.5); }
+  .ibtn.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); color:#9BF0E8; }
+  .lane.recording { border-color:rgba(255,90,110,.6); box-shadow:0 0 18px rgba(255,90,110,.18); }
+  .inmeter { height:7px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); margin-top:8px; }
+  .inmeter i { display:block; height:100%; width:0%; transition:width .04s linear;
+    background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 60%, var(--amber) 82%, #FF5C7A 95%); }
+
+  .body { display:flex; height:calc(100vh - 53px); }
+  /* console rail: master + verb */
+  .rail { width:240px; min-width:240px; border-right:1px solid var(--hairline); background:var(--panel);
+    backdrop-filter:blur(22px); padding:14px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+  .module { border:1px solid var(--hairline); border-radius:14px; padding:12px; background:rgba(255,255,255,.02); }
+  .module h3 { font:700 10px 'Space Mono'; letter-spacing:.22em; color:var(--dim); margin-bottom:10px; text-transform:uppercase; }
+  .module h3.pink { color:#FF9DCE; }
+  .krow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .krow label { font:500 10.5px Inter; color:var(--dim); width:54px; }
+  .krow input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:4px; }
+  .krow output { font:500 10px 'Space Mono'; color:var(--teal); width:38px; text-align:right; }
+  .meter { height:10px; border-radius:99px; background:rgba(0,0,0,.5); overflow:hidden; border:1px solid var(--hairline); }
+  .meter i { display:block; height:100%; width:0%;
+    background:linear-gradient(90deg,var(--teal) 0%, #9BE37B 55%, var(--amber) 75%, #FF5C7A 92%); transition:width .05s linear; }
+
+  /* tracks */
+  .tracks { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+  .drop { border:2px dashed rgba(233,30,140,.35); border-radius:18px; padding:38px 20px; text-align:center;
+    color:var(--dim); font-size:13.5px; cursor:pointer; transition:all .15s; }
+  .drop:hover, .drop.over { border-color:var(--pink); color:var(--text); background:rgba(233,30,140,.05); }
+  .lane { border:1px solid var(--hairline); border-radius:16px; background:var(--panel); backdrop-filter:blur(18px);
+    padding:10px 12px; animation:rise .25s ease-out; }
+  @keyframes rise { from { opacity:0; transform:translateY(8px); } }
+  .lane.muted { opacity:.45; }
+  .lhead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .lhead .name { font:600 12.5px Inter; color:#FFD6EA; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip { padding:4px 10px; border-radius:8px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.04); color:var(--dim); font:700 10px 'Space Mono'; transition:all .1s; }
+  .chip.m.on { background:rgba(255,90,110,.18); color:#FF9DAB; border-color:rgba(255,90,110,.5); }
+  .chip.s.on { background:rgba(245,166,35,.18); color:#FFD79B; border-color:rgba(245,166,35,.5); }
+  .chip.x { margin-left:auto; color:#FF7A93; }
+  .wave { width:100%; height:54px; border-radius:10px; background:rgba(0,0,0,.4); cursor:pointer; display:block; }
+  .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:6px 14px; margin-top:8px; }
+  .knob { display:flex; align-items:center; gap:6px; }
+  .knob label { font:500 9.5px 'Space Mono'; color:var(--dim); width:34px; letter-spacing:.04em; }
+  .knob input[type=range] { flex:1; accent-color:var(--teal); cursor:pointer; height:3px; }
+  .knob.pink input { accent-color:var(--pink); }
+  .knob select { flex:1; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline);
+    border-radius:7px; font:500 10px Inter; padding:3px 5px; outline:none; min-width:0; }
+  .knob select option { background:var(--bg1); }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/">← Pink Room</a>
+  <h1>🎚 THE STUDIO</h1>
+  <span class="clock" id="clock">0:00.0</span>
+  <button class="tbtn hot" id="play">▶ Play</button>
+  <button class="tbtn" id="stop">■ Stop</button>
+  <button class="tbtn teal" id="loop">↻ Loop</button>
+  <button class="tbtn rec" id="rec">● Record</button>
+  <span class="countin" id="countin"></span>
+  <div class="right">
+    <label class="tbtn" style="cursor:pointer">⚡ Load plugin (.js)<input type="file" id="plugfile" accept=".js" hidden /></label>
+    <label class="tbtn" style="cursor:pointer">+ Add tracks<input type="file" id="addfiles" accept="audio/*" multiple hidden /></label>
+    <button class="tbtn teal" id="exportBtn">⬇ Export WAV</button>
+  </div>
+</div>
+
+<div class="body">
+  <div class="rail">
+    <div class="module">
+      <h3>Master</h3>
+      <div class="krow"><label>Volume</label><input type="range" id="mGain" min="0" max="1.4" step="0.01" value="0.9" /><output id="mGainO">0.90</output></div>
+      <div class="krow"><label>Limiter</label><input type="range" id="mLim" min="-12" max="0" step="0.5" value="-1" /><output id="mLimO">-1.0</output></div>
+      <div style="margin-top:10px"><div class="meter"><i id="meterL"></i></div><div style="height:4px"></div><div class="meter"><i id="meterR"></i></div></div>
+    </div>
+    <div class="module">
+      <h3>Record</h3>
+      <button class="ibtn" id="inputBtn" style="margin-bottom:8px">🎤 Pick mic / input</button>
+      <div class="krow"><label>Monitor</label><input type="range" id="monGain" min="0" max="1.2" step="0.01" value="0" /><output id="monGainO">off</output></div>
+      <button class="ibtn" id="monBtn" style="margin-bottom:8px">🎧 Headphone monitor: OFF</button>
+      <div class="inmeter"><i id="inMeter"></i></div>
+      <div class="krow" style="margin-top:10px"><label>Count-in</label><input type="range" id="countBars" min="0" max="2" step="1" value="1" /><output id="countBarsO">1 bar</output></div>
+      <div class="krow"><label>Tempo</label><input type="range" id="recBpm" min="60" max="180" step="1" value="120" /><output id="recBpmO">120</output></div>
+      <button class="ibtn" id="punchBtn" style="margin:8px 0">⊏⊐ Punch-in: OFF</button>
+      <div style="font:700 9px 'Space Mono';letter-spacing:.18em;color:var(--dim);margin:6px 0 4px">LATENCY COMP</div>
+      <div class="lat-grid" id="latGrid">
+        <span class="lbl">output</span><span class="v" id="latOut">—</span>
+        <span class="lbl">input</span><span class="v" id="latIn">—</span>
+        <span class="lbl tot">round-trip</span><span class="v tot" id="latTot">—</span>
+      </div>
+      <button class="ibtn" id="calibBtn" style="margin-top:8px">⟳ Calibrate (loopback)</button>
+      <div class="rec-warn" id="recWarn">Pick an input to begin. Use headphones — speaker monitoring causes feedback + bleed.</div>
+    </div>
+    <div class="module">
+      <h3 class="pink">TIFF VERB</h3>
+      <div class="krow"><label>Size</label><input type="range" id="vSize" min="0.4" max="6" step="0.1" value="2.2" /><output id="vSizeO">2.2s</output></div>
+      <div class="krow"><label>Tone</label><input type="range" id="vTone" min="800" max="14000" step="100" value="6000" /><output id="vToneO">6.0k</output></div>
+      <div class="krow"><label>Pre-dly</label><input type="range" id="vPre" min="0" max="0.12" step="0.005" value="0.02" /><output id="vPreO">20ms</output></div>
+      <div class="krow"><label>Return</label><input type="range" id="vRet" min="0" max="1.5" step="0.01" value="0.8" /><output id="vRetO">0.80</output></div>
+      <div style="font:400 9.5px 'Space Mono'; color:var(--dim); margin-top:6px">your reverb. each track has a SEND.</div>
+    </div>
+    <div class="module">
+      <h3>Plugins loaded</h3>
+      <div id="plugList" style="font:400 11px Inter; color:var(--dim); line-height:1.8">TIFF VERB (bus) · Telephone · Crush · Wide</div>
+    </div>
+  </div>
+
+  <div class="tracks" id="tracks">
+    <div class="drop" id="drop">Drop your stems here — vocals, beat, anything (MP3 / WAV)<br/><span style="font:400 11px 'Space Mono';color:var(--dim)">each file becomes a lane on the board</span></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════ TIFF'S STUDIO ENGINE — Web Audio, all local, $0 ═══════════ */
+const $ = (id) => document.getElementById(id);
+let ctx = null;                 // AudioContext (created on first interaction)
+const tracks = [];              // {id,name,buffer,nodes:{...},ui:{...},gain,pan,eq:{lo,mid,hi},comp,send,plug,plugParams,muted,solo}
+let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
+let verb = null;                // {convolver, predelay, ret}
+let master = null;              // {gain, limiter, analyserL, analyserR, splitter}
+
+/* ── plugin registry — B's own format ──
+   TIFF_PLUGINS.register({ name, params:[{id,label,min,max,value}],
+     create(ctx){ return {input, output, set(id,val)} } })            */
+window.TIFF_PLUGINS = {
+  list: [],
+  register(p) { this.list.push(p); refreshPlugUi(); },
+};
+/* built-ins */
+TIFF_PLUGINS.list.push(
+  { name: "Telephone", params: [{ id:"amt", label:"AMT", min:0, max:1, value:1 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const hp = c.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 600;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200;
+      const dry = c.createGain(), wet = c.createGain(); dry.gain.value = 0; wet.gain.value = 1;
+      i.connect(hp); hp.connect(lp); lp.connect(wet); wet.connect(o); i.connect(dry); dry.connect(o);
+      return { input: i, output: o, set(id, v) { wet.gain.value = v; dry.gain.value = 1 - v; } };
+    } },
+  { name: "Crush", params: [{ id:"amt", label:"AMT", min:0, max:1, value:0.4 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const ws = c.createWaveShaper();
+      const setCurve = (a) => { const k = a * 60 + 1, n = 256, curve = new Float32Array(n);
+        for (let j = 0; j < n; j++) { const x = (j / (n - 1)) * 2 - 1; curve[j] = Math.tanh(x * k) / Math.tanh(k); }
+        ws.curve = curve; };
+      setCurve(0.4);
+      i.connect(ws); ws.connect(o);
+      return { input: i, output: o, set(id, v) { setCurve(v); } };
+    } },
+  { name: "Wide", params: [{ id:"amt", label:"AMT", min:0, max:1, value:0.5 }],
+    create(c) {
+      const i = c.createGain(), o = c.createGain();
+      const split = c.createChannelSplitter(2), merge = c.createChannelMerger(2);
+      const dly = c.createDelay(0.05); dly.delayTime.value = 0.012;
+      i.connect(split);
+      split.connect(merge, 0, 0);
+      split.connect(dly, 1); dly.connect(merge, 0, 1);
+      merge.connect(o);
+      return { input: i, output: o, set(id, v) { dly.delayTime.value = v * 0.025; } };
+    } },
+);
+function refreshPlugUi() {
+  $("plugList").textContent = "TIFF VERB (bus) · " + TIFF_PLUGINS.list.map(p => p.name).join(" · ");
+  tracks.forEach(t => fillPlugSelect(t));
+}
+$("plugfile").onchange = async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  try { (new Function(await f.text()))(); } catch (err) { alert("Plugin error: " + err.message); }
+  e.target.value = "";
+};
+
+/* ── TIFF VERB — generated stereo impulse response ── */
+function makeIR(c, seconds, tone) {
+  const rate = c.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
+  const ir = c.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    let lp = 0;
+    const a = Math.min(0.99, tone / (rate / 2) * 3); // crude one-pole tone shaping
+    for (let i = 0; i < len; i++) {
+      const env = Math.pow(1 - i / len, 2.2);
+      const n = (Math.random() * 2 - 1) * env;
+      lp = lp + a * (n - lp);
+      d[i] = lp * (ch ? 0.96 : 1); // slight L/R decorrelation
+    }
+  }
+  return ir;
+}
+
+function ensureCtx() {
+  if (ctx) return ctx;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  buildBus(ctx);
+  requestAnimationFrame(tickUi);
+  return ctx;
+}
+// Browsers gate audio behind a user gesture — ANY first touch unlocks it.
+["pointerdown", "keydown"].forEach(evt =>
+  document.addEventListener(evt, () => { if (ctx?.state === "suspended") ctx.resume(); }, true));
+function buildBus(c) {
+  master = { gain: c.createGain(), limiter: c.createDynamicsCompressor(),
+             splitter: c.createChannelSplitter(2), aL: c.createAnalyser(), aR: c.createAnalyser() };
+  master.gain.gain.value = parseFloat($("mGain").value);
+  const lim = master.limiter;
+  lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
+  lim.attack.value = 0.002; lim.release.value = 0.12;
+  master.gain.connect(lim); lim.connect(c.destination);
+  lim.connect(master.splitter);
+  master.aL.fftSize = 512; master.aR.fftSize = 512;
+  master.splitter.connect(master.aL, 0); master.splitter.connect(master.aR, 1);
+
+  verb = { convolver: c.createConvolver(), predelay: c.createDelay(0.2), ret: c.createGain() };
+  verb.convolver.buffer = makeIR(c, parseFloat($("vSize").value), parseFloat($("vTone").value));
+  verb.predelay.delayTime.value = parseFloat($("vPre").value);
+  verb.ret.gain.value = parseFloat($("vRet").value);
+  verb.predelay.connect(verb.convolver); verb.convolver.connect(verb.ret); verb.ret.connect(master.gain);
+}
+
+/* ── tracks ── */
+async function addFiles(files) {
+  const c = ensureCtx();
+  for (const f of files) {
+    if (!f.type.startsWith("audio") && !/\.(mp3|wav|m4a|ogg|flac)$/i.test(f.name)) continue;
+    let buf;
+    try { buf = await c.decodeAudioData(await f.arrayBuffer()); }
+    catch { alert(`Couldn't read ${f.name}`); continue; }
+    const t = {
+      id: Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ""),
+      buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
+      send: 0, plug: "", plugParams: {}, muted: false, solo: false, src: null, live: null,
+    };
+    tracks.push(t);
+    laneUi(t);
+  }
+  $("drop").style.display = tracks.length ? "none" : "block";
+  if (playing) restartPlayback();
+}
+
+function laneUi(t) {
+  const d = document.createElement("div");
+  d.className = "lane"; d.id = "lane-" + t.id;
+  d.innerHTML = `
+    <div class="lhead">
+      <span class="name">${t.name}</span>
+      <button class="chip m">M</button><button class="chip s">S</button>
+      <button class="chip x">✕</button>
+    </div>
+    <canvas class="wave" width="1200" height="54"></canvas>
+    <div class="strip">
+      <div class="knob pink"><label>VOL</label><input type="range" data-k="gain" min="0" max="1.4" step="0.01" value="${t.gain}" /></div>
+      <div class="knob"><label>PAN</label><input type="range" data-k="pan" min="-1" max="1" step="0.01" value="0" /></div>
+      <div class="knob"><label>LOW</label><input type="range" data-k="lo" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>MID</label><input type="range" data-k="mid" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>HIGH</label><input type="range" data-k="hi" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob"><label>COMP</label><input type="range" data-k="comp" min="0" max="1" step="0.01" value="0" /></div>
+      <div class="knob pink"><label>VERB</label><input type="range" data-k="send" min="0" max="1" step="0.01" value="0" /></div>
+      <div class="knob"><label>FX</label><select data-k="plug"><option value="">— none —</option></select></div>
+      <div class="knob" data-plugparam style="display:none"><label>AMT</label><input type="range" data-k="plugamt" min="0" max="1" step="0.01" value="0.5" /></div>
+    </div>`;
+  $("tracks").appendChild(d);
+  drawWave(d.querySelector(".wave"), t.buffer);
+  fillPlugSelect(t);
+
+  d.querySelector(".chip.m").onclick = (e) => { t.muted = !t.muted; e.target.classList.toggle("on", t.muted);
+    d.classList.toggle("muted", t.muted); applyMix(); };
+  d.querySelector(".chip.s").onclick = (e) => { t.solo = !t.solo; e.target.classList.toggle("on", t.solo); applyMix(); };
+  d.querySelector(".chip.x").onclick = () => { stopAll(); tracks.splice(tracks.indexOf(t), 1); d.remove();
+    $("drop").style.display = tracks.length ? "none" : "block"; };
+  d.querySelector(".wave").onclick = (e) => {
+    const frac = e.offsetX / e.target.clientWidth;
+    seek(frac * maxDur());
+  };
+  d.querySelectorAll("input[type=range],select").forEach(inp => {
+    inp.oninput = () => {
+      const k = inp.dataset.k, v = inp.tagName === "SELECT" ? inp.value : parseFloat(inp.value);
+      if (k === "gain") t.gain = v; if (k === "pan") t.pan = v;
+      if (k === "lo") t.eq.lo = v; if (k === "mid") t.eq.mid = v; if (k === "hi") t.eq.hi = v;
+      if (k === "comp") t.comp = v; if (k === "send") t.send = v;
+      if (k === "plug") { t.plug = v; d.querySelector("[data-plugparam]").style.display = v ? "flex" : "none";
+        if (playing) restartPlayback(); return; }
+      if (k === "plugamt") { t.plugParams.amt = v; t.live?.plugNode?.set("amt", v); return; }
+      applyTrack(t);
+    };
+  });
+}
+function fillPlugSelect(t) {
+  const sel = document.querySelector(`#lane-${t.id} select[data-k=plug]`);
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">— none —</option>` +
+    TIFF_PLUGINS.list.map(p => `<option value="${p.name}">${p.name}</option>`).join("");
+  sel.value = cur;
+}
+function drawWave(cv, buf) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  const d = buf.getChannelData(0), step = Math.ceil(d.length / W);
+  g.strokeStyle = "rgba(233,30,140,0.75)"; g.lineWidth = 1;
+  g.beginPath();
+  for (let x = 0; x < W; x++) {
+    let mn = 1, mx = -1;
+    for (let j = 0; j < step; j++) { const v = d[x * step + j] || 0; if (v < mn) mn = v; if (v > mx) mx = v; }
+    g.moveTo(x, (1 + mn) * H / 2); g.lineTo(x, (1 + mx) * H / 2);
+  }
+  g.stroke();
+}
+
+/* ── live graph per track ── */
+function buildTrackGraph(c, t, when, offset, isOffline) {
+  const src = c.createBufferSource(); src.buffer = t.buffer;
+  const inG = c.createGain();
+  const lo = c.createBiquadFilter(); lo.type = "lowshelf"; lo.frequency.value = 120;
+  const mid = c.createBiquadFilter(); mid.type = "peaking"; mid.frequency.value = 1000; mid.Q.value = 0.9;
+  const hi = c.createBiquadFilter(); hi.type = "highshelf"; hi.frequency.value = 8000;
+  const comp = c.createDynamicsCompressor();
+  const pan = c.createStereoPanner();
+  const fader = c.createGain();
+  const send = c.createGain();
+
+  src.connect(inG); inG.connect(lo); lo.connect(mid); mid.connect(hi);
+  let tail = hi;
+  let plugNode = null;
+  if (t.plug) {
+    const def = TIFF_PLUGINS.list.find(p => p.name === t.plug);
+    if (def) { try { plugNode = def.create(c); tail.connect(plugNode.input); tail = plugNode.output;
+      plugNode.set("amt", t.plugParams.amt ?? def.params[0]?.value ?? 0.5); } catch { plugNode = null; } }
+  }
+  tail.connect(comp); comp.connect(pan); pan.connect(fader);
+  const dest = isOffline ? c._masterGain : master.gain;
+  const vdest = isOffline ? c._verbPre : verb.predelay;
+  fader.connect(dest);
+  fader.connect(send); send.connect(vdest);
+
+  const live = { src, inG, lo, mid, hi, comp, pan, fader, send, plugNode };
+  applyTrackTo(t, live);
+  // `when` is the ctx time the transport position `offset` maps to.
+  // `t.offset` (recorded takes) is where this clip SITS on the timeline; full
+  // stems default to 0 = play from the top.
+  const clipPos = t.offset || 0;
+  const transportZeroCtx = when - offset;            // ctx time of transport pos 0
+  const clipStartCtx = transportZeroCtx + clipPos;   // ctx time this clip should sound
+  if (clipStartCtx >= when) {
+    // clip hasn't begun yet — start it in the future at sample 0
+    src.start(clipStartCtx, 0);
+  } else {
+    // transport is already past the clip start — start now, partway in
+    const into = (when - clipStartCtx);
+    if (into < t.buffer.duration - 0.01) {
+      src.start(when, Math.max(0, Math.min(into, t.buffer.duration - 0.01)));
+    } // else: clip already finished, don't start it
+  }
+  return live;
+}
+function applyTrackTo(t, n) {
+  const anySolo = tracks.some(x => x.solo);
+  const audible = !t.muted && (!anySolo || t.solo);
+  n.fader.gain.value = audible ? t.gain : 0;
+  n.pan.pan.value = t.pan;
+  n.lo.gain.value = t.eq.lo; n.mid.gain.value = t.eq.mid; n.hi.gain.value = t.eq.hi;
+  n.comp.threshold.value = -8 - t.comp * 28; n.comp.ratio.value = 1 + t.comp * 9;
+  n.comp.knee.value = 12; n.comp.attack.value = 0.004; n.comp.release.value = 0.18;
+  n.send.gain.value = t.send;
+}
+function applyTrack(t) { if (t.live) applyTrackTo(t, t.live); }
+function applyMix() { tracks.forEach(applyTrack); }
+
+/* ── transport ── */
+function maxDur() { return Math.max(0.01, ...tracks.map(t => (t.offset || 0) + t.buffer.duration)); }
+function pos() { return playing ? (ctx.currentTime - startCtxTime + startOffset) : startOffset; }
+function playAll() {
+  const c = ensureCtx();
+  if (c.state === "suspended") c.resume();
+  if (!tracks.length) return;
+  stopSources();
+  // a pause can land past the end (loop wrap / tail) — wrap to the top,
+  // otherwise sources start beyond their audio and play silence
+  if (startOffset >= maxDur() - 0.02) startOffset = 0;
+  startCtxTime = c.currentTime + 0.05;
+  tracks.forEach(t => { t.live = buildTrackGraph(c, t, startCtxTime, startOffset, false); });
+  playing = true;
+  $("play").textContent = "❚❚ Pause";
+}
+function stopSources() { tracks.forEach(t => { try { t.live?.src.stop(); } catch {} t.live = null; }); }
+function pauseAll() { startOffset = Math.max(0, pos()); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
+function stopAll() { stopSources(); playing = false; startOffset = 0; $("play").textContent = "▶ Play"; }
+function seek(t) { const was = playing; startOffset = Math.max(0, Math.min(t, maxDur())); if (was) playAll(); }
+function restartPlayback() { const p = pos(); startOffset = p; playAll(); }
+$("play").onclick = () => playing ? pauseAll() : playAll();
+$("stop").onclick = stopAll;
+$("loop").onclick = (e) => { loop = !loop; e.target.classList.toggle("on", loop); };
+
+/* ── ui tick: clock, playheads, meters, loop ── */
+function tickUi() {
+  requestAnimationFrame(tickUi);
+  const p = pos(), dur = maxDur();
+  $("clock").textContent = `${Math.floor(p / 60)}:${String(Math.floor(p % 60)).padStart(2, "0")}.${Math.floor((p % 1) * 10)}`;
+  if (playing && p >= dur) { if (loop) { startOffset = 0; playAll(); } else stopAll(); }
+  // playheads — a take's wave spans only ITS buffer starting at t.offset, so
+  // map the transport playhead into the clip's local time.
+  tracks.forEach(t => {
+    const cv = document.querySelector(`#lane-${t.id} .wave`); if (!cv) return;
+    drawWave(cv, t.buffer);
+    const g = cv.getContext("2d");
+    const local = p - (t.offset || 0);                 // transport pos inside this clip
+    if (local < 0 || local > t.buffer.duration) return; // playhead not over this clip
+    const x = (local / t.buffer.duration) * cv.width;
+    g.strokeStyle = "rgba(0,209,196,0.9)"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke();
+  });
+  // meters
+  const lvlOf = (a) => { const d = new Uint8Array(a.fftSize); a.getByteTimeDomainData(d);
+    let mx = 0; for (const v of d) mx = Math.max(mx, Math.abs(v - 128) / 128); return mx; };
+  if (master) {
+    $("meterL").style.width = (lvlOf(master.aL) * 100) + "%";
+    $("meterR").style.width = (lvlOf(master.aR) * 100) + "%";
+  }
+  // input meter + runaway-feedback watch
+  if (REC.inAnalyser) { const il = lvlOf(REC.inAnalyser); $("inMeter").style.width = (il * 100) + "%"; feedbackWatch(il); }
+}
+
+/* ── master + verb controls ── */
+const bindOut = (id, fmt) => { const el = $(id); el.oninput = () => { $(id + "O").textContent = fmt(parseFloat(el.value)); el.dispatchEvent(new Event("change")); }; };
+bindOut("mGain", v => v.toFixed(2)); bindOut("mLim", v => v.toFixed(1));
+bindOut("vSize", v => v.toFixed(1) + "s"); bindOut("vTone", v => (v / 1000).toFixed(1) + "k");
+bindOut("vPre", v => Math.round(v * 1000) + "ms"); bindOut("vRet", v => v.toFixed(2));
+$("mGain").addEventListener("change", () => master && (master.gain.gain.value = parseFloat($("mGain").value)));
+$("mLim").addEventListener("change", () => master && (master.limiter.threshold.value = parseFloat($("mLim").value)));
+$("vRet").addEventListener("change", () => verb && (verb.ret.gain.value = parseFloat($("vRet").value)));
+$("vPre").addEventListener("change", () => verb && (verb.predelay.delayTime.value = parseFloat($("vPre").value)));
+let irTimer = null;
+const reIR = () => { if (!verb) return; clearTimeout(irTimer);
+  irTimer = setTimeout(() => { verb.convolver.buffer = makeIR(ctx, parseFloat($("vSize").value), parseFloat($("vTone").value)); }, 200); };
+$("vSize").addEventListener("change", reIR); $("vTone").addEventListener("change", reIR);
+
+/* ── files in ── */
+$("addfiles").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
+$("drop").onclick = () => $("addfiles").click();
+document.body.addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+document.body.addEventListener("dragleave", () => $("drop").classList.remove("over"));
+document.body.addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("over");
+  addFiles(Array.from(e.dataTransfer.files || [])); });
+
+/* ── EXPORT — render the whole board offline to a WAV ── */
+$("exportBtn").onclick = async () => {
+  if (!tracks.length) return;
+  ensureCtx();
+  $("exportBtn").textContent = "rendering…"; $("exportBtn").disabled = true;
+  try {
+    const dur = maxDur() + parseFloat($("vSize").value); // verb tail
+    const oc = new OfflineAudioContext(2, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+    // offline bus
+    oc._masterGain = oc.createGain(); oc._masterGain.gain.value = parseFloat($("mGain").value);
+    const lim = oc.createDynamicsCompressor();
+    lim.threshold.value = parseFloat($("mLim").value); lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.002; lim.release.value = 0.12;
+    oc._masterGain.connect(lim); lim.connect(oc.destination);
+    const conv = oc.createConvolver(); conv.buffer = makeIR(oc, parseFloat($("vSize").value), parseFloat($("vTone").value));
+    oc._verbPre = oc.createDelay(0.2); oc._verbPre.delayTime.value = parseFloat($("vPre").value);
+    const ret = oc.createGain(); ret.gain.value = parseFloat($("vRet").value);
+    oc._verbPre.connect(conv); conv.connect(ret); ret.connect(oc._masterGain);
+    tracks.forEach(t => buildTrackGraph(oc, t, 0, 0, true));
+    const rendered = await oc.startRendering();
+    // WAV encode (16-bit PCM stereo)
+    const len = rendered.length, L = rendered.getChannelData(0), R = rendered.getChannelData(1);
+    const ab = new ArrayBuffer(44 + len * 4), v = new DataView(ab);
+    const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, "RIFF"); v.setUint32(4, 36 + len * 4, true); ws(8, "WAVE"); ws(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+    v.setUint32(24, rendered.sampleRate, true); v.setUint32(28, rendered.sampleRate * 4, true);
+    v.setUint16(32, 4, true); v.setUint16(34, 16, true); ws(36, "data"); v.setUint32(40, len * 4, true);
+    let off = 44;
+    for (let i = 0; i < len; i++) {
+      v.setInt16(off, Math.max(-32768, Math.min(32767, L[i] * 32767)), true); off += 2;
+      v.setInt16(off, Math.max(-32768, Math.min(32767, R[i] * 32767)), true); off += 2;
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([ab], { type: "audio/wav" }));
+    a.download = "pink-room-mix.wav"; a.click();
+  } catch (e) { alert("Export failed: " + e.message); }
+  $("exportBtn").textContent = "⬇ Export WAV"; $("exportBtn").disabled = false;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RECORDING — low-latency monitor · feedback avoidance · latency compensation
+   ═══════════════════════════════════════════════════════════════════════════
+   THE PROBLEM. When you sing/play over the beat, two delays stack:
+     • OUTPUT latency  — the beat leaves the buffer at transport time T but
+       doesn't hit the air until T + outputLatency (DAC + driver buffer).
+     • INPUT latency   — the mic captures sound, but those samples don't reach
+       the graph until inputLatency later (ADC + capture buffer).
+   The performer reacts to what they HEAR, so a note hit "on the beat" lands in
+   the recording late by ~ (outputLatency + inputLatency) — the ROUND TRIP.
+   FIX: shift the captured take EARLIER by the round trip when we place it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const REC = {
+  stream: null, srcNode: null, monGain: null, monHP: null, inAnalyser: null,
+  worklet: null, recProc: null, capturing: false, chunks: [], capRate: 0,
+  capStartCtxTime: 0,                 // ctx.currentTime when the FIRST sample landed
+  capTransportStart: 0,               // transport pos at that same instant
+  inputLatencyEst: 0.012,             // refined by device + calibration
+  calibrated: null,                   // measured round-trip from loopback, or null
+  monitorOn: false, punchOn: false, deviceId: null,
+};
+
+/* ── latency numbers (real, from the live context) ──
+   baseLatency  = AudioContext processing buffer (render quantum + ScriptProcessor).
+   outputLatency = full path to the speaker (DAC + OS), Chrome-reported.        */
+function outputLatency() {
+  if (!ctx) return 0;
+  // outputLatency is the honest one; fall back to baseLatency*2 if unavailable.
+  return ctx.outputLatency || (ctx.baseLatency ? ctx.baseLatency * 2 : 0.02);
+}
+function inputLatency() {
+  // If we ran a loopback calibration, that single number already contains the
+  // FULL round trip (out+in) — return it whole and skip adding output again.
+  if (REC.calibrated != null) return REC.calibrated - outputLatency();
+  return REC.inputLatencyEst;
+}
+function roundTrip() {
+  return REC.calibrated != null ? REC.calibrated : (outputLatency() + inputLatency());
+}
+function refreshLatencyUi() {
+  if (!ctx) return;
+  $("latOut").textContent = (outputLatency() * 1000).toFixed(1) + " ms";
+  $("latIn").textContent  = (inputLatency() * 1000).toFixed(1) + " ms" + (REC.calibrated != null ? " *" : "");
+  $("latTot").textContent = (roundTrip() * 1000).toFixed(1) + " ms";
+}
+
+/* ── pick / open an input with RAW capture (no phone-call DSP) ── */
+async function openInput() {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  // FEEDBACK AVOIDANCE, layer 1: kill the phone-call processing. echoCancellation,
+  // noiseSuppression and autoGainControl are tuned for voice calls — they pump,
+  // gate transients, and (echoCancel) actively chase the monitor signal, which
+  // both colors the take AND fights our latency math. A recording wants RAW.
+  const constraints = { audio: {
+    echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+    channelCount: 1, ...(REC.deviceId ? { deviceId: { exact: REC.deviceId } } : {}),
+  } };
+  try {
+    if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
+    REC.stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) { setWarn("Mic blocked: " + e.message, true); return false; }
+
+  // pull the true input latency the device reports, if any
+  const tr = REC.stream.getAudioTracks()[0];
+  const s = tr.getSettings ? tr.getSettings() : {};
+  if (s.latency) REC.inputLatencyEst = s.latency;          // seconds, when present
+  REC.deviceId = s.deviceId || REC.deviceId;
+
+  REC.srcNode = c.createMediaStreamSource(REC.stream);
+  REC.inAnalyser = c.createAnalyser(); REC.inAnalyser.fftSize = 512;
+  REC.srcNode.connect(REC.inAnalyser);
+
+  // MONITOR PATH — the SHORTEST possible route to the cans. Straight to
+  // destination, bypassing master.gain → limiter (the limiter's lookahead adds
+  // delay and we want monitoring as immediate as the hardware allows).
+  REC.monGain = c.createGain(); REC.monGain.gain.value = 0;
+  REC.monHP = c.createBiquadFilter(); REC.monHP.type = "highpass"; REC.monHP.frequency.value = 60; // trim rumble in the cans only
+  REC.srcNode.connect(REC.monHP); REC.monHP.connect(REC.monGain); REC.monGain.connect(c.destination);
+
+  refreshLatencyUi();
+  $("inputBtn").classList.add("on");
+  $("inputBtn").textContent = "🎤 " + (tr.label ? tr.label.slice(0, 22) : "input ready");
+  setWarn(headphoneAdvice(), false);
+  return true;
+}
+$("inputBtn").onclick = openInput;
+
+function headphoneAdvice() {
+  return "Input ready. HEADPHONES strongly recommended — monitoring on open speakers will feed back into the mic. Monitor stays OFF until you turn it on.";
+}
+function setWarn(msg, bad) { const w = $("recWarn"); w.textContent = msg; w.classList.toggle("bad", !!bad); }
+
+/* ── MONITOR control + FEEDBACK AVOIDANCE layer 2 (runaway detector) ── */
+function setMonitor(on) {
+  REC.monitorOn = on && !!REC.monGain;
+  const val = parseFloat($("monGain").value);
+  if (REC.monGain) REC.monGain.gain.setTargetAtTime(REC.monitorOn ? val : 0, ctx.currentTime, 0.01);
+  $("monBtn").classList.toggle("on", REC.monitorOn);
+  $("monBtn").textContent = "🎧 Headphone monitor: " + (REC.monitorOn ? "ON" : "OFF");
+}
+$("monBtn").onclick = () => { if (!REC.monGain) { openInput().then(() => setMonitor(true)); } else setMonitor(!REC.monitorOn); };
+$("monGain").oninput = () => {
+  $("monGainO").textContent = parseFloat($("monGain").value) === 0 ? "off" : parseFloat($("monGain").value).toFixed(2);
+  if (REC.monGain && REC.monitorOn) REC.monGain.gain.setTargetAtTime(parseFloat($("monGain").value), ctx.currentTime, 0.01);
+};
+
+/* runaway-feedback kill: if input level pins for ~250ms straight, drop the
+   monitor. This is the safety net for "I forgot I'm on speakers". */
+let pinFrames = 0;
+function feedbackWatch(level) {
+  if (REC.monitorOn && level > 0.92) { if (++pinFrames > 15) { setMonitor(false); setWarn("⚠ Feedback detected — monitor killed. Use headphones.", true); pinFrames = 0; } }
+  else pinFrames = 0;
+}
+
+/* ── count-in / tempo ── */
+$("countBars").oninput = () => { const n = +$("countBars").value; $("countBarsO").textContent = n === 0 ? "off" : n + (n === 1 ? " bar" : " bars"); };
+$("recBpm").oninput = () => $("recBpmO").textContent = $("recBpm").value;
+$("punchBtn").onclick = () => { REC.punchOn = !REC.punchOn; $("punchBtn").classList.toggle("on", REC.punchOn); $("punchBtn").textContent = "⊏⊐ Punch-in: " + (REC.punchOn ? "ON (records from playhead)" : "OFF"); };
+
+/* a short metronome click via oscillator — for count-in only */
+function click(c, when, accent) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = accent ? 1600 : 1000;
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.32, when + 0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+  o.connect(g); g.connect(c.destination);   // click also bypasses the limiter
+  o.start(when); o.stop(when + 0.08);
+}
+
+/* ── THE RECORD BUTTON ── */
+$("rec").onclick = async () => {
+  if (REC.capturing) { stopRecording(); return; }
+  if (!REC.stream && !(await openInput())) return;
+  armAndRecord();
+};
+
+async function armAndRecord() {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  $("rec").classList.add("armed");
+
+  const bpm = +$("recBpm").value, bars = +$("countBars").value;
+  const beat = 60 / bpm, barLen = beat * 4;
+  const countDur = bars * barLen;
+
+  // PUNCH-IN: keep the current playhead; otherwise drop to the top so the take
+  // sits against the start of the beat. Either way the transport rolls during
+  // the count-in so the performer can feel the groove before the punch.
+  if (!REC.punchOn) startOffset = 0;
+  const punchTransportPos = startOffset;       // where the recorded audio will LAND
+
+  // schedule count-in clicks, then start the beat in sync with the downbeat
+  const t0 = c.currentTime + 0.12;             // small safety lead
+  for (let b = 0; b < bars * 4; b++) click(c, t0 + b * beat, b % 4 === 0);
+  showCountin(bars * 4, t0, beat);
+
+  // transport (the beat) begins AT the downbeat after the count
+  const beatStartCtxTime = t0 + countDur;
+  // arm the actual capture to begin at that same instant
+  REC.capTransportStart = punchTransportPos;
+  REC.capStartCtxTime = beatStartCtxTime;
+
+  // start playback locked to beatStartCtxTime (reuse the engine, but with our clock)
+  scheduleTransportAt(beatStartCtxTime, punchTransportPos);
+  beginCapture();                              // capture starts NOW; we tag samples by ctx time
+}
+
+/* like playAll() but starts every source at an explicit ctx time + offset,
+   so the recording can be perfectly phase-locked to the transport. */
+function scheduleTransportAt(atCtxTime, offset) {
+  const c = ctx;
+  stopSources();
+  if (offset >= maxDur() - 0.02) offset = 0;
+  startCtxTime = atCtxTime; startOffset = offset;
+  tracks.forEach(t => { t.live = buildTrackGraph(c, t, atCtxTime, offset, false); });
+  playing = true; $("play").textContent = "❚❚ Pause";
+}
+
+function showCountin(beats, t0, beat) {
+  let shown = -1;
+  const id = setInterval(() => {
+    const now = ctx.currentTime;
+    const i = Math.floor((now - t0) / beat);
+    if (i >= beats) { $("countin").textContent = ""; clearInterval(id); return; }
+    if (i >= 0 && i !== shown) { shown = i; $("countin").textContent = String(beats - i); }
+  }, 30);
+}
+
+/* ── CAPTURE — ScriptProcessor grabs raw float samples + the ctx time of the
+   FIRST block, which is what the latency math hangs on. ── */
+function beginCapture() {
+  const c = ctx;
+  REC.chunks = []; REC.capRate = c.sampleRate; REC.capturing = true;
+  REC.captureFirstCtxTime = null;
+  const proc = c.createScriptProcessor(2048, 1, 1);
+  REC.recProc = proc;
+  proc.onaudioprocess = (e) => {
+    if (!REC.capturing) return;
+    // the block we're handed was captured BEFORE this callback fired; its first
+    // sample's arrival time ≈ now minus one block. We record the arrival time of
+    // the very first block to anchor the take.
+    if (REC.captureFirstCtxTime == null) {
+      REC.captureFirstCtxTime = c.currentTime - (2048 / c.sampleRate);
+    }
+    REC.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  // ScriptProcessor must be pulled by the graph to fire; route through a muted
+  // gain to destination so it ticks WITHOUT adding the mic to the output (that
+  // would be a feedback path). Monitoring is the SEPARATE monGain route.
+  const sink = c.createGain(); sink.gain.value = 0;
+  REC.srcNode.connect(proc); proc.connect(sink); sink.connect(c.destination);
+  REC.captureSink = sink;
+  REC.capturing = true;
+  $("rec").classList.remove("armed"); $("rec").classList.add("live");
+  $("rec").textContent = "■ Stop rec";
+}
+
+function stopRecording() {
+  if (!REC.capturing) return;
+  REC.capturing = false;
+  try { REC.srcNode.disconnect(REC.recProc); } catch {}
+  try { REC.recProc.disconnect(); REC.captureSink.disconnect(); } catch {}
+  REC.recProc.onaudioprocess = null; REC.recProc = null;
+  $("rec").classList.remove("live", "armed"); $("rec").textContent = "● Record";
+  $("countin").textContent = "";
+
+  // assemble
+  const total = REC.chunks.reduce((n, c) => n + c.length, 0);
+  if (total < REC.capRate * 0.1) { setWarn("Take too short — nothing captured.", true); return; }
+  const flat = new Float32Array(total);
+  let o = 0; for (const ch of REC.chunks) { flat.set(ch, o); o += ch.length; }
+
+  // ── LATENCY COMPENSATION ──────────────────────────────────────────────────
+  // arrival-time of first captured sample, in transport coordinates:
+  //   transportPosAtArrival = (firstCtxTime - startCtxTime) + startOffsetAtRecStart
+  // but we recorded against capStartCtxTime/capTransportStart, so:
+  const arrival = REC.captureFirstCtxTime ?? REC.capStartCtxTime;
+  const transportPosAtArrival = (arrival - REC.capStartCtxTime) + REC.capTransportStart;
+  // shift EARLIER by the full round trip so a note performed on the beat the
+  // singer HEARD lands on that beat in the timeline:
+  const compensated = transportPosAtArrival - roundTrip();
+  let placeAt = compensated;
+
+  // trim/pad so the buffer's sample 0 corresponds to placeAt >= 0
+  const rate = REC.capRate;
+  let buf;
+  if (placeAt < 0) {
+    // the comp pushed us before t=0: drop the leading samples instead of
+    // negative-offsetting (which the engine can't do).
+    const drop = Math.min(flat.length - 1, Math.round(-placeAt * rate));
+    buf = ctx.createBuffer(1, flat.length - drop, rate);
+    buf.copyToChannel(flat.subarray(drop), 0);
+    placeAt = 0;
+  } else {
+    buf = ctx.createBuffer(1, flat.length, rate);
+    buf.copyToChannel(flat, 0);
+  }
+
+  // make it a stereo-friendly track buffer (mono → both channels handled by panner)
+  const t = {
+    id: Math.random().toString(36).slice(2),
+    name: "TAKE " + (tracks.filter(x => x.isTake).length + 1) + ` (+${(roundTrip() * 1000).toFixed(0)}ms comp)`,
+    buffer: buf, gain: 0.9, pan: 0, eq: { lo: 0, mid: 0, hi: 0 }, comp: 0,
+    send: 0, plug: "", plugParams: {}, muted: false, solo: false, src: null, live: null,
+    isTake: true, offset: placeAt,
+  };
+  tracks.push(t);
+  laneUiTake(t, placeAt);
+  $("drop").style.display = "none";
+  setWarn(`Take landed at ${placeAt.toFixed(3)}s, compensated ${(roundTrip() * 1000).toFixed(1)}ms for round-trip latency.`, false);
+}
+
+/* ── LOOPBACK CALIBRATION — the honest way to measure round trip ──
+   We emit a sharp click out the speaker/headphone, listen on the mic, and
+   measure how long until it comes back. That delta IS the real round-trip
+   (output + acoustic + input). Hold the mic to the cans or sit in a quiet room.
+   This beats any reported number because it measures THIS rig. ── */
+$("calibBtn").onclick = async () => {
+  const c = ensureCtx();
+  if (c.state === "suspended") await c.resume();
+  if (!REC.stream && !(await openInput())) return;
+  setWarn("Calibrating… emitting a click, listening for the return. Hold mic near the speaker.", false);
+  $("calibBtn").disabled = true; $("calibBtn").textContent = "listening…";
+
+  // record a short window
+  const rate = c.sampleRate, winSec = 0.4;
+  const chunks = []; let firstCtx = null;
+  const proc = c.createScriptProcessor(1024, 1, 1);
+  proc.onaudioprocess = (e) => { if (firstCtx == null) firstCtx = c.currentTime - 1024 / rate; chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  const sink = c.createGain(); sink.gain.value = 0;
+  REC.srcNode.connect(proc); proc.connect(sink); sink.connect(c.destination);
+
+  const clickAt = c.currentTime + 0.1;
+  click(c, clickAt, true);
+
+  await new Promise(r => setTimeout(r, (clickAt - c.currentTime + winSec) * 1000 + 120));
+  REC.srcNode.disconnect(proc); proc.disconnect(); sink.disconnect(); proc.onaudioprocess = null;
+
+  const total = chunks.reduce((n, x) => n + x.length, 0);
+  const flat = new Float32Array(total); let o = 0; for (const x of chunks) { flat.set(x, o); o += x.length; }
+  // find the click's return: first sample whose |amp| crosses a noise-relative threshold
+  let peak = 0; for (let i = 0; i < flat.length; i++) peak = Math.max(peak, Math.abs(flat[i]));
+  const thr = Math.max(0.06, peak * 0.4);
+  let idx = -1; for (let i = 0; i < flat.length; i++) { if (Math.abs(flat[i]) >= thr) { idx = i; break; } }
+
+  if (idx < 0 || peak < 0.04) {
+    setWarn("Calibration failed — no click heard. Turn up output / hold mic to the speaker, then retry.", true);
+  } else {
+    // arrival-in-ctx-time of the detected sample:
+    const detectedCtx = firstCtx + idx / rate;
+    const measured = detectedCtx - clickAt;            // FULL round trip, seconds
+    if (measured > 0.003 && measured < 0.5) {
+      REC.calibrated = measured;
+      refreshLatencyUi();
+      setWarn(`Calibrated: round-trip = ${(measured * 1000).toFixed(1)} ms (measured on your rig). Takes will use this.`, false);
+    } else setWarn(`Calibration gave an odd value (${(measured * 1000).toFixed(0)}ms) — ignored. Try again in a quiet spot.`, true);
+  }
+  $("calibBtn").disabled = false; $("calibBtn").textContent = "⟳ Calibrate (loopback)";
+};
+
+/* ── lane for a recorded take: needs the offset (where on the timeline it sits) ── */
+function laneUiTake(t, placeAt) {
+  laneUi(t);
+  const d = $("lane-" + t.id);
+  d.classList.add("recording");
+  setTimeout(() => d.classList.remove("recording"), 1200);
+  // tag the lane with its timeline offset so the user can nudge it
+  const head = d.querySelector(".lhead");
+  const nudge = document.createElement("span");
+  nudge.style.cssText = "font:600 9.5px 'Space Mono';color:var(--teal);margin-left:6px";
+  nudge.textContent = `@${placeAt.toFixed(2)}s`;
+  head.insertBefore(nudge, head.querySelector(".chip.m"));
+}
+</script>
+</body>
+</html>
