@@ -8,6 +8,18 @@
 
 ---
 
+## ⏩⏩⏩ LATEST — 2026-06-25 — FULL EFFECT LIBRARY (38 → 124 effects)
+
+`static/editor.html` now ships the **complete vetted 86-effect batch on top of the original 38 = 124 effects**, all clean-room house-named and **Chrome-verified rendering + exporting** (fingerprint-diff, zero errors). Designed by the `leprince-fx-design` workflow (spec JSON saved to that run's task output), implemented in 10 batches: overlay/filter · pixel passes · the Transition family (keyframeable Completion=1 no-op) · color/grade suite · blur · stylize (Voronoi/Kuwahara/CMYK halftone/dither/comic/chrome/glass) · distort (mirror/kaleido/polar/ripple/magnifier/lens-warp/CRT/pinch) · generate (gradients/grid/checker/frame/light-rays/flare/star/CRT) · key (knockout/despill/unmultiply) · channel (reroute/flip/luma→alpha/matrix-mixer/channel-calc) · perspective (glow/4 shadows/bevel/stroke/rim) · matte toolkit (choke/spread/feather/levels/despeckle/refine/edge-blur/grow-bleed/invert/harden).
+
+**Adding an effect = touch ALL of:** `FX_DEFS` · `KDEF` (main + numeric subs; string seg/swatch OUT) · the renderer (`clipFilter` | `clipOverlayFX`+`hasOverlayFX` | `withLayerFX`+`hasLayerBufferFX`; alpha morphology helpers `morphMatte`/`blurMatte` are in `withLayerFX` scope) · `FX_CAT` · `FX_RANGE` · `FX_EXTRA`. `projectNeedsFrameServer`/`isIdentity` auto-follow.
+
+⚠️ **Perf:** Oil Daub, Brushed Paint (Kuwahara), Smart Smooth, Leaded Glass, Cell Mosaic are heavy O(n·r²) (~2–5s/frame @720p) — future preview-downsample optimization. Everything else is snappy.
+
+Auto-memory: [[editor-fx-library-124]]. The in-room-agent plan to make these callable by Tiff/Kit: [[agent-room-control-and-model]].
+
+---
+
 ## ⏩⏩ HANDOFF — v1.3.0 (2026-06-20) — READ THIS FIRST
 
 **Where we are:** `static/editor.html` is now a genuinely capable AE-style compositor. The full spine is in and working, end to end (preview + export). App is at **v1.3.0** (canonical `APP_VERSION` in `app.py`; editor About `LP_VERSION` matches). Everything below is **committed + pushed to `tiffagnx/Arkitect` master** and **pixel/functionally verified in real Chrome on port 7788**.

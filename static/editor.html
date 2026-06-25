@@ -335,15 +335,15 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .heads-wrap{overflow:hidden;background:#101116;border-right:1px solid var(--line)}
 #heads{position:relative}
 .thead{border-bottom:1px solid var(--line2);position:relative;overflow:hidden}
-.thead .thead-top{height:var(--lane-h,58px);display:flex;align-items:center;gap:7px;padding:0 9px}
+.thead .thead-top{height:var(--lane-h,58px);display:flex;align-items:center;gap:7px;padding:0 9px 0 21px}
 .thead .tname{font:700 10px var(--mono);letter-spacing:.08em;color:var(--dim)}
 .thead .ttype{font-size:9px;color:var(--dim2);margin-left:auto;text-transform:uppercase;letter-spacing:.1em}
 /* twirl-down property rows (AE-style) */
-.tl-ghead{height:20px;display:flex;align-items:center;gap:3px;padding-left:8px;font:700 8.5px var(--mono);letter-spacing:.12em;color:var(--cy);text-transform:uppercase;border-top:1px solid var(--line2)}
-.tl-prow{height:20px;display:flex;align-items:center;gap:5px;padding-left:14px;border-top:1px solid var(--line2)}
-.tl-prow.d1{padding-left:22px}
-.tl-prow.d2{padding-left:34px}
-.tl-prow.add{padding-left:22px}
+.tl-ghead{height:20px;display:flex;align-items:center;gap:3px;padding-left:20px;font:700 8.5px var(--mono);letter-spacing:.12em;color:var(--cy);text-transform:uppercase;border-top:1px solid var(--line2)}
+.tl-prow{height:20px;display:flex;align-items:center;gap:5px;padding-left:26px;border-top:1px solid var(--line2)}
+.tl-prow.d1{padding-left:34px}
+.tl-prow.d2{padding-left:46px}
+.tl-prow.add{padding-left:34px}
 .tl-prow .tl-sw{width:15px;flex:none;font-size:11px;color:var(--dim2);background:none;text-align:center}
 .tl-prow .tl-sw.on{color:var(--cy)}
 .tl-prow .tl-sw.off{visibility:hidden}
@@ -857,6 +857,92 @@ const FX_DEFS=[
   ['fxWarp','Warp',0,'Strength',0.5],
   ['fxGradMap','Gradient Map',0,'Amount',1],
   ['fxNoise','Fractal Noise',0,'Amount',0.5],
+  ['fxBrightContrast','Bright & Contrast',0,'Amount',1],
+  ['fxPhotoFilter','Glass Filter',0,'Density',0.35],
+  ['fxRamp','Gradient Sky',0,'Mix',0.55],
+  ['fxQuad','Corner Wash',0,'Mix',0.5],
+  ['fxGrid','Rule Grid',0,'Opacity',0.8],
+  ['fxChecker','Checker Field',0,'Opacity',0.6],
+  ['fxFrame','Picture Frame',0,'Opacity',1],
+  ['fxDiffuse','Soft Diffusion',0,'Diffusion',0.4],
+  ['fxStrobe','Strobe Pulse',0,'Completion',0.5],
+  ['fxOffset','Drift',0,'Shift X',0.25],
+  ['fxMirror','Single Fold',0,'Amount',1],
+  ['fxShear','Row Shudder',0,'Amount',0.4],
+  ['fxTileStamp','Tile Stamp',1,'Tiles',3],
+  ['fxColorKnockout','Color Knockout',0,'Strength',1],
+  ['fxChannelShuffle','Channel Reroute',0,'Amount',1],
+  ['fxChannelFlip','Channel Flip',0,'Amount',1],
+  ['fxAlphaFromLum','Luma To Alpha',0,'Strength',1],
+  ['fxDespill','Despill',0,'Amount',1],
+  ['fxUnmultiply','Unmultiply',0,'Amount',1],
+  ['fxWipeLinear','Banded Wipe',1,'Completion',0.5],
+  ['fxWipeClock','Clock Sweep',1,'Completion',0.5],
+  ['fxWipeIris','Iris Reveal',1,'Completion',0.5],
+  ['fxWipeBlinds','Slat Reveal',1,'Completion',0.5],
+  ['fxWipeBarn','Barn Doors',1,'Completion',0.5],
+  ['fxWipeDip','Color Dip',1,'Completion',0.5],
+  ['fxWipeTiles','Block Dissolve',1,'Completion',0.5],
+  ['fxWipeGradient','Luma Dissolve',1,'Completion',0.5],
+  ['fxWipePush','Slide Push',1,'Completion',0.5],
+  ['fxBWMix','Mono Mixer',0,'Amount',1],
+  ['fxChannelMix','Matrix Mixer',0,'Amount',1],
+  ['fxColorBalance','Three-Way Balance',0,'Amount',1],
+  ['fxTritone','Split Tone',0,'Amount',1],
+  ['fxLeaveColor','Color Pop',0,'Amount',1],
+  ['fxSwatchSwap','Recolor',0,'Strength',1],
+  ['fxFilmFade','Faded Print',0,'Fade',0.5],
+  ['fxCineLUT','Signature Looks',0,'Intensity',1],
+  ['fxToneMap','Tone Recover',0,'Amount',1],
+  ['fxBoxBlur','Box Soften',0,'Radius',6],
+  ['fxLensBlur','Cine Bokeh',0,'Blur',8],
+  ['fxTiltShift','Tilt Focus',0,'Blur',10],
+  ['fxIrisBlur','Iris Defocus',0,'Blur',10],
+  ['fxUnsharp','Detail Sharpen',0,'Amount',0.6],
+  ['fxSurfaceBlur','Smart Smooth',0,'Radius',5],
+  ['fxFrost','Frosted Glass',0,'Spread',4],
+  ['fxCompoundBlur','Luma Soften',0,'Max Blur',8],
+  ['fxCrystallize','Cell Mosaic',0,'Cell Size',34],
+  ['fxPosterEdges','Ink Cartoon',0,'Strength',0.7],
+  ['fxOilBrush','Oil Daub',0,'Brush Size',4],
+  ['fxKuwahara','Brushed Paint',0,'Radius',4],
+  ['fxColorDots','Process Dots',0,'Dot Size',6],
+  ['fxDither','Ordered Dither',0,'Amount',1],
+  ['fxComic','Comic Tone',0,'Amount',1],
+  ['fxScatter','Scatter Grain',0,'Spread',8],
+  ['fxChrome','Liquid Metal',0,'Amount',0.8],
+  ['fxPlastic','Wet Sheen',0,'Shine',0.7],
+  ['fxStainedGlass','Leaded Glass',0,'Cell Size',40],
+  ['fxKaleido','Kaleidoscope',1,'Wedges',6],
+  ['fxPolar','Polar Wrap',0,'Mode',1],
+  ['fxRipple','Pond Ripple',0,'Amount',0.4],
+  ['fxLoupe','Magnifier',0,'Zoom',0.6],
+  ['fxFisheye','Lens Warp',0,'Curve',0.5],
+  ['fxTubeCurve','Tube Curve',0,'Curvature',0.4],
+  ['fxPinch','Pinch & Punch',0,'Amount',-0.5],
+  ['fxRays','Light Rays',0,'Intensity',0.6],
+  ['fxFlare','Optic Flare',0,'Brightness',0.7],
+  ['fxStarburst','Glint Star',0,'Intensity',0.7],
+  ['fxCRTOverlay','Tube Screen',0,'Amount',0.6],
+  ['fxOuterGlow','Halo Glow',0,'Glow Size',12],
+  ['fxDropShadow2','Tinted Shadow',0,'Distance',20],
+  ['fxLongShadow','Trailing Shadow',0,'Length',40],
+  ['fxFloorShadow','Floor Shadow',0,'Lean',40],
+  ['fxStroke','Edge Trace',0,'Width',4],
+  ['fxBevelAlpha','Carved Edge',0,'Edge Depth',8],
+  ['fxInnerShadow','Inset Shadow',0,'Distance',12],
+  ['fxRimLight','Rim Light',0,'Rim Width',8],
+  ['fxMatteChoke','Matte Choke',0,'Choke',3],
+  ['fxChoker','Edge Spread',0,'Spread / Shrink',-2],
+  ['fxFeatherAlpha','Feather Matte',0,'Feather',6],
+  ['fxAlphaLevels','Matte Levels',0,'Amount',1],
+  ['fxDespot','Despeckle Matte',0,'Clean',1],
+  ['fxRefineEdge','Refine Matte',0,'Refine',1],
+  ['fxEdgeBlur','Edge-Only Blur',0,'Edge Blur',4],
+  ['fxGrowBounds','Grow & Bleed',0,'Grow',4],
+  ['fxInvertMatte','Invert Matte',0,'Amount',1],
+  ['fxMatteThresh','Harden Matte',0,'Amount',1],
+  ['fxChannelMath','Channel Calc',0,'Amount',1],
 ];
 function fxActive(c,f,def){return isKeyed(c,f)||(c[f]!=null&&c[f]!==def);}
 function twOpen(c,key,def){if(!c._tw)return def;return c._tw[key]==null?def:c._tw[key];}
@@ -1222,6 +1308,23 @@ const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
   fxLevels:0,fxLevInB:0,fxLevInW:1,fxLevGamma:1,fxLevOutB:0,fxLevOutW:1,
   fxGradMap:0,fxNoise:0,fxNoiseScale:80,
   fxCurve:0,
+  fxBrightContrast:0,fxBCBright:0,fxBCContrast:0,fxPhotoFilter:0,fxRamp:0,fxRampAngle:0,fxQuad:0,fxGrid:0,fxGridSize:40,fxGridWidth:1,fxChecker:0,fxCheckSize:24,fxFrame:0,fxFrameWidth:8,fxFrameInset:0,
+  fxDiffuse:0,fxDiffRadius:18,fxStrobe:0,fxStrobePeriod:0.1,fxStrobeDuty:0.5,fxOffset:0,fxOffsetY:0,fxMirror:0,fxMirrorSeam:0,fxShear:0,fxShearWave:40,fxShearPhase:0,fxTileStamp:1,fxTilePhase:0,
+  fxColorKnockout:0,fxKnockTol:0.1,fxKnockSoft:0.1,fxChannelShuffle:0,fxChannelFlip:0,fxAlphaFromLum:0,fxAlphaGamma:1,fxDespill:0,fxUnmultiply:0,
+  fxWipeLinear:1,fxWLAngle:0,fxWLFeather:0,fxWipeClock:1,fxWCStart:0,fxWipeIris:1,fxWIX:0.5,fxWIY:0.5,fxWipeBlinds:1,fxWBlCount:10,fxWipeBarn:1,fxWipeDip:1,fxWipeTiles:1,fxWTCols:16,fxWTSoft:0.1,fxWipeGradient:1,fxWGSoft:0.15,fxWipePush:1,
+  fxBWMix:0,fxBWRed:30,fxBWGreen:59,fxBWBlue:11,fxChannelMix:0,fxCMrr:100,fxCMrg:0,fxCMrb:0,fxCMgr:0,fxCMgg:100,fxCMgb:0,fxCMbr:0,fxCMbg:0,fxCMbb:100,
+  fxColorBalance:0,fxCBShadR:0,fxCBShadG:0,fxCBShadB:0,fxCBMidR:0,fxCBMidG:0,fxCBMidB:0,fxCBHiR:0,fxCBHiG:0,fxCBHiB:0,
+  fxTritone:0,fxLeaveColor:0,fxLCHue:0,fxLCTol:30,fxLCSoft:20,fxSwatchSwap:0,fxSwapTol:0.15,fxSwapSoft:0.1,fxFilmFade:0,fxFFLift:30,fxFFRoll:20,fxCineLUT:0,fxToneMap:0,fxTMShadow:40,fxTMHi:40,fxTMDetail:30,
+  fxBoxBlur:0,fxLensBlur:0,fxLensHi:0.5,fxTiltShift:0,fxTiltPos:0.5,fxTiltWidth:0.3,fxTiltFeather:0.1,fxIrisBlur:0,fxIrisRad:0.5,fxIrisFeather:0.3,fxIrisCX:0.5,fxIrisCY:0.5,
+  fxUnsharp:0,fxUSRadius:3,fxUSThresh:0,fxSurfaceBlur:0,fxSurfThresh:0.15,fxSurfAmt:1,fxFrost:0,fxCompoundBlur:0,fxCompBias:0.5,
+  fxCrystallize:0,fxCrystalJitter:0.6,fxPosterEdges:0,fxPELevels:5,fxPEThresh:40,fxOilBrush:0,fxOilBins:20,fxKuwahara:0,fxColorDots:0,fxDither:0,fxDitherLevels:2,fxComic:0,fxComicThresh:0.45,fxComicPitch:6,fxScatter:0,fxScatterGrain:0,
+  fxChrome:0,fxChromeContrast:1.6,fxPlastic:0,fxPlasticSharp:1.8,fxStainedGlass:0,fxGlassBorder:2,fxKaleido:1,fxKaleidoSpin:0,fxPolar:0,fxRipple:0,fxRippleWave:40,fxRipplePhase:0,
+  fxLoupe:0,fxLoupeRad:0.25,fxLoupeX:0.5,fxLoupeY:0.5,fxFisheye:0,fxFisheyeScale:1,fxTubeCurve:0,fxCRTVignette:0,fxPinch:0,fxPinchRad:0.8,fxPinchX:0.5,fxPinchY:0.5,
+  fxRays:0,fxRayX:0.5,fxRayY:0.5,fxRayCount:80,fxFlare:0,fxFlareX:0.7,fxFlareY:0.3,fxStarburst:0,fxStarX:0.5,fxStarY:0.5,fxStarPoints:4,fxStarLen:1,fxCRTOverlay:0,fxCRTCurve:0.4,
+  fxOuterGlow:0,fxGlowIntensity:0.85,fxDropShadow2:0,fxShadAngle:135,fxShadSoft:8,fxShadOpacity:0.6,
+  fxLongShadow:0,fxLSAngle:135,fxLSOpacity:0.45,fxFloorShadow:0,fxFSFlatten:0.45,fxFSSoft:12,fxFSOpacity:0.5,fxStroke:0,fxStrokeOpacity:1,fxBevelAlpha:0,fxBevLight:135,fxBevIntensity:0.7,fxBevSoften:4,
+  fxInnerShadow:0,fxISAngle:135,fxISSoft:6,fxISOpacity:0.6,fxRimLight:0,fxRimAngle:315,fxRimIntensity:0.9,
+  fxMatteChoke:0,fxChoker:0,fxFeatherAlpha:0,fxFeatherBias:0,fxAlphaLevels:0,fxAlphaInB:0,fxAlphaInW:1,fxAlphaGamma2:1,fxDespot:0,fxRefineEdge:0,fxRefineShift:0,fxRefineFeather:0,fxEdgeBlur:0,fxGrowBounds:0,fxInvertMatte:0,fxMatteThresh:0,fxMatteCut:0.5,fxMatteSoft:0.1,fxChannelMath:0,
   volume:1};
 const KEYABLE=Object.keys(KDEF);
 const BLENDS=[['Normal','source-over'],['Add','lighter'],['Screen','screen'],['Multiply','multiply'],
@@ -1258,6 +1361,7 @@ function clipFilter(c,f,kpx){
   const br=pval(c,'fxBright',fr,1);if(br!==1)parts.push(`brightness(${br})`);
   const ex=pval(c,'fxExposure',fr,0);if(ex!==0)parts.push(`brightness(${Math.pow(2,ex).toFixed(4)})`);
   const co=pval(c,'fxContrast',fr,1);if(co!==1)parts.push(`contrast(${co})`);
+  const bc=pval(c,'fxBrightContrast',fr,0);if(bc!==0){const bb=1+(pval(c,'fxBCBright',fr,0)/100)*bc,cc=1+(pval(c,'fxBCContrast',fr,0)/100)*bc;if(bb!==1)parts.push(`brightness(${bb.toFixed(4)})`);if(cc!==1)parts.push(`contrast(${cc.toFixed(4)})`);}
   const sa=pval(c,'fxSat',fr,1);if(sa!==1)parts.push(`saturate(${sa})`);
   const hu=pval(c,'fxHue',fr,0);if(hu!==0)parts.push(`hue-rotate(${hu}deg)`);
   const gr=pval(c,'fxGray',fr,0);if(gr>0)parts.push(`grayscale(${clamp(gr,0,1)})`);
@@ -1282,7 +1386,10 @@ function clipOverlayFX(ctx,c,f,r){
   if(!r)return;
   const fr=f-c.start,vg=clamp(pval(c,'fxVignette',fr,0),0,1),tn=clamp(pval(c,'fxTint',fr,0),0,1),gn=clamp(pval(c,'fxGrain',fr,0),0,1);
   const lk=clamp(pval(c,'fxLeak',fr,0),0,1),sc=clamp(pval(c,'fxScan',fr,0),0,1);
-  if(vg<=0&&tn<=0&&gn<=0&&lk<=0&&sc<=0)return;
+  const pf=clamp(pval(c,'fxPhotoFilter',fr,0),0,1),rmp=clamp(pval(c,'fxRamp',fr,0),0,1),qd=clamp(pval(c,'fxQuad',fr,0),0,1),gd=clamp(pval(c,'fxGrid',fr,0),0,1),ck=clamp(pval(c,'fxChecker',fr,0),0,1),frm=clamp(pval(c,'fxFrame',fr,0),0,1);
+  const wLin=pval(c,'fxWipeLinear',fr,1),wClk=pval(c,'fxWipeClock',fr,1),wIris=pval(c,'fxWipeIris',fr,1),wBl=pval(c,'fxWipeBlinds',fr,1),wBarn=pval(c,'fxWipeBarn',fr,1),wDip=pval(c,'fxWipeDip',fr,1),wTiles=pval(c,'fxWipeTiles',fr,1);
+  const lray=clamp(pval(c,'fxRays',fr,0),0,1),lflare=clamp(pval(c,'fxFlare',fr,0),0,1),lstar=clamp(pval(c,'fxStarburst',fr,0),0,1),lcrt=clamp(pval(c,'fxCRTOverlay',fr,0),0,1);
+  if(vg<=0&&tn<=0&&gn<=0&&lk<=0&&sc<=0&&pf<=0&&rmp<=0&&qd<=0&&gd<=0&&ck<=0&&frm<=0&&wLin>=1&&wClk>=1&&wIris>=1&&wBl>=1&&wBarn>=1&&wDip>=1&&wTiles>=1&&lray<=0&&lflare<=0&&lstar<=0&&lcrt<=0)return;
   ctx.save();ctx.filter='none';
   ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();   // keep the overlay inside the image, never the letterbox
   if(tn>0){ctx.globalCompositeOperation='multiply';ctx.globalAlpha=tn;ctx.fillStyle=c.fxTintColor||'#ff5fa2';ctx.fillRect(r.x,r.y,r.w,r.h);}
@@ -1301,6 +1408,88 @@ function clipOverlayFX(ctx,c,f,r){
   // Scanlines — dark horizontal CRT lines
   if(sc>0){ctx.globalCompositeOperation='multiply';ctx.globalAlpha=clamp(sc,0,1);
     const pat=ctx.createPattern(scanTile(),'repeat');ctx.fillStyle=pat;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Glass Filter — warming/cooling colour glass (multiply, or overlay to hold luminosity)
+  if(pf>0){ctx.globalCompositeOperation=(c.fxPFPreserve==='on')?'overlay':'multiply';ctx.globalAlpha=pf;ctx.fillStyle=c.fxPFColor||'#ec8a3c';ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Gradient Sky — two-stop linear/radial ramp over the image
+  if(rmp>0){const blend=c.fxRampBlend||'normal';ctx.globalCompositeOperation=blend==='normal'?'source-over':blend;ctx.globalAlpha=rmp;
+    const cx=r.x+r.w/2,cy=r.y+r.h/2;let g;
+    if((c.fxRampShape||'linear')==='radial'){g=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.hypot(r.w,r.h)/2);}
+    else{const a=(pval(c,'fxRampAngle',fr,0))*Math.PI/180,ln=(Math.abs(Math.cos(a))*r.w+Math.abs(Math.sin(a))*r.h)/2;
+      g=ctx.createLinearGradient(cx-Math.cos(a)*ln,cy-Math.sin(a)*ln,cx+Math.cos(a)*ln,cy+Math.sin(a)*ln);}
+    g.addColorStop(0,c.fxRampA||'#ff5fa2');g.addColorStop(1,c.fxRampB||'#13123a');ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Corner Wash — four soft radial pools, one per corner
+  if(qd>0){const blend=c.fxQuadBlend||'screen';ctx.globalCompositeOperation=blend==='normal'?'source-over':blend;ctx.globalAlpha=qd;
+    const rad=Math.hypot(r.w,r.h)*0.7,corners=[[r.x,r.y,c.fxQuadTL||'#ff5fa2'],[r.x+r.w,r.y,c.fxQuadTR||'#ffd166'],[r.x,r.y+r.h,c.fxQuadBL||'#5bc0eb'],[r.x+r.w,r.y+r.h,c.fxQuadBR||'#9b5de5']];
+    for(const co of corners){const g=ctx.createRadialGradient(co[0],co[1],0,co[0],co[1],rad);g.addColorStop(0,co[2]);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);}}
+  // Rule Grid — repeating ruled grid pattern
+  if(gd>0){const blend=c.fxGridBlend||'normal';ctx.globalCompositeOperation=blend==='normal'?'source-over':blend;ctx.globalAlpha=gd;
+    ctx.fillStyle=ctx.createPattern(gridTile(c.fxGridSize||40,c.fxGridWidth||1,c.fxGridColor||'#ffffff'),'repeat');ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Checker Field — repeating checkerboard pattern
+  if(ck>0){const blend=c.fxCheckBlend||'normal';ctx.globalCompositeOperation=blend==='normal'?'source-over':blend;ctx.globalAlpha=ck;
+    ctx.fillStyle=ctx.createPattern(checkerTile(c.fxCheckSize||24,c.fxCheckColor||'#000000'),'repeat');ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Picture Frame — inset stroked border (optional double line)
+  if(frm>0){ctx.globalCompositeOperation='source-over';ctx.globalAlpha=frm;ctx.strokeStyle=c.fxFrameColor||'#ffffff';
+    const w=Math.max(1,c.fxFrameWidth||8),i=(c.fxFrameInset||0);ctx.lineWidth=w;
+    ctx.strokeRect(r.x+i+w/2,r.y+i+w/2,Math.max(1,r.w-2*i-w),Math.max(1,r.h-2*i-w));
+    if(c.fxFrameDouble==='on'){const g2=w*1.6;ctx.lineWidth=Math.max(1,w*0.5);ctx.strokeRect(r.x+i+g2+w/2,r.y+i+g2+w/2,Math.max(1,r.w-2*(i+g2)-w),Math.max(1,r.h-2*(i+g2)-w));}}
+  // ── Transitions (Completion 0→1 reveals; default 1 = fully visible). Layer is buffered, so destination-out only cuts THIS layer.
+  // Banded Wipe — straight edge at any angle
+  if(wLin<1){const a=(pval(c,'fxWLAngle',fr,0))*Math.PI/180,cx=r.x+r.w/2,cy=r.y+r.h/2,dg=Math.hypot(r.w,r.h),ft=Math.max(1,pval(c,'fxWLFeather',fr,0)*dg);
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.save();ctx.translate(cx,cy);ctx.rotate(a);
+    const edge=-dg/2+wLin*dg,g=ctx.createLinearGradient(0,edge-ft,0,edge+ft);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,1)');
+    ctx.fillStyle=g;ctx.fillRect(-dg,edge-ft,2*dg,2*dg);ctx.restore();}
+  // Clock Sweep — radial hand
+  if(wClk<1){const cx=r.x+r.w/2,cy=r.y+r.h/2,rad=Math.hypot(r.w,r.h),st=-Math.PI/2+(pval(c,'fxWCStart',fr,0))*Math.PI/180,sweep=(1-wClk)*2*Math.PI,ccw=(c.fxWCDir==='Counter');
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,rad,st,ccw?st-sweep:st+sweep,ccw);ctx.closePath();ctx.fill();}
+  // Iris Reveal — expanding circle/diamond from a focus point
+  if(wIris<1){const fx2=r.x+pval(c,'fxWIX',fr,0.5)*r.w,fy2=r.y+pval(c,'fxWIY',fr,0.5)*r.h,
+    maxR=Math.max(Math.hypot(fx2-r.x,fy2-r.y),Math.hypot(fx2-(r.x+r.w),fy2-r.y),Math.hypot(fx2-r.x,fy2-(r.y+r.h)),Math.hypot(fx2-(r.x+r.w),fy2-(r.y+r.h))),
+    cr=wIris*maxR,close=(c.fxWIInvert==='Close');
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.beginPath();if(!close)ctx.rect(r.x,r.y,r.w,r.h);
+    if((c.fxWIShape||'Circle')==='Diamond'){ctx.moveTo(fx2,fy2-cr);ctx.lineTo(fx2+cr,fy2);ctx.lineTo(fx2,fy2+cr);ctx.lineTo(fx2-cr,fy2);ctx.closePath();}
+    else{ctx.moveTo(fx2+cr,fy2);ctx.arc(fx2,fy2,cr,0,Math.PI*2);}
+    ctx.fill(close?'nonzero':'evenodd');}
+  // Slat Reveal — opening slats
+  if(wBl<1){const n=Math.max(2,Math.round(pval(c,'fxWBlCount',fr,10))),horiz=(c.fxWBlDir!=='Vertical');
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.beginPath();
+    if(horiz){const sh2=r.h/n;for(let i2=0;i2<n;i2++)ctx.rect(r.x,r.y+i2*sh2+wBl*sh2,r.w,(1-wBl)*sh2);}
+    else{const sw2=r.w/n;for(let i2=0;i2<n;i2++)ctx.rect(r.x+i2*sw2+wBl*sw2,r.y,(1-wBl)*sw2,r.h);}
+    ctx.fill();}
+  // Barn Doors — two doors part from centre
+  if(wBarn<1){const horiz=(c.fxWBarnDir!=='Vertical'),close=(c.fxWBarnMode==='Close'),comp=close?(1-wBarn):wBarn;
+    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.beginPath();
+    if(horiz){const gap=comp*(r.w/2);ctx.rect(r.x,r.y,Math.max(0,r.w/2-gap),r.h);ctx.rect(r.x+r.w/2+gap,r.y,Math.max(0,r.w/2-gap),r.h);}
+    else{const gap=comp*(r.h/2);ctx.rect(r.x,r.y,r.w,Math.max(0,r.h/2-gap));ctx.rect(r.x,r.y+r.h/2+gap,r.w,Math.max(0,r.h/2-gap));}
+    ctx.fill();}
+  // Block Dissolve — grid of tiles popping in (random or checker order)
+  if(wTiles<1){const cols=Math.max(2,Math.round(pval(c,'fxWTCols',fr,16))),rows=Math.max(1,Math.round(cols*r.h/r.w)),cw=r.w/cols,chh=r.h/rows,soft=Math.max(0.01,pval(c,'fxWTSoft',fr,0.1)),checker=(c.fxWTPattern==='Checker');
+    ctx.globalCompositeOperation='destination-out';ctx.fillStyle='#000';
+    for(let cy2=0;cy2<rows;cy2++)for(let cx2=0;cx2<cols;cx2++){let thr;if(checker)thr=((cx2+cy2)%2)*0.5+0.25;else{const ss=Math.sin(cx2*12.9898+cy2*78.233)*43758.5453;thr=ss-Math.floor(ss);}
+      const a=clamp((thr-wTiles)/soft,0,1);if(a>0){ctx.globalAlpha=a;ctx.fillRect(r.x+cx2*cw,r.y+cy2*chh,cw+1,chh+1);}}
+    ctx.globalAlpha=1;}
+  // Color Dip — fade up from / down to a solid colour (paints, not erases)
+  if(wDip<1){let al=(c.fxWDipMode==='To Color')?wDip:(1-wDip);if(c.fxWDipEase!=='Linear')al=al*al*(3-2*al);
+    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=clamp(al,0,1);ctx.fillStyle=c.fxWDipColor||'#000000';ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Light Rays — screened radial streaks from a source
+  if(lray>0){const sx=r.x+r.w*pval(c,'fxRayX',fr,0.5),sy=r.y+r.h*pval(c,'fxRayY',fr,0.5),N=Math.max(4,Math.round(pval(c,'fxRayCount',fr,80))),len=Math.hypot(r.w,r.h),col=c.fxRayColor||'#ffdca8';
+    ctx.globalCompositeOperation='screen';ctx.globalAlpha=lray;
+    for(let i=0;i<N;i++){const h=((i*2654435761)>>>0)/4294967295,th=i/N*2*Math.PI+h*0.06;ctx.save();ctx.translate(sx,sy);ctx.rotate(th);const g=ctx.createLinearGradient(0,0,len,0);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;const wd=len*0.012;ctx.beginPath();ctx.moveTo(0,-wd);ctx.lineTo(len,-wd*0.2);ctx.lineTo(len,wd*0.2);ctx.lineTo(0,wd);ctx.closePath();ctx.fill();ctx.restore();}
+    const bg=ctx.createRadialGradient(sx,sy,0,sx,sy,len*0.15);bg.addColorStop(0,col);bg.addColorStop(1,'rgba(0,0,0,0)');ctx.globalAlpha=lray*0.8;ctx.fillStyle=bg;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Optic Flare — glow + streaks + ghost discs
+  if(lflare>0){const sx=r.x+r.w*pval(c,'fxFlareX',fr,0.7),sy=r.y+r.h*pval(c,'fxFlareY',fr,0.3),cx=r.x+r.w/2,cy=r.y+r.h/2,col=c.fxFlareColor||'#ffffff';
+    ctx.globalCompositeOperation='screen';ctx.globalAlpha=lflare;const g=ctx.createRadialGradient(sx,sy,0,sx,sy,r.w*0.25);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);
+    const Ln=Math.hypot(r.w,r.h);for(let q=0;q<2;q++){ctx.save();ctx.translate(sx,sy);ctx.rotate(q?Math.PI/2:0);const lg2=ctx.createLinearGradient(-Ln,0,Ln,0);lg2.addColorStop(0,'rgba(0,0,0,0)');lg2.addColorStop(0.5,col);lg2.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=lg2;ctx.globalAlpha=lflare*0.5;ctx.fillRect(-Ln,-1.5,2*Ln,3);ctx.restore();}
+    const gh=[[0.3,8],[0.6,14],[0.9,10],[1.3,18],[1.6,22]];ctx.globalAlpha=lflare*0.4;for(let gi=0;gi<gh.length;gi++){const t=gh[gi][0],rad=gh[gi][1],gx=sx+(cx-sx)*t,gy=sy+(cy-sy)*t,gg2=ctx.createRadialGradient(gx,gy,0,gx,gy,rad);gg2.addColorStop(0,gi%2?col:'rgba(180,200,255,1)');gg2.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gg2;ctx.fillRect(gx-rad,gy-rad,rad*2,rad*2);}}
+  // Glint Star — anamorphic star spokes
+  if(lstar>0){const sx=r.x+r.w*pval(c,'fxStarX',fr,0.5),sy=r.y+r.h*pval(c,'fxStarY',fr,0.5),pts=Math.max(2,Math.round(pval(c,'fxStarPoints',fr,4))),len=Math.hypot(r.w,r.h)*0.4*pval(c,'fxStarLen',fr,1),col=c.fxStarColor||'#ffffff';
+    ctx.globalCompositeOperation='screen';ctx.globalAlpha=lstar;
+    for(let i=0;i<pts;i++){const th=i*Math.PI/pts;for(let dq=0;dq<2;dq++){ctx.save();ctx.translate(sx,sy);ctx.rotate(th+(dq?Math.PI:0));const g=ctx.createLinearGradient(0,0,len,0);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;const wd=len*0.02;ctx.beginPath();ctx.moveTo(0,-wd);ctx.lineTo(len,0);ctx.lineTo(0,wd);ctx.closePath();ctx.fill();ctx.restore();}}
+    const bg=ctx.createRadialGradient(sx,sy,0,sx,sy,len*0.1);bg.addColorStop(0,col);bg.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=bg;ctx.fillRect(r.x,r.y,r.w,r.h);}
+  // Tube Screen — CRT scanlines + RGB phosphor + tube darken
+  if(lcrt>0){const phos=(c.fxCRTPhosphor!=='off'),curve=clamp(pval(c,'fxCRTCurve',fr,0.4),0,1);
+    ctx.globalCompositeOperation='multiply';ctx.globalAlpha=lcrt*0.5;ctx.fillStyle=ctx.createPattern(scanTile(),'repeat');ctx.fillRect(r.x,r.y,r.w,r.h);
+    if(phos){ctx.globalCompositeOperation='screen';ctx.globalAlpha=lcrt*0.25;ctx.fillStyle=ctx.createPattern(crtPhosphorTile(),'repeat');ctx.fillRect(r.x,r.y,r.w,r.h);}
+    if(curve>0){ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;const cx=r.x+r.w/2,cy=r.y+r.h/2,rad=Math.hypot(r.w,r.h)/2,g=ctx.createRadialGradient(cx,cy,rad*0.55,cx,cy,rad);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,`rgba(0,0,0,${(curve*lcrt*0.6).toFixed(3)})`);ctx.fillStyle=g;ctx.fillRect(r.x,r.y,r.w,r.h);}}
   ctx.restore();
 }
 let _scanTile=null;
@@ -1310,7 +1499,22 @@ function scanTile(){
   g.fillStyle='#fff';g.fillRect(0,0,4,4);g.fillStyle='#000';g.fillRect(0,0,4,2);
   _scanTile=cv;return cv;
 }
-function hasOverlayFX(c,f){const fr=f-c.start;return pval(c,'fxVignette',fr,0)>0||pval(c,'fxTint',fr,0)>0||pval(c,'fxGrain',fr,0)>0||pval(c,'fxLeak',fr,0)>0||pval(c,'fxScan',fr,0)>0;}
+// Rule Grid + Checker Field tiles (cached by params) — for the Generate overlay effects
+let _gridCache={};
+function gridTile(size,width,color){const key=size+'|'+width+'|'+color;if(_gridCache[key])return _gridCache[key];
+  const n=Math.max(2,Math.round(size)),cv=document.createElement('canvas');cv.width=cv.height=n;const g=cv.getContext('2d');
+  g.strokeStyle=color;g.lineWidth=width;g.beginPath();g.moveTo(0,0);g.lineTo(n,0);g.moveTo(0,0);g.lineTo(0,n);g.stroke();
+  _gridCache[key]=cv;return cv;}
+let _checkCache={};
+function checkerTile(size,color){const key=size+'|'+color;if(_checkCache[key])return _checkCache[key];
+  const s=Math.max(1,Math.round(size)),cv=document.createElement('canvas');cv.width=cv.height=2*s;const g=cv.getContext('2d');
+  g.fillStyle=color;g.fillRect(0,0,s,s);g.fillRect(s,s,s,s);_checkCache[key]=cv;return cv;}
+let _crtPhos=null;
+function crtPhosphorTile(){if(_crtPhos)return _crtPhos;const cv=document.createElement('canvas');cv.width=3;cv.height=1;const g=cv.getContext('2d');
+  g.fillStyle='#ff3030';g.fillRect(0,0,1,1);g.fillStyle='#30ff30';g.fillRect(1,0,1,1);g.fillStyle='#3030ff';g.fillRect(2,0,1,1);_crtPhos=cv;return cv;}
+function hasOverlayFX(c,f){const fr=f-c.start;return pval(c,'fxVignette',fr,0)>0||pval(c,'fxTint',fr,0)>0||pval(c,'fxGrain',fr,0)>0||pval(c,'fxLeak',fr,0)>0||pval(c,'fxScan',fr,0)>0
+  ||pval(c,'fxPhotoFilter',fr,0)>0||pval(c,'fxRamp',fr,0)>0||pval(c,'fxQuad',fr,0)>0||pval(c,'fxGrid',fr,0)>0||pval(c,'fxChecker',fr,0)>0||pval(c,'fxFrame',fr,0)>0
+  ||pval(c,'fxRays',fr,0)>0||pval(c,'fxFlare',fr,0)>0||pval(c,'fxStarburst',fr,0)>0||pval(c,'fxCRTOverlay',fr,0)>0;}
 // pixel-level effects need the layer rendered in isolation (an offscreen buffer)
 function hasLayerBufferFX(c,f){const fr=f-c.start;
   return pval(c,'fxPixel',fr,0)>0||pval(c,'fxGlow',fr,0)>0||pval(c,'fxPosterize',fr,0)>=2
@@ -1320,7 +1524,19 @@ function hasLayerBufferFX(c,f){const fr=f-c.start;
     ||pval(c,'fxRGB',fr,0)!==0||pval(c,'fxHalftone',fr,0)>=2
     ||pval(c,'fxKey',fr,0)>0||pval(c,'fxLumaKey',fr,0)>0||pval(c,'fxDirBlur',fr,0)>0
     ||pval(c,'fxRadBlur',fr,0)>0||pval(c,'fxWarp',fr,0)!==0
-    ||pval(c,'fxGradMap',fr,0)>0||pval(c,'fxNoise',fr,0)>0;}
+    ||pval(c,'fxGradMap',fr,0)>0||pval(c,'fxNoise',fr,0)>0
+    ||pval(c,'fxDiffuse',fr,0)>0||pval(c,'fxStrobe',fr,0)>0||pval(c,'fxOffset',fr,0)!==0||pval(c,'fxOffsetY',fr,0)!==0
+    ||pval(c,'fxMirror',fr,0)>0||pval(c,'fxShear',fr,0)>0||Math.round(pval(c,'fxTileStamp',fr,1))>1
+    ||pval(c,'fxColorKnockout',fr,0)>0||pval(c,'fxChannelShuffle',fr,0)>0||pval(c,'fxChannelFlip',fr,0)>0
+    ||pval(c,'fxAlphaFromLum',fr,0)>0||pval(c,'fxDespill',fr,0)>0||pval(c,'fxUnmultiply',fr,0)>0
+    ||pval(c,'fxWipeLinear',fr,1)<1||pval(c,'fxWipeClock',fr,1)<1||pval(c,'fxWipeIris',fr,1)<1||pval(c,'fxWipeBlinds',fr,1)<1||pval(c,'fxWipeBarn',fr,1)<1||pval(c,'fxWipeDip',fr,1)<1||pval(c,'fxWipeTiles',fr,1)<1||pval(c,'fxWipeGradient',fr,1)<1||pval(c,'fxWipePush',fr,1)<1
+    ||pval(c,'fxBWMix',fr,0)>0||pval(c,'fxChannelMix',fr,0)>0||pval(c,'fxColorBalance',fr,0)>0||pval(c,'fxTritone',fr,0)>0||pval(c,'fxLeaveColor',fr,0)>0||pval(c,'fxSwatchSwap',fr,0)>0||pval(c,'fxFilmFade',fr,0)>0||pval(c,'fxCineLUT',fr,0)>0||pval(c,'fxToneMap',fr,0)>0
+    ||pval(c,'fxBoxBlur',fr,0)>0||pval(c,'fxLensBlur',fr,0)>0||pval(c,'fxTiltShift',fr,0)>0||pval(c,'fxIrisBlur',fr,0)>0||pval(c,'fxUnsharp',fr,0)>0||pval(c,'fxSurfaceBlur',fr,0)>0||pval(c,'fxFrost',fr,0)>0||pval(c,'fxCompoundBlur',fr,0)>0
+    ||pval(c,'fxCrystallize',fr,0)>0||pval(c,'fxPosterEdges',fr,0)>0||pval(c,'fxOilBrush',fr,0)>0||pval(c,'fxKuwahara',fr,0)>0||pval(c,'fxColorDots',fr,0)>=2||pval(c,'fxDither',fr,0)>0||pval(c,'fxComic',fr,0)>0||pval(c,'fxScatter',fr,0)>0
+    ||pval(c,'fxChrome',fr,0)>0||pval(c,'fxPlastic',fr,0)>0||pval(c,'fxStainedGlass',fr,0)>0||Math.round(pval(c,'fxKaleido',fr,1))>1||pval(c,'fxPolar',fr,0)>0||pval(c,'fxRipple',fr,0)>0||pval(c,'fxLoupe',fr,0)>0||pval(c,'fxFisheye',fr,0)!==0||pval(c,'fxTubeCurve',fr,0)>0||pval(c,'fxPinch',fr,0)!==0
+    ||pval(c,'fxOuterGlow',fr,0)>0||pval(c,'fxDropShadow2',fr,0)>0
+    ||pval(c,'fxLongShadow',fr,0)>0||pval(c,'fxFloorShadow',fr,0)>0||pval(c,'fxStroke',fr,0)>0||pval(c,'fxBevelAlpha',fr,0)>0||pval(c,'fxInnerShadow',fr,0)>0||pval(c,'fxRimLight',fr,0)>0
+    ||pval(c,'fxMatteChoke',fr,0)!==0||pval(c,'fxChoker',fr,0)!==0||pval(c,'fxFeatherAlpha',fr,0)>0||pval(c,'fxAlphaLevels',fr,0)>0||pval(c,'fxDespot',fr,0)>0||pval(c,'fxRefineEdge',fr,0)>0||pval(c,'fxEdgeBlur',fr,0)>0||pval(c,'fxGrowBounds',fr,0)>0||pval(c,'fxInvertMatte',fr,0)>0||pval(c,'fxMatteThresh',fr,0)>0||pval(c,'fxChannelMath',fr,0)>0;}
 function needsLayerBuffer(c,f){return clipMasks(c).length>0||hasLayerBufferFX(c,f);}
 
 // ── MASKS (per-clip vector mattes) ───────────────────────────────────────
@@ -1473,6 +1689,57 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
   if(po>=2){const im=lg.getImageData(0,0,W,H),d=im.data,step=255/(po-1);
     for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]=Math.round(Math.round(d[i]/step)*step);d[i+1]=Math.round(Math.round(d[i+1]/step)*step);d[i+2]=Math.round(Math.round(d[i+2]/step)*step);}
     lg.putImageData(im,0,0);}
+  // Box Soften — iterated blur (flatter than Soft Focus); replaces the layer
+  const bxb=pval(c,'fxBoxBlur',fr,0);
+  if(bxb>0){const rad=bxb*k,iter=Math.max(1,parseInt(c.fxBoxIter||'1'));
+    for(let it=0;it<iter;it++){reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${(rad/iter).toFixed(2)}px)`;sg.drawImage(L,0,0);sg.filter='none';reset(lg);lg.clearRect(0,0,W,H);lg.drawImage(S,0,0);}}
+  // Cine Bokeh — blurred base + additive highlight bloom (fake optical bokeh); replaces the layer
+  const lnb=pval(c,'fxLensBlur',fr,0);
+  if(lnb>0){const rad=lnb*k,hi=clamp(pval(c,'fxLensHi',fr,0.5),0,1);
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${rad.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    sg.globalCompositeOperation='lighter';sg.globalAlpha=hi;sg.filter=`blur(${(rad*1.4).toFixed(1)}px) brightness(${(1.4+hi).toFixed(2)}) contrast(1.7)`;sg.drawImage(L,0,0);reset(sg);
+    reset(lg);lg.clearRect(0,0,W,H);lg.drawImage(S,0,0);}
+  // Tilt Focus — sharp band, blurred away from it (miniature look)
+  const tsf=pval(c,'fxTiltShift',fr,0);
+  if(tsf>0){const rad=tsf*k,pos=pval(c,'fxTiltPos',fr,0.5),bw=pval(c,'fxTiltWidth',fr,0.3),ftl=pval(c,'fxTiltFeather',fr,0.1),horiz=(c.fxTiltDir!=='Vertical'),span=horiz?H:W;
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${rad.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    sg.globalCompositeOperation='destination-in';const ctr=pos*span,half=(bw*span)/2,fpx=ftl*span,g=horiz?sg.createLinearGradient(0,0,0,H):sg.createLinearGradient(0,0,W,0),st=v=>clamp(v/span,0,1);
+    g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(st(ctr-half-fpx),'rgba(0,0,0,1)');g.addColorStop(st(ctr-half),'rgba(0,0,0,0)');g.addColorStop(st(ctr+half),'rgba(0,0,0,0)');g.addColorStop(st(ctr+half+fpx),'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,1)');
+    sg.fillStyle=g;sg.fillRect(0,0,W,H);reset(sg);reset(lg);lg.drawImage(S,0,0);}
+  // Iris Defocus — circular in-focus centre defocusing toward edges (portrait look)
+  const irb=pval(c,'fxIrisBlur',fr,0);
+  if(irb>0){const rad=irb*k,cx2=pval(c,'fxIrisCX',fr,0.5)*W,cy2=pval(c,'fxIrisCY',fr,0.5)*H,mn=Math.min(W,H)/2,inner=pval(c,'fxIrisRad',fr,0.5)*mn,outer=Math.max(inner+1,inner+pval(c,'fxIrisFeather',fr,0.3)*mn);
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${rad.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    sg.globalCompositeOperation='destination-in';const g=sg.createRadialGradient(cx2,cy2,inner,cx2,cy2,outer);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,1)');sg.fillStyle=g;sg.fillRect(0,0,W,H);reset(sg);reset(lg);lg.drawImage(S,0,0);}
+  // Detail Sharpen — radius-based unsharp mask (blurred copy via filter, then high-pass add)
+  const usm=clamp(pval(c,'fxUnsharp',fr,0),0,3);
+  if(usm>0){const rad=pval(c,'fxUSRadius',fr,3)*k,th=pval(c,'fxUSThresh',fr,0)*255;
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${rad.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    const bl=sg.getImageData(0,0,W,H).data,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;for(let ch=0;ch<3;ch++){const hp=d[i+ch]-bl[i+ch];if(Math.abs(hp)>th)d[i+ch]=clamp(d[i+ch]+usm*hp,0,255);}}
+    lg.putImageData(im,0,0);}
+  // Smart Smooth — edge-preserving (bilateral-style range) blur; skin smoothing
+  const sfb=Math.round(pval(c,'fxSurfaceBlur',fr,0));
+  if(sfb>0){const rad=Math.min(12,sfb),th=pval(c,'fxSurfThresh',fr,0.15)*255,amt=clamp(pval(c,'fxSurfAmt',fr,1),0,1),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;const lc=0.299*s[i]+0.587*s[i+1]+0.114*s[i+2];let ar=0,ag=0,ab=0,nn=0;
+      for(let dy=-rad;dy<=rad;dy++){const yy=y+dy;if(yy<0||yy>=H)continue;for(let dx=-rad;dx<=rad;dx++){const xx=x+dx;if(xx<0||xx>=W)continue;const j=(yy*W+xx)*4;if(s[j+3]===0)continue;const ll=0.299*s[j]+0.587*s[j+1]+0.114*s[j+2];if(Math.abs(ll-lc)<=th){ar+=s[j];ag+=s[j+1];ab+=s[j+2];nn++;}}}
+      if(nn>0){d[i]+=((ar/nn)-d[i])*amt;d[i+1]+=((ag/nn)-d[i+1])*amt;d[i+2]+=((ab/nn)-d[i+2])*amt;}}
+    lg.putImageData(im,0,0);}
+  // Frosted Glass — deterministically jittered nearby sampling
+  const frs=pval(c,'fxFrost',fr,0);
+  if(frs>0){const SP=frs*k,fine=(c.fxFrostQ==='Fine'),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,h=((x*374761393)^(y*668265263))>>>0,ox=((h&255)/255-0.5)*2*SP,oy=(((h>>8)&255)/255-0.5)*2*SP,sx=clamp((x+ox)|0,0,W-1),sy=clamp((y+oy)|0,0,H-1),j=(sy*W+sx)*4;
+      if(fine){const h2=((x*2654435761)^(y*40503))>>>0,ox2=((h2&255)/255-0.5)*2*SP,oy2=(((h2>>8)&255)/255-0.5)*2*SP,sx2=clamp((x+ox2)|0,0,W-1),sy2=clamp((y+oy2)|0,0,H-1),j2=(sy2*W+sx2)*4;
+        d[i]=(s[j]+s[j2])>>1;d[i+1]=(s[j+1]+s[j2+1])>>1;d[i+2]=(s[j+2]+s[j2+2])>>1;d[i+3]=(s[j+3]+s[j2+3])>>1;}
+      else{d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}}
+    lg.putImageData(im,0,0);}
+  // Luma Soften — variable blur driven by the image's own luminance
+  const cpb=pval(c,'fxCompoundBlur',fr,0);
+  if(cpb>0){const rad=cpb*k,bias=clamp(pval(c,'fxCompBias',fr,0.5),0,1),shadows=(c.fxCompInvert==='Shadows');
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${rad.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    const Ld=lg.getImageData(0,0,W,H).data,sd=sg.getImageData(0,0,W,H),sdd=sd.data;
+    for(let i=0;i<sdd.length;i+=4){if(sdd[i+3]===0)continue;let lum=(0.299*Ld[i]+0.587*Ld[i+1]+0.114*Ld[i+2])/255,m=shadows?1-lum:lum;m=Math.pow(clamp(m,0,1),1+(0.5-bias)*2);sdd[i+3]=Math.round(sdd[i+3]*clamp(m,0,1));}
+    sg.putImageData(sd,0,0);reset(lg);lg.drawImage(S,0,0);}
   // ── Per-pixel tone/colour passes — one combined loop (gamma → warmth → vibrance → duotone → solarize → threshold)
   const ga=pval(c,'fxGamma',fr,1),tp=pval(c,'fxTemp',fr,0),vb=clamp(pval(c,'fxVibrance',fr,0),-1,2),
         du=clamp(pval(c,'fxDuotone',fr,0),0,1),so=clamp(pval(c,'fxSolarize',fr,0),0,1),th=clamp(pval(c,'fxThreshold',fr,0),0,1);
@@ -1647,6 +1914,400 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
   if(lmk>0){const cut=lmk*255,soft=18,im=lg.getImageData(0,0,W,H),d=im.data;
     for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lm=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
       if(Lm<cut-soft)d[i+3]=0;else if(Lm<cut+soft)d[i+3]=Math.round(d[i+3]*(Lm-(cut-soft))/(2*soft));}
+    lg.putImageData(im,0,0);}
+  // Soft Diffusion — screen a blurred copy back over the sharp layer (cine pro-mist bloom)
+  const df=clamp(pval(c,'fxDiffuse',fr,0),0,1);
+  if(df>0){reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${(pval(c,'fxDiffRadius',fr,18)).toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    reset(lg);lg.globalCompositeOperation='screen';lg.globalAlpha=df*0.7;lg.drawImage(S,0,0);reset(lg);}
+  // Strobe Pulse — Completion drives a flash clock; push toward the flash colour while "on"
+  const stb=clamp(pval(c,'fxStrobe',fr,0),0,1);
+  if(stb>0){const per=Math.max(0.02,pval(c,'fxStrobePeriod',fr,0.1)),duty=clamp(pval(c,'fxStrobeDuty',fr,0.5),0.05,0.95),ph=(stb/per)%1,on=ph<duty?stb:0;
+    if(on>0){const fc=hex2rgb(c.fxStrobeColor||'#ffffff'),im=lg.getImageData(0,0,W,H),d=im.data;
+      for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(fc[0]-d[i])*on;d[i+1]+=(fc[1]-d[i+1])*on;d[i+2]+=(fc[2]-d[i+2])*on;}
+      lg.putImageData(im,0,0);}}
+  // Drift — toroidal wrap-around offset (seamless pans)
+  const ofx=pval(c,'fxOffset',fr,0),ofy=pval(c,'fxOffsetY',fr,0);
+  if(ofx!==0||ofy!==0){const ox2=Math.round(ofx*W),oy2=Math.round(ofy*H),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,sx=((x-ox2)%W+W)%W,sy=((y-oy2)%H+H)%H,j=(sy*W+sx)*4;d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}
+    lg.putImageData(im,0,0);}
+  // Single Fold — reflect across a seam (mix blends toward the reflection)
+  const mir=clamp(pval(c,'fxMirror',fr,0),0,1);
+  if(mir>0){const side=c.fxMirrorSide||'L→R',seam=pval(c,'fxMirrorSeam',fr,0),sX=Math.round((0.5+seam)*W),sY=Math.round((0.5+seam)*H),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;let sx=x,sy=y;
+      if(side==='L→R')sx=x>sX?2*sX-x:x;else if(side==='R→L')sx=x<sX?2*sX-x:x;else if(side==='T→B')sy=y>sY?2*sY-y:y;else sy=y<sY?2*sY-y:y;
+      sx=sx<0?0:sx>W-1?W-1:sx;sy=sy<0?0:sy>H-1?H-1:sy;const j=(sy*W+sx)*4;
+      d[i]+=(s[j]-d[i])*mir;d[i+1]+=(s[j+1]-d[i+1])*mir;d[i+2]+=(s[j+2]-d[i+2])*mir;d[i+3]+=(s[j+3]-d[i+3])*mir;}
+    lg.putImageData(im,0,0);}
+  // Row Shudder — per-row (or per-column) sine shear for analog/VHS jitter
+  const shr=clamp(pval(c,'fxShear',fr,0),0,1);
+  if(shr>0){const axis=c.fxShearAxis||'Horizontal',wave=Math.max(2,pval(c,'fxShearWave',fr,40)),sphz=pval(c,'fxShearPhase',fr,0),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    if(axis==='Horizontal'){for(let y=0;y<H;y++){const sh2=Math.round(shr*W*0.08*Math.sin(y/wave*2*Math.PI+sphz));
+      for(let x=0;x<W;x++){const i=(y*W+x)*4;let sx=x-sh2;sx=sx<0?0:sx>W-1?W-1:sx;const j=(y*W+sx)*4;d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}}}
+    else{for(let x=0;x<W;x++){const sh2=Math.round(shr*H*0.08*Math.sin(x/wave*2*Math.PI+sphz));
+      for(let y=0;y<H;y++){const i=(y*W+x)*4;let sy=y-sh2;sy=sy<0?0:sy>H-1?H-1:sy;const j=(sy*W+x)*4;d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}}}
+    lg.putImageData(im,0,0);}
+  // Tile Stamp — repeat the layer as N×N tiles (optional row stagger + mirrored edges)
+  const tl=Math.round(pval(c,'fxTileStamp',fr,1));
+  if(tl>1){const tph=pval(c,'fxTilePhase',fr,0),tmir=(c.fxTileMirror==='Mirror'),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,tileRow=Math.floor(y*tl/H);let sx=(x*tl)%W,sy=(y*tl)%H;
+      sx=(sx+Math.round(tileRow*tph*W))%W;if(tmir&&Math.floor(x*tl/W)%2===1)sx=W-1-sx;sx=((sx%W)+W)%W;sy=((sy%H)+H)%H;const j=(sy*W+sx)*4;
+      d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}
+    lg.putImageData(im,0,0);}
+  // Color Knockout — knock any chosen colour to transparent (tolerance + soft edge)
+  const ckn=clamp(pval(c,'fxColorKnockout',fr,0),0,1);
+  if(ckn>0){const kc=hex2rgb(c.fxKnockColor||'#ff00ff'),tol=pval(c,'fxKnockTol',fr,0.1)*255,sof=pval(c,'fxKnockSoft',fr,0.1)*255,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const dr=d[i]-kc[0],dg=d[i+1]-kc[1],db=d[i+2]-kc[2],dist=Math.sqrt(dr*dr+dg*dg+db*db),a=clamp((dist-tol)/(sof+1e-3),0,1);d[i+3]=Math.round(d[i+3]*(1-(1-a)*ckn));}
+    lg.putImageData(im,0,0);}
+  // Channel Reroute — source each output channel from R/G/B/Lum/Max/Min
+  const csh=clamp(pval(c,'fxChannelShuffle',fr,0),0,1);
+  if(csh>0){const pick=(r,g,b,sel)=>sel==='R'?r:sel==='G'?g:sel==='B'?b:sel==='Lum'?(0.299*r+0.587*g+0.114*b):sel==='Max'?Math.max(r,g,b):Math.min(r,g,b);
+    const sr=c.fxShufR||'R',sg2=c.fxShufG||'G',sb=c.fxShufB||'B',im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2];d[i]+=(pick(r,g,b,sr)-r)*csh;d[i+1]+=(pick(r,g,b,sg2)-g)*csh;d[i+2]+=(pick(r,g,b,sb)-b)*csh;}
+    lg.putImageData(im,0,0);}
+  // Channel Flip — invert selected channel(s)
+  const cfl=clamp(pval(c,'fxChannelFlip',fr,0),0,1);
+  if(cfl>0){const sel=c.fxFlipCh||'B',dR=sel.indexOf('R')>=0,dG=sel.indexOf('G')>=0,dB=sel.indexOf('B')>=0,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;if(dR)d[i]+=((255-d[i])-d[i])*cfl;if(dG)d[i+1]+=((255-d[i+1])-d[i+1])*cfl;if(dB)d[i+2]+=((255-d[i+2])-d[i+2])*cfl;}
+    lg.putImageData(im,0,0);}
+  // Luma To Alpha — brightness-driven transparency (gradient matte)
+  const afl=clamp(pval(c,'fxAlphaFromLum',fr,0),0,1);
+  if(afl>0){const dir=c.fxAlphaDir||'bright',gm=Math.max(0.05,pval(c,'fxAlphaGamma',fr,1)),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;let t=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;if(dir==='dark')t=1-t;t=Math.pow(t,gm);d[i+3]=Math.round(d[i+3]*(1-(1-t)*afl));}
+    lg.putImageData(im,0,0);}
+  // Despill — neutralise green/blue screen spill on the foreground
+  const dsp=clamp(pval(c,'fxDespill',fr,0),0,1);
+  if(dsp>0){const sch=c.fxSpillCh||'green',im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2];
+      if(sch==='green'){const mx=Math.max(r,b);if(g>mx)d[i+1]+=(mx-g)*dsp;}else{const mx=Math.max(r,g);if(b>mx)d[i+2]+=(mx-b)*dsp;}}
+    lg.putImageData(im,0,0);}
+  // Unmultiply — recover additive elements (fire/flash) off black; coverage→alpha
+  const unm=clamp(pval(c,'fxUnmultiply',fr,0),0,1);
+  if(unm>0){const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lu=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;
+      if(Lu>0.004){d[i]=clamp(d[i]/Lu,0,255);d[i+1]=clamp(d[i+1]/Lu,0,255);d[i+2]=clamp(d[i+2]/Lu,0,255);}d[i+3]=Math.round(d[i+3]*(1-(1-Lu)*unm));}
+    lg.putImageData(im,0,0);}
+  // Mono Mixer — channel-weighted greyscale
+  const bw=clamp(pval(c,'fxBWMix',fr,0),0,1);
+  if(bw>0){const wr=pval(c,'fxBWRed',fr,30)/100,wg=pval(c,'fxBWGreen',fr,59)/100,wb=pval(c,'fxBWBlue',fr,11)/100,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const gy=clamp(d[i]*wr+d[i+1]*wg+d[i+2]*wb,0,255);d[i]+=(gy-d[i])*bw;d[i+1]+=(gy-d[i+1])*bw;d[i+2]+=(gy-d[i+2])*bw;}
+    lg.putImageData(im,0,0);}
+  // Matrix Mixer — per-channel linear recombination
+  const chm=clamp(pval(c,'fxChannelMix',fr,0),0,1);
+  if(chm>0){const rr=pval(c,'fxCMrr',fr,100)/100,rg=pval(c,'fxCMrg',fr,0)/100,rb=pval(c,'fxCMrb',fr,0)/100,gr=pval(c,'fxCMgr',fr,0)/100,gg=pval(c,'fxCMgg',fr,100)/100,gb=pval(c,'fxCMgb',fr,0)/100,br=pval(c,'fxCMbr',fr,0)/100,bgc=pval(c,'fxCMbg',fr,0)/100,bb=pval(c,'fxCMbb',fr,100)/100,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2],nr=clamp(r*rr+g*rg+b*rb,0,255),ng=clamp(r*gr+g*gg+b*gb,0,255),nb=clamp(r*br+g*bgc+b*bb,0,255);d[i]+=(nr-r)*chm;d[i+1]+=(ng-g)*chm;d[i+2]+=(nb-b)*chm;}
+    lg.putImageData(im,0,0);}
+  // Three-Way Balance — shadows/mids/highlights colour push
+  const cbal=clamp(pval(c,'fxColorBalance',fr,0),0,1);
+  if(cbal>0){const sR=pval(c,'fxCBShadR',fr,0),sG=pval(c,'fxCBShadG',fr,0),sB=pval(c,'fxCBShadB',fr,0),mR=pval(c,'fxCBMidR',fr,0),mG=pval(c,'fxCBMidG',fr,0),mB=pval(c,'fxCBMidB',fr,0),hR=pval(c,'fxCBHiR',fr,0),hG=pval(c,'fxCBHiG',fr,0),hB=pval(c,'fxCBHiB',fr,0),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const L=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255,ws=clamp(1-L*2,0,1),wh=clamp((L-0.5)*2,0,1),wm=1-ws-wh;
+      d[i]=clamp(d[i]+(sR*ws+mR*wm+hR*wh)*0.64*cbal,0,255);d[i+1]=clamp(d[i+1]+(sG*ws+mG*wm+hG*wh)*0.64*cbal,0,255);d[i+2]=clamp(d[i+2]+(sB*ws+mB*wm+hB*wh)*0.64*cbal,0,255);}
+    lg.putImageData(im,0,0);}
+  // Split Tone — three-stop luminance→colour remap (shadows/mids/highlights)
+  const tri=clamp(pval(c,'fxTritone',fr,0),0,1);
+  if(tri>0){const cs=hex2rgb(c.fxTriShadow||'#1a1730'),cmid=hex2rgb(c.fxTriMid||'#7a5a86'),chh=hex2rgb(c.fxTriHi||'#ffe9c2'),LR=new Uint8ClampedArray(256),LG=new Uint8ClampedArray(256),LB=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){const Ln=v/255;let a,b,t;if(Ln<0.5){a=cs;b=cmid;t=Ln*2;}else{a=cmid;b=chh;t=(Ln-0.5)*2;}LR[v]=a[0]+(b[0]-a[0])*t;LG[v]=a[1]+(b[1]-a[1])*t;LB[v]=a[2]+(b[2]-a[2])*t;}
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lv=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])|0;d[i]+=(LR[Lv]-d[i])*tri;d[i+1]+=(LG[Lv]-d[i+1])*tri;d[i+2]+=(LB[Lv]-d[i+2])*tri;}
+    lg.putImageData(im,0,0);}
+  // Color Pop — keep one hue, desaturate the rest
+  const lcp=clamp(pval(c,'fxLeaveColor',fr,0),0,1);
+  if(lcp>0){const keepH=pval(c,'fxLCHue',fr,0),tol=pval(c,'fxLCTol',fr,30),sof=Math.max(1,pval(c,'fxLCSoft',fr,20)),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b),dd=mx-mn;
+      let h=0;if(dd>0){if(mx===r)h=((g-b)/dd)%6;else if(mx===g)h=(b-r)/dd+2;else h=(r-g)/dd+4;h*=60;if(h<0)h+=360;}
+      const sat=mx===0?0:dd/mx;let dh=Math.abs(h-keepH);if(dh>180)dh=360-dh;let m=clamp(1-(dh-tol)/sof,0,1);if(sat<0.12)m=0;
+      const gy=0.299*r+0.587*g+0.114*b,kk=(1-m)*lcp;d[i]+=(gy-r)*kk;d[i+1]+=(gy-g)*kk;d[i+2]+=(gy-b)*kk;}
+    lg.putImageData(im,0,0);}
+  // Recolor — shift one colour family toward another
+  const rcl=clamp(pval(c,'fxSwatchSwap',fr,0),0,1);
+  if(rcl>0){const from=hex2rgb(c.fxSwapFrom||'#e23a3a'),to=hex2rgb(c.fxSwapTo||'#3a7be2'),tol=pval(c,'fxSwapTol',fr,0.15)*255,sof=pval(c,'fxSwapSoft',fr,0.1)*255,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const dr=d[i]-from[0],dg=d[i+1]-from[1],db=d[i+2]-from[2],dist=Math.sqrt(dr*dr+dg*dg+db*db),wgt=clamp(1-(dist-tol)/(sof+1e-3),0,1)*rcl;
+      d[i]=clamp(d[i]+(to[0]-from[0])*wgt,0,255);d[i+1]=clamp(d[i+1]+(to[1]-from[1])*wgt,0,255);d[i+2]=clamp(d[i+2]+(to[2]-from[2])*wgt,0,255);}
+    lg.putImageData(im,0,0);}
+  // Faded Print — lifted milky blacks, rolled whites, split-tone
+  const ffd=clamp(pval(c,'fxFilmFade',fr,0),0,1);
+  if(ffd>0){const lift=pval(c,'fxFFLift',fr,30)/100*60,roll=pval(c,'fxFFRoll',fr,20)/100*40,shc=hex2rgb(c.fxFFShadow||'#2c3a4a'),hic=hex2rgb(c.fxFFHi||'#f0d9b0'),LUT=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++)LUT[v]=clamp(lift+v*((255-roll-lift)/255),0,255);
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;let r=LUT[d[i]],g=LUT[d[i+1]],b=LUT[d[i+2]];const L=(0.299*r+0.587*g+0.114*b)/255;
+      r+=((shc[0]-128)*(1-L)+(hic[0]-128)*L)*0.18;g+=((shc[1]-128)*(1-L)+(hic[1]-128)*L)*0.18;b+=((shc[2]-128)*(1-L)+(hic[2]-128)*L)*0.18;
+      d[i]+=(clamp(r,0,255)-d[i])*ffd;d[i+1]+=(clamp(g,0,255)-d[i+1])*ffd;d[i+2]+=(clamp(b,0,255)-d[i+2])*ffd;}
+    lg.putImageData(im,0,0);}
+  // Signature Looks — preset creative LUTs
+  const cln=clamp(pval(c,'fxCineLUT',fr,0),0,1);
+  if(cln>0){const preset=c.fxCLPreset||'teal-orange',RR=new Uint8ClampedArray(256),GG=new Uint8ClampedArray(256),BB=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){const x=v/255;let r=x,g=x,b=x;
+      if(preset==='teal-orange'){const s=x*x*(3-2*x);r=clamp(x+(x-0.5)*0.35+0.06*s,0,1);b=clamp(x-(x-0.5)*0.35+0.08*(1-s),0,1);g=x;}
+      else if(preset==='bleach'){const s=clamp((x-0.5)*1.5+0.5,0,1);r=g=b=s;}
+      else if(preset==='noir'){const s=clamp((x-0.5)*1.7+0.5,0,1);r=clamp(s-0.02,0,1);g=s;b=clamp(s+0.04,0,1);}
+      else if(preset==='vintage'){r=clamp(0.06+x*0.93+0.04,0,1);g=clamp(0.04+x*0.95,0,1);b=clamp(0.10+x*0.85,0,1);}
+      RR[v]=r*255;GG[v]=g*255;BB[v]=b*255;}
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;d[i]+=(RR[d[i]]-d[i])*cln;d[i+1]+=(GG[d[i+1]]-d[i+1])*cln;d[i+2]+=(BB[d[i+2]]-d[i+2])*cln;}
+    lg.putImageData(im,0,0);}
+  // Tone Recover — one-knob shadow lift + highlight tame
+  const tmp=clamp(pval(c,'fxToneMap',fr,0),0,1);
+  if(tmp>0){const sh=pval(c,'fxTMShadow',fr,40)/100,hi=pval(c,'fxTMHi',fr,40)/100,det=pval(c,'fxTMDetail',fr,30)/100,LUT=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){const x=v/255;let t=x+sh*(1-x)*Math.pow(1-x,1.5)-hi*x*Math.pow(x,1.5);t=t/(t+(1-t)*(1-det*0.5)+1e-4);LUT[v]=clamp(t*255,0,255);}
+    const im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const Lv=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])|0,sc=Lv>0?LUT[Lv]/Lv:0;
+      d[i]+=(clamp(d[i]*sc,0,255)-d[i])*tmp;d[i+1]+=(clamp(d[i+1]*sc,0,255)-d[i+1])*tmp;d[i+2]+=(clamp(d[i+2]*sc,0,255)-d[i+2])*tmp;}
+    lg.putImageData(im,0,0);}
+  // Luma Dissolve — brightness sets reveal order (Completion 0→1; default 1 = visible)
+  const wGrad=pval(c,'fxWipeGradient',fr,1);
+  if(wGrad<1){const soft=Math.max(0.02,pval(c,'fxWGSoft',fr,0.15)),inv=(c.fxWGInvert==='Darks Last'),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;let Y=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;const thr=inv?1-Y:Y,keep=clamp((wGrad*(1+soft)-thr)/soft,0,1);d[i+3]=Math.round(d[i+3]*keep);}
+    lg.putImageData(im,0,0);}
+  // Slide Push — slide the layer in from an edge; trailing area goes transparent
+  const wPush=pval(c,'fxWipePush',fr,1);
+  if(wPush<1){const dir=c.fxWPushDir||'Right',off=1-wPush,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    let ox2=0,oy2=0;if(dir==='Left')ox2=-Math.round(off*W);else if(dir==='Right')ox2=Math.round(off*W);else if(dir==='Top')oy2=-Math.round(off*H);else oy2=Math.round(off*H);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,sx=x-ox2,sy=y-oy2;
+      if(sx<0||sx>=W||sy<0||sy>=H){d[i]=0;d[i+1]=0;d[i+2]=0;d[i+3]=0;}else{const j=(sy*W+sx)*4;d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}}
+    lg.putImageData(im,0,0);}
+  // Cell Mosaic — Voronoi cells filled with each cell's average colour
+  const cry=pval(c,'fxCrystallize',fr,0);
+  if(cry>0){const cell=Math.max(4,cry*k),jit=clamp(pval(c,'fxCrystalJitter',fr,0.6),0,1),dots=(c.fxCrystalShape==='Dots');
+    const cols=Math.ceil(W/cell)+2,rows=Math.ceil(H/cell)+2,nc=cols*rows,sxA=new Float32Array(nc),syA=new Float32Array(nc);
+    for(let gy=0;gy<rows;gy++)for(let gx=0;gx<cols;gx++){const h=((gx*374761393)^(gy*668265263))>>>0,jx=((h&255)/255-0.5)*jit*cell,jy=(((h>>8)&255)/255-0.5)*jit*cell;sxA[gy*cols+gx]=(gx-1+0.5)*cell+jx;syA[gy*cols+gx]=(gy-1+0.5)*cell+jy;}
+    const im=lg.getImageData(0,0,W,H),d=im.data,assign=new Int32Array(W*H),sR=new Float64Array(nc),sG=new Float64Array(nc),sB=new Float64Array(nc),ct=new Uint32Array(nc);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,gx0=Math.floor(x/cell)+1,gy0=Math.floor(y/cell)+1;let best=-1,bd=1e18;
+      for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const gx=gx0+ox,gy=gy0+oy;if(gx<0||gy<0||gx>=cols||gy>=rows)continue;const k2=gy*cols+gx,ax=x-sxA[k2],ay=y-syA[k2],dd=ax*ax+ay*ay;if(dd<bd){bd=dd;best=k2;}}
+      assign[y*W+x]=best;if(best>=0&&d[i+3]>0){sR[best]+=d[i];sG[best]+=d[i+1];sB[best]+=d[i+2];ct[best]++;}}
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;const b=assign[y*W+x];if(b<0||ct[b]===0)continue;d[i]=sR[b]/ct[b];d[i+1]=sG[b]/ct[b];d[i+2]=sB[b]/ct[b];
+      if(dots){const ax=x-sxA[b],ay=y-syA[b];if(ax*ax+ay*ay>(cell*0.45)*(cell*0.45))d[i+3]=0;}}
+    lg.putImageData(im,0,0);}
+  // Ink Cartoon — posterize colours + Sobel-inked outlines
+  const pe=clamp(pval(c,'fxPosterEdges',fr,0),0,1);
+  if(pe>0){const lvl=Math.max(2,Math.round(pval(c,'fxPELevels',fr,5))),th=pval(c,'fxPEThresh',fr,40),ink=hex2rgb(c.fxPEInk||'#000000'),step=255/(lvl-1),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;
+      let r=Math.round(Math.round(s[i]/step)*step),g=Math.round(Math.round(s[i+1]/step)*step),b=Math.round(Math.round(s[i+2]/step)*step);
+      const cl=0.299*s[i]+0.587*s[i+1]+0.114*s[i+2],Lf=idx=>s[idx+3]===0?cl:0.299*s[idx]+0.587*s[idx+1]+0.114*s[idx+2];
+      const x0=x>0?x-1:x,x1=x<W-1?x+1:x,y0=y>0?y-1:y,y1=y<H-1?y+1:y,tl=(y0*W+x0)*4,tc=(y0*W+x)*4,tr=(y0*W+x1)*4,ml=(y*W+x0)*4,mr=(y*W+x1)*4,bl=(y1*W+x0)*4,bc=(y1*W+x)*4,brr=(y1*W+x1)*4;
+      const gx=-Lf(tl)-2*Lf(ml)-Lf(bl)+Lf(tr)+2*Lf(mr)+Lf(brr),gy=-Lf(tl)-2*Lf(tc)-Lf(tr)+Lf(bl)+2*Lf(bc)+Lf(brr),mag=Math.sqrt(gx*gx+gy*gy);
+      if(mag>th){const e=clamp(mag/255,0,1)*pe;r+=(ink[0]-r)*e;g+=(ink[1]-g)*e;b+=(ink[2]-b)*e;}
+      d[i]=r;d[i+1]=g;d[i+2]=b;}
+    lg.putImageData(im,0,0);}
+  // Oil Daub — intensity-binned modal colour
+  const oil=Math.round(pval(c,'fxOilBrush',fr,0));
+  if(oil>0){const r=Math.min(8,oil),bins=Math.max(2,Math.round(pval(c,'fxOilBins',fr,20))),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;const cB=new Int32Array(bins),br=new Float64Array(bins),bg=new Float64Array(bins),bb=new Float64Array(bins);
+      for(let dy=-r;dy<=r;dy++){const yy=y+dy;if(yy<0||yy>=H)continue;for(let dx=-r;dx<=r;dx++){const xx=x+dx;if(xx<0||xx>=W)continue;const j=(yy*W+xx)*4;if(s[j+3]===0)continue;const lum=(0.299*s[j]+0.587*s[j+1]+0.114*s[j+2])/255,bi=Math.min(bins-1,(lum*bins)|0);cB[bi]++;br[bi]+=s[j];bg[bi]+=s[j+1];bb[bi]+=s[j+2];}}
+      let mb=0;for(let bi=1;bi<bins;bi++)if(cB[bi]>cB[mb])mb=bi;if(cB[mb]>0){d[i]=br[mb]/cB[mb];d[i+1]=bg[mb]/cB[mb];d[i+2]=bb[mb]/cB[mb];}}
+    lg.putImageData(im,0,0);}
+  // Brushed Paint — Kuwahara (lowest-variance quadrant mean)
+  const kuw=Math.round(pval(c,'fxKuwahara',fr,0));
+  if(kuw>0){const r=Math.min(8,kuw),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;let bv=1e18,br=s[i],bg=s[i+1],bb=s[i+2];
+      const quad=(qx0,qx1,qy0,qy1)=>{let n=0,sr=0,sg=0,sb=0,sl=0,sl2=0;for(let yy=qy0;yy<=qy1;yy++){if(yy<0||yy>=H)continue;for(let xx=qx0;xx<=qx1;xx++){if(xx<0||xx>=W)continue;const j=(yy*W+xx)*4;if(s[j+3]===0)continue;const l=0.299*s[j]+0.587*s[j+1]+0.114*s[j+2];sr+=s[j];sg+=s[j+1];sb+=s[j+2];sl+=l;sl2+=l*l;n++;}}if(n>0){const v=sl2/n-(sl/n)*(sl/n);if(v<bv){bv=v;br=sr/n;bg=sg/n;bb=sb/n;}}};
+      quad(x-r,x,y-r,y);quad(x,x+r,y-r,y);quad(x-r,x,y,y+r);quad(x,x+r,y,y+r);d[i]=br;d[i+1]=bg;d[i+2]=bb;}
+    lg.putImageData(im,0,0);}
+  // Process Dots — CMYK (or mono) halftone rosette, cut back to the silhouette
+  const cdt=Math.round(pval(c,'fxColorDots',fr,0));
+  if(cdt>=2){const n=Math.max(3,Math.round(cdt*k)),mono=(c.fxDotsMode==='Mono'),im=lg.getImageData(0,0,W,H),d=im.data;
+    reset(sg);sg.clearRect(0,0,W,H);sg.putImageData(im,0,0);
+    reset(lg);lg.clearRect(0,0,W,H);lg.fillStyle='#fff';lg.fillRect(0,0,W,H);lg.globalCompositeOperation='multiply';
+    for(let by=0;by<H;by+=n)for(let bx=0;bx<W;bx+=n){const cxp=Math.min(W-1,bx+(n>>1)),cyp=Math.min(H-1,by+(n>>1)),idx=(cyp*W+cxp)*4;if(d[idx+3]<8)continue;
+      const r=d[idx]/255,g=d[idx+1]/255,b=d[idx+2]/255,K=1-Math.max(r,g,b);
+      if(mono){const rad=Math.sqrt(clamp(K,0,1))*(n*0.62);if(rad>0.3){lg.fillStyle='#000';lg.beginPath();lg.arc(cxp,cyp,rad,0,7);lg.fill();}}
+      else{const C=K>=1?0:(1-r-K)/(1-K),M=K>=1?0:(1-g-K)/(1-K),Y=K>=1?0:(1-b-K)/(1-K),o=n*0.18,inks=[['#00bcd4',C,-o,-o],['#e91e8c',M,o,-o],['#ffd400',Y,0,o],['#111111',K,0,0]];
+        for(let q=0;q<inks.length;q++){const rad=Math.sqrt(clamp(inks[q][1],0,1))*(n*0.42);if(rad>0.3){lg.fillStyle=inks[q][0];lg.beginPath();lg.arc(cxp+inks[q][2],cyp+inks[q][3],rad,0,7);lg.fill();}}}}
+    reset(lg);lg.globalCompositeOperation='destination-in';lg.drawImage(S,0,0);reset(lg);}
+  // Ordered Dither — 4×4 Bayer to a reduced palette
+  const dth=clamp(pval(c,'fxDither',fr,0),0,1);
+  if(dth>0){const lvl=Math.max(2,Math.round(pval(c,'fxDitherLevels',fr,2))),mono=(c.fxDitherMono!=='RGB'),B=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]],im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;const t=(B[y&3][x&3]+0.5)/16-0.5;
+      if(mono){const lum=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;let q=clamp(Math.round((lum+t/lvl)*(lvl-1))/(lvl-1)*255,0,255);d[i]+=(q-d[i])*dth;d[i+1]+=(q-d[i+1])*dth;d[i+2]+=(q-d[i+2])*dth;}
+      else{for(let ch=0;ch<3;ch++){let q=clamp(Math.round((d[i+ch]/255+t/lvl)*(lvl-1))/(lvl-1)*255,0,255);d[i+ch]+=(q-d[i+ch])*dth;}}}
+    lg.putImageData(im,0,0);}
+  // Comic Tone — tonal bands + screentone dots in shadows
+  const cmc=clamp(pval(c,'fxComic',fr,0),0,1);
+  if(cmc>0){const th=pval(c,'fxComicThresh',fr,0.45),pitch=Math.max(2,Math.round(pval(c,'fxComicPitch',fr,6)*k)),ink=hex2rgb(c.fxComicInk||'#101820'),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;const L=(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2])/255;let r,g,b;
+      if(L>0.66){r=255;g=255;b=255;}else if(L>th){r=d[i];g=d[i+1];b=d[i+2];}
+      else{const px=x%pitch-pitch/2,py=y%pitch-pitch/2,dotR=pitch*0.34*(1-L/Math.max(0.01,th));if(px*px+py*py<dotR*dotR){r=ink[0];g=ink[1];b=ink[2];}else{r=d[i];g=d[i+1];b=d[i+2];}}
+      d[i]+=(r-d[i])*cmc;d[i+1]+=(g-d[i+1])*cmc;d[i+2]+=(b-d[i+2])*cmc;}
+    lg.putImageData(im,0,0);}
+  // Scatter Grain — per-pixel positional jitter (chunkable)
+  const sct=pval(c,'fxScatter',fr,0);
+  if(sct>0){const amt=sct*k,gg=Math.round(pval(c,'fxScatterGrain',fr,0)),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,hx=(x>>gg),hy=(y>>gg),h=((hx*374761393)^(hy*668265263))>>>0,h2=((hx*2654435761)^(hy*40503))>>>0,dx=((h&255)/255-0.5)*2*amt,dy=((h2&255)/255-0.5)*2*amt,sx=clamp((x+dx)|0,0,W-1),sy=clamp((y+dy)|0,0,H-1),j=(sy*W+sx)*4;
+      d[i]=s[j];d[i+1]=s[j+1];d[i+2]=s[j+2];d[i+3]=s[j+3];}
+    lg.putImageData(im,0,0);}
+  // Liquid Metal — relief from luminance gradient remapped through a metal ramp
+  const chr=clamp(pval(c,'fxChrome',fr,0),0,1);
+  if(chr>0){const con=pval(c,'fxChromeContrast',fr,1.6),tint=hex2rgb(c.fxChromeTint||'#cfe0f5'),lo=hex2rgb('#1a2330'),hiC=hex2rgb('#ffffff'),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),lum=idx=>0.299*s[idx]+0.587*s[idx+1]+0.114*s[idx+2];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;const x0=x>0?x-1:x,x1=x<W-1?x+1:x,y0=y>0?y-1:y,y1=y<H-1?y+1:y;
+      const gx=lum((y*W+x1)*4)-lum((y*W+x0)*4),gy=lum((y1*W+x)*4)-lum((y0*W+x)*4),cl=lum(i)/255,rel=clamp(0.5+(cl-0.5)*con+(gx+gy)/512,0,1);
+      let a,b,t;if(rel<0.5){a=lo;b=tint;t=rel*2;}else{a=tint;b=hiC;t=(rel-0.5)*2;}d[i]+=((a[0]+(b[0]-a[0])*t)-d[i])*chr;d[i+1]+=((a[1]+(b[1]-a[1])*t)-d[i+1])*chr;d[i+2]+=((a[2]+(b[2]-a[2])*t)-d[i+2])*chr;}
+    lg.putImageData(im,0,0);}
+  // Wet Sheen — glossy specular rim along tonal edges
+  const pla=clamp(pval(c,'fxPlastic',fr,0),0,1);
+  if(pla>0){const sharp=Math.max(0.1,pval(c,'fxPlasticSharp',fr,1.8)),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),lum=idx=>0.299*s[idx]+0.587*s[idx+1]+0.114*s[idx+2];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]===0)continue;const x0=x>0?x-1:x,x1=x<W-1?x+1:x,y0=y>0?y-1:y,y1=y<H-1?y+1:y;
+      const gx=lum((y*W+x1)*4)-lum((y*W+x0)*4),gy=lum((y1*W+x)*4)-lum((y0*W+x)*4),mag=Math.sqrt(gx*gx+gy*gy)/255,hl=clamp(Math.pow(mag,1/sharp),0,1)*pla;
+      d[i]+=(255-d[i])*hl;d[i+1]+=(255-d[i+1])*hl;d[i+2]+=(255-d[i+2])*hl;}
+    lg.putImageData(im,0,0);}
+  // Leaded Glass — Voronoi cells + dark leading borders
+  const stg=pval(c,'fxStainedGlass',fr,0);
+  if(stg>0){const cell=Math.max(6,stg*k),bw=Math.max(1,Math.round(pval(c,'fxGlassBorder',fr,2))),lead=hex2rgb(c.fxGlassLead||'#0a0a0a'),cols=Math.ceil(W/cell)+2,rows=Math.ceil(H/cell)+2,nc=cols*rows,sxA=new Float32Array(nc),syA=new Float32Array(nc);
+    for(let gy=0;gy<rows;gy++)for(let gx=0;gx<cols;gx++){const h=((gx*374761393)^(gy*668265263))>>>0;sxA[gy*cols+gx]=(gx-1+0.5)*cell+((h&255)/255-0.5)*0.7*cell;syA[gy*cols+gx]=(gy-1+0.5)*cell+(((h>>8)&255)/255-0.5)*0.7*cell;}
+    const im=lg.getImageData(0,0,W,H),d=im.data,asg=new Int32Array(W*H),sR=new Float64Array(nc),sG=new Float64Array(nc),sB=new Float64Array(nc),ct=new Uint32Array(nc);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,gx0=Math.floor(x/cell)+1,gy0=Math.floor(y/cell)+1;let best=-1,bd=1e18;
+      for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const gx=gx0+ox,gy=gy0+oy;if(gx<0||gy<0||gx>=cols||gy>=rows)continue;const k2=gy*cols+gx,ax=x-sxA[k2],ay=y-syA[k2],dd=ax*ax+ay*ay;if(dd<bd){bd=dd;best=k2;}}
+      asg[y*W+x]=best;if(best>=0&&d[i+3]>0){sR[best]+=d[i];sG[best]+=d[i+1];sB[best]+=d[i+2];ct[best]++;}}
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;const b=asg[y*W+x];let bor=false;
+      for(let oy=-bw;oy<=bw&&!bor;oy++)for(let ox=-bw;ox<=bw;ox++){const xx=x+ox,yy=y+oy;if(xx<0||yy<0||xx>=W||yy>=H)continue;if(asg[yy*W+xx]!==b){bor=true;break;}}
+      if(bor){d[i]=lead[0];d[i+1]=lead[1];d[i+2]=lead[2];}else if(b>=0&&ct[b]>0){d[i]=sR[b]/ct[b];d[i+1]=sG[b]/ct[b];d[i+2]=sB[b]/ct[b];}}
+    lg.putImageData(im,0,0);}
+  // Kaleidoscope — radial wedge mirror
+  const kal=Math.round(pval(c,'fxKaleido',fr,1));
+  if(kal>1){const spin=pval(c,'fxKaleidoSpin',fr,0),seg=2*Math.PI/kal,cx=W/2,cy=H/2,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,dx=x-cx,dy=y-cy,r=Math.hypot(dx,dy);let a=Math.atan2(dy,dx)+spin;a=((a%seg)+seg)%seg;if(a>seg/2)a=seg-a;const ang2=a+spin,sx=cx+r*Math.cos(ang2),sy=cy+r*Math.sin(ang2);d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Polar Wrap — rect↔polar remap
+  const pol=pval(c,'fxPolar',fr,0);
+  if(pol>0){const mode=c.fxPolarMode||'Rect→Polar',cx=W/2,cy=H/2,maxR=Math.min(W,H)/2,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;let sx,sy;if(mode==='Polar→Rect'){let th=Math.atan2(y-cy,x-cx)+Math.PI/2;if(th<0)th+=2*Math.PI;const rr=Math.hypot(x-cx,y-cy);sx=((th%(2*Math.PI))/(2*Math.PI))*W;sy=(rr/maxR)*H;}else{const th=(x/W)*2*Math.PI,rr=(y/H)*maxR;sx=cx+rr*Math.cos(th-Math.PI/2);sy=cy+rr*Math.sin(th-Math.PI/2);}d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Pond Ripple — concentric radial displacement
+  const rip=pval(c,'fxRipple',fr,0);
+  if(rip>0){const wave=Math.max(2,pval(c,'fxRippleWave',fr,40)*k),phase=pval(c,'fxRipplePhase',fr,0),cx=W/2,cy=H/2,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,dx=x-cx,dy=y-cy,r=Math.hypot(dx,dy),disp=rip*18*k*Math.sin(r/wave*2*Math.PI-phase),nr=r+disp;let sx=x,sy=y;if(r>0){sx=cx+dx*nr/r;sy=cy+dy*nr/r;}d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Magnifier — local circular zoom
+  const lou=pval(c,'fxLoupe',fr,0);
+  if(lou>0){const cx=pval(c,'fxLoupeX',fr,0.5)*W,cy=pval(c,'fxLoupeY',fr,0.5)*H,rp=pval(c,'fxLoupeRad',fr,0.25)*Math.min(W,H),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,dd=Math.hypot(x-cx,y-cy);if(dd<rp){const f=dd/rp,fall=1-f*f,sc=1/(1+lou*fall),sx=cx+(x-cx)*sc,sy=cy+(y-cy)*sc;d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}}
+    lg.putImageData(im,0,0);}
+  // Lens Warp — barrel/pincushion (r^2 polynomial)
+  const fis=pval(c,'fxFisheye',fr,0);
+  if(fis!==0){const sc2=pval(c,'fxFisheyeScale',fr,1),cx=W/2,cy=H/2,maxR=Math.min(W,H)/2,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,nx=(x-cx)/maxR,ny=(y-cy)/maxR,r2=nx*nx+ny*ny,f=1+fis*r2,sx=cx+nx*maxR*f*sc2,sy=cy+ny*maxR*f*sc2;d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Tube Curve — CRT bulge with rounded edge + edge dim
+  const tub=pval(c,'fxTubeCurve',fr,0);
+  if(tub>0){const vig=clamp(pval(c,'fxCRTVignette',fr,0),0,1),cx=W/2,cy=H/2,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,nx=(x-cx)/(W/2),ny=(y-cy)/(H/2),sxn=nx*(1+tub*0.5*ny*ny),syn=ny*(1+tub*0.5*nx*nx),sx=cx+sxn*(W/2),sy=cy+syn*(H/2);
+      if(sx<0||sx>=W||sy<0||sy>=H){d[i+3]=0;}else{d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);if(vig>0){const dim=clamp(1-(nx*nx+ny*ny)*vig,0,1);d[i]*=dim;d[i+1]*=dim;d[i+2]*=dim;}}}
+    lg.putImageData(im,0,0);}
+  // Pinch & Punch — radial pinch (neg) / punch (pos)
+  const pin=pval(c,'fxPinch',fr,0);
+  if(pin!==0){const cx=pval(c,'fxPinchX',fr,0.5)*W,cy=pval(c,'fxPinchY',fr,0.5)*H,maxR=Math.min(W,H)/2*pval(c,'fxPinchRad',fr,0.8),im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),samp=(sx,sy,o)=>{const xi=sx<0?0:sx>W-1?W-1:sx|0,yi=sy<0?0:sy>H-1?H-1:sy|0;return s[(yi*W+xi)*4+o];};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,dx=x-cx,dy=y-cy,r=Math.hypot(dx,dy),nd=r/maxR;let sx=x,sy=y;if(nd<1&&nd>1e-4){const ndp=(pin<0)?Math.pow(nd,1+(-pin)*1.5):Math.pow(nd,1/(1+pin*1.5)),sc=ndp/nd;sx=cx+dx*sc;sy=cy+dy*sc;}d[i]=samp(sx,sy,0);d[i+1]=samp(sx,sy,1);d[i+2]=samp(sx,sy,2);d[i+3]=samp(sx,sy,3);}
+    lg.putImageData(im,0,0);}
+  // Halo Glow — coloured soft glow behind the silhouette (composited under L)
+  const og=pval(c,'fxOuterGlow',fr,0);
+  if(og>0){const size=og*k,col=c.fxGlowColor||'#ff5fa2',inten=clamp(pval(c,'fxGlowIntensity',fr,0.85),0,1);
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${size.toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalCompositeOperation='destination-over';lg.globalAlpha=inten;lg.drawImage(S,0,0);reset(lg);}
+  // Tinted Shadow — offset+blurred coloured shadow from layer alpha (under L)
+  const ds2=pval(c,'fxDropShadow2',fr,0);
+  if(ds2>0){const dist=ds2*k,ang=pval(c,'fxShadAngle',fr,135)*Math.PI/180,ox=Math.cos(ang)*dist,oy=Math.sin(ang)*dist,soft=pval(c,'fxShadSoft',fr,8)*k,col=c.fxShadColor||'#000000',op=clamp(pval(c,'fxShadOpacity',fr,0.6),0,1);
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${soft.toFixed(1)}px)`;sg.drawImage(L,ox,oy);sg.filter='none';sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalCompositeOperation='destination-over';lg.globalAlpha=op;lg.drawImage(S,0,0);reset(lg);}
+  // Trailing Shadow — flat-design silhouette stamped along an angle, behind L
+  const lsh=pval(c,'fxLongShadow',fr,0);
+  if(lsh>0){const ang=pval(c,'fxLSAngle',fr,135)*Math.PI/180,len=lsh*k,N=clamp(Math.round(len),4,80),stepx=Math.cos(ang)*len/N,stepy=Math.sin(ang)*len/N,col=c.fxLSColor||'#000000',op=clamp(pval(c,'fxLSOpacity',fr,0.45),0,1);
+    reset(sg);sg.clearRect(0,0,W,H);for(let i=1;i<=N;i++){sg.globalAlpha=1-i/N;sg.drawImage(L,stepx*i,stepy*i);}reset(sg);
+    sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalCompositeOperation='destination-over';lg.globalAlpha=op;lg.drawImage(S,0,0);reset(lg);}
+  // Floor Shadow — silhouette laid onto an imagined ground (skew + flatten), behind L
+  const ffs=pval(c,'fxFloorShadow',fr,0);
+  if(ffs>0){const flat=clamp(pval(c,'fxFSFlatten',fr,0.45),0.1,1),soft=pval(c,'fxFSSoft',fr,12)*k,op=clamp(pval(c,'fxFSOpacity',fr,0.5),0,1),col=c.fxFSColor||'#000000',lean=ffs/100*0.8;
+    const ld=lg.getImageData(0,0,W,H).data;let mnX=W,mxX=0,mxY=0,found=false;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(ld[(y*W+x)*4+3]>8){found=true;if(x<mnX)mnX=x;if(x>mxX)mxX=x;if(y>mxY)mxY=y;}}
+    if(found){const cx=(mnX+mxX)/2;reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${Math.max(0,soft).toFixed(1)}px)`;sg.translate(cx,mxY);sg.transform(1,0,lean,flat,0,0);sg.translate(-cx,-mxY);sg.drawImage(L,0,0);sg.setTransform(1,0,0,1,0,0);sg.filter='none';
+      sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+      reset(lg);lg.globalCompositeOperation='destination-over';lg.globalAlpha=op;lg.drawImage(S,0,0);reset(lg);}}
+  // Edge Trace — coloured outline around the alpha silhouette
+  const stk=pval(c,'fxStroke',fr,0);
+  if(stk>0){const w=stk*k,col=c.fxStrokeColor||'#ffffff',op=clamp(pval(c,'fxStrokeOpacity',fr,1),0,1),pos=c.fxStrokePos||'Outside';
+    reset(sg);sg.clearRect(0,0,W,H);for(let a=0;a<16;a++){const th=a/16*2*Math.PI;sg.drawImage(L,Math.cos(th)*w,Math.sin(th)*w);}reset(sg);
+    sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalAlpha=op;
+    if(pos==='Inside'){lg.globalCompositeOperation='source-atop';lg.drawImage(S,0,0);}
+    else if(pos==='Center'){lg.globalCompositeOperation='destination-over';lg.drawImage(S,0,0);reset(lg);lg.globalAlpha=op;lg.globalCompositeOperation='source-atop';lg.drawImage(S,0,0);}
+    else{lg.globalCompositeOperation='destination-over';lg.drawImage(S,0,0);}
+    reset(lg);}
+  // Carved Edge — chiselled bevel from the alpha gradient lit by a light vector
+  const bev=pval(c,'fxBevelAlpha',fr,0);
+  if(bev>0){const depth=bev*k,lang=pval(c,'fxBevLight',fr,135)*Math.PI/180,lx=Math.cos(lang),ly=Math.sin(lang),inten=clamp(pval(c,'fxBevIntensity',fr,0.7),0,1),sof=pval(c,'fxBevSoften',fr,4)*k;
+    reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${Math.max(1,depth+sof).toFixed(1)}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    const ab=sg.getImageData(0,0,W,H).data,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;const x0=x>0?x-1:x,x1=x<W-1?x+1:x,y0=y>0?y-1:y,y1=y<H-1?y+1:y;
+      const gx=(ab[(y*W+x1)*4+3]-ab[(y*W+x0)*4+3])/255,gy=(ab[(y1*W+x)*4+3]-ab[(y0*W+x)*4+3])/255,dot=clamp(gx*lx+gy*ly,-1,1)*inten,tgt=dot>0?255:0,a2=Math.abs(dot);
+      d[i]+=(tgt-d[i])*a2;d[i+1]+=(tgt-d[i+1])*a2;d[i+2]+=(tgt-d[i+2])*a2;}
+    lg.putImageData(im,0,0);}
+  // Inset Shadow — shadow cast inward from the silhouette edge
+  const ins=pval(c,'fxInnerShadow',fr,0);
+  if(ins>0){const dist=ins*k,ang=pval(c,'fxISAngle',fr,135)*Math.PI/180,ox=Math.cos(ang)*dist,oy=Math.sin(ang)*dist,soft=pval(c,'fxISSoft',fr,6)*k,op=clamp(pval(c,'fxISOpacity',fr,0.6),0,1),col=c.fxISColor||'#000000';
+    reset(sg);sg.clearRect(0,0,W,H);sg.drawImage(L,0,0);sg.globalCompositeOperation='destination-out';sg.filter=`blur(${Math.max(0,soft).toFixed(1)}px)`;sg.drawImage(L,ox,oy);sg.filter='none';reset(sg);
+    sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalCompositeOperation='source-atop';lg.globalAlpha=op;lg.drawImage(S,0,0);reset(lg);}
+  // Rim Light — bright directional edge kicker (additive)
+  const rim=pval(c,'fxRimLight',fr,0);
+  if(rim>0){const w=rim*k,ang=pval(c,'fxRimAngle',fr,315)*Math.PI/180,ox=Math.cos(ang)*w,oy=Math.sin(ang)*w,inten=clamp(pval(c,'fxRimIntensity',fr,0.9),0,1),col=c.fxRimColor||'#ffffff';
+    reset(sg);sg.clearRect(0,0,W,H);sg.drawImage(L,0,0);sg.globalCompositeOperation='destination-out';sg.filter=`blur(${Math.max(1,w*0.4).toFixed(1)}px)`;sg.drawImage(L,ox,oy);sg.filter='none';reset(sg);
+    sg.globalCompositeOperation='source-in';sg.fillStyle=col;sg.fillRect(0,0,W,H);reset(sg);
+    reset(lg);lg.globalCompositeOperation='lighter';lg.globalAlpha=inten;lg.drawImage(S,0,0);reset(lg);}
+  // Matte Choke — close holes (dilate→erode) / open specks (erode→dilate) on alpha
+  const mck=pval(c,'fxMatteChoke',fr,0);
+  if(mck!==0){const r=Math.round(Math.abs(mck)*k);if(r>=1){const close=(c.fxMatteChokeMode!=='Open specks'),im=lg.getImageData(0,0,W,H),d=im.data,N=W*H,M=new Float32Array(N);
+    for(let j=0,i=0;j<N;j++,i+=4)M[j]=d[i+3]/255;let R=morphMatte(M,W,H,close?r:-r);R=morphMatte(R,W,H,close?-r:r);
+    for(let j=0,i=0;j<N;j++,i+=4)d[i+3]=Math.round(R[j]*255);lg.putImageData(im,0,0);}}
+  // Edge Spread — single-step alpha dilate(+)/erode(-)
+  const chk=pval(c,'fxChoker',fr,0);
+  if(chk!==0){const r=Math.round(chk*k);if(Math.abs(r)>=1){const im=lg.getImageData(0,0,W,H),d=im.data,N=W*H,M=new Float32Array(N);
+    for(let j=0,i=0;j<N;j++,i+=4)M[j]=d[i+3]/255;const R=morphMatte(M,W,H,r);
+    for(let j=0,i=0;j<N;j++,i+=4)d[i+3]=Math.round(R[j]*255);lg.putImageData(im,0,0);}}
+  // Feather Matte — soften only the alpha edge
+  const fea=pval(c,'fxFeatherAlpha',fr,0);
+  if(fea>0){const r=Math.round(fea*k);if(r>=1){const bias=pval(c,'fxFeatherBias',fr,0),im=lg.getImageData(0,0,W,H),d=im.data,N=W*H,M=new Float32Array(N);
+    for(let j=0,i=0;j<N;j++,i+=4)M[j]=d[i+3]/255;const R=blurMatte(M,W,H,r);
+    for(let j=0,i=0;j<N;j++,i+=4)d[i+3]=Math.round(clamp(R[j]+bias,0,1)*255);lg.putImageData(im,0,0);}}
+  // Matte Levels — input black/white + gamma remap on the alpha channel
+  const alv=clamp(pval(c,'fxAlphaLevels',fr,0),0,1);
+  if(alv>0){const inB=pval(c,'fxAlphaInB',fr,0),inW=pval(c,'fxAlphaInW',fr,1),gm=Math.max(0.01,pval(c,'fxAlphaGamma2',fr,1)),rng=Math.max(1e-3,inW-inB),LUT=new Uint8ClampedArray(256);
+    for(let v=0;v<256;v++){let t=(v/255-inB)/rng;t=t<0?0:t>1?1:t;t=Math.pow(t,1/gm);LUT[v]=Math.round(t*255);}
+    const im=lg.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4)d[i+3]+=(LUT[d[i+3]]-d[i+3])*alv;lg.putImageData(im,0,0);}
+  // Despeckle Matte — median on alpha to kill lone speckles
+  const dsp2=clamp(pval(c,'fxDespot',fr,0),0,1);
+  if(dsp2>0){const r=(c.fxDespotKern==='5x5')?2:1,im=lg.getImageData(0,0,W,H),d=im.data,s=new Uint8ClampedArray(d),win=[];
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;win.length=0;for(let dy=-r;dy<=r;dy++){const yy=y+dy<0?0:y+dy>=H?H-1:y+dy;for(let dx=-r;dx<=r;dx++){const xx=x+dx<0?0:x+dx>=W?W-1:x+dx;win.push(s[(yy*W+xx)*4+3]);}}
+      win.sort((a,b)=>a-b);const med=win[win.length>>1];d[i+3]=Math.round(s[i+3]+(med-s[i+3])*dsp2);}
+    lg.putImageData(im,0,0);}
+  // Refine Matte — blur then re-harden the alpha edge
+  const rfe=clamp(pval(c,'fxRefineEdge',fr,0),0,1);
+  if(rfe>0){const r=Math.round(pval(c,'fxRefineFeather',fr,0)*k+1),shift=pval(c,'fxRefineShift',fr,0),im=lg.getImageData(0,0,W,H),d=im.data,N=W*H,M=new Float32Array(N);
+    for(let j=0,i=0;j<N;j++,i+=4)M[j]=d[i+3]/255;const B=blurMatte(M,W,H,r);
+    for(let j=0,i=0;j<N;j++,i+=4){d[i+3]=Math.round(clamp((B[j]-0.5)*(1+rfe*3)+0.5+shift,0,1)*255);}lg.putImageData(im,0,0);}
+  // Edge-Only Blur — blur the picture only in the matte transition band
+  const ebl=pval(c,'fxEdgeBlur',fr,0);
+  if(ebl>0){const r=Math.round(ebl*k);if(r>=1){reset(sg);sg.clearRect(0,0,W,H);sg.filter=`blur(${r}px)`;sg.drawImage(L,0,0);sg.filter='none';
+    const bl=sg.getImageData(0,0,W,H).data,im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){const a=d[i+3]/255,E=4*a*(1-a);if(E>0.01){d[i]+=(bl[i]-d[i])*E;d[i+1]+=(bl[i+1]-d[i+1])*E;d[i+2]+=(bl[i+2]-d[i+2])*E;}}
+    lg.putImageData(im,0,0);}}
+  // Grow & Bleed — spread the cutout outward, bleeding edge colour
+  const grb=pval(c,'fxGrowBounds',fr,0);
+  if(grb>0){const passes=Math.min(20,Math.round(grb*k)),bleed=(c.fxGrowBleed!=='Alpha only'),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let p=0;p<passes;p++){const s=new Uint8ClampedArray(d);
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(s[i+3]>=250)continue;let nj=-1;
+        if(x>0&&s[i-4+3]>200)nj=i-4;else if(x<W-1&&s[i+4+3]>200)nj=i+4;else if(y>0&&s[i-W*4+3]>200)nj=i-W*4;else if(y<H-1&&s[i+W*4+3]>200)nj=i+W*4;
+        if(nj>=0){if(bleed){d[i]=s[nj];d[i+1]=s[nj+1];d[i+2]=s[nj+2];}d[i+3]=255;}}}
+    lg.putImageData(im,0,0);}
+  // Invert Matte — invert the alpha channel
+  const ivm=clamp(pval(c,'fxInvertMatte',fr,0),0,1);
+  if(ivm>0){const im=lg.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4)d[i+3]+=((255-d[i+3])-d[i+3])*ivm;lg.putImageData(im,0,0);}
+  // Harden Matte — crisp the alpha at a cutoff with a soft band
+  const hmt=clamp(pval(c,'fxMatteThresh',fr,0),0,1);
+  if(hmt>0){const cut=pval(c,'fxMatteCut',fr,0.5),soft=Math.max(0.001,pval(c,'fxMatteSoft',fr,0.1)),im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){const a=d[i+3]/255;let t;if(a<cut-soft)t=0;else if(a>cut+soft)t=1;else t=(a-(cut-soft))/(2*soft);d[i+3]=Math.round(d[i+3]*(1-hmt)+t*255*hmt);}
+    lg.putImageData(im,0,0);}
+  // Channel Calc — per-pixel arithmetic between two channels into a chosen output
+  const cmath=clamp(pval(c,'fxChannelMath',fr,0),0,1);
+  if(cmath>0){const pk=(r,g,b,sel)=>sel==='R'?r:sel==='G'?g:sel==='B'?b:(0.299*r+0.587*g+0.114*b),A=c.fxMathA||'R',Bs=c.fxMathB||'G',op=c.fxMathOp||'difference',oc=c.fxMathOut||'All',im=lg.getImageData(0,0,W,H),d=im.data;
+    for(let i=0;i<d.length;i+=4){if(d[i+3]===0)continue;const r=d[i],g=d[i+1],b=d[i+2],a=pk(r,g,b,A),bb=pk(r,g,b,Bs);let res;
+      if(op==='add')res=Math.min(255,a+bb);else if(op==='subtract')res=Math.max(0,a-bb);else if(op==='multiply')res=a*bb/255;else res=Math.abs(a-bb);
+      if(oc==='All'||oc==='R')d[i]+=(res-d[i])*cmath;if(oc==='All'||oc==='G')d[i+1]+=(res-d[i+1])*cmath;if(oc==='All'||oc==='B')d[i+2]+=(res-d[i+2])*cmath;}
     lg.putImageData(im,0,0);}
   // Masks
   if(clipMasks(c).length){buildMaskAlpha(M,S,c,f,W,H);
@@ -2555,6 +3216,21 @@ const FX_CAT={ // field → [category label, accent colour]
   fxRGB:['Distort','#8B7FD0'],fxWarp:['Distort','#8B7FD0'],
   fxDirBlur:['Blur','#5BA3C7'],fxRadBlur:['Blur','#5BA3C7'],
   fxKey:['Key','#5BB98C'],fxLumaKey:['Key','#5BB98C'],
+  fxBrightContrast:['Colour','#C77FB0'],fxPhotoFilter:['Colour','#C77FB0'],
+  fxRamp:['Generate','#6FB79A'],fxQuad:['Generate','#6FB79A'],fxGrid:['Generate','#6FB79A'],fxChecker:['Generate','#6FB79A'],fxFrame:['Generate','#6FB79A'],
+  fxDiffuse:['Blur','#5BA3C7'],fxStrobe:['Stylize','#D9A441'],fxTileStamp:['Stylize','#D9A441'],
+  fxOffset:['Distort','#8B7FD0'],fxMirror:['Distort','#8B7FD0'],fxShear:['Distort','#8B7FD0'],
+  fxColorKnockout:['Key','#5BB98C'],fxDespill:['Key','#5BB98C'],fxUnmultiply:['Key','#5BB98C'],
+  fxChannelShuffle:['Channel','#9CC75B'],fxChannelFlip:['Channel','#9CC75B'],fxAlphaFromLum:['Channel','#9CC75B'],
+  fxWipeLinear:['Transition','#C7905B'],fxWipeClock:['Transition','#C7905B'],fxWipeIris:['Transition','#C7905B'],fxWipeBlinds:['Transition','#C7905B'],fxWipeBarn:['Transition','#C7905B'],fxWipeDip:['Transition','#C7905B'],fxWipeTiles:['Transition','#C7905B'],fxWipeGradient:['Transition','#C7905B'],fxWipePush:['Transition','#C7905B'],
+  fxBWMix:['Colour','#C77FB0'],fxChannelMix:['Channel','#9CC75B'],fxColorBalance:['Colour','#C77FB0'],fxTritone:['Colour','#C77FB0'],fxLeaveColor:['Colour','#C77FB0'],fxSwatchSwap:['Colour','#C77FB0'],fxFilmFade:['Colour','#C77FB0'],fxCineLUT:['Colour','#C77FB0'],fxToneMap:['Colour','#C77FB0'],
+  fxBoxBlur:['Blur','#5BA3C7'],fxLensBlur:['Blur','#5BA3C7'],fxTiltShift:['Blur','#5BA3C7'],fxIrisBlur:['Blur','#5BA3C7'],fxUnsharp:['Blur','#5BA3C7'],fxSurfaceBlur:['Blur','#5BA3C7'],fxFrost:['Blur','#5BA3C7'],fxCompoundBlur:['Blur','#5BA3C7'],
+  fxCrystallize:['Stylize','#D9A441'],fxPosterEdges:['Stylize','#D9A441'],fxOilBrush:['Stylize','#D9A441'],fxKuwahara:['Stylize','#D9A441'],fxColorDots:['Stylize','#D9A441'],fxDither:['Stylize','#D9A441'],fxComic:['Stylize','#D9A441'],fxScatter:['Stylize','#D9A441'],
+  fxChrome:['Stylize','#D9A441'],fxPlastic:['Stylize','#D9A441'],fxStainedGlass:['Stylize','#D9A441'],
+  fxKaleido:['Distort','#8B7FD0'],fxPolar:['Distort','#8B7FD0'],fxRipple:['Distort','#8B7FD0'],fxLoupe:['Distort','#8B7FD0'],fxFisheye:['Distort','#8B7FD0'],fxTubeCurve:['Distort','#8B7FD0'],fxPinch:['Distort','#8B7FD0'],
+  fxRays:['Generate','#6FB79A'],fxFlare:['Generate','#6FB79A'],fxStarburst:['Generate','#6FB79A'],fxCRTOverlay:['Generate','#6FB79A'],fxOuterGlow:['Perspective','#B05B8B'],fxDropShadow2:['Perspective','#B05B8B'],
+  fxLongShadow:['Perspective','#B05B8B'],fxFloorShadow:['Perspective','#B05B8B'],fxStroke:['Perspective','#B05B8B'],fxBevelAlpha:['Perspective','#B05B8B'],fxInnerShadow:['Perspective','#B05B8B'],fxRimLight:['Perspective','#B05B8B'],
+  fxMatteChoke:['Matte','#5BB9A8'],fxChoker:['Matte','#5BB9A8'],fxFeatherAlpha:['Matte','#5BB9A8'],fxAlphaLevels:['Matte','#5BB9A8'],fxDespot:['Matte','#5BB9A8'],fxRefineEdge:['Matte','#5BB9A8'],fxEdgeBlur:['Matte','#5BB9A8'],fxGrowBounds:['Matte','#5BB9A8'],fxInvertMatte:['Matte','#5BB9A8'],fxMatteThresh:['Matte','#5BB9A8'],fxChannelMath:['Channel','#9CC75B'],
 };
 const FX_RANGE={ // field → [min,max,step] for the slider
   fxBlur:[0,40,.5],fxBright:[.2,2.5,.01],fxExposure:[-3,3,.05],fxContrast:[.2,3,.01],fxSat:[0,3,.01],fxVibrance:[-1,1.5,.01],
@@ -2563,6 +3239,17 @@ const FX_RANGE={ // field → [min,max,step] for the slider
   fxTint:[0,1,.01],fxGrain:[0,1,.01],fxPixel:[0,60,1],fxGlow:[0,1,.01],fxSharpen:[0,3,.05],fxEmboss:[0,1,.01],fxEdges:[0,1,.01],
   fxRGB:[-20,20,1],fxHalftone:[2,20,1],fxLeak:[0,1,.01],fxScan:[0,1,.01],
   fxKey:[0,1,.01],fxLumaKey:[0,1,.01],fxDirBlur:[0,60,1],fxRadBlur:[0,1,.01],fxWarp:[-1,1,.02],
+  fxBrightContrast:[0,2,.01],fxPhotoFilter:[0,1,.01],fxRamp:[0,1,.01],fxQuad:[0,1,.01],fxGrid:[0,1,.01],fxChecker:[0,1,.01],fxFrame:[0,1,.01],
+  fxDiffuse:[0,1,.02],fxStrobe:[0,1,.01],fxOffset:[-1,1,.01],fxMirror:[0,1,.02],fxShear:[0,1,.02],fxTileStamp:[1,10,1],
+  fxColorKnockout:[0,1,.01],fxChannelShuffle:[0,1,.01],fxChannelFlip:[0,1,.01],fxAlphaFromLum:[0,1,.01],fxDespill:[0,1,.01],fxUnmultiply:[0,1,.01],
+  fxWipeLinear:[0,1,.01],fxWipeClock:[0,1,.01],fxWipeIris:[0,1,.01],fxWipeBlinds:[0,1,.01],fxWipeBarn:[0,1,.01],fxWipeDip:[0,1,.01],fxWipeTiles:[0,1,.01],fxWipeGradient:[0,1,.01],fxWipePush:[0,1,.01],
+  fxBWMix:[0,1,.01],fxChannelMix:[0,1,.01],fxColorBalance:[0,1,.01],fxTritone:[0,1,.01],fxLeaveColor:[0,1,.01],fxSwatchSwap:[0,1,.01],fxFilmFade:[0,1,.01],fxCineLUT:[0,1,.01],fxToneMap:[0,1,.01],
+  fxBoxBlur:[0,60,.5],fxLensBlur:[0,50,.5],fxTiltShift:[0,50,.5],fxIrisBlur:[0,50,.5],fxUnsharp:[0,3,.05],fxSurfaceBlur:[0,12,1],fxFrost:[0,20,.5],fxCompoundBlur:[0,50,.5],
+  fxCrystallize:[0,140,1],fxPosterEdges:[0,1,.05],fxOilBrush:[0,12,1],fxKuwahara:[0,10,1],fxColorDots:[0,40,1],fxDither:[0,1,.05],fxComic:[0,1,.05],fxScatter:[0,40,1],
+  fxChrome:[0,1,.05],fxPlastic:[0,1,.05],fxStainedGlass:[0,160,1],fxKaleido:[1,16,1],fxPolar:[0,1,1],fxRipple:[0,1,.02],fxLoupe:[0,1.5,.05],fxFisheye:[-1,1,.02],fxTubeCurve:[0,1,.02],fxPinch:[-1,1,.02],
+  fxRays:[0,1,.01],fxFlare:[0,1,.01],fxStarburst:[0,1,.01],fxCRTOverlay:[0,1,.01],fxOuterGlow:[0,60,1],fxDropShadow2:[0,80,1],
+  fxLongShadow:[0,120,1],fxFloorShadow:[0,100,1],fxStroke:[0,30,1],fxBevelAlpha:[0,30,1],fxInnerShadow:[0,40,1],fxRimLight:[0,24,1],
+  fxMatteChoke:[-30,30,1],fxChoker:[-25,25,1],fxFeatherAlpha:[0,40,1],fxAlphaLevels:[0,1,.01],fxDespot:[0,1,.01],fxRefineEdge:[0,1,.01],fxEdgeBlur:[0,30,1],fxGrowBounds:[0,30,1],fxInvertMatte:[0,1,.01],fxMatteThresh:[0,1,.01],fxChannelMath:[0,1,.01],
 };
 function efxRange(f){return FX_RANGE[f]||[0,1,.01];}
 // Extra per-effect controls beyond the main slider — swatch / second slider / segmented selector
@@ -2590,6 +3277,87 @@ const FX_EXTRA={
   fxWarp:[{kind:'seg',sub:'fxWarpType',label:'Type',opts:['twirl','bulge','spherize','wave'],def:'twirl'}],
   fxGradMap:[{kind:'gradmap'}],
   fxNoise:[{kind:'slider',sub:'fxNoiseScale',label:'Scale',min:4,max:400,step:1}],
+  fxBrightContrast:[{kind:'slider',sub:'fxBCBright',label:'Brightness',min:-100,max:100,step:1},{kind:'slider',sub:'fxBCContrast',label:'Contrast',min:-100,max:100,step:1}],
+  fxPhotoFilter:[{kind:'swatch',sub:'fxPFColor',def:'#ec8a3c',label:'Filter colour'},{kind:'seg',sub:'fxPFPreserve',label:'Preserve Lum',opts:['off','on'],def:'off'}],
+  fxRamp:[{kind:'seg',sub:'fxRampShape',label:'Shape',opts:['linear','radial'],def:'linear'},{kind:'slider',sub:'fxRampAngle',label:'Angle°',min:0,max:360,step:1},{kind:'seg',sub:'fxRampBlend',label:'Blend',opts:['normal','multiply','screen','overlay'],def:'normal'},{kind:'swatch',sub:'fxRampA',def:'#ff5fa2',label:'Start colour'},{kind:'swatch',sub:'fxRampB',def:'#13123a',label:'End colour'}],
+  fxQuad:[{kind:'seg',sub:'fxQuadBlend',label:'Blend',opts:['normal','screen','multiply','overlay'],def:'screen'},{kind:'swatch',sub:'fxQuadTL',def:'#ff5fa2',label:'Top-left'},{kind:'swatch',sub:'fxQuadTR',def:'#ffd166',label:'Top-right'},{kind:'swatch',sub:'fxQuadBL',def:'#5bc0eb',label:'Bottom-left'},{kind:'swatch',sub:'fxQuadBR',def:'#9b5de5',label:'Bottom-right'}],
+  fxGrid:[{kind:'slider',sub:'fxGridSize',label:'Cell size',min:8,max:200,step:1},{kind:'slider',sub:'fxGridWidth',label:'Line width',min:0.5,max:8,step:0.5},{kind:'seg',sub:'fxGridBlend',label:'Blend',opts:['normal','screen','multiply'],def:'normal'},{kind:'swatch',sub:'fxGridColor',def:'#ffffff',label:'Line colour'}],
+  fxChecker:[{kind:'slider',sub:'fxCheckSize',label:'Square size',min:4,max:160,step:1},{kind:'seg',sub:'fxCheckBlend',label:'Blend',opts:['normal','multiply','screen'],def:'normal'},{kind:'swatch',sub:'fxCheckColor',def:'#000000',label:'Square colour'}],
+  fxFrame:[{kind:'slider',sub:'fxFrameWidth',label:'Stroke width',min:1,max:60,step:1},{kind:'slider',sub:'fxFrameInset',label:'Inset',min:0,max:200,step:1},{kind:'seg',sub:'fxFrameDouble',label:'Double line',opts:['off','on'],def:'off'},{kind:'swatch',sub:'fxFrameColor',def:'#ffffff',label:'Frame colour'}],
+  fxDiffuse:[{kind:'slider',sub:'fxDiffRadius',label:'Softness',min:4,max:60,step:1}],
+  fxStrobe:[{kind:'slider',sub:'fxStrobePeriod',label:'Period',min:0.02,max:0.5,step:0.01},{kind:'slider',sub:'fxStrobeDuty',label:'On Ratio',min:0.05,max:0.95,step:0.05},{kind:'swatch',sub:'fxStrobeColor',def:'#ffffff',label:'Flash colour'}],
+  fxOffset:[{kind:'slider',sub:'fxOffsetY',label:'Shift Y',min:-1,max:1,step:0.01}],
+  fxMirror:[{kind:'slider',sub:'fxMirrorSeam',label:'Seam',min:-0.5,max:0.5,step:0.02},{kind:'seg',sub:'fxMirrorSide',label:'Fold',opts:['L→R','R→L','T→B','B→T'],def:'L→R'}],
+  fxShear:[{kind:'slider',sub:'fxShearWave',label:'Band Height',min:8,max:120,step:2},{kind:'slider',sub:'fxShearPhase',label:'Phase',min:0,max:6.28,step:0.05},{kind:'seg',sub:'fxShearAxis',label:'Axis',opts:['Horizontal','Vertical'],def:'Horizontal'}],
+  fxTileStamp:[{kind:'slider',sub:'fxTilePhase',label:'Row Offset',min:0,max:1,step:0.05},{kind:'seg',sub:'fxTileMirror',label:'Edges',opts:['Repeat','Mirror'],def:'Repeat'}],
+  fxColorKnockout:[{kind:'swatch',sub:'fxKnockColor',def:'#ff00ff',label:'Key colour'},{kind:'slider',sub:'fxKnockTol',label:'Tolerance',min:0,max:1,step:0.005},{kind:'slider',sub:'fxKnockSoft',label:'Softness',min:0,max:1,step:0.005}],
+  fxChannelShuffle:[{kind:'seg',sub:'fxShufR',label:'Red from',opts:['R','G','B','Lum','Max','Min'],def:'R'},{kind:'seg',sub:'fxShufG',label:'Green from',opts:['R','G','B','Lum','Max','Min'],def:'G'},{kind:'seg',sub:'fxShufB',label:'Blue from',opts:['R','G','B','Lum','Max','Min'],def:'B'}],
+  fxChannelFlip:[{kind:'seg',sub:'fxFlipCh',label:'Channel',opts:['R','G','B','RG','RB','GB'],def:'B'}],
+  fxAlphaFromLum:[{kind:'seg',sub:'fxAlphaDir',label:'Keep',opts:['bright','dark'],def:'bright'},{kind:'slider',sub:'fxAlphaGamma',label:'Falloff',min:0.2,max:5,step:0.01}],
+  fxDespill:[{kind:'seg',sub:'fxSpillCh',label:'Spill',opts:['green','blue'],def:'green'}],
+  fxWipeLinear:[{kind:'slider',sub:'fxWLAngle',label:'Angle°',min:0,max:360,step:1},{kind:'slider',sub:'fxWLFeather',label:'Feather',min:0,max:0.5,step:0.01}],
+  fxWipeClock:[{kind:'slider',sub:'fxWCStart',label:'Start Angle°',min:0,max:360,step:1},{kind:'seg',sub:'fxWCDir',label:'Direction',opts:['Clockwise','Counter'],def:'Clockwise'}],
+  fxWipeIris:[{kind:'seg',sub:'fxWIShape',label:'Shape',opts:['Circle','Diamond'],def:'Circle'},{kind:'slider',sub:'fxWIX',label:'Center X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxWIY',label:'Center Y',min:0,max:1,step:0.01},{kind:'seg',sub:'fxWIInvert',label:'Mode',opts:['Open','Close'],def:'Open'}],
+  fxWipeBlinds:[{kind:'slider',sub:'fxWBlCount',label:'Slats',min:2,max:40,step:1},{kind:'seg',sub:'fxWBlDir',label:'Direction',opts:['Horizontal','Vertical'],def:'Horizontal'}],
+  fxWipeBarn:[{kind:'seg',sub:'fxWBarnDir',label:'Direction',opts:['Horizontal','Vertical'],def:'Horizontal'},{kind:'seg',sub:'fxWBarnMode',label:'Mode',opts:['Open','Close'],def:'Open'}],
+  fxWipeDip:[{kind:'swatch',sub:'fxWDipColor',def:'#000000',label:'Dip colour'},{kind:'seg',sub:'fxWDipMode',label:'Mode',opts:['From Color','To Color'],def:'From Color'},{kind:'seg',sub:'fxWDipEase',label:'Ease',opts:['Linear','Smooth'],def:'Smooth'}],
+  fxWipeTiles:[{kind:'slider',sub:'fxWTCols',label:'Columns',min:3,max:60,step:1},{kind:'seg',sub:'fxWTPattern',label:'Pattern',opts:['Random','Checker'],def:'Random'},{kind:'slider',sub:'fxWTSoft',label:'Softness',min:0.01,max:0.5,step:0.01}],
+  fxWipeGradient:[{kind:'slider',sub:'fxWGSoft',label:'Edge Softness',min:0.02,max:0.6,step:0.01},{kind:'seg',sub:'fxWGInvert',label:'Reveal',opts:['Lights Last','Darks Last'],def:'Lights Last'}],
+  fxWipePush:[{kind:'seg',sub:'fxWPushDir',label:'From',opts:['Left','Right','Top','Bottom'],def:'Right'}],
+  fxBWMix:[{kind:'slider',sub:'fxBWRed',label:'Red',min:0,max:150,step:1},{kind:'slider',sub:'fxBWGreen',label:'Green',min:0,max:150,step:1},{kind:'slider',sub:'fxBWBlue',label:'Blue',min:0,max:150,step:1}],
+  fxChannelMix:[{kind:'slider',sub:'fxCMrr',label:'R←R',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMrg',label:'R←G',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMrb',label:'R←B',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMgr',label:'G←R',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMgg',label:'G←G',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMgb',label:'G←B',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMbr',label:'B←R',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMbg',label:'B←G',min:-200,max:200,step:1},{kind:'slider',sub:'fxCMbb',label:'B←B',min:-200,max:200,step:1}],
+  fxColorBalance:[{kind:'slider',sub:'fxCBShadR',label:'Shadow R',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBShadG',label:'Shadow G',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBShadB',label:'Shadow B',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBMidR',label:'Mid R',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBMidG',label:'Mid G',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBMidB',label:'Mid B',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBHiR',label:'Hi R',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBHiG',label:'Hi G',min:-100,max:100,step:1},{kind:'slider',sub:'fxCBHiB',label:'Hi B',min:-100,max:100,step:1}],
+  fxTritone:[{kind:'swatch',sub:'fxTriShadow',def:'#1a1730',label:'Shadows'},{kind:'swatch',sub:'fxTriMid',def:'#7a5a86',label:'Midtones'},{kind:'swatch',sub:'fxTriHi',def:'#ffe9c2',label:'Highlights'}],
+  fxLeaveColor:[{kind:'slider',sub:'fxLCHue',label:'Keep Hue°',min:0,max:360,step:1},{kind:'slider',sub:'fxLCTol',label:'Tolerance°',min:0,max:180,step:1},{kind:'slider',sub:'fxLCSoft',label:'Softness°',min:1,max:90,step:1}],
+  fxSwatchSwap:[{kind:'swatch',sub:'fxSwapFrom',def:'#e23a3a',label:'From colour'},{kind:'swatch',sub:'fxSwapTo',def:'#3a7be2',label:'To colour'},{kind:'slider',sub:'fxSwapTol',label:'Tolerance',min:0,max:1,step:0.005},{kind:'slider',sub:'fxSwapSoft',label:'Softness',min:0,max:1,step:0.005}],
+  fxFilmFade:[{kind:'slider',sub:'fxFFLift',label:'Lift Blacks',min:0,max:100,step:1},{kind:'slider',sub:'fxFFRoll',label:'Roll Whites',min:0,max:100,step:1},{kind:'swatch',sub:'fxFFShadow',def:'#2c3a4a',label:'Shadow tint'},{kind:'swatch',sub:'fxFFHi',def:'#f0d9b0',label:'Highlight tint'}],
+  fxCineLUT:[{kind:'seg',sub:'fxCLPreset',label:'Look',opts:['teal-orange','bleach','noir','vintage','clean'],def:'teal-orange'}],
+  fxToneMap:[{kind:'slider',sub:'fxTMShadow',label:'Shadows',min:0,max:100,step:1},{kind:'slider',sub:'fxTMHi',label:'Highlights',min:0,max:100,step:1},{kind:'slider',sub:'fxTMDetail',label:'Detail',min:0,max:100,step:1}],
+  fxBoxBlur:[{kind:'seg',sub:'fxBoxIter',label:'Iterations',opts:['1','2','3'],def:'1'}],
+  fxLensBlur:[{kind:'slider',sub:'fxLensHi',label:'Highlight Bloom',min:0,max:1,step:0.02}],
+  fxTiltShift:[{kind:'slider',sub:'fxTiltPos',label:'Position',min:0,max:1,step:0.01},{kind:'slider',sub:'fxTiltWidth',label:'Band Width',min:0.02,max:1,step:0.01},{kind:'slider',sub:'fxTiltFeather',label:'Feather',min:0,max:0.5,step:0.01},{kind:'seg',sub:'fxTiltDir',label:'Orientation',opts:['Horizontal','Vertical'],def:'Horizontal'}],
+  fxIrisBlur:[{kind:'slider',sub:'fxIrisRad',label:'Focus Radius',min:0.05,max:1,step:0.01},{kind:'slider',sub:'fxIrisFeather',label:'Feather',min:0,max:1,step:0.01},{kind:'slider',sub:'fxIrisCX',label:'Center X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxIrisCY',label:'Center Y',min:0,max:1,step:0.01}],
+  fxUnsharp:[{kind:'slider',sub:'fxUSRadius',label:'Radius',min:0.5,max:12,step:0.5},{kind:'slider',sub:'fxUSThresh',label:'Threshold',min:0,max:0.4,step:0.01}],
+  fxSurfaceBlur:[{kind:'slider',sub:'fxSurfThresh',label:'Threshold',min:0.02,max:0.6,step:0.01},{kind:'slider',sub:'fxSurfAmt',label:'Amount',min:0,max:1,step:0.02}],
+  fxFrost:[{kind:'seg',sub:'fxFrostQ',label:'Quality',opts:['Coarse','Fine'],def:'Coarse'}],
+  fxCompoundBlur:[{kind:'slider',sub:'fxCompBias',label:'Bias',min:0,max:1,step:0.02},{kind:'seg',sub:'fxCompInvert',label:'Drive By',opts:['Highlights','Shadows'],def:'Highlights'}],
+  fxCrystallize:[{kind:'seg',sub:'fxCrystalShape',label:'Cell Look',opts:['Crystal','Dots'],def:'Crystal'},{kind:'slider',sub:'fxCrystalJitter',label:'Randomness',min:0,max:1,step:0.05}],
+  fxPosterEdges:[{kind:'slider',sub:'fxPELevels',label:'Posterize Levels',min:2,max:12,step:1},{kind:'slider',sub:'fxPEThresh',label:'Edge Threshold',min:0,max:255,step:1},{kind:'swatch',sub:'fxPEInk',def:'#000000',label:'Ink Colour'}],
+  fxOilBrush:[{kind:'slider',sub:'fxOilBins',label:'Detail',min:4,max:40,step:1}],
+  fxColorDots:[{kind:'seg',sub:'fxDotsMode',label:'Inks',opts:['CMYK','Mono'],def:'CMYK'}],
+  fxDither:[{kind:'slider',sub:'fxDitherLevels',label:'Levels',min:2,max:8,step:1},{kind:'seg',sub:'fxDitherMono',label:'Colour',opts:['RGB','Mono'],def:'Mono'}],
+  fxComic:[{kind:'slider',sub:'fxComicThresh',label:'Ink Threshold',min:0,max:1,step:0.05},{kind:'slider',sub:'fxComicPitch',label:'Dot Pitch',min:3,max:20,step:1},{kind:'swatch',sub:'fxComicInk',def:'#101820',label:'Ink'}],
+  fxScatter:[{kind:'slider',sub:'fxScatterGrain',label:'Chunkiness',min:0,max:5,step:1}],
+  fxChrome:[{kind:'slider',sub:'fxChromeContrast',label:'Polish',min:0.5,max:3,step:0.1},{kind:'swatch',sub:'fxChromeTint',def:'#cfe0f5',label:'Metal Tint'}],
+  fxPlastic:[{kind:'slider',sub:'fxPlasticSharp',label:'Sharpness',min:0.5,max:4,step:0.1}],
+  fxStainedGlass:[{kind:'slider',sub:'fxGlassBorder',label:'Lead Width',min:1,max:6,step:1},{kind:'swatch',sub:'fxGlassLead',def:'#0a0a0a',label:'Lead Colour'}],
+  fxKaleido:[{kind:'slider',sub:'fxKaleidoSpin',label:'Spin',min:-3.14,max:3.14,step:0.05}],
+  fxPolar:[{kind:'seg',sub:'fxPolarMode',label:'Map',opts:['Rect→Polar','Polar→Rect'],def:'Rect→Polar'}],
+  fxRipple:[{kind:'slider',sub:'fxRippleWave',label:'Wavelength',min:10,max:120,step:2},{kind:'slider',sub:'fxRipplePhase',label:'Phase',min:0,max:6.28,step:0.05}],
+  fxLoupe:[{kind:'slider',sub:'fxLoupeRad',label:'Size',min:0.05,max:0.6,step:0.02},{kind:'slider',sub:'fxLoupeX',label:'Center X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxLoupeY',label:'Center Y',min:0,max:1,step:0.01}],
+  fxFisheye:[{kind:'slider',sub:'fxFisheyeScale',label:'Fit',min:0.6,max:1.4,step:0.02}],
+  fxTubeCurve:[{kind:'slider',sub:'fxCRTVignette',label:'Edge Dim',min:0,max:1,step:0.05}],
+  fxPinch:[{kind:'slider',sub:'fxPinchRad',label:'Radius',min:0.2,max:1.2,step:0.05},{kind:'slider',sub:'fxPinchX',label:'Center X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxPinchY',label:'Center Y',min:0,max:1,step:0.01}],
+  fxRays:[{kind:'slider',sub:'fxRayX',label:'Source X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxRayY',label:'Source Y',min:0,max:1,step:0.01},{kind:'slider',sub:'fxRayCount',label:'Ray count',min:12,max:200,step:1},{kind:'swatch',sub:'fxRayColor',def:'#ffdca8',label:'Ray colour'}],
+  fxFlare:[{kind:'slider',sub:'fxFlareX',label:'Source X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxFlareY',label:'Source Y',min:0,max:1,step:0.01},{kind:'swatch',sub:'fxFlareColor',def:'#ffffff',label:'Flare colour'}],
+  fxStarburst:[{kind:'slider',sub:'fxStarX',label:'Centre X',min:0,max:1,step:0.01},{kind:'slider',sub:'fxStarY',label:'Centre Y',min:0,max:1,step:0.01},{kind:'slider',sub:'fxStarPoints',label:'Points',min:2,max:8,step:1},{kind:'slider',sub:'fxStarLen',label:'Ray length',min:0.2,max:2,step:0.01},{kind:'swatch',sub:'fxStarColor',def:'#ffffff',label:'Glint colour'}],
+  fxCRTOverlay:[{kind:'seg',sub:'fxCRTPhosphor',label:'RGB phosphor',opts:['on','off'],def:'on'},{kind:'slider',sub:'fxCRTCurve',label:'Tube darken',min:0,max:1,step:0.01}],
+  fxOuterGlow:[{kind:'swatch',sub:'fxGlowColor',def:'#ff5fa2',label:'Glow Color'},{kind:'slider',sub:'fxGlowIntensity',label:'Intensity',min:0,max:1,step:0.05}],
+  fxDropShadow2:[{kind:'slider',sub:'fxShadAngle',label:'Angle',min:0,max:360,step:1},{kind:'slider',sub:'fxShadSoft',label:'Softness',min:0,max:40,step:1},{kind:'slider',sub:'fxShadOpacity',label:'Opacity',min:0,max:1,step:0.05},{kind:'swatch',sub:'fxShadColor',def:'#000000',label:'Shadow Color'}],
+  fxLongShadow:[{kind:'slider',sub:'fxLSAngle',label:'Angle',min:0,max:360,step:1},{kind:'slider',sub:'fxLSOpacity',label:'Opacity',min:0,max:1,step:0.05},{kind:'swatch',sub:'fxLSColor',def:'#000000',label:'Shadow Color'}],
+  fxFloorShadow:[{kind:'slider',sub:'fxFSFlatten',label:'Flatten',min:0.1,max:1,step:0.05},{kind:'slider',sub:'fxFSSoft',label:'Softness',min:0,max:40,step:1},{kind:'slider',sub:'fxFSOpacity',label:'Opacity',min:0,max:1,step:0.05},{kind:'swatch',sub:'fxFSColor',def:'#000000',label:'Shadow Color'}],
+  fxStroke:[{kind:'swatch',sub:'fxStrokeColor',def:'#ffffff',label:'Stroke Color'},{kind:'slider',sub:'fxStrokeOpacity',label:'Opacity',min:0,max:1,step:0.05},{kind:'seg',sub:'fxStrokePos',label:'Position',opts:['Outside','Center','Inside'],def:'Outside'}],
+  fxBevelAlpha:[{kind:'slider',sub:'fxBevLight',label:'Light Angle',min:0,max:360,step:1},{kind:'slider',sub:'fxBevIntensity',label:'Intensity',min:0,max:1,step:0.05},{kind:'slider',sub:'fxBevSoften',label:'Soften',min:0,max:20,step:1}],
+  fxInnerShadow:[{kind:'slider',sub:'fxISAngle',label:'Angle',min:0,max:360,step:1},{kind:'slider',sub:'fxISSoft',label:'Softness',min:0,max:30,step:1},{kind:'slider',sub:'fxISOpacity',label:'Opacity',min:0,max:1,step:0.05},{kind:'swatch',sub:'fxISColor',def:'#000000',label:'Shadow Color'}],
+  fxRimLight:[{kind:'slider',sub:'fxRimAngle',label:'Light Angle',min:0,max:360,step:1},{kind:'slider',sub:'fxRimIntensity',label:'Intensity',min:0,max:1,step:0.05},{kind:'swatch',sub:'fxRimColor',def:'#ffffff',label:'Light Color'}],
+  fxMatteChoke:[{kind:'seg',sub:'fxMatteChokeMode',label:'Mode',opts:['Close holes','Open specks'],def:'Close holes'}],
+  fxFeatherAlpha:[{kind:'slider',sub:'fxFeatherBias',label:'Bias',min:-0.4,max:0.4,step:0.01}],
+  fxAlphaLevels:[{kind:'slider',sub:'fxAlphaInB',label:'Input Black',min:0,max:1,step:0.01},{kind:'slider',sub:'fxAlphaInW',label:'Input White',min:0,max:1,step:0.01},{kind:'slider',sub:'fxAlphaGamma2',label:'Gamma',min:0.2,max:3,step:0.01}],
+  fxDespot:[{kind:'seg',sub:'fxDespotKern',label:'Window',opts:['3x3','5x5'],def:'3x3'}],
+  fxRefineEdge:[{kind:'slider',sub:'fxRefineShift',label:'Edge Shift',min:-0.4,max:0.4,step:0.01},{kind:'slider',sub:'fxRefineFeather',label:'Feather',min:0,max:20,step:1}],
+  fxGrowBounds:[{kind:'seg',sub:'fxGrowBleed',label:'Fill',opts:['Bleed colour','Alpha only'],def:'Bleed colour'}],
+  fxMatteThresh:[{kind:'slider',sub:'fxMatteCut',label:'Cutoff',min:0,max:1,step:0.01},{kind:'slider',sub:'fxMatteSoft',label:'Softness',min:0.01,max:0.4,step:0.01}],
+  fxChannelMath:[{kind:'seg',sub:'fxMathA',label:'Source A',opts:['R','G','B','Lum'],def:'R'},{kind:'seg',sub:'fxMathB',label:'Source B',opts:['R','G','B','Lum'],def:'G'},{kind:'seg',sub:'fxMathOp',label:'Operator',opts:['add','subtract','multiply','difference'],def:'difference'},{kind:'seg',sub:'fxMathOut',label:'Write to',opts:['R','G','B','All'],def:'All'}],
 };
 // Colour props that live OFF KDEF (the generic FX_EXTRA `sub` clear can't reach them, since gradmap has no sub
 // and duotone has no FX_EXTRA entry). Wiped on effect remove/clear so a re-added effect starts from default colours.
