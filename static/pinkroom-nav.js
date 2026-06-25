@@ -18,6 +18,13 @@
   a.pr-back img{height:14px;width:auto;display:block;opacity:.95;}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  // CLOUD: on the hosted site, inject the browser-direct AI engine + bridge into every room (pure no-op on
+  // the desktop, where DMV_AI sees localhost and stands down). async=false keeps order (cloud-ai before
+  // cloud-bridge); injected first so the fetch override is installed before any room AI call fires.
+  if (!document.querySelector('script[data-dmvai]')) {
+    const a1 = document.createElement("script"); a1.src = "/static/cloud-ai.js"; a1.async = false; a1.setAttribute("data-dmvai", "1"); document.head.appendChild(a1);
+    const a2 = document.createElement("script"); a2.src = "/static/cloud-bridge.js"; a2.async = false; a2.setAttribute("data-dmvbridge", "1"); document.head.appendChild(a2);
+  }
   // force the app-window (Edge/Chrome --app mode) title bar to graphite, overriding the OS accent color
   if(!document.querySelector('meta[name="theme-color"]')){ const tc = document.createElement("meta"); tc.name = "theme-color"; tc.content = "#0C0D10"; document.head.appendChild(tc); }
   // app/taskbar icon = Tec (matches the desktop shortcut), not the generic Edge icon
