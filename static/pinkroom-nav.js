@@ -44,9 +44,15 @@
     sb.onmouseover = () => { sb.style.borderColor = "rgba(120,182,205,.8)"; sb.style.color = "#CFE6EE"; };
     sb.onmouseout = () => { sb.style.borderColor = "rgba(120,182,205,.4)"; sb.style.color = "#9FCFDD"; };
     sb.onclick = () => {
-      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent already in the room → just open the window
-      try { const u = new URL(location.href); u.searchParams.set("brain", "kit"); location.href = u.toString(); }  // none yet → bring Kit in
-      catch (_) { location.href = location.pathname + "?brain=kit"; }
+      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent in the room → just open the window
+      // kit-helper.js is injected on every room load and defines __kitOpen once it finishes setting up —
+      // it can lag a split-second right after load. ⚠️ NEVER reload here: a reload WIPES an unsaved
+      // studio/beats session (the data-loss bug B hit summoning an agent). Wait for __kitOpen instead.
+      var _tries = 0;
+      var _t = setInterval(function () {
+        if (window.__kitOpen) { clearInterval(_t); window.__kitOpen(); }
+        else if (++_tries > 60) { clearInterval(_t); }   // ~3s; give up quietly — do NOT reload/wipe
+      }, 50);
     };
     (document.querySelector(".kit-mount") || document.querySelector(".top") || document.querySelector(".menubar") || document.body).appendChild(sb);
   }
