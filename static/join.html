@@ -66,6 +66,19 @@
   section.blk p + p{margin-top:14px}
   .note{margin-top:20px;padding:13px 16px;border-left:3px solid var(--gold);background:rgba(230,193,106,.06);border-radius:0 10px 10px 0;font:600 13.5px Inter;color:#E6D3A8}
   .note.teal{border-left-color:var(--teal);background:rgba(62,156,184,.07);color:#BFE0EC}
+  .mac-hint{display:block;margin:14px auto 0;font:600 12.5px Inter;color:var(--teal);text-decoration:none;opacity:.92;position:relative}
+  .mac-hint:hover{opacity:1;text-decoration:underline}
+  .machelp{max-width:680px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .machelp summary{cursor:pointer;list-style:none;padding:16px 20px;font:700 14px Inter;color:var(--teal);display:flex;align-items:center;gap:9px}
+  .machelp summary::-webkit-details-marker{display:none}
+  .machelp summary:hover{color:#BFE0EC}
+  .machelp[open] summary{border-bottom:1px solid var(--line)}
+  .machelp .mh-body{padding:8px 22px 20px;color:#C2C8D1;font:500 14px Inter;line-height:1.65}
+  .machelp .mh-body p{margin:12px 0;max-width:none}
+  .machelp ol{margin:12px 0;padding-left:22px}
+  .machelp li{margin:9px 0}
+  .machelp code{font:600 12.5px 'Space Mono',monospace;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;padding:2px 7px;color:#E6D3A8;user-select:all;white-space:nowrap}
+  .machelp .mh-small{font-size:12.5px;color:var(--dim);margin-top:14px}
 
   /* readiness bar */
   .ready{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 20px}
@@ -168,11 +181,12 @@
         <p class="coda">It's not finished. We're building it in the open, with the people who'll actually use it. If that's you — you're early, and you're exactly who it's for.</p>
       </div>
       <div class="cta-row">
-        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest">⬇&nbsp; Download for Mac</a>
+        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
         <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville.zip">⬇&nbsp; Download for Windows</a>
         <a class="btn try" href="/static/beats.html">🥁&nbsp; Try The Kitchen — free, in your browser</a>
         <a class="btn ghost" href="#how">See how it works ↓</a>
       </div>
+      <a class="mac-hint" href="#mac-help">🍎 On a Mac? It needs one 30-second step to open — how →</a>
       <div class="wip-flag"><span class="dot"></span> EARLY · BUILT IN THE OPEN · FOR THE ONES WHO GIVE A DAMN</div>
     </div>
   </header>
@@ -301,7 +315,7 @@
     <div class="wrap">
       <h2>The chair's open. Get in before it's obvious.</h2>
       <div class="cta-row">
-        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest">⬇&nbsp; Download for Mac</a>
+        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
         <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville.zip">⬇&nbsp; Download for Windows</a>
         <a class="btn try" href="/static/beats.html">🥁&nbsp; Try The Kitchen — free, in your browser</a>
         <a class="btn ghost" href="mailto:koonce47@gmail.com?subject=DeMartinville%20%E2%80%94%20founding%20creator&body=Tell%20me%20about%20your%20craft%20%2B%20who%20you%27d%20bring%20in%3A%0A%0A" id="ctaJoin">Become a founding creator →</a>
@@ -309,6 +323,22 @@
     </div>
   </section>
 
+  <section id="mac-help" class="wrap" style="margin:30px auto 50px">
+    <details class="machelp">
+      <summary>🍎 On a Mac and it won't open? Read this — 30-second one-time step</summary>
+      <div class="mh-body">
+        <p>macOS blocks <em>every</em> app that didn't come from Apple's own store — tiny indie tools and big-name ones alike, ours included (we're getting it Apple-signed so this step disappears). So if you see <em>"Apple could not verify…"</em> or <em>"app is damaged,"</em> nothing's wrong — you just tell your Mac to trust it once:</p>
+        <ol>
+          <li>Download <b>DeMartinville</b> above and unzip it (drop the app in Applications or on your Desktop).</li>
+          <li>Open <b>Terminal</b> — press <b>⌘&nbsp;+&nbsp;Space</b>, type <i>Terminal</i>, hit <b>Enter</b>.</li>
+          <li>Type this <b>with a space at the end</b>: <code>xattr -dr com.apple.quarantine </code></li>
+          <li><b>Drag the DeMartinville app onto the Terminal window</b> — it fills in the location for you — then press <b>Enter</b>.</li>
+          <li>Double-click <b>DeMartinville</b>. It opens, and it never asks again. 🎉</li>
+        </ol>
+        <p class="mh-small">Older Macs can instead use System&nbsp;Settings → Privacy&nbsp;&amp;&nbsp;Security → "Open Anyway." Newer Macs need the Terminal step above. On Windows there are no steps — it just runs.</p>
+      </div>
+    </details>
+  </section>
   <footer><span class="foot-logo"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></span>local · private · yours · built in the open</footer>
 
 <script>
