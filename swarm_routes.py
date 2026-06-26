@@ -81,7 +81,13 @@ def _save_json(path: Path, data) -> None:
 
 
 def _load_providers() -> list[dict]:
-    return _load_json(PROV_FILE, [])
+    # dedup by id (last-wins, mirrors swarm_save's replace-then-append) so a hand-edited or
+    # partially-written providers.json with duplicate ids can't double a slot in the picker.
+    seen = {}
+    for p in _load_json(PROV_FILE, []):
+        if isinstance(p, dict) and p.get("id"):
+            seen[p["id"]] = p
+    return list(seen.values())
 
 
 # ── secrets vault — encrypt API keys AT REST so a copied/stolen disk can't read them ──
@@ -171,7 +177,7 @@ class ProviderError(Exception):
 
 
 async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 700,
-                        temperature: float = 0.3, image: str = "") -> str:
+                        temperature: float = 0.3, image: str = "", effort: str = "") -> str:
     """One non-streaming chat call to any OpenAI-compatible provider. This is the
     ONLY new primitive — everything else reuses the ARKITECT's existing helpers.
     Raises RateLimited on 429 (caller rotates to the next slot) and ProviderError
@@ -191,6 +197,7 @@ async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 70
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    body = _sanitize_body(slot, body, effort)   # strip temp for GPT-5 reasoning + add the effort dial
     async with httpx.AsyncClient(timeout=90) as cx:
         r = await cx.post(url, headers=headers, json=body)
     if r.status_code == 429:
@@ -204,15 +211,93 @@ async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 70
         raise ProviderError(f"{slot['name']} returned an unreadable reply")
 
 
-async def provider_stream(slot: dict, payload: dict):
+# ── REASONING EFFORT for the non-Claude top brains (Grok / GPT-5.x / Gemini) ───────────────────
+# All three accept `reasoning_effort` as a TOP-LEVEL field on their OpenAI-compat /chat/completions,
+# so the effort lever drives their REAL thinking with NO native streamer. The trap is the OPPOSITE
+# 400s: GPT-5 *reasoning* models reject `temperature`; GPT-5 *chat* models reject `reasoning_effort`;
+# Gemini 3 Pro rejects effort "medium". So: classify the provider, gate on the specific MODEL, and
+# SAFE-DEFAULT to sending nothing when unsure — a missing param is harmless, a wrong one hard-400s,
+# and users can dock arbitrary models. (Claude is handled separately via the native /v1/messages door.)
+def _provider_of(slot) -> str:
+    b = (slot.get("base_url", "") or "").lower()
+    if "anthropic.com" in b:                   return "anthropic"
+    if "api.x.ai" in b:                        return "xai"
+    if "generativelanguage.googleapis" in b:   return "gemini"
+    if "api.openai.com" in b:                  return "openai"
+    if "openrouter.ai" in b:                   return "openrouter"
+    return "other"
+
+
+def _gpt5_reasoning(model: str) -> bool:
+    m = (model or "").lower()
+    return m.startswith(("gpt-5", "o1", "o3", "o4")) and "chat" not in m   # the *chat* variant has no reasoning_effort
+
+
+def _grok_reasoning(model: str) -> bool:
+    m = (model or "").lower()
+    if "grok-3-mini" in m:            return True
+    if "fast" in m or "vision" in m:  return False   # grok-4-fast / 4.1-fast / grok-2-vision: no reasoning_effort
+    mt = re.search(r"grok-(\d+)(?:\.(\d+))?", m)
+    return bool(mt) and (int(mt.group(1)), int(mt.group(2) or 0)) >= (4, 3)   # grok-4.3+ supports it
+
+
+def _gemini_thinking(model: str) -> bool:
+    m = (model or "").lower()
+    return m.startswith("gemini-") and ("2.5" in m or "3" in m) and "image" not in m
+
+
+def _effort_field(provider: str, model: str, effort: str):
+    """(field, value) to inject for the effort lever, or (None, None) = send nothing (safe default)."""
+    e = (effort or "high").lower()
+    m = (model or "").lower()
+    if provider == "openai":
+        if not _gpt5_reasoning(model):
+            return (None, None)
+        top = "xhigh" if any(t in m for t in ("gpt-5.4", "gpt-5.5", "codex")) else "high"
+        return ("reasoning_effort", {"low": "low", "medium": "medium", "high": "high", "max": top}.get(e, "high"))
+    if provider == "xai":
+        if not _grok_reasoning(model):
+            return (None, None)
+        return ("reasoning_effort", {"low": "low", "medium": "medium", "high": "high", "max": "high"}.get(e, "high"))
+    if provider == "gemini":
+        if not _gemini_thinking(model):
+            return (None, None)
+        val = {"low": "low", "medium": "medium", "high": "high", "max": "high"}.get(e, "high")
+        if "pro" in m and val == "medium":   # Gemini 3 Pro rejects "medium" — only low/high
+            val = "low"
+        return ("reasoning_effort", val)
+    # openrouter / other / unknown → DON'T GUESS (a :free alias hides the real family). Safe default.
+    return (None, None)
+
+
+def _sanitize_body(slot, body, effort=""):
+    """Return a COPY of an OpenAI-compat body that's safe + reasoning-aware for ANY docked model:
+       1) GPT-5 reasoning models hard-400 on temperature/top_p → strip them (true even with no lever);
+       2) when an effort lever is set + the model is a known reasoning brain, add `reasoning_effort`."""
+    out = dict(body or {})
+    provider = _provider_of(slot)
+    model = out.get("model", "")
+    if provider == "openai" and _gpt5_reasoning(model):
+        out.pop("temperature", None)
+        out.pop("top_p", None)
+    if effort:
+        field, val = _effort_field(provider, model, effort)
+        if field:
+            out[field] = val
+    return out
+
+
+async def provider_stream(slot: dict, payload: dict, effort: str = ""):
     """STREAM chat deltas from any OpenAI-compatible provider as ARKITECT SSE lines —
     the streaming sibling of provider_once. Emits the SAME shape as app.lm_stream
     ({'type':'delta','text':...}) so the chat frontend needs zero changes. Points at the
-    slot's base_url + Bearer key instead of local LM Studio."""
+    slot's base_url + Bearer key instead of local LM Studio. `effort` engages the provider's
+    native reasoning dial (Grok / GPT-5 / Gemini) when the docked model supports it."""
     base = (slot.get("base_url") or "").rstrip("/")
     url = f"{base}/chat/completions"
     headers = {"Authorization": f"Bearer {slot.get('api_key','')}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "Tiff ARKITECT"}
+    payload = _sanitize_body(slot, payload, effort)
     try:
         async with httpx.AsyncClient(timeout=None) as cx:
             async with cx.stream("POST", url, headers=headers, json=payload) as r:
@@ -239,8 +324,158 @@ async def provider_stream(slot: dict, payload: dict):
         yield f"data: {json.dumps({'type':'error','text':emsg})}\n\n"
 
 
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+# ANTHROPIC NATIVE (/v1/messages) — the REAL effort + adaptive-thinking dial.
+#   The OpenAI-compat door (/chat/completions) can't carry Claude's native thinking controls, so
+#   for a Claude slot we call Anthropic's OWN endpoint: the effort lever becomes the genuine
+#   `output_config.effort` knob (low→max) + adaptive thinking = real deep reasoning, not a prompt.
+#   NO temperature/top_p (they 400 on Opus 4.8). Same SSE/return shapes as the OpenAI-compat path,
+#   so /api/chat + /api/kit consume it unchanged. Effort + adaptive thinking are GA (no beta header).
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+def _anthropic_url(slot):
+    base = (slot.get("base_url") or "https://api.anthropic.com/v1").rstrip("/")
+    return base + "/messages" if base.endswith("/v1") else base + "/v1/messages"
+
+
+def _anthropic_headers(slot):
+    return {"x-api-key": slot.get("api_key", ""), "anthropic-version": "2023-06-01",
+            "content-type": "application/json"}
+
+
+def _flatten_text_blocks(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+    return ""
+
+
+def _oa_content_to_anthropic(content):
+    """OpenAI message content (str | [{type:text|image_url}]) → Anthropic content (str | blocks)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        blocks = []
+        for c in content:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "text":
+                blocks.append({"type": "text", "text": c.get("text", "")})
+            elif c.get("type") == "image_url":
+                url = ((c.get("image_url") or {}).get("url")) or ""
+                if url.startswith("data:"):
+                    try:
+                        head, b64 = url.split(",", 1)
+                        media = head.split(":", 1)[1].split(";", 1)[0]
+                        blocks.append({"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}})
+                    except Exception:
+                        pass
+                elif url:
+                    blocks.append({"type": "image", "source": {"type": "url", "url": url}})
+        return blocks if blocks else ""
+    return str(content)
+
+
+def _oa_to_anthropic(messages):
+    """Split an OpenAI-style messages list into (system_str, anthropic_messages[user/assistant])."""
+    sys_parts, out = [], []
+    for m in messages or []:
+        role = m.get("role")
+        if role == "system":
+            c = m.get("content")
+            sys_parts.append(c if isinstance(c, str) else _flatten_text_blocks(c))
+        elif role in ("user", "assistant"):
+            out.append({"role": role, "content": _oa_content_to_anthropic(m.get("content"))})
+    # Anthropic requires the FIRST message use the "user" role. A trailing-window slice
+    # (e.g. messages[-12:]) can start on an assistant turn → 400 "first message must use user".
+    # Trim any leading assistant turn(s) so the array always opens on user.
+    while out and out[0]["role"] == "assistant":
+        out.pop(0)
+    return ("\n\n".join(p for p in sys_parts if p).strip(), out)
+
+
+def _anthropic_body(model, system, messages, max_tokens, effort):
+    body = {"model": model or "claude-opus-4-8", "max_tokens": int(max_tokens or 1024),
+            "messages": messages, "output_config": {"effort": (effort or "high")},
+            "thinking": {"type": "adaptive"}}
+    if system:
+        body["system"] = system
+    return body
+
+
+async def anthropic_native_stream(slot, payload, effort="high"):
+    """STREAM from Anthropic's native /v1/messages. Same SSE shape as provider_stream
+    ({'type':'delta','text':...}). `payload` is the OpenAI-style cpay (messages incl. a leading
+    system message); we split it out, convert content, and set the real effort + adaptive thinking."""
+    system, msgs = _oa_to_anthropic(payload.get("messages") or [])
+    if not msgs:
+        msgs = [{"role": "user", "content": "Hello"}]
+    body = _anthropic_body(slot.get("model"), system, msgs, payload.get("max_tokens") or 2048, effort)
+    body["stream"] = True
+    try:
+        async with httpx.AsyncClient(timeout=None) as cx:
+            async with cx.stream("POST", _anthropic_url(slot), headers=_anthropic_headers(slot), json=body) as r:
+                if r.status_code != 200:
+                    txt = (await r.aread()).decode(errors="replace")[:300]
+                    yield f"data: {json.dumps({'type':'error','text':'Claude error '+str(r.status_code)+': '+txt})}\n\n"
+                    return
+                async for line in r.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    chunk = line[5:].strip()
+                    if not chunk:
+                        continue
+                    try:
+                        obj = json.loads(chunk)
+                    except Exception:
+                        continue
+                    t = obj.get("type")
+                    if t == "content_block_delta":
+                        d = obj.get("delta") or {}
+                        if d.get("type") == "text_delta" and d.get("text"):
+                            yield f"data: {json.dumps({'type':'delta','text':d['text']})}\n\n"
+                    elif t == "message_stop":
+                        return
+                    elif t == "error":
+                        em = (obj.get("error") or {}).get("message") or "Claude stream error"
+                        yield f"data: {json.dumps({'type':'error','text':em})}\n\n"
+                        return
+    except Exception as e:
+        yield f"data: {json.dumps({'type':'error','text':'Claude couldn’t be reached: '+str(e)[:200]})}\n\n"
+
+
+async def anthropic_native_once(slot, system, user, max_tokens=700, effort="high", image=""):
+    """Non-streaming native Anthropic call (the docked-agent path). Returns text; raises on error
+    so the caller can fall back to the local brain. Mirrors provider_once + the real effort dial."""
+    user_content = user
+    if image:
+        blocks = [{"type": "text", "text": user or "Look at this image."}]
+        if image.startswith("data:"):
+            try:
+                head, b64 = image.split(",", 1)
+                media = head.split(":", 1)[1].split(";", 1)[0]
+                blocks.append({"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}})
+            except Exception:
+                pass
+        else:
+            blocks.append({"type": "image", "source": {"type": "url", "url": image}})
+        user_content = blocks
+    body = _anthropic_body(slot.get("model"), system, [{"role": "user", "content": user_content}], max_tokens, effort)
+    async with httpx.AsyncClient(timeout=120) as cx:
+        r = await cx.post(_anthropic_url(slot), headers=_anthropic_headers(slot), json=body)
+    if r.status_code == 429:
+        raise RateLimited(slot.get("name", "Claude"))
+    if r.status_code != 200:
+        raise ProviderError(f"Claude {r.status_code}: {r.text[:200]}")
+    try:
+        parts = [b.get("text", "") for b in (r.json().get("content") or []) if b.get("type") == "text"]
+        return "".join(parts).strip()
+    except (KeyError, IndexError, ValueError, TypeError):
+        raise ProviderError("Claude returned an unreadable reply")
+
+
 async def _call_with_fallback(slots: list[dict], system: str, user: str,
-                              max_tokens: int, temperature: float, image: str = "") -> tuple[str, str]:
+                              max_tokens: int, temperature: float, image: str = "", effort: str = "") -> tuple[str, str]:
     """Try each slot in order; on a 429/error advance to the next so a single
     rate-limited free tier never sinks the whole agent. Returns (text, provider_name).
     Agents start the list rotated so they don't all hammer the same provider first.
@@ -248,7 +483,7 @@ async def _call_with_fallback(slots: list[dict], system: str, user: str,
     last_err = None
     for slot in slots:
         try:
-            txt = await provider_once(slot, system, user, max_tokens, temperature, image)
+            txt = await provider_once(slot, system, user, max_tokens, temperature, image, effort)
             if txt:
                 return txt, slot["name"]
         except (RateLimited, ProviderError) as e:
@@ -591,9 +826,15 @@ async def swarm_test(req: Request):
             key = _load_keys().get(pid, "")
     if not (base_url and model and key):
         return JSONResponse({"ok": False, "error": "need base_url, model and api_key"}, status_code=400)
-    slot = {"name": "test", "base_url": base_url, "model": model, "api_key": key}
+    slot = {"name": (d.get("name") or "test"), "base_url": base_url, "model": model, "api_key": key}
+    # Claude has no /chat/completions and uses x-api-key (not Bearer) — test it via the native door,
+    # or a perfectly valid sk-ant key reports as broken.
+    _is_claude = ("anthropic.com" in base_url.lower() or "claude" in (model + (d.get("name") or "")).lower())
     try:
-        out = await provider_once(slot, "Reply with the single word: ok", "ping", 5, 0.0)
+        if _is_claude:
+            out = await anthropic_native_once(slot, "Reply with the single word: ok", "ping", 5, "low")
+        else:
+            out = await provider_once(slot, "Reply with the single word: ok", "ping", 5, 0.0)
         return {"ok": True, "reply": out[:60]}
     except RateLimited:
         return {"ok": False, "error": "rate-limited (429) — the key works but the free tier is busy; try again shortly"}
@@ -624,9 +865,27 @@ async def swarm_models(req: Request):
             return JSONResponse({"ok": False, "error": f"{r.status_code}: {(r.text or '')[:160]}"}, status_code=200)
         j = r.json()
         data = j.get("data") or j.get("models") or (j if isinstance(j, list) else [])
-        ids = sorted({ (m.get("id") if isinstance(m, dict) else str(m)) for m in data
-                       if (isinstance(m, dict) and m.get("id")) or isinstance(m, str) })
-        return {"ok": True, "models": ids[:400], "total": len(ids)}
+        # Also surface CAPABLE models (vision + tool-calling) when the catalog tells us — the agent
+        # drives the app via tool calls, so weak/text-only models can't run it. OpenRouter exposes
+        # `architecture.input_modalities` + `supported_parameters`; providers that don't → capable=[].
+        ids, capable = [], []
+        for m in data:
+            if isinstance(m, dict) and m.get("id"):
+                mid = m["id"]; ids.append(mid)
+                arch = m.get("architecture") or {}
+                modal = arch.get("input_modalities") or []
+                if isinstance(modal, str):
+                    modal = [modal]
+                blob = (" ".join(str(x) for x in modal) + " " + str(arch.get("modality", ""))).lower()
+                sp = m.get("supported_parameters") or []
+                has_vision = "image" in blob
+                has_tools = any(str(x).lower() in ("tools", "tool_choice", "function_call", "functions") for x in sp)
+                if has_vision and has_tools:
+                    capable.append(mid)
+            elif isinstance(m, str):
+                ids.append(m)
+        ids = sorted(set(ids)); capable = sorted(set(capable))
+        return {"ok": True, "models": ids[:400], "capable": capable[:200], "total": len(ids)}
     except Exception as e:
         return JSONResponse({"ok": False, "error": f"couldn't list models: {e}"}, status_code=200)
 
