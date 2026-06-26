@@ -355,12 +355,24 @@
 
   <section id="mac-help" class="wrap" style="margin:30px auto 50px">
     <details class="machelp">
-      <summary>🍎 On a Mac? Read this first</summary>
+      <summary>🍎 On a Mac? Read this first — one-minute setup</summary>
       <div class="mh-body">
-        <p><b>The honest version:</b> we keep DeMartinville <em>free</em> — which means we're not paying Apple's $99/yr "developer toll." So when you download it, macOS throws up a scary <em>"unidentified developer"</em> wall. That's Apple's wall, not a bug in ours — here's the 10-second way past it.</p>
-        <p style="text-align:center;margin:18px 0"><a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip" style="display:inline-flex">⬇&nbsp; Download for Mac (Apple Silicon)</a></p>
-        <p><b>Then, to open it:</b> go to <b>System&nbsp;Settings → Privacy&nbsp;&amp;&nbsp;Security</b>, scroll to the bottom, and click <b>"Open Anyway"</b> next to DeMartinville. If it instead says <em>"damaged,"</em> open <b>Terminal</b>, type <code>xattr -cr </code> (with a trailing space), drag the app onto the window, and hit Enter. After that it opens like any other app.</p>
-        <p class="mh-small">Straight up: DeMartinville is <b>Windows-first</b> right now — the Mac build runs fine with the steps above, it's just earlier in the game. On Windows there's none of this; it just runs.</p>
+        <p><b>Real talk:</b> DeMartinville is <em>free</em> — which means we don't pay Apple's <b>$99-a-year "developer" fee</b> just so their computers will trust our app. Everybody's got their hand out; we're not paying it, because we're not charging <em>you</em> a dime. The trade-off: the first time, <b>you</b> flip one switch yourself. One line, one time, and you're done forever. Slow and simple, here's exactly how:</p>
+
+        <p><b>Step 1 — Download it.</b></p>
+        <p style="text-align:center;margin:14px 0"><a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip" style="display:inline-flex">⬇&nbsp; Download for Mac</a></p>
+
+        <p><b>Step 2 — Unzip &amp; move it.</b> Double-click the downloaded file, then drag <b>DeMartinville</b> into your <b>Applications</b> folder.</p>
+
+        <p><b>Step 3 — Open Terminal.</b> Press <code>⌘ Space</code>, type <em>Terminal</em>, hit Enter. (It's a little black window — relax, you only paste one line into it.)</p>
+
+        <p><b>Step 4 — Paste this exact line and press Enter:</b></p>
+        <p style="text-align:center;margin:10px 0"><code style="white-space:normal;word-break:break-all">xattr -dr com.apple.quarantine /Applications/DeMartinville.app</code></p>
+        <p>Nothing dramatic happens — <b>no message means it worked.</b> That line just tells your Mac "I trust this app," which is the exact thing Apple was blocking.</p>
+
+        <p><b>Step 5 — Double-click DeMartinville</b> in your Applications folder. It opens. <b>That's it — you never touch Terminal again.</b></p>
+
+        <p class="mh-small"><b>Why not just "Open Anyway"?</b> On the newest macOS (Sequoia), Apple <em>broke</em> that button for free apps — it does nothing now. The line above is the one thing that actually works, so don't waste time in Settings. <b>And straight up:</b> DeMartinville is <b>Windows-first</b> right now — the Mac side runs, it's just earlier. On Windows there's none of this; it just opens.</p>
       </div>
     </details>
   </section>
