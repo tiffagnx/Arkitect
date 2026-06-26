@@ -126,7 +126,16 @@
   .final h2{font-size:clamp(25px,4vw,38px);max-width:18ch;margin:0 auto 8px;background:linear-gradient(180deg,#fff,#c4ccd2);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   .truth{max-width:62ch;margin:18px auto 0;font:600 13.5px Inter;color:#AEB4BE;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:15px 18px}
   footer{border-top:1px solid var(--line);padding:26px 0 40px;text-align:center;color:var(--faint);font:500 12px 'Space Mono',monospace;letter-spacing:.06em}
-  @media (max-width:640px){ .grid2{grid-template-columns:1fr} .rung.r2,.rung.r3,.rung.r4{margin-left:0} }
+  @media (max-width:640px){
+    .grid2{grid-template-columns:1fr}
+    .rung.r2,.rung.r3,.rung.r4{margin-left:0}
+    .hero{padding:52px 0 42px}
+    .hero::after{display:none}                 /* drop the heavy ghost hero image on phones */
+    .wrap{padding:0 18px}
+    .cta-row{gap:10px}
+    .cta-row .btn{width:100%;justify-content:center}
+    section.blk{padding:38px 0}
+  }
   /* the manifesto hero — the opening that does the emotional work (owner's words, his soul) */
   .manifesto{ max-width:60ch; margin:6px auto 0; position:relative; }
   .manifesto p{ color:#C2C8D1; font-size:clamp(15px,1.95vw,18.5px); line-height:1.72; margin:0 0 17px; }
@@ -413,6 +422,9 @@
    as it crosses your reading line (and dims back on scroll up). Airbyte-style. */
 (function(){
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Phones/tablets: skip the word-by-word scroll reveal entirely — on touch + small screens it's
+  // heavy (hundreds of animated word-spans) and can leave text stuck dimmed. Plain, readable, smooth.
+  if (window.innerWidth <= 760 || matchMedia('(hover: none) and (pointer: coarse)').matches) return;
   var SEL  = '.manifesto p, section.blk > p, .story p';
   var KEEP = '.gold, .accent, b, strong, a';   // keep these words' own color — only lift them
   var blocks = document.querySelectorAll(SEL);
