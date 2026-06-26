@@ -491,7 +491,7 @@
         <button class="send" id="send">➤</button>
       </div>
       <input type="file" id="fileInput" multiple
-        accept="image/*,.pdf,.docx,.txt,.md,.csv,.json,.log,.html,.css,.js,.ts,.py,.xml,.yaml,.yml,.ini,.rtf,.tsv,.srt" hidden />
+        accept="image/*,audio/*,.wav,.mp3,.m4a,.flac,.aac,.ogg,.pdf,.docx,.txt,.md,.csv,.json,.log,.html,.css,.js,.ts,.py,.xml,.yaml,.yml,.ini,.rtf,.tsv,.srt" hidden />
     </div></div>
   </main>
 </div>
@@ -823,6 +823,20 @@ async function send() {
   const imgAtts  = atts.filter(a => a.kind === "image" && a.url);
   let modelText = typed;
   for (const f of fileAtts) modelText += `\n\n📎 ${f.name}:\n${f.text}`;
+  // 🎵 AUDIO — she HEARS it: Whisper for the words (your key), the browser for the numbers, folded
+  //    into the message as text so ANY brain (even a local one) can break it down. Drop a song with
+  //    nothing typed and she checks it out on her own, then asks what you want to do.
+  const audAtt = atts.find(a => a.kind === "audio" && a.url);
+  if (audAtt) {
+    setStatus("having a listen…");
+    let lyrics = "", terr = "";
+    try { const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: audAtt.url, audio_name: audAtt.name }) }).then(r => r.json()); lyrics = (tr && tr.text) || ""; terr = (tr && tr.error) || ""; } catch (_) {}
+    const m = audAtt.meta || {};
+    const mline = [m.durationSec && (m.durationSec + "s"), m.peakDb != null && ("peak " + m.peakDb + "dB"), m.rmsDb != null && ("RMS " + m.rmsDb + "dB"), m.crestDb != null && ("crest " + m.crestDb + "dB"), m.centroidHz && ("brightness " + m.centroidHz + "Hz"), m.bands && ("balance " + Object.keys(m.bands).map(k => k + "=" + m.bands[k] + "%").join(" "))].filter(Boolean).join(" · ");
+    const head = modelText.trim() ? modelText : "I just dropped you a song — give it a real listen, break down what it sounds like (the vibe AND the engineering: loudness/headroom, brightness, dynamics, low-end, anything that'll get harsh), then ask me what I want to do with it.";
+    const noLyric = /key/i.test(terr) ? " (no transcription key — break down the sound from the measured numbers, and tell me I can add a free Groq key for the lyrics)" : " (no transcript — read it from the measured sound)";
+    modelText = head + "\n\n[🎵 " + (audAtt.name || "audio") + (mline ? " — measured: " + mline : "") + (lyrics ? "\nlyrics/transcript:\n" + lyrics.slice(0, 1800) : noLyric) + "]";
+  }
   const content = imgAtts.length
     ? [{ type: "text", text: modelText || "(image attached — take a look)" },
        ...imgAtts.map(a => ({ type: "image_url", image_url: { url: a.url } }))]
@@ -832,7 +846,7 @@ async function send() {
 
   ta.value = ""; ta.style.height = "auto"; growInput();
   clearAtts();
-  addMsg("user", typed, dispAtts);
+  addMsg("user", typed || (audAtt ? "🎵 " + audAtt.name : ""), dispAtts);
   messages.push(userMsg);
 
   streaming = true;
@@ -1148,13 +1162,17 @@ function addFiles(fileList) {
     if (pendingAtt.length >= 8) { setStatus("8 attachments max per message", true); break; }
     const id = ++attSeq;
     const isImg = (f.type || "").startsWith("image/");
-    const isText = (f.type || "").startsWith("text/") || TEXT_EXTS.test(f.name || "");
+    const isAudio = (f.type || "").startsWith("audio/") || /\.(wav|mp3|m4a|flac|aac|ogg|aiff?)$/i.test(f.name || "");
+    const isText = !isAudio && ((f.type || "").startsWith("text/") || TEXT_EXTS.test(f.name || ""));
     const ext = ((f.name || "").split(".").pop() || "").toLowerCase();
-    const att = { id, name: f.name || (isImg ? "pasted-image.png" : "file"), mime: f.type, kind: isImg ? "image" : "file", loading: true };
+    const att = { id, name: f.name || (isImg ? "pasted-image.png" : "file"), mime: f.type, kind: isAudio ? "audio" : (isImg ? "image" : "file"), loading: true };
     pendingAtt.push(att); renderChips();
     const r = new FileReader();
     r.onerror = () => { att.loading = false; att.error = "couldn't read"; renderChips(); };
-    if (isImg) {
+    if (isAudio) {
+      r.onload = async () => { att.url = r.result; try { if (window.DMV_EAR) att.meta = await window.DMV_EAR.analyze(f); } catch (_) {} att.note = "song — she'll hear it"; att.loading = false; renderChips(); };
+      r.readAsDataURL(f);
+    } else if (isImg) {
       r.onload = () => { att.url = r.result; att.loading = false; renderChips(); };
       r.readAsDataURL(f);
     } else if (isText) {
@@ -1414,6 +1432,7 @@ startArkTips();
      on demartinlabs.com they make the room run on the user's own key, no server needed. -->
 <script src="/static/cloud-ai.js?v=4"></script>
 <script src="/static/cloud-bridge.js?v=4"></script>
+<script src="/static/audio-ear.js"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
 <script src="/static/copy-anywhere.js"></script>

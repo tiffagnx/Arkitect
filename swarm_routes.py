@@ -211,6 +211,40 @@ async def provider_once(slot: dict, system: str, user: str, max_tokens: int = 70
         raise ProviderError(f"{slot['name']} returned an unreadable reply")
 
 
+# ── TRANSCRIPTION — the "words" half of hearing. Whisper runs on Groq (fast + cheap +
+#    the key the owner already has) and on OpenAI, both at the OpenAI-compat
+#    /audio/transcriptions endpoint. The DSP "numbers" half is measured free in the
+#    browser (static/audio-ear.js); this is the only part that needs a key. ──
+def _whisper_slot(slots):
+    """Pick a slot that can transcribe + its whisper model id. Groq first (instant),
+    then OpenAI. Returns (slot, model) or (None, None) if nothing can transcribe."""
+    for s in (slots or []):
+        b = (s.get("base_url", "") or "").lower()
+        if "groq" in b:
+            return s, "whisper-large-v3"        # large-v3 (not turbo): lyrics over a music bed need the accuracy
+    for s in (slots or []):
+        b = (s.get("base_url", "") or "").lower()
+        if "api.openai.com" in b:
+            return s, "whisper-1"
+    return None, None
+
+
+async def transcribe(slot: dict, audio_bytes: bytes, filename: str = "audio.wav",
+                     model: str = "whisper-large-v3-turbo") -> str:
+    """One transcription call to a Whisper-compatible /audio/transcriptions endpoint
+    (multipart). Returns plain text. Raises ProviderError on a non-200."""
+    base = (slot["base_url"] or "").rstrip("/")
+    url = f"{base}/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {slot['api_key']}"}
+    files = {"file": (filename or "audio.wav", audio_bytes, "application/octet-stream")}
+    data = {"model": model, "response_format": "text"}
+    async with httpx.AsyncClient(timeout=180) as cx:
+        r = await cx.post(url, headers=headers, files=files, data=data)
+    if r.status_code != 200:
+        raise ProviderError(f"transcribe {slot.get('name','?')} {r.status_code}: {r.text[:160]}")
+    return (r.text or "").strip()
+
+
 # ── REASONING EFFORT for the non-Claude top brains (Grok / GPT-5.x / Gemini) ───────────────────
 # All three accept `reasoning_effort` as a TOP-LEVEL field on their OpenAI-compat /chat/completions,
 # so the effort lever drives their REAL thinking with NO native streamer. The trap is the OPPOSITE

@@ -673,6 +673,9 @@ body.mode-simple .director-only{display:none!important}
 <div class="toast" id="toast"></div>
 
 <script src="/static/ae-menus.js"></script>
+<script src="/static/vendor/three.min.js"></script>
+<script src="/static/editor-inpaint.js?v=3"></script>
+<script src="/static/editor-trace.js?v=1"></script>
 <script>window.LP_FX={list:[],byField:{},resolve:[],register(d){this.list.push(d);}};</script>
 <script src="/static/leprince-fx.js?v=1"></script>
 <script>
@@ -1302,6 +1305,8 @@ function setPlayhead(f,scrollInto){
 
 // ── ANIMATABLE PROPERTIES (P2 keyframe engine) ───────────────────────────
 const KDEF={opacity:1,posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,
+  posZ:0,rotX:0,rotY:0,orientX:0,orientY:0,orientZ:0,
+  camZoom:0,poiX:0,poiY:0,poiZ:0,lightIntensity:100,lightConeAngle:90,lightConeFeather:50,
   fxBlur:0,fxBright:1,fxContrast:1,fxSat:1,fxHue:0,fxGray:0,fxSepia:0,fxInvert:0,fxShadow:0,fxVignette:0,fxTint:0,
   fxGrain:0,fxPixel:0,fxGlow:0,fxPosterize:0,
   fxExposure:0,fxGamma:1,fxTemp:0,fxVibrance:0,fxThreshold:0,fxSolarize:0,fxDuotone:0,
@@ -2343,7 +2348,9 @@ function clipAlpha(c,f){
   if(c.transOut&&f>c.start+c.dur-c.transOut)a*=clamp((c.start+c.dur-f)/c.transOut,0,1);
   return a;}
 const imgCache={};
-function imageFor(c){if(imgCache[c.mediaId])return imgCache[c.mediaId];
+function imageFor(c){
+  if(c.dataURL){const key='url:'+c.id;if(!imgCache[key]){const im=new Image();im.src=c.dataURL;imgCache[key]=im;}return imgCache[key];} // inline image (Content-Aware Fill output)
+  if(imgCache[c.mediaId])return imgCache[c.mediaId];
   const im=new Image();im.src=`/api/editor/media/${c.mediaId}/src`;imgCache[c.mediaId]=im;return im;}
 
 // ── PREVIEW / RENDER (shared by preview + export) ──────────────────────
@@ -2385,8 +2392,9 @@ function activeVideoClips(f){
   const out=[];
   project.tracks.forEach((t,ti)=>{
     for(const c of t.clips){
-      const k=clipKind(c);if(k==='audio'||k==='text')continue;   // visual clips only
+      const k=clipKind(c);if(k==='audio'||k==='text'||k==='camera'||k==='light')continue;   // visual clips only (camera/light are invisible)
       if(f<c.start||f>=c.start+c.dur)continue;
+      if(k==='shape'){out.push({c,ti,shape:true});continue;}
       if(k==='solid'||c.solid){out.push({c,ti,solid:true});continue;}
       const m=MEDIA[c.mediaId];out.push({c,ti,img:k==='image'||(m&&m.kind==='image')});
     }});
@@ -2461,6 +2469,48 @@ function drawSolidClip(ctx,c,f,W,H){
   };
   if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
 }
+// ── SHAPE LAYERS — parametric vector shapes (rect/round/ellipse/polygon/star/line) ──
+// Drawn centred in the comp rect like a solid, but as a filled/stroked path. Transform,
+// effects, masks, blend, motion-blur all flow through the shared pipeline for free.
+function shapeDims(c){return {w:(c.shW==null?project.width*0.4:c.shW),h:(c.shH==null?project.height*0.4:c.shH)};}
+function _rrPath(g,x,y,w,h,r){r=Math.max(0,Math.min(r,w/2,h/2));
+  g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.arcTo(x+w,y,x+w,y+r,r);
+  g.lineTo(x+w,y+h-r);g.arcTo(x+w,y+h,x+w-r,y+h,r);
+  g.lineTo(x+r,y+h);g.arcTo(x,y+h,x,y+h-r,r);
+  g.lineTo(x,y+r);g.arcTo(x,y,x+r,y,r);g.closePath();}
+// Build the shape outline in canvas px, centred at (cx,cy). k = comp→canvas scale.
+function shapePath(g,c,cx,cy,k){
+  const {w:cw,h:ch}=shapeDims(c);const w=cw*k,h=ch*k,sh=c.shape||'roundrect';
+  g.beginPath();
+  if(sh==='rect'){g.rect(cx-w/2,cy-h/2,w,h);}
+  else if(sh==='roundrect'){_rrPath(g,cx-w/2,cy-h/2,w,h,(c.shRadius==null?24:c.shRadius)*k);}
+  else if(sh==='ellipse'){g.ellipse(cx,cy,w/2,h/2,0,0,Math.PI*2);}
+  else if(sh==='polygon'||sh==='star'){
+    const pts=Math.max(3,(c.shPoints==null?5:c.shPoints)|0),inner=(c.shInner==null?0.5:c.shInner);
+    const n=sh==='star'?pts*2:pts,rx=w/2,ry=h/2;
+    for(let i=0;i<n;i++){const ang=-Math.PI/2+i*Math.PI*2/n,rr=(sh==='star'&&(i&1))?inner:1;
+      const x=cx+Math.cos(ang)*rx*rr,y=cy+Math.sin(ang)*ry*rr;i?g.lineTo(x,y):g.moveTo(x,y);}
+    g.closePath();
+  }
+  else if(sh==='line'){g.moveTo(cx-w/2,cy);g.lineTo(cx+w/2,cy);}
+}
+function drawShapeClip(ctx,c,f,W,H){
+  const a=clipAlpha(c,f);if(a<=0)return;
+  const buf=needsLayerBuffer(c,f);
+  const k=stageK(W,H),fw=project.width*k,fh=project.height*k,ox=(W-fw)/2,oy=(H-fh)/2;
+  const cx=ox+fw/2,cy=oy+fh/2,sh=c.shape||'roundrect';
+  const drawInner=g=>{
+    g.save();g.globalAlpha=a;g.globalCompositeOperation=buf?'source-over':(c.blend||'source-over');g.filter=clipFilter(c,f,k);
+    applyClipTransform(g,c,f,W,H,k);
+    shapePath(g,c,cx,cy,k);
+    if(sh!=='line'&&c.shFillOn!==false){g.fillStyle=c.shFill||'#3E9CB8';g.fill();}
+    const sw=(c.shStrokeW==null?(sh==='line'?6:0):c.shStrokeW);
+    if(sw>0){g.lineWidth=Math.max(0.5,sw*k);g.strokeStyle=c.shStroke||'#ffffff';g.lineJoin='round';g.lineCap='round';g.stroke();}
+    clipOverlayFX(g,c,f,{x:ox,y:oy,w:fw,h:fh});
+    g.restore();
+  };
+  if(buf)withLayerFX(ctx,c,f,W,H,drawInner);else drawInner(ctx);
+}
 // Adjustment layer — its effects + masks grade EVERYTHING composited beneath it.
 let _adjC=null;
 function _adjSnap(W,H){if(!_adjC)_adjC=document.createElement('canvas');if(_adjC.width!==W||_adjC.height!==H){_adjC.width=W;_adjC.height=H;}return _adjC;}
@@ -2486,6 +2536,7 @@ function drawOneClip(ctx,entry,f,W,H,srcOverride){
   const {c,img,solid}=entry;
   if(c.nullObject)return true;   // null objects are invisible — they exist only to parent other layers
   if(c.adjustment){drawAdjustmentClip(ctx,effClip(c),f,W,H);return true;}
+  if(entry.shape){drawShapeClip(ctx,effClip(c),f,W,H);return true;}
   if(solid){drawSolidClip(ctx,effClip(c),f,W,H);return true;}
   let src,sw,sh;
   if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))return false;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
@@ -2548,27 +2599,153 @@ function setPanelBg(v){panelBgMode=v;const st=document.querySelector('.stage');i
       s.backgroundSize='20px 20px';s.backgroundPosition='0 0,10px 10px';}
     else{s.backgroundColor=v;}}
   toast('Panel background: '+(v==='default'?'Default':v==='checker'?'Checkerboard':v==='#000'?'Black':'White'));}
+// ════════════════════════════════════════════════════════════════════════
+//  3D ENGINE (Three.js) — AE "Classic 3D": 3D layers become textured planes in
+//  a perspective camera; contiguous runs of 3D layers render through the camera
+//  + lights and composite onto the 2D output; 2D layers break the run (screen
+//  space, no camera/lights). Degrades to flat 2D if WebGL/THREE is unavailable.
+// ════════════════════════════════════════════════════════════════════════
+let _lp3dOK=null;
+function lp3dOK(){if(_lp3dOK!=null)return _lp3dOK;if(!window.THREE){_lp3dOK=false;return false;}
+  try{const c=document.createElement('canvas');_lp3dOK=!!(c.getContext('webgl2')||c.getContext('webgl'));}catch(e){_lp3dOK=false;}return _lp3dOK;}
+function is3DEntry(c){return !!c.threeD&&!c.trackMatte&&!c.nullObject&&!c.adjustment;}
+function comp3DActive(f){if(!lp3dOK())return false;for(const e of activeVideoClips(f))if(e.c.threeD)return true;return false;}
+function activeCamera(f){let cam=null;for(const t of project.tracks)for(const c of t.clips)if(clipKind(c)==='camera'&&f>=c.start&&f<c.start+c.dur)cam=c;return cam;} // topmost active camera wins
+function activeLights(f){const out=[];for(const t of project.tracks)for(const c of t.clips)if(clipKind(c)==='light'&&f>=c.start&&f<c.start+c.dur)out.push(c);return out;}
+function defaultCamZoom(){return Math.round(project.width*1.4);} // ~40° HFOV, AE-ish; camera distance==zoom ⇒ comp fills at z=0
+let _LP3D=null;
+function lp3dRenderer(RW,RH){
+  if(!window.THREE)return null;
+  const pw=project.width,ph=project.height;
+  if(_LP3D&&_LP3D.RW===RW&&_LP3D.RH===RH&&_LP3D.pw===pw&&_LP3D.ph===ph)return _LP3D;
+  if(_LP3D){try{for(const p of _LP3D.planes)if(p){p.tex.dispose();p.matLit.dispose();p.matBasic.dispose();}_LP3D.geo.dispose();_LP3D.renderer.dispose();_LP3D.renderer.forceContextLoss();}catch(e){}}
+  let renderer;
+  try{renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});}
+  catch(e){_lp3dOK=false;return null;}
+  renderer.setPixelRatio(1);renderer.setSize(RW,RH,false);
+  if('useLegacyLights' in renderer)renderer.useLegacyLights=true; // AE intensity maps clean /100
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x000000,0);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(50,RW/RH,1,1e6);
+  const geo=new THREE.PlaneGeometry(1,1);
+  _LP3D={renderer,scene,camera,geo,RW,RH,pw,ph,planes:[],lights:[]};
+  return _LP3D;
+}
+function lp3dGetPlane(R,i){
+  if(R.planes[i])return R.planes[i];
+  const cv=document.createElement('canvas');cv.width=R.pw;cv.height=R.ph;
+  const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter;tex.generateMipmaps=false;
+  const base={map:tex,transparent:true,alphaTest:0.01,side:THREE.DoubleSide};
+  const matLit=new THREE.MeshLambertMaterial(base),matBasic=new THREE.MeshBasicMaterial(Object.assign({},base));
+  const mesh=new THREE.Mesh(R.geo,matBasic);
+  const p={cv,ctx:cv.getContext('2d'),tex,matLit,matBasic,mesh};R.planes[i]=p;return p;
+}
+// Render a layer's content (fx+masks+opacity) UNTRANSFORMED into the plane's comp-res canvas.
+// The 3D transform is applied to the mesh, so the texture must be the centred, fit content only.
+function render3DLayerTexture(R,entry,i,f,srcOverride){
+  const p=lp3dGetPlane(R,i),g=p.ctx;
+  g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.filter='none';
+  g.clearRect(0,0,p.cv.width,p.cv.height);
+  const clone=Object.assign({},entry.c,{posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,scaleX:1,scaleY:1,blend:'source-over',threeD:false,parentId:null,motionBlur:false,trackMatte:null});
+  let ok=true;try{ok=drawOneClip(g,Object.assign({},entry,{c:clone}),f,R.pw,R.ph,srcOverride);}catch(e){ok=false;}
+  p.tex.needsUpdate=true;
+  return ok?p:null;
+}
+function build3DCamera(R,f){
+  const cam=R.camera,ph=project.height,camClip=activeCamera(f);
+  let zoom,px,py,pz,qx,qy,qz;
+  if(camClip){const fr=f-camClip.start;
+    zoom=pval(camClip,'camZoom',fr,0)||defaultCamZoom();
+    px=pval(camClip,'posX',fr,0);py=pval(camClip,'posY',fr,0);pz=pval(camClip,'posZ',fr,-defaultCamZoom());
+    qx=pval(camClip,'poiX',fr,0);qy=pval(camClip,'poiY',fr,0);qz=pval(camClip,'poiZ',fr,0);
+  }else{zoom=defaultCamZoom();px=0;py=0;pz=-zoom;qx=qy=qz=0;}
+  cam.fov=2*Math.atan(ph/(2*Math.max(1,zoom)))*180/Math.PI;
+  cam.aspect=project.width/project.height;cam.near=1;cam.far=Math.max(1e5,zoom*8);
+  cam.position.set(px,-py,-pz);cam.up.set(0,1,0);cam.lookAt(qx,-qy,-qz);cam.updateProjectionMatrix();
+  return cam;
+}
+function apply3DLights(R,f){
+  for(const l of R.lights){R.scene.remove(l);if(l.target)R.scene.remove(l.target);}
+  R.lights.length=0;
+  const lcs=activeLights(f);
+  if(!lcs.length){const amb=new THREE.AmbientLight(0xffffff,1);R.scene.add(amb);R.lights.push(amb);return;} // no lights ⇒ full-bright (AE)
+  for(const c of lcs){const fr=f-c.start,type=c.lightType||'point';
+    const col=new THREE.Color(c.lightColor||'#ffffff'),inten=Math.max(0,pval(c,'lightIntensity',fr,100))/100;
+    let L;
+    if(type==='ambient')L=new THREE.AmbientLight(col,inten);
+    else if(type==='parallel')L=new THREE.DirectionalLight(col,inten);
+    else if(type==='spot'){L=new THREE.SpotLight(col,inten);L.angle=clamp(pval(c,'lightConeAngle',fr,90)/2*Math.PI/180,0.01,Math.PI/2-0.01);L.penumbra=clamp(pval(c,'lightConeFeather',fr,50)/100,0,1);L.decay=0;}
+    else{L=new THREE.PointLight(col,inten);L.decay=0;}
+    L.position.set(pval(c,'posX',fr,0),-pval(c,'posY',fr,0),-pval(c,'posZ',fr,0));
+    if(L.target){L.target.position.set(pval(c,'poiX',fr,0),-pval(c,'poiY',fr,0),-pval(c,'poiZ',fr,0));R.scene.add(L.target);}
+    if(c.castSh&&'castShadow' in L){L.castShadow=true;if(L.shadow){L.shadow.mapSize.set(1024,1024);L.shadow.bias=-0.0005;}}
+    R.scene.add(L);R.lights.push(L);
+  }
+}
+function render3DRun(ctx,run,f,W,H,srcOverride){
+  if(!window.THREE)return;
+  const pw=project.width,ph=project.height;
+  const k=stageK(W,H),fw=pw*k,fh=ph*k,ox=(W-fw)/2,oy=(H-fh)/2;
+  const RW=Math.max(1,Math.round(fw)),RH=Math.max(1,Math.round(fh));
+  const R=lp3dRenderer(RW,RH);if(!R)return;
+  for(const p of R.planes)if(p&&p.mesh)R.scene.remove(p.mesh); // hide all pooled meshes; re-add only what we use
+  apply3DLights(R,f);
+  const cam=build3DCamera(R,f),d=Math.PI/180;
+  for(let idx=0;idx<run.length;idx++){
+    const entry=run[idx],c=entry.c,fr=f-c.start;
+    const p=render3DLayerTexture(R,entry,idx,f,srcOverride);if(!p)continue;
+    const m=p.mesh;
+    const sc=pval(c,'scale',fr,1),sx=sc*(c.scaleX==null?1:c.scaleX),sy=sc*(c.scaleY==null?1:c.scaleY);
+    m.scale.set(pw*sx,ph*sy,1);
+    m.position.set(pval(c,'posX',fr,0),-pval(c,'posY',fr,0),-pval(c,'posZ',fr,0));
+    m.rotation.set((pval(c,'rotX',fr,0)+pval(c,'orientX',fr,0))*d,
+                   -(pval(c,'rotY',fr,0)+pval(c,'orientY',fr,0))*d,
+                   -(pval(c,'rotation',fr,0)+pval(c,'orientZ',fr,0))*d,'YXZ');
+    m.material=(c.accLights!==false)?p.matLit:p.matBasic;
+    m.castShadow=!!c.castSh;m.receiveShadow=!!c.accSh;
+    R.scene.add(m);
+  }
+  R.renderer.render(R.scene,cam);
+  ctx.drawImage(R.renderer.domElement,ox,oy,RW,RH);
+}
+// One 2D layer entry (guide / track-matte / 2nd-layer / motion-blur). Mutates `consumed`.
+function render2DEntry(ctx,vis,i,consumed,f,W,H,srcOverride){
+  const entry=vis[i],c=entry.c;
+  if(c.guide&&srcOverride)return;   // Guide layers: preview only, skipped on export
+  if(c.trackMatte&&i+1<vis.length){const me=vis[i+1];consumed.add(i+1); // layer above = the matte
+    if(me.c.guide&&srcOverride){drawOneClip(ctx,entry,f,W,H,srcOverride);return;} // a guide matte is preview-only → ignore on export
+    drawMatted(ctx,entry,me,c.trackMatte,f,W,H,srcOverride);return;}
+  if(i+1<vis.length&&!consumed.has(i+1)&&clipNeeds2nd(c,f)){const _ab=vis[i+1];consumed.add(i+1); // 2nd-layer: render the layer above to a dedicated canvas FIRST, before this clip's withLayerFX claims the shared pool
+    const _l2=document.createElement('canvas');_l2.width=W;_l2.height=H;window.__lp2ndCanvas=null;try{drawOneClipMB(_l2.getContext('2d'),_ab,f,W,H);}catch(e){}window.__lp2ndCanvas=_l2;}
+  else window.__lp2ndCanvas=null;
+  drawOneClipMB(ctx,entry,f,W,H,srcOverride);
+}
 function drawFrameInto(ctx,W,H,f,srcOverride){
   ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   const vis=activeVideoClips(f),consumed=new Set();
-  for(let i=0;i<vis.length;i++){
-    if(consumed.has(i))continue;
-    const entry=vis[i],c=entry.c;
-    if(c.guide&&srcOverride)continue;   // Guide layers: preview only, skipped on export
-    if(c.trackMatte&&i+1<vis.length){const me=vis[i+1];consumed.add(i+1); // layer above = the matte
-      if(me.c.guide&&srcOverride){drawOneClip(ctx,entry,f,W,H,srcOverride);continue;} // a guide matte is preview-only → ignore on export
-      drawMatted(ctx,entry,me,c.trackMatte,f,W,H,srcOverride);continue;}
-    if(i+1<vis.length&&!consumed.has(i+1)&&clipNeeds2nd(c,f)){const _ab=vis[i+1];consumed.add(i+1); // 2nd-layer: render the layer above to a dedicated canvas FIRST, before this clip's withLayerFX claims the shared pool
-      const _l2=document.createElement('canvas');_l2.width=W;_l2.height=H;window.__lp2ndCanvas=null;try{drawOneClipMB(_l2.getContext('2d'),_ab,f,W,H);}catch(e){}window.__lp2ndCanvas=_l2;}
-    else window.__lp2ndCanvas=null;
-    drawOneClipMB(ctx,entry,f,W,H,srcOverride);
+  const any3D=lp3dOK()&&vis.some(e=>e.c.threeD);
+  if(!any3D){
+    for(let i=0;i<vis.length;i++){if(consumed.has(i))continue;render2DEntry(ctx,vis,i,consumed,f,W,H,srcOverride);}
+  }else{
+    const r3=c=>is3DEntry(c)&&!(c.guide&&srcOverride); // a Guide+3D layer must drop on export → route it to the 2D path (which skips guides)
+    let i=0;
+    while(i<vis.length){
+      if(consumed.has(i)){i++;continue;}
+      if(r3(vis[i].c)){
+        const run=[];let j=i;
+        while(j<vis.length&&!consumed.has(j)&&r3(vis[j].c)){run.push(vis[j]);j++;}
+        try{render3DRun(ctx,run,f,W,H,srcOverride);}catch(e){console.warn('[3D]',e&&e.message);}
+        i=j;
+      }else{render2DEntry(ctx,vis,i,consumed,f,W,H,srcOverride);i++;}
+    }
   }
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
   ctx.filter='none';
 }
 function drawFrame(){drawFrameInto(sctx,screen.width,screen.height,playhead);drawNullMarkers(sctx,screen.width,screen.height);drawOverlays(sctx,screen.width,screen.height);drawSelOverlay(sctx,screen.width,screen.height);drawMaskOverlay(sctx,screen.width,screen.height);}
-// Null-object markers — a small amber crosshair so the invisible null is visible & grabbable (preview only, never exported)
+// Null / camera / light markers — small icons so the invisible helper layers are locatable (preview only, never exported)
 function drawNullMarkers(ctx,W,H){
   const f=playhead;
   for(const {c} of activeVideoClips(f)){
@@ -2578,6 +2755,20 @@ function drawNullMarkers(ctx,W,H){
     const s=11;ctx.strokeRect(p.x-s,p.y-s,2*s,2*s);
     ctx.beginPath();ctx.moveTo(p.x-s-5,p.y);ctx.lineTo(p.x+s+5,p.y);ctx.moveTo(p.x,p.y-s-5);ctx.lineTo(p.x,p.y+s+5);ctx.stroke();
     ctx.font='9px ui-monospace,monospace';ctx.fillText(c.name||'Null',p.x+s+6,p.y-s);
+    ctx.restore();
+  }
+  // Camera & light markers (placed by their X/Y position relative to comp centre; preview hint only)
+  const k=stageK(W,H),cx0=(W-project.width*k)/2+project.width*k/2,cy0=(H-project.height*k)/2+project.height*k/2;
+  for(const t of project.tracks)for(const c of t.clips){
+    const kind=clipKind(c);if(kind!=='camera'&&kind!=='light')continue;
+    if(f<c.start||f>=c.start+c.dur)continue;
+    const fr=f-c.start,x=cx0+pval(c,'posX',fr,0)*k,y=cy0+pval(c,'posY',fr,0)*k;
+    ctx.save();ctx.setTransform(1,0,0,1,0,0);
+    const col=kind==='camera'?'rgba(120,200,255,.95)':'rgba(255,219,120,.95)';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1.3;
+    if(kind==='light'){ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+      for(let a=0;a<8;a++){const ang=a*Math.PI/4;ctx.beginPath();ctx.moveTo(x+Math.cos(ang)*7,y+Math.sin(ang)*7);ctx.lineTo(x+Math.cos(ang)*11,y+Math.sin(ang)*11);ctx.stroke();}}
+    else{ctx.strokeRect(x-9,y-6,14,12);ctx.beginPath();ctx.moveTo(x+5,y-3);ctx.lineTo(x+11,y-6);ctx.lineTo(x+11,y+6);ctx.lineTo(x+5,y+3);ctx.closePath();ctx.stroke();}
+    ctx.font='9px ui-monospace,monospace';ctx.fillText(c.name||kind,x+14,y-8);
     ctx.restore();
   }
 }
@@ -3060,22 +3251,72 @@ function refreshInspector(){
       refreshInspector();drawFrame();save(true);});
     $('#cDel').onclick=deleteSel;return;
   }
+  if(clipKind(clip)==='camera'){
+    b.innerHTML=`<div class="grp"><div class="gt">📷 Camera</div>
+      <div class="hint" style="margin-bottom:2px">${esc(clip.name||'Camera')}</div>
+      ${numRow('Start (f)','cStart',clip.start)}${numRow('Length (f)','cDur',clip.dur)}
+      ${numRowK('Zoom','camZoom',clip)}
+      <div class="hint">Bigger Zoom = flatter (more telephoto); smaller = wider, more dramatic perspective.</div></div>
+    <div class="grp"><div class="gt">Position</div>
+      ${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}${numRowK('Pos Z','posZ',clip)}</div>
+    <div class="grp"><div class="gt">Point of Interest</div>
+      ${numRowK('POI X','poiX',clip)}${numRowK('POI Y','poiY',clip)}${numRowK('POI Z','poiZ',clip)}
+      <div class="hint">The camera always looks toward its Point of Interest. Keyframe Position + POI to fly through 3D layers.</div></div>
+    <button class="del-btn" id="cDel">Delete camera</button>`;
+    bindNum('cStart',v=>{clip.start=Math.max(0,v|0);renderTimeline();save(true);});
+    bindNum('cDur',v=>{clip.dur=Math.max(1,v|0);renderTimeline();save(true);});
+    for(const fld of ['camZoom','posX','posY','posZ','poiX','poiY','poiZ'])bindKRow(fld,clip);
+    $('#cDel').onclick=deleteSel;return;
+  }
+  if(clipKind(clip)==='light'){
+    const lt=clip.lightType||'point',isSpot=lt==='spot',isDir=(lt==='spot'||lt==='parallel');
+    const tb=(v,l)=>`<button class="chip ${lt===v?'on':''}" data-lty="${v}">${l}</button>`;
+    b.innerHTML=`<div class="grp"><div class="gt">💡 Light</div>
+      <div class="hint" style="margin-bottom:2px">${esc(clip.name||'Light')}</div>
+      <div class="row" style="align-items:flex-start"><label>Type</label><div class="chiprow" style="flex-wrap:wrap;gap:4px">${tb('ambient','Ambient')}${tb('point','Point')}${tb('spot','Spot')}${tb('parallel','Parallel')}</div></div>
+      <div class="row"><label>Color</label><input type="color" id="lCol" value="${clip.lightColor||'#ffffff'}"></div>
+      ${numRowK('Intensity','lightIntensity',clip)}
+      ${isSpot?numRowK('Cone Angle','lightConeAngle',clip)+numRowK('Cone Feather','lightConeFeather',clip):''}
+      ${numRow('Start (f)','cStart',clip.start)}${numRow('Length (f)','cDur',clip.dur)}</div>
+      ${lt==='ambient'?'':`<div class="grp"><div class="gt">Position</div>${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}${numRowK('Pos Z','posZ',clip)}</div>`}
+      ${isDir?`<div class="grp"><div class="gt">Point of Interest</div>${numRowK('POI X','poiX',clip)}${numRowK('POI Y','poiY',clip)}${numRowK('POI Z','poiZ',clip)}<div class="hint">Spot / Parallel lights aim at the Point of Interest.</div></div>`:''}
+      <div class="grp"><div class="gt">Options</div><div class="row"><label>Casts Shadows</label><button class="chip ${clip.castSh?'on':''}" id="lSh">${clip.castSh?'On':'Off'}</button></div>
+        <div class="hint">Only 3D layers with “Accepts Lights” on are lit. Shadows also need a layer set to “Casts Shadows”.</div></div>
+    <button class="del-btn" id="cDel">Delete light</button>`;
+    bindNum('cStart',v=>{clip.start=Math.max(0,v|0);renderTimeline();save(true);});
+    bindNum('cDur',v=>{clip.dur=Math.max(1,v|0);renderTimeline();save(true);});
+    for(const fld of ['lightIntensity','lightConeAngle','lightConeFeather','posX','posY','posZ','poiX','poiY','poiZ'])bindKRow(fld,clip);
+    {const e=$('#lCol');if(e)e.oninput=ev=>{clip.lightColor=ev.target.value;drawFrame();save(true);};}
+    $$('#inspBody [data-lty]').forEach(btn=>btn.onclick=()=>{clip.lightType=btn.dataset.lty;refreshInspector();drawFrame();save(true);});
+    {const e=$('#lSh');if(e)e.onclick=()=>{clip.castSh=!clip.castSh;refreshInspector();drawFrame();save(true);};}
+    $('#cDel').onclick=deleteSel;return;
+  }
   const m=MEDIA[clip.mediaId]||{};
   const isAud=clipKind(clip)==='audio';
   const isSolid=clipKind(clip)==='solid'||!!clip.solid;
+  const isShape=clipKind(clip)==='shape';
   const opaKeyed=isKeyed(clip,'opacity');
-  b.innerHTML=`<div class="grp"><div class="gt">${isSolid?'Solid':isAud?'Audio Clip':'Clip'}</div>
-    <div class="hint" style="margin-bottom:2px">${esc(isSolid?(clip.name||''):(m.name||''))}</div>
+  b.innerHTML=`<div class="grp"><div class="gt">${isSolid?'Solid':isShape?'Shape':isAud?'Audio Clip':'Clip'}</div>
+    <div class="hint" style="margin-bottom:2px">${esc(isSolid||isShape?(clip.name||''):(m.name||''))}</div>
     ${isSolid?`<div class="row"><label>Color</label><input type="color" id="cSolColor" value="${clip.color||'#6a6a6a'}"></div>`:''}
-    ${numRow('Start (f)','cStart',clip.start)}${isSolid?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
+    ${numRow('Start (f)','cStart',clip.start)}${isSolid||isShape?'':numRow('In (f)','cIn',clip.in||0)}${numRow('Length (f)','cDur',clip.dur)}
     ${isAud?'':`<div class="row"><label>Track Matte</label><select class="fld" id="cTrkMat">${[['','None'],['alpha','Alpha'],['alphaInv','Alpha Inv'],['luma','Luma'],['lumaInv','Luma Inv']].map(([v,l])=>`<option value="${v}" ${(clip.trackMatte||'')===v?'selected':''}>${l}</option>`).join('')}</select></div>`}
     ${isAud?'':`<div class="row"><label>Parent</label><select class="fld" id="cParent"><option value="">None</option>${project.tracks.flatMap(t=>t.clips).filter(o=>o.id!==clip.id).map(o=>`<option value="${o.id}" ${clip.parentId===o.id?'selected':''}>${esc(o.name||o.text||(MEDIA[o.mediaId]||{}).name||'Layer')}</option>`).join('')}</select></div>`}
     ${isAud?'':`<div class="row"><label>Motion Blur</label><button class="chip ${clip.motionBlur?'on':''}" id="cMB">${clip.motionBlur?'On':'Off'}</button></div>`}
     </div>
+    ${isShape?shapeInspector(clip):''}
     ${isAud?'':`<div class="grp director-only"><div class="gt">Transform</div>
       ${numRowK('Anchor X','anchorX',clip)}${numRowK('Anchor Y','anchorY',clip)}
       ${numRowK('Pos X','posX',clip)}${numRowK('Pos Y','posY',clip)}
       ${numRowK('Scale','scale',clip)}${numRow('Scale X','cScaleX',clip.scaleX==null?1:clip.scaleX)}${numRow('Scale Y','cScaleY',clip.scaleY==null?1:clip.scaleY)}${numRowK('Rotate','rotation',clip)}${numRowK('Opacity','opacity',clip)}</div>
+    ${isAud?'':`<div class="grp director-only"><div class="gt">3D</div>
+      <div class="row"><label>3D Layer</label><button class="chip ${clip.threeD?'on':''}" id="c3D">${clip.threeD?'On':'Off'}</button></div>
+      ${clip.threeD?`${numRowK('Pos Z','posZ',clip)}${numRowK('X Rotation','rotX',clip)}${numRowK('Y Rotation','rotY',clip)}
+        <div class="hint" style="margin:2px 0">Z rotation = the “Rotate” field above.</div>
+        <div class="row"><label>Accepts Lights</label><button class="chip ${clip.accLights!==false?'on':''}" id="cAccL">${clip.accLights!==false?'On':'Off'}</button></div>
+        <div class="row"><label>Casts Shadows</label><button class="chip ${clip.castSh?'on':''}" id="cCastS">${clip.castSh?'On':'Off'}</button></div>
+        <div class="row"><label>Accepts Shadows</label><button class="chip ${clip.accSh?'on':''}" id="cAccS">${clip.accSh?'On':'Off'}</button></div>`
+      :'<div class="hint">Turn on to place this layer in 3D space. Add a 📷 Camera to fly around it and 💡 Lights to light it.</div>'}</div>`}
     <div class="grp director-only"><div class="gt">Effect Controls</div>
       <div id="efxMount"></div>
       <div class="row" style="margin-top:7px"><label>Blend</label><select class="fld" id="cBlend">${BLENDS.map(bm=>`<option value="${bm[1]}" ${(clip.blend||'source-over')===bm[1]?'selected':''}>${bm[0]}</option>`).join('')}</select></div></div>
@@ -3106,6 +3347,15 @@ function refreshInspector(){
     }
     $('#cAud').onclick=()=>{clip.audio=!(clip.audio!==false)?false:true;refreshInspector();save(true);};
     bindMasksInspector(clip);
+    if(isShape)bindShapeInspector(clip);
+    if(clip.threeD)for(const fld of ['posZ','rotX','rotY'])bindKRow(fld,clip);
+    {const e=$('#c3D');if(e)e.onclick=()=>{
+      if(!lp3dOK()&&!clip.threeD)return toast('3D needs WebGL — not available here',1);
+      clip.threeD=!clip.threeD;if(clip.threeD&&clip.accLights==null)clip.accLights=true;
+      refreshInspector();renderTimeline();drawFrame();save(true);};}
+    {const e=$('#cAccL');if(e)e.onclick=()=>{clip.accLights=!(clip.accLights!==false);refreshInspector();drawFrame();save(true);};}
+    {const e=$('#cCastS');if(e)e.onclick=()=>{clip.castSh=!clip.castSh;refreshInspector();drawFrame();save(true);};}
+    {const e=$('#cAccS');if(e)e.onclick=()=>{clip.accSh=!clip.accSh;refreshInspector();drawFrame();save(true);};}
   }else{bindNum('aFi',v=>{clip.audioFadeIn=Math.max(0,v|0);save(true);});
         bindNum('aFo',v=>{clip.audioFadeOut=Math.max(0,v|0);save(true);});}
   $('#cVol').oninput=e=>{writeProp(clip,'volume',+e.target.value);save(true);};
@@ -3172,6 +3422,34 @@ function bindMasksInspector(clip){
     bindNum('mw_'+m.id,v=>{const b=ibox();writeMaskPath(clip,m,{box:{x:b.x,y:b.y,w:Math.max(2,v|0),h:b.h}});renderTimeline();drawFrame();save(true);});
     bindNum('mh_'+m.id,v=>{const b=ibox();writeMaskPath(clip,m,{box:{x:b.x,y:b.y,w:b.w,h:Math.max(2,v|0)}});renderTimeline();drawFrame();save(true);});
   }
+}
+// ── SHAPE INSPECTOR (type/size/corner/points/fill/stroke) ────────────────
+function shapeInspector(c){
+  const sh=c.shape||'roundrect';
+  const tb=(v,l)=>`<button class="chip ${sh===v?'on':''}" data-shty="${v}">${l}</button>`;
+  return `<div class="grp"><div class="gt">Shape</div>
+    <div class="row" style="align-items:flex-start"><label>Type</label><div class="chiprow" style="flex-wrap:wrap;gap:4px">
+      ${tb('rect','Rect')}${tb('roundrect','Round')}${tb('ellipse','Ellipse')}${tb('polygon','Polygon')}${tb('star','Star')}${tb('line','Line')}</div></div>
+    ${numRow('Width','shW',c.shW==null?Math.round(project.width*0.4):c.shW)}
+    ${numRow('Height','shH',c.shH==null?Math.round(project.height*0.4):c.shH)}
+    ${sh==='roundrect'?numRow('Corner','shRad',c.shRadius==null?24:c.shRadius):''}
+    ${(sh==='polygon'||sh==='star')?numRow('Points','shPts',c.shPoints==null?5:c.shPoints):''}
+    ${sh==='star'?numRow('Inner %','shInr',Math.round((c.shInner==null?0.5:c.shInner)*100)):''}
+    ${sh==='line'?'':`<div class="row"><label>Fill</label><div class="chiprow"><input type="color" id="shFill" value="${c.shFill||'#3E9CB8'}"><button class="chip ${c.shFillOn!==false?'on':''}" id="shFillOn">${c.shFillOn!==false?'On':'Off'}</button></div></div>`}
+    <div class="row"><label>Stroke</label><div class="chiprow"><input type="color" id="shStroke" value="${c.shStroke||'#ffffff'}"></div></div>
+    ${numRow('Stroke W','shStrokeW',c.shStrokeW==null?(sh==='line'?6:0):c.shStrokeW)}</div>`;
+}
+function bindShapeInspector(c){
+  $$('#inspBody [data-shty]').forEach(b=>b.onclick=()=>{c.shape=b.dataset.shty;refreshInspector();drawFrame();save(true);});
+  bindNum('shW',v=>{c.shW=Math.max(1,v|0);drawFrame();save(true);});
+  bindNum('shH',v=>{c.shH=Math.max(1,v|0);drawFrame();save(true);});
+  bindNum('shRad',v=>{c.shRadius=Math.max(0,v|0);drawFrame();save(true);});
+  bindNum('shPts',v=>{c.shPoints=Math.max(3,v|0);drawFrame();save(true);});
+  bindNum('shInr',v=>{c.shInner=clamp(v/100,0.05,1);drawFrame();save(true);});
+  bindNum('shStrokeW',v=>{c.shStrokeW=Math.max(0,v);drawFrame();save(true);});
+  {const e=$('#shFill');if(e)e.oninput=ev=>{c.shFill=ev.target.value;drawFrame();save(true);};}
+  {const e=$('#shStroke');if(e)e.oninput=ev=>{c.shStroke=ev.target.value;drawFrame();save(true);};}
+  {const e=$('#shFillOn');if(e)e.onclick=()=>{c.shFillOn=!(c.shFillOn!==false);refreshInspector();drawFrame();save(true);};}
 }
 // ── KEYFRAME AUTHORING (inspector rows with a stopwatch) ─────────────────
 function valAt(c,field){const fr=playhead-c.start;return isKeyed(c,field)?pval(c,field,fr,KDEF[field]):(c[field]==null?KDEF[field]:c[field]);}
@@ -3834,6 +4112,9 @@ function projectNeedsFrameServer(p){
     if((c.scaleX!=null&&c.scaleX!==1)||(c.scaleY!=null&&c.scaleY!==1))return true; // flip — native path has no hflip/vflip
     if((c.anchorX&&c.anchorX!==0)||(c.anchorY&&c.anchorY!==0))return true;
     if(clipKind(c)==='solid'||c.solid)return true; // solids aren't drawn by the native ffmpeg path
+    if(clipKind(c)==='shape')return true; // shape layers are canvas-generated — frame-server only
+    if(c.threeD||clipKind(c)==='camera'||clipKind(c)==='light')return true; // 3D is WebGL-composited client-side
+    if(c.dataURL)return true; // inline images (Content-Aware Fill) — native ffmpeg path has no file for them
     if(c.guide)return true; // guide layers must be skipped on export — only the frame-server path can
     if(c.adjustment)return true; // adjustment layers grade the comp — frame-server only
     if(c.trackMatte)return true; // track mattes are canvas-composited — frame-server only
@@ -4095,6 +4376,148 @@ window.addEventListener('resize',fitScreen);
     const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>x.nullObject).length,0)+1;
     const c={id:uid(),kind:'solid',solid:true,nullObject:true,name:'Null '+n,color:'#8a8a8a',start:playhead,dur:Math.round(5*FPS())};
     tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Null Object added — parent layers to it to move them together');}
+  function newShape(kind){
+    let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[project.tracks.length-1];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}
+    const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>clipKind(x)==='shape').length,0)+1;
+    const c={id:uid(),kind:'shape',shape:kind||'roundrect',name:'Shape '+n,
+      shW:Math.round(project.width*0.4),shH:Math.round(project.height*0.4),shRadius:24,shPoints:5,shInner:0.5,
+      shFill:'#3E9CB8',shFillOn:true,shStroke:'#ffffff',shStrokeW:0,start:playhead,dur:Math.round(5*FPS())};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Shape layer “'+c.name+'” added');}
+  function _layerTrack(){let tr=(sel&&project.tracks.find(t=>t.id===sel.trackId))||project.tracks[project.tracks.length-1];
+    if(!tr){tr={id:uid(),name:'Track 1',clips:[]};insertTrack(tr);}return tr;}
+  function newCamera(){
+    if(!lp3dOK())return toast('3D needs WebGL — not available here',1);
+    const tr=_layerTrack();const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>clipKind(x)==='camera').length,0)+1;
+    const z=defaultCamZoom();
+    const c={id:uid(),kind:'camera',name:'Camera '+n,camZoom:z,posX:0,posY:0,posZ:-z,poiX:0,poiY:0,poiZ:0,start:playhead,dur:Math.round(8*FPS())};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Camera added — set layers to 3D, then move/orbit the camera');}
+  function newLight(type){
+    if(!lp3dOK())return toast('3D needs WebGL — not available here',1);
+    const tr=_layerTrack();const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>clipKind(x)==='light').length,0)+1;
+    const c={id:uid(),kind:'light',name:'Light '+n,lightType:type||'point',lightColor:'#ffffff',lightIntensity:100,
+      lightConeAngle:90,lightConeFeather:50,castSh:false,
+      posX:0,posY:Math.round(-project.height*0.3),posZ:-Math.round(project.width*0.4),poiX:0,poiY:0,poiZ:0,start:playhead,dur:Math.round(8*FPS())};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();toast('Light added — turn layers 3D + “Accepts Lights” to light them');}
+  function toggle3D(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    const k=clipKind(s.clip);if(k==='audio'||k==='camera'||k==='light'||k==='text')return toast('3D works on image / video / solid / shape layers',1);
+    if(!lp3dOK()&&!s.clip.threeD)return toast('3D needs WebGL — not available here',1);
+    s.clip.threeD=!s.clip.threeD;if(s.clip.threeD&&s.clip.accLights==null)s.clip.accLights=true;
+    renderTimeline();refreshInspector();drawFrame();save();
+    toast(s.clip.threeD?'3D layer ON — add a Camera + Light, then move it in Z':'3D layer off');}
+  // Content-Aware Fill — mask the object to remove, then fill the hole from surrounding pixels.
+  function contentAwareFill(mode){
+    const s=sc();if(!s||!s.clip)return toast('Select the layer with the object to remove',1);
+    const clip=s.clip,k=clipKind(clip);
+    if(k==='audio'||k==='camera'||k==='light'||k==='text')return toast('Content-Aware Fill works on image / video / solid / shape layers',1);
+    if(!clipMasks(clip).length)return toast('Draw a mask around what to remove (＋ Add Mask, or the Pen tool), then run Content-Aware Fill',1);
+    if(!window.LPInpaint)return toast('Fill engine not loaded',1);
+    toast('Content-Aware Fill — synthesizing from surrounding pixels…');
+    setTimeout(()=>{try{_runContentAwareFill(clip,mode);}catch(e){console.warn('[fill]',e);toast('Fill failed: '+(e.message||e),1);}},45);
+  }
+  function _runContentAwareFill(clip,mode){
+    const W=project.width,H=project.height,f=playhead,k=clipKind(clip);
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+    const raw=Object.assign({},clip,{masks:[],trackMatte:null,blend:'source-over',opacity:1,threeD:false,parentId:null,motionBlur:false});
+    const entry={c:raw,solid:(k==='solid'||raw.solid),img:(k==='image'),shape:(k==='shape')};
+    if(!drawOneClip(g,entry,f,W,H,null))return toast('Layer isn’t ready yet — try again in a moment',1);
+    const M=document.createElement('canvas');M.width=W;M.height=H;
+    const S=document.createElement('canvas');S.width=W;S.height=H;
+    buildMaskAlpha(M,S,clip,f,W,H);
+    const ma=M.getContext('2d').getImageData(0,0,W,H).data;
+    const hole=new Uint8Array(W*H);let cnt=0,minx=W,miny=H,maxx=0,maxy=0;
+    for(let i=0;i<W*H;i++){if(ma[i*4+3]>128){hole[i]=1;cnt++;const x=i%W,y=(i/W)|0;if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}}
+    if(!cnt)return toast('The mask is empty — nothing to fill',1);
+    if(cnt>W*H*0.6)return toast('That covers most of the frame — mask a smaller region',1);
+    const hw=maxx-minx,hh=maxy-miny;
+    const useTexture=mode==='texture'?true:mode==='telea'?false:(cnt>2200&&hw>32&&hh>32);
+    const full=g.getImageData(0,0,W,H);
+    if(useTexture){
+      const maxd=360,scale=Math.min(1,maxd/Math.max(W,H)),copts={patch:9,band:28,maxMs:3500};
+      if(scale<1){const dw=Math.max(1,Math.round(W*scale)),dh=Math.max(1,Math.round(H*scale));
+        const sc1=document.createElement('canvas');sc1.width=dw;sc1.height=dh;const sg=sc1.getContext('2d');sg.imageSmoothingEnabled=true;sg.drawImage(cv,0,0,dw,dh);
+        const small=sg.getImageData(0,0,dw,dh);
+        const hs=new Uint8Array(dw*dh);for(let y=0;y<dh;y++)for(let x=0;x<dw;x++){const sx=Math.min(W-1,Math.floor(x/scale)),sy=Math.min(H-1,Math.floor(y/scale));hs[y*dw+x]=hole[sy*W+sx];}
+        LPInpaint.criminisi(small,hs,copts);
+        const tmp=document.createElement('canvas');tmp.width=dw;tmp.height=dh;tmp.getContext('2d').putImageData(small,0,0);
+        g.imageSmoothingEnabled=true;g.clearRect(0,0,W,H);g.drawImage(tmp,0,0,W,H);
+        const up=g.getImageData(0,0,W,H);
+        for(let i=0;i<W*H;i++)if(!hole[i]){const a=i*4;up.data[a]=full.data[a];up.data[a+1]=full.data[a+1];up.data[a+2]=full.data[a+2];up.data[a+3]=full.data[a+3];}
+        g.putImageData(up,0,0);
+      }else{LPInpaint.criminisi(full,hole,copts);g.putImageData(full,0,0);}
+    }else{LPInpaint.telea(full,hole,{radius:6});g.putImageData(full,0,0);}
+    const featherPx=clamp(Math.round(Math.min(hw,hh)*0.06),2,40);
+    const hf=new Float32Array(W*H);for(let i=0;i<W*H;i++)hf[i]=hole[i]?1:0;
+    const soft=blurMatte(morphMatte(hf,W,H,Math.max(1,Math.round(featherPx*0.5))),W,H,featherPx);
+    const filled=g.getImageData(0,0,W,H);
+    for(let i=0;i<W*H;i++)filled.data[i*4+3]=Math.round(clamp(soft[i],0,1)*255);
+    const patch=document.createElement('canvas');patch.width=W;patch.height=H;patch.getContext('2d').putImageData(filled,0,0);
+    const n=project.tracks.reduce((a,t)=>a+t.clips.filter(x=>/^Fill\b/.test(x.name||'')).length,0)+1;
+    const fc={id:uid(),kind:'image',dataURL:patch.toDataURL('image/png'),name:'Fill '+n,start:clip.start,dur:clip.dur,opacity:1};
+    // Place on top of the source. If the source uses a Track Matte, a same-track push would become its matte —
+    // so give the fill its own track at the top of the stack instead.
+    let tr;
+    if(clip.trackMatte){tr={id:uid(),name:'Fill',clips:[]};project.tracks.push(tr);}
+    else tr=project.tracks.find(t=>t.clips.includes(clip))||project.tracks[project.tracks.length-1];
+    tr.clips.push(fc);renderTimeline();select(tr.id,fc.id);drawFrame();save();
+    toast('Content-Aware Fill done — “'+fc.name+'” added above ('+(useTexture?'texture':'smooth')+'). Hide or delete it to compare.');
+  }
+  // ── AUTO-TRACE — render the selected layer, trace its alpha/luma into vector mask paths ──
+  function _traceSelected(opts){
+    opts=opts||{};
+    const s=sc();if(!s||!s.clip)return {err:'Select a layer to trace'};
+    const clip=s.clip,k=clipKind(clip);
+    if(k==='audio'||k==='camera'||k==='light')return {err:'Auto-trace works on image / video / solid / shape / text layers'};
+    if(!window.LPTrace)return {err:'Trace engine not loaded'};
+    const W=project.width,H=project.height;
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+    if(k==='text'){const tclone=Object.assign({},clip,{posX:0,posY:0,scale:1,rotation:0,anchorX:0,anchorY:0,scaleX:1,scaleY:1,blend:'source-over',opacity:1});
+      try{drawTextClip(g,tclone,playhead,W,H);}catch(e){return {err:'Could not render the text'};}}
+    else{const raw=Object.assign({},clip,{masks:[],trackMatte:null,blend:'source-over',opacity:1,threeD:false,parentId:null,motionBlur:false});
+      const entry={c:raw,solid:(k==='solid'||raw.solid),img:(k==='image'),shape:(k==='shape')};
+      if(!drawOneClip(g,entry,playhead,W,H,null))return {err:'Layer isn’t ready yet — try again in a moment'};}
+    const maxd=1000,scale=Math.min(1,maxd/Math.max(W,H)),dw=Math.max(1,Math.round(W*scale)),dh=Math.max(1,Math.round(H*scale));
+    let img;
+    if(scale<1){const s1=document.createElement('canvas');s1.width=dw;s1.height=dh;const sg=s1.getContext('2d');sg.imageSmoothingEnabled=true;sg.drawImage(cv,0,0,dw,dh);img=sg.getImageData(0,0,dw,dh);}
+    else img=g.getImageData(0,0,W,H);
+    let channel=opts.channel;
+    if(!channel){if(k==='text')channel='alpha';else{const d=img.data,N=dw*dh;let transp=0;for(let i=0;i<N;i+=5)if(d[i*4+3]<128)transp++;channel=(transp>N*0.02)?'alpha':'luma';}}
+    const th=opts.threshold!=null?opts.threshold:0.5;
+    const b=LPTrace.buildBinary(img,{channel,threshold:th});
+    const contours=LPTrace.trace(b.bin,b.W,b.H,{minArea:Math.max(30,dw*dh*0.0006),simplify:opts.simplify||1.5});
+    if(scale<1)for(const c of contours)for(const p of c.points){p.x/=scale;p.y/=scale;}
+    return {clip,contours,channel};
+  }
+  function _contoursToMasks(contours,prefix){
+    const inside=(pt,poly)=>{let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;if(((yi>pt.y)!==(yj>pt.y))&&(pt.x<(xj-xi)*(pt.y-yi)/((yj-yi)||1e-9)+xi))c=!c;}return c;};
+    const cent=poly=>{let x=0,y=0;for(const p of poly){x+=p.x;y+=p.y;}return {x:x/poly.length,y:y/poly.length};};
+    const masks=[];
+    for(let i=0;i<contours.length;i++){const poly=contours[i].points,ct=cent(poly);let depth=0;
+      for(let j=0;j<contours.length;j++){if(j!==i&&contours[j].area>contours[i].area&&inside(ct,contours[j].points))depth++;}
+      masks.push({id:uid(),name:(prefix||'Trace')+' '+(i+1),shape:'pen',mode:(depth&1)?'subtract':'add',inverted:false,feather:0,opacity:1,expansion:0,smooth:false,points:poly.map(p=>({x:p.x,y:p.y}))});}
+    return masks;
+  }
+  function autoTrace(){
+    const r=_traceSelected({});if(r.err)return toast(r.err,1);
+    if(!r.contours.length)return toast('Nothing to trace — try a layer with clearer edges',1);
+    if(r.contours.length>500)return toast('Too detailed ('+r.contours.length+' paths) — simplify the image first',1);
+    const masks=_contoursToMasks(r.contours,'Trace');
+    r.clip.masks=(r.clip.masks||[]).concat(masks);selMaskId=masks[0]&&masks[0].id;
+    renderTimeline();refreshInspector();drawFrame();save();
+    toast('Auto-traced '+masks.length+' path'+(masks.length>1?'s':'')+' ('+r.channel+') → masks on “'+(r.clip.name||clipKind(r.clip))+'”');
+  }
+  function createFromTrace(target){
+    const r=_traceSelected({});if(r.err)return toast(r.err,1);
+    if(!r.contours.length)return toast('Nothing to trace from this layer',1);
+    const masks=_contoursToMasks(r.contours,'Path');
+    if(target==='masks'){r.clip.masks=(r.clip.masks||[]).concat(masks);renderTimeline();refreshInspector();drawFrame();save();
+      return toast('Created '+masks.length+' mask path'+(masks.length>1?'s':'')+' from “'+(r.clip.name||'layer')+'”');}
+    const color=(clipKind(r.clip)==='text'&&r.clip.color)||'#ffffff';
+    const tr=project.tracks.find(t=>t.clips.includes(r.clip))||project.tracks[project.tracks.length-1];
+    const c={id:uid(),kind:'solid',solid:true,name:'Outline Shape',color,start:r.clip.start,dur:r.clip.dur,opacity:1,masks};
+    tr.clips.push(c);renderTimeline();select(tr.id,c.id);drawFrame();save();
+    toast('Created a filled shape from “'+(r.clip.name||'layer')+'” ('+masks.length+' path'+(masks.length>1?'s':'')+')');
+  }
   function toggleMotionBlur(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)==='audio')return toast('Motion blur is for visual layers',1);
     s.clip.motionBlur=!s.clip.motionBlur;renderTimeline();refreshInspector();drawFrame();save();
@@ -4432,6 +4855,10 @@ window.addEventListener('resize',fitScreen);
       if(/^Adjustment Layer/i.test(L))return ()=>newAdjustment();
       if(/^Null Object/i.test(L))return ()=>newNull();
       if(/^Solid/i.test(L))return ()=>newSolid();
+      if(/^Shape/i.test(L))return ()=>newShape();
+      if(/^Light/i.test(L))return ()=>newLight();
+      if(/^Camera/i.test(L))return ()=>newCamera();
+      if(/^Content-Aware Fill/i.test(L))return ()=>contentAwareFill();
       if(/^New Composition/i.test(L))return ()=>$('#btnNew').click();
       if(/^Composition Settings/i.test(L))return openCompSettings;
       return null;
@@ -4450,6 +4877,16 @@ window.addEventListener('resize',fitScreen);
       return (it.behavior&&/\b(switch|toggle|behaves|currently selected|makes? the)\b/i.test(it.behavior))?toggleAdjustment:()=>newAdjustment();
     if(menuId==='layer'&&/^Null Object/i.test(L))return ()=>newNull();
     if(menuId==='layer'&&/^Solid/i.test(L))return ()=>newSolid();
+    if(menuId==='layer'&&/^Shape Layer/i.test(L))return ()=>newShape();
+    if(menuId==='layer'&&/^Light(?:…|\.\.\.)?$/i.test(L))return ()=>newLight();
+    if(menuId==='layer'&&/^Camera(?:…|\.\.\.)?$/i.test(L))return ()=>newCamera();
+    if(menuId==='layer'&&/^Content-Aware Fill/i.test(L))return ()=>contentAwareFill();
+    if(menuId==='layer'&&/^3D Layer$/i.test(L))return ()=>toggle3D();
+    if(menuId==='layer'&&/^Auto-?trace/i.test(L))return ()=>autoTrace();
+    if(menuId==='layer'&&/^Create 3D Layer Instance/i.test(L))return ()=>toggle3D();
+    if(menuId==='layer'&&/^Create Masks from/i.test(L))return ()=>createFromTrace('masks');
+    if(menuId==='layer'&&/^Create Shapes from/i.test(L))return ()=>createFromTrace('shape');
+    if(menuId==='layer'&&/^Convert to Editable Text/i.test(L))return ()=>toast('Text layers here are already editable — select one and edit it in the Inspector',0);
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
     if(menuId==='layer'){
       if(/^Rename$/i.test(L))return renameSel;

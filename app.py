@@ -3197,6 +3197,152 @@ async def session_del(sid: str):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+#  THE WALL — a PERMANENT signature wall. Sacred to the owner (a memorial: people
+#  who've signed are gone now, their mark stays). Marks must outlive everyone,
+#  never be erased by an update, never be silently dropped. TWO durability layers:
+#    • data/wall.json        — the live state (atomic-written, crash-proof)
+#    • data/wall_log.jsonl   — APPEND-ONLY, one signature per line, NEVER rewritten:
+#                              the everlasting record. A lost/corrupt wall.json is
+#                              fully rebuilt from it, so no mark can ever be lost.
+#  data/ is excluded from the release zip, so an app update never touches it. The
+#  truly-shared cross-person wall rides the cloud move; this makes it durable +
+#  ownable (Export) on whatever host it runs on. ══════════════════════════════════
+WALL_FILE = DATA / "wall.json"
+WALL_LOG = DATA / "wall_log.jsonl"   # APPEND-ONLY — never overwritten
+
+
+def _wall_rebuild_from_log() -> dict | None:
+    """Reconstruct the entire wall from the append-only log — the safety net that
+    guarantees a deleted/corrupt wall.json can never cost a single signature."""
+    try:
+        if not WALL_LOG.exists():
+            return None
+        walls = [{"sigs": []}]
+        for line in WALL_LOG.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            op = rec.get("op")
+            if op == "new_wall":
+                walls.append({"sigs": []})
+            elif op == "sign" and rec.get("sig"):
+                wi = rec.get("wall", len(walls) - 1)
+                while len(walls) <= wi:
+                    walls.append({"sigs": []})
+                walls[wi]["sigs"].append(rec["sig"])
+            elif op == "hide":
+                sid = rec.get("id")
+                for w in walls:
+                    w["sigs"] = [s for s in w["sigs"] if s.get("id") != sid]
+        if any(w["sigs"] for w in walls):
+            return {"cur": len(walls) - 1, "walls": walls}
+    except Exception:
+        pass
+    return None
+
+
+def _wall_load() -> dict:
+    try:
+        d = json.loads(WALL_FILE.read_text(encoding="utf-8"))
+        if isinstance(d, dict) and isinstance(d.get("walls"), list) and d["walls"]:
+            return d
+    except Exception:
+        pass
+    return _wall_rebuild_from_log() or {"cur": 0, "walls": [{"sigs": []}]}
+
+
+def _wall_log_append(rec: dict) -> None:
+    """Append one record to the everlasting log ('a' mode — existing lines are
+    NEVER touched), so the full history is permanent and recoverable."""
+    with WALL_LOG.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+@app.get("/api/wall")
+async def wall_get():
+    return _wall_load()
+
+
+@app.post("/api/wall/sign")
+async def wall_sign(req: Request):
+    body = await req.json()
+    sig = body.get("sig") or {}
+    if not sig.get("png") or sig.get("w") is None or sig.get("h") is None:
+        return {"ok": False, "error": "empty signature"}
+    db = _wall_load()
+    wi = body.get("wall")
+    if not isinstance(wi, int) or wi < 0 or wi >= len(db["walls"]):
+        wi = db.get("cur", len(db["walls"]) - 1)
+    # PERMANENT FIRST: write to the append-only log BEFORE the live file, so even
+    # if the live-file write somehow fails, the mark is already in the record.
+    _wall_log_append({"op": "sign", "wall": wi, "sig": sig, "ts": sig.get("ts")})
+    db["walls"][wi]["sigs"].append(sig)
+    db["cur"] = len(db["walls"]) - 1
+    _atomic_write(WALL_FILE, json.dumps(db, ensure_ascii=False))
+    return {"ok": True, "wall": wi, "count": len(db["walls"][wi]["sigs"])}
+
+
+@app.post("/api/wall/new")
+async def wall_new():
+    db = _wall_load()
+    db["walls"].append({"sigs": []})
+    db["cur"] = len(db["walls"]) - 1
+    _wall_log_append({"op": "new_wall"})
+    _atomic_write(WALL_FILE, json.dumps(db, ensure_ascii=False))
+    return {"ok": True, "cur": db["cur"]}
+
+
+@app.post("/api/wall/remove")
+async def wall_remove(req: Request):
+    # A tag can be HIDDEN from the live wall (spam/abuse) but it is NEVER erased
+    # from the append-only log — the record stays permanent. (The shared version
+    # will gate this to the owner only so no one can wipe another's mark.)
+    body = await req.json()
+    sid = (body.get("id") or "").strip()
+    db = _wall_load()
+    removed = False
+    for w in db["walls"]:
+        n = len(w["sigs"])
+        w["sigs"] = [s for s in w["sigs"] if s.get("id") != sid]
+        if len(w["sigs"]) != n:
+            removed = True
+    if removed:
+        _wall_log_append({"op": "hide", "id": sid})
+        _atomic_write(WALL_FILE, json.dumps(db, ensure_ascii=False))
+    return {"ok": removed}
+
+
+@app.post("/api/transcribe")
+async def transcribe_audio(req: Request):
+    """Transcribe an uploaded audio file (data URL) via Whisper on the user's own key.
+    The MAIN CHAT uses this so ANY brain — even a text-only local model — can 'hear' a
+    song: the words come from Whisper here, the numbers from the browser (audio-ear.js),
+    folded into the message as text. Rooms transcribe inline in /api/kit instead."""
+    body = await req.json()
+    audio = (body.get("audio") or "").strip()
+    name = (body.get("audio_name") or "audio.wav").strip()
+    if not audio:
+        return {"text": "", "error": "no audio"}
+    try:
+        from swarm_routes import transcribe as _transcribe, _whisper_slot as _wslot
+        raw = audio.split(",", 1)[1] if "," in audio else audio
+        ab = base64.b64decode(raw)
+        if len(ab) >= 25 * 1024 * 1024:
+            return {"text": "", "error": "audio too big (25 MB max for transcription)"}
+        ws, wm = _wslot(_enabled_slots())
+        if not ws:
+            return {"text": "", "error": "no transcription key — add a Groq key in the keys hub (it's free + fast)"}
+        text = await _transcribe(ws, ab, name, wm)
+        return {"text": text}
+    except Exception as e:
+        return {"text": "", "error": str(e)[:160]}
+
+
+# ════════════════════════════════════════════════════════════════════════════
 #  THE EDITOR — the flagship wing. A pro NLE + compositor (static/editor.html).
 #  Render engine = native ffmpeg + NVENC (already on PATH). Preview = 540p
 #  proxies so the 2060S scrubs smooth. Storage rule (B's box): proxy/thumb/peak
@@ -4785,15 +4931,44 @@ async def screenshot(req: Request):
         return JSONResponse({"error": f"screen capture failed: {e}"}, status_code=500)
 
 
+def _fmt_audio_meta(m) -> str:
+    """Turn the browser-measured numbers (audio-ear.js) into one tight line for the agent."""
+    if not isinstance(m, dict):
+        return ""
+    try:
+        p = []
+        if m.get("durationSec"):
+            p.append(f"{m['durationSec']}s")
+        if m.get("sampleRate"):
+            p.append(f"{m['sampleRate']}Hz/{m.get('channels', '?')}ch")
+        if m.get("peakDb") is not None:
+            p.append(f"peak {m['peakDb']}dBFS")
+        if m.get("rmsDb") is not None:
+            p.append(f"RMS {m['rmsDb']}dBFS")
+        if m.get("crestDb") is not None:
+            p.append(f"crest {m['crestDb']}dB")
+        if m.get("centroidHz"):
+            p.append(f"brightness {m['centroidHz']}Hz")
+        b = m.get("bands") or {}
+        if isinstance(b, dict) and b:
+            p.append("balance " + " ".join(f"{k}={v}%" for k, v in b.items()))
+        return " · ".join(p)
+    except Exception:
+        return ""
+
+
 @app.post("/api/kit")
 async def kit_help(req: Request):
     body = await req.json()
     room = (body.get("room") or "").strip().lower()
     msg = (body.get("message") or "").strip()
     image = (body.get("image") or "").strip()   # optional uploaded image → the agent LOOKS at it (vision)
+    audio = (body.get("audio") or "").strip()   # optional uploaded audio → the agent HEARS it (transcribe + measured numbers)
+    audio_meta = body.get("audio_meta") or {}   # browser-measured sound (loudness/brightness/balance) from audio-ear.js
+    audio_name = (body.get("audio_name") or "audio.wav").strip()
     session = (body.get("session") or "").strip()   # studio hands a live text snapshot of the timeline (free)
     handoff = (body.get("handoff") or "").strip()    # one-time brief from the main chat (the warm handoff)
-    if not msg and not image:
+    if not msg and not image and not audio:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
     # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
     # the brain BECOMES that character (identity + voice from persona) while keeping every bit of
@@ -4881,6 +5056,37 @@ async def kit_help(req: Request):
     if image:
         system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
                    "if they want to make something, write the generate prompt FROM the image.")
+    if audio:
+        # HEARING — transcribe the words (Whisper on the user's own key) + read the measured sound
+        # (loudness/brightness/dynamics/balance, done free in the browser). Fold both into context so
+        # the agent breaks down what it HEARS. If they dropped it with no message, it self-starts.
+        _atext = ""
+        _no_key = False
+        try:
+            from swarm_routes import transcribe as _transcribe, _whisper_slot as _wslot
+            _raw = audio.split(",", 1)[1] if "," in audio else audio
+            _ab = base64.b64decode(_raw)
+            _ws, _wm = _wslot(_enabled_slots())
+            if not _ws:
+                _no_key = True                              # no Whisper-capable key → measured numbers only
+            elif 0 < len(_ab) < 25 * 1024 * 1024:           # Whisper API ~25 MB cap
+                _atext = await _transcribe(_ws, _ab, audio_name, _wm)
+        except Exception:
+            _atext = ""
+        _mfmt = _fmt_audio_meta(audio_meta)
+        _proactive = ("" if msg else
+                      " The user dropped this WITHOUT saying anything — so check it out on your own, give a clear "
+                      "breakdown of what it sounds like, then ask what they want to do with it.")
+        system += ("\n\nAUDIO ATTACHED — the user uploaded a sound file"
+                   + (f' ("{audio_name}")' if audio_name and audio_name != "audio.wav" else "") + ". "
+                   "You can HEAR it: break down what it SOUNDS like in your own voice — the vibe AND the hard "
+                   "engineering read (loudness/headroom, brightness, dynamics, low-end weight, anything that might "
+                   "get harsh), reference specific moments, and talk like the engineer you are." + _proactive
+                   + (("\n[MEASURED] " + _mfmt) if _mfmt else "")
+                   + (("\n[TRANSCRIPT] " + _atext[:1800]) if _atext else
+                      ("\n(No transcription key set — break down the SOUND from the measured numbers, and let them know "
+                       "they can add a FREE Groq key in the keys hub to also get the lyrics.)" if _no_key
+                       else "\n(No transcript came back — read it from the measured sound + the user's notes.)")))
     if handoff:
         system += ("\n\nWARM HANDOFF — the user JUST came from the main chat where they were working this out. "
                    "Pick up that thread immediately, reference what they said, and don't make them repeat "

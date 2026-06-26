@@ -27,6 +27,13 @@
       "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7795"],
       "port": 7795,
       "autoPort": false
+    },
+    {
+      "name": "editor-preview",
+      "runtimeExecutable": "C:/Users/koonc/Desktop/Projects/pink-room/venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "7799"],
+      "port": 7799,
+      "autoPort": false
     }
   ]
 }

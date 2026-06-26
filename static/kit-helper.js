@@ -296,6 +296,7 @@
 
   // ── 📎 image upload — so the agent can SEE what you show her and write the prompt from it ──
   let pendingImage = "";
+  let pendingAudio = null;   // {dataURL, meta, name} — a song/clip the agent will HEAR (same 📎)
   const picRow = win.querySelector(".kit-pic"), upBtn = win.querySelector(".kit-up");
   function renderPic(){
     if (!picRow) return;
@@ -303,11 +304,30 @@
       picRow.innerHTML = '<img src="' + pendingImage + '" alt=""><button class="kit-picx" title="remove">✕</button>';
       picRow.style.display = "flex";
       const x = picRow.querySelector(".kit-picx"); if (x) x.onclick = () => { pendingImage = ""; renderPic(); };
+    } else if (pendingAudio){
+      const dur = pendingAudio.meta && pendingAudio.meta.durationSec;
+      picRow.innerHTML = '<span style="display:inline-flex;align-items:center;gap:7px;font:600 11px Inter;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:9px;padding:6px 10px">🎵 ' +
+        String(pendingAudio.name || "audio").replace(/[<>&]/g, "") + (dur ? " · " + Math.floor(dur / 60) + ":" + ("0" + Math.floor(dur % 60)).slice(-2) : "") +
+        "</span><button class=\"kit-picx\" title=\"remove\">✕</button>";
+      picRow.style.display = "flex";
+      const x = picRow.querySelector(".kit-picx"); if (x) x.onclick = () => { pendingAudio = null; renderPic(); };
     } else { picRow.innerHTML = ""; picRow.style.display = "none"; }
   }
   if (upBtn) upBtn.onclick = () => {
-    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*,audio/*";   // ONE clip — image OR a song
     inp.onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return;
+      if ((f.type || "").indexOf("audio") === 0 || /\.(wav|mp3|m4a|flac|aac|ogg|aiff?)$/i.test(f.name || "")) {
+        pendingImage = "";
+        const rd = new FileReader();
+        rd.onload = async () => {
+          let meta = {};
+          try { if (window.DMV_EAR) meta = await window.DMV_EAR.analyze(f); } catch (_) {}
+          pendingAudio = { dataURL: rd.result, meta: meta, name: f.name || "audio" }; renderPic();
+        };
+        rd.readAsDataURL(f);
+        return;
+      }
+      pendingAudio = null;
       const rd = new FileReader(); rd.onload = () => { pendingImage = rd.result; renderPic(); }; rd.readAsDataURL(f); };
     inp.click();
   };
@@ -854,22 +874,24 @@
         } catch (_) {}
       }
     }
-    const q = input.value.trim(); if ((!q && !pendingImage) || busy) return;   // allow an image-only ask
+    const q = input.value.trim(); if ((!q && !pendingImage && !pendingAudio) || busy) return;   // allow an image- OR audio-only ask
     busy = true; go.disabled = true;
     const sentImage = pendingImage;
-    addMsg("you", q || "(image)");
+    const sentAudio = pendingAudio;
+    addMsg("you", q || (sentAudio ? "🎵 " + (sentAudio.name || "audio") : "(image)"));
     if (sentImage) { const im = document.createElement("img"); im.src = sentImage;
       im.style.cssText = "max-width:130px;border-radius:9px;margin-top:5px;display:block;border:1px solid rgba(120,182,205,.4);";
       body.appendChild(im); body.scrollTop = body.scrollHeight; }
-    input.value = ""; input.style.height = "auto"; pendingImage = ""; renderPic();
-    const think = addMsg("kit", active.name + "'s on it…"); think.classList.add("think"); winSpr.setSpeed(9);
+    input.value = ""; input.style.height = "auto"; pendingImage = ""; pendingAudio = null; renderPic();
+    const think = addMsg("kit", active.name + (sentAudio ? " is having a listen…" : "'s on it…")); think.classList.add("think"); winSpr.setSpeed(9);
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      const payload = { room, message: q || (sentImage && !sentAudio ? "Look at this image and write a great prompt I can generate from it." : ""), character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
       { const _crew = getAgentCrew(active); if (_crew && _crew.length) payload.crew = _crew; }   // CREW: the user-picked backing brains for THIS agent
       if (handoff && handoff.brief) { payload.handoff = handoff.brief; handoff = null; }   // seed the room ONCE with the chat brief, then run on the room's own thread
       if (sentImage) payload.image = sentImage;
+      if (sentAudio) { payload.audio = sentAudio.dataURL; payload.audio_meta = sentAudio.meta || {}; payload.audio_name = sentAudio.name || "audio"; }   // HEAR it: Whisper transcript + the free measured numbers
       // session-aware: if this room exposes a live snapshot (the studio does), hand the agent the REAL session
       if (typeof window.dmvSessionSnapshot === "function") { const snap = window.dmvSessionSnapshot(); if (snap) payload.session = snap; }
       if (active.mine) {

@@ -62,8 +62,9 @@ GUEST_CORE = {
 
 def scrub(text: str) -> str:
     # Genericize the owner so a craft lesson framed around "B" reads cleanly for anyone.
-    text = re.sub(r"\bB['’]s\b", "the artist's", text)
-    text = re.sub(r"\bB\b", "the artist", text)
+    # Lookbehind (?<![&\w]) keeps "R&B" intact — only a truly standalone "B" (the owner) is genericized.
+    text = re.sub(r"(?<![&\w])B['’]s\b", "the artist's", text)
+    text = re.sub(r"(?<![&\w])B\b", "the artist", text)
     # Drop any line that still names a person/brand/pet/email after the above.
     keep = []
     for line in text.splitlines():

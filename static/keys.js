@@ -108,6 +108,24 @@
     const haveName = new Set(configured.map(c => (c.name || "").toLowerCase()));
     body.innerHTML = "";
 
+    // 🧭 WHAT POWERS WHAT — capability → key/model guide. So a user knows EXACTLY what to get (or
+    //    install) for each thing they want to do, and what's free/local vs paid. (Owner's ask.)
+    body.insertAdjacentHTML("beforeend",
+      '<div style="background:linear-gradient(180deg,rgba(230,193,106,.10),rgba(255,255,255,.02));border:1px solid rgba(230,193,106,.32);border-radius:12px;padding:13px 15px;margin-bottom:16px">' +
+      '<div style="font:800 13px Oxanium,sans-serif;color:#E6C16A;letter-spacing:.04em;margin-bottom:6px">🧭 WHAT YOU NEED FOR EACH THING</div>' +
+      '<div style="font:500 12px Inter,sans-serif;color:#cfd6de;line-height:1.5;margin-bottom:10px">Easiest free start: <b>one Groq key</b> (no credit card) powers chat, deep thinking, <i>and</i> song transcription. Add a free <b>Gemini</b> key for seeing/images. Or grab <b>one OpenRouter key</b> for nearly everything.</div>' +
+      '<div style="font:500 11.5px Inter,sans-serif;color:#aeb6c0;line-height:1.75">' +
+      '💬 <b style="color:#dfe6ee">Chat / writing</b> → any key below — or 100% free + offline (install <b>LM Studio</b> + a model)<br>' +
+      '👁 <b style="color:#dfe6ee">See images</b> → a vision model: Gemini (free), Claude, GPT, or Grok<br>' +
+      '🎧 <b style="color:#dfe6ee">Hear a song — the SOUND</b> (loudness, brightness, mix read) → <span style="color:#7FD3B0">FREE, built in, no key</span><br>' +
+      '📝 <b style="color:#dfe6ee">Hear a song — the LYRICS</b> → a <b>Groq</b> key (free Whisper). Tip: run the isolated vocal for cleaner lyrics<br>' +
+      '🎨 <b style="color:#dfe6ee">Make images</b> → free on your own GPU (built-in FLUX), or a media key (Atlas/FAL/KIE) for pennies<br>' +
+      '🎬 <b style="color:#dfe6ee">Make video</b> → a media key (Atlas = cheapest). <span style="color:#E6C16A">This one actually costs money</span> (~pennies/sec)<br>' +
+      '🔱 <b style="color:#dfe6ee">God Mode</b> (deepest reasoning) → a paid <b>Claude</b> key; free-ish alt = Groq <code>gpt-oss-120b</code>' +
+      '</div>' +
+      '<div style="font:500 11px Inter,sans-serif;color:#8b94a0;line-height:1.55;margin-top:10px;border-top:1px solid rgba(255,255,255,.07);padding-top:8px">Straight talk: chat, seeing, hearing + transcription can all be <b style="color:#7FD3B0">$0</b>. Images = pennies. Video is the one that genuinely costs. Want zero cloud? LM Studio (brain) + built-in FLUX (images) run free on your machine; only video &amp; Claude God Mode need the cloud.</div>' +
+      '</div>');
+
     const bh = document.createElement("div"); bh.className = "kw-cat"; bh.textContent = "Cloud brain — your key powers the cloud lane"; body.appendChild(bh);
 
     // first model in the hint, unless it's a description ("pick any model…") → no default

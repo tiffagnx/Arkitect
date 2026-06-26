@@ -34,6 +34,12 @@
   .wsign:hover{filter:brightness(1.06)} .wsign:active{transform:translateY(1px)}
   .wsign.arm{background:linear-gradient(120deg,#7be38f,#46c46a);color:#06210f;box-shadow:0 4px 16px rgba(70,196,106,.4)}
 
+  /* back pill (this page no longer loads pinkroom-nav, so style it locally) */
+  a.pr-back{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;
+    text-decoration:none;color:var(--text);font:700 15px Oxanium,sans-serif;background:rgba(255,255,255,.05);
+    border:1px solid var(--hairline);cursor:pointer}
+  a.pr-back:hover{border-color:rgba(230,193,106,.5);color:var(--gold)}
+
   /* ── the wall ── */
   .wall-frame{position:absolute;inset:54px 0 0 0;padding:20px;overflow:auto}
   .wall-surface{position:relative;width:100%;min-height:calc(100vh - 94px);height:100%;border-radius:8px;overflow:hidden;
@@ -43,7 +49,7 @@
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.25), inset 0 22px 60px rgba(255,255,255,.18),
       inset 0 -40px 90px rgba(40,34,24,.30), 0 24px 60px rgba(0,0,0,.5);
     cursor:default;}
-  .wall-surface.placing{cursor:none}
+  .wall-surface.placing{cursor:crosshair}
   .wall-tex{position:absolute;inset:0;width:100%;height:100%;opacity:.55;mix-blend-mode:multiply;pointer-events:none}
   .wall-stain{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;opacity:.5;
     background:
@@ -96,7 +102,7 @@
   .pad-h{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--hairline)}
   .pad-h span{font:700 11px 'Space Mono',monospace;letter-spacing:.18em;color:var(--gold)}
   .pad-h button{background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
-  .pad-cv-wrap{margin:14px 15px 0;border-radius:10px;overflow:hidden;border:1px solid var(--hairline);
+  .pad-cv-wrap{margin:14px auto 0;width:-moz-fit-content;width:fit-content;max-width:calc(100% - 30px);border-radius:10px;overflow:hidden;border:1px solid var(--hairline);
     background:
       radial-gradient(130% 80% at 50% -6%, rgba(255,250,238,.5) 0%, rgba(255,250,238,0) 42%),
       radial-gradient(120% 100% at 50% 0%, #d9d3c6 0%, #c7c1b4 46%, #aaa493 100%);}
@@ -127,6 +133,7 @@
     <div class="wnav"><button id="wPrev" title="older wall">◀</button><span id="wLabel">Wall 1</span><button id="wNext" title="newer wall">▶</button></div>
     <div class="spacer"></div>
     <span class="wcount" id="wCount"></span>
+    <button class="wnav" id="wExport" title="Download the whole wall — it's yours, keep it forever" style="width:auto;padding:0 10px;height:30px;font:700 11px Inter">⤓ Export</button>
     <button class="wsign" id="wSign">✍ Sign the Wall</button>
   </div>
 
@@ -171,12 +178,55 @@ const $ = s => document.getElementById(s);   // all call-sites use bare ids
 /* ───────── data (local v1; the shared/Cloudflare backend is a drop-in later — see WALL_BACKEND.md) ───────── */
 const KEY = "ark_wall_v2";                              // v2 = variable-size, crop-to-ink, tight-pack
 const MAX_AREA = 26000, MAX_DIM = 340, MIN_DIM = 38;    // your space BUDGET: shape it any way (wide/tall/sideways), capped in area + reach; gaps can be small
-let DB = load(), curWall = DB.cur;
-function load(){
+let DB = loadCache(), curWall = DB.cur;
+function loadCache(){                                    // local MIRROR — instant paint + offline fallback
   try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && d.walls) return d; }catch(e){}
   return { cur:0, walls:[ { sigs:[] } ] };
 }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }   // cache only — the DURABLE record is the backend
+
+/* ── DURABLE BACKEND — the wall is PERMANENT. It lives on the app's server:
+   data/wall.json (live state) + data/wall_log.jsonl (an APPEND-ONLY log of every
+   signature ever, never rewritten — the everlasting record). localStorage is just
+   a fast offline cache. A mark is NEVER dropped: a failed POST is queued and
+   retried forever, and it's already in the local cache meanwhile. ── */
+async function syncFromServer(){
+  try{
+    const r = await fetch("/api/wall"); if(!r.ok) return;
+    const d = await r.json();
+    if(d && Array.isArray(d.walls) && d.walls.length){ DB = d; if(curWall>DB.walls.length-1) curWall = DB.cur; save(); render(); }
+  }catch(e){}
+}
+const PENDQ = "ark_wall_pendq";
+function pendGet(){ try{ return JSON.parse(localStorage.getItem(PENDQ)||"[]"); }catch(e){ return []; } }
+function pendSet(q){ try{ localStorage.setItem(PENDQ, JSON.stringify(q)); }catch(e){} }
+async function postSign(sig, wallIdx){
+  try{
+    const r = await fetch("/api/wall/sign",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sig, wall:wallIdx})});
+    if(r.ok && (await r.json()).ok) return true;
+  }catch(e){}
+  const q = pendGet(); q.push({sig, wall:wallIdx}); pendSet(q);            // failed → queue, NEVER drop
+  toast("Saved here — still syncing your mark to the wall (it won't be lost).", 3200);
+  return false;
+}
+async function flushPending(){
+  const q = pendGet(); if(!q.length) return;
+  const left = [];
+  for(const item of q){
+    let ok=false; try{ const r = await fetch("/api/wall/sign",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item)}); ok = r.ok && (await r.json()).ok; }catch(e){}
+    if(!ok) left.push(item);
+  }
+  pendSet(left);
+  if(q.length && !left.length){ toast("Caught up — every mark's on the wall. 🖋️"); syncFromServer(); }
+}
+async function postNew(){ try{ await fetch("/api/wall/new",{method:"POST"}); }catch(e){} }
+async function postRemove(id){ try{ await fetch("/api/wall/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); }catch(e){} }
+function exportWall(){
+  const blob = new Blob([JSON.stringify(DB,null,1)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "demartin-wall-"+Date.now()+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast("Wall exported — that file is yours. Back it up anywhere; it can never be lost now.");
+}
 const wall = i => DB.walls[i];
 const coverage = i => { const W=$("wall"), A=Math.max(1,W.clientWidth*W.clientHeight); return wall(i).sigs.reduce((s,g)=>s+g.w*g.h,0)/A; };   // bbox fill ratio → "wall full"
 
@@ -188,7 +238,7 @@ function render(){
     const d = document.createElement("div");
     d.className = "sig"; d.style.left = s.x+"px"; d.style.top = s.y+"px"; d.style.width = s.w+"px"; d.style.height = s.h+"px";
     d.innerHTML = `<img src="${s.png}" alt="signature"><div class="tag">${s.handle?escapeHtml(s.handle):""}</div><button class="rm" title="remove this tag">✕</button>`;
-    d.querySelector(".rm").onclick = e => { e.stopPropagation(); if(confirm("Remove this tag from the wall?")){ w.sigs = w.sigs.filter(x=>x.id!==s.id); save(); render(); } };
+    d.querySelector(".rm").onclick = e => { e.stopPropagation(); if(confirm("Remove this tag from the wall?")){ w.sigs = w.sigs.filter(x=>x.id!==s.id); save(); postRemove(s.id); render(); } };
     layer.appendChild(d);
   });
   $("emptyCta").style.display = w.sigs.length ? "none" : "block";
@@ -218,7 +268,7 @@ function fits(r){
   return {ok:true};
 }
 $("wSign").onclick = ()=>{
-  if(coverage(DB.cur) > 0.66){ DB.walls.push({sigs:[]}); DB.cur = DB.walls.length-1; curWall = DB.cur; save(); toast("This wall’s packed — fresh wall’s up. Fill it."); render(); }
+  if(coverage(DB.cur) > 0.66){ DB.walls.push({sigs:[]}); DB.cur = DB.walls.length-1; curWall = DB.cur; save(); postNew(); toast("This wall’s packed — fresh wall’s up. Fill it."); render(); }
   if(curWall !== DB.cur){ curWall = DB.cur; render(); }
   placing = !placing;
   $("wSign").classList.toggle("arm", placing);
@@ -301,13 +351,16 @@ $("padPlace").onclick = ()=>{
     handle: $("padHandle").value.trim().slice(0,24), png,
     x: curRegion.x + bb.x*sx, y: curRegion.y + bb.y*sy, w: bb.w*sx, h: bb.h*sy, ts:Date.now() };
   wall(DB.cur).sigs.push(sig);
-  DB.cur = DB.walls.length-1; curWall = DB.cur; save(); closePad(); render();
+  DB.cur = DB.walls.length-1; curWall = DB.cur; save(); postSign(sig, DB.cur); closePad(); render();
   toast(sig.handle ? "Signed — "+sig.handle+" is on the wall. 🖋️" : "Signed — you’re on the wall. 🖋️");
 };
 window.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if($("padOv").classList.contains("on")) closePad(); else cancelPlacing(); } });
 
+$("wExport").onclick = exportWall;
 render();
+syncFromServer(); flushPending();                 // pull the DURABLE wall + post anything still queued
+setInterval(flushPending, 15000);                 // keep retrying any un-synced mark — never give up on it
+window.addEventListener("online", flushPending);
 </script>
-<script src="/static/pinkroom-nav.js"></script>
 </body>
 </html>
