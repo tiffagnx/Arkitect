@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="theme-color" content="#0C0D10" />
 <title>DeMartinville — for creators</title>
-<meta name="description" content="Turn your craft into an AI that works in your style — then book the real you when it matters. Recruiting ground-floor creators, in the open." />
+<meta name="description" content="A whole creative studio on your own machine — record and mix music, cook beats, cut video, make images, build apps, and train your own AI agents that actually do the work. Free and private; your own keys when you want them." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
@@ -126,7 +126,18 @@
   .final h2{font-size:clamp(25px,4vw,38px);max-width:18ch;margin:0 auto 8px;background:linear-gradient(180deg,#fff,#c4ccd2);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   .truth{max-width:62ch;margin:18px auto 0;font:600 13.5px Inter;color:#AEB4BE;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:15px 18px}
   footer{border-top:1px solid var(--line);padding:26px 0 40px;text-align:center;color:var(--faint);font:500 12px 'Space Mono',monospace;letter-spacing:.06em}
-  @media (max-width:640px){ .grid2{grid-template-columns:1fr} .rung.r2,.rung.r3,.rung.r4{margin-left:0} }
+  .phone-note{display:none;margin:18px auto 0;max-width:44ch;font:600 13px Inter;color:#E6D3A8;background:rgba(230,193,106,.08);border:1px solid rgba(230,193,106,.26);border-radius:12px;padding:11px 15px;line-height:1.5}
+  @media (max-width:640px){
+    .grid2{grid-template-columns:1fr}
+    .rung.r2,.rung.r3,.rung.r4{margin-left:0}
+    .hero{padding:52px 0 42px}
+    .hero::after{display:none}                 /* drop the heavy ghost hero image on phones */
+    .wrap{padding:0 18px}
+    .cta-row{gap:10px}
+    .cta-row .btn{width:100%;justify-content:center}
+    section.blk{padding:38px 0}
+    .phone-note{display:block}
+  }
   /* the manifesto hero — the opening that does the emotional work (owner's words, his soul) */
   .manifesto{ max-width:60ch; margin:6px auto 0; position:relative; }
   .manifesto p{ color:#C2C8D1; font-size:clamp(15px,1.95vw,18.5px); line-height:1.72; margin:0 0 17px; }
@@ -181,37 +192,59 @@
         <p class="coda">It's not finished. We're building it in the open, with the people who'll actually use it. If that's you — you're early, and you're exactly who it's for.</p>
       </div>
       <div class="cta-row">
-        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
+        <a class="btn try" href="https://demartinlabs.com/app">▶&nbsp; Open it free — right in your browser</a>
         <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville.zip">⬇&nbsp; Download for Windows</a>
-        <a class="btn try" href="/static/beats.html">🥁&nbsp; Try The Kitchen — free, in your browser</a>
         <a class="btn ghost" href="#how">See how it works ↓</a>
       </div>
-      <a class="mac-hint" href="#mac-help">🍎 On a Mac? It needs one 30-second step to open — how →</a>
+      <a class="mac-hint" href="#mac-help">🍎 On a Mac? Read this — newer Macs run it free in the browser →</a>
       <div class="wip-flag"><span class="dot"></span> EARLY · BUILT IN THE OPEN · FOR THE ONES WHO GIVE A DAMN</div>
+      <p class="phone-note">📱 On your phone? You've got the full rundown right here. The studio itself — recording, beats, video — runs on a <b>computer</b>; open it there for the real thing.</p>
     </div>
   </header>
 
   <section class="showcase">
     <div class="wrap">
       <div class="kicker">what's actually inside</div>
-      <h2>Not a pitch. A real studio you can open right now.</h2>
-      <p class="sub">Free, private, on your own machine. This is what's running the second you download it:</p>
+      <h2>Not a pitch. A whole creative studio you can open right now.</h2>
+      <p class="sub">Free and private. Open it in your browser, or download it — either way, this is what's running the second you're in:</p>
       <div class="shots">
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/daw.png" alt="DeMartin Audio Labs"><figcaption><b>DeMartin Audio Labs</b> &mdash; record, edit, mix, master. A real engine, not a toy.</figcaption></figure>
-        <figure><img loading="lazy" src="https://demartinlabs.com/shots/beats.png" alt="The Kitchen"><figcaption><b>The Kitchen</b> &mdash; cook a beat from scratch: 808s, synths, a piano roll, and an AI in every plugin.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/beats.png" alt="Leon Production Labs"><figcaption><b>Leon Production Labs</b> &mdash; cook a beat from scratch: 808s, synths, a piano roll, and an AI in every plugin.</figcaption></figure>
         <figure><img loading="lazy" src="https://demartinlabs.com/shots/editor.png" alt="LePrince Visual Labs"><figcaption><b>LePrince Visual Labs</b> &mdash; cut video like a pro: keyframes, effects, masks.</figcaption></figure>
-        <figure><img loading="lazy" src="https://demartinlabs.com/shots/build.png" alt="Blueprint Builds"><figcaption><b>Blueprint Builds</b> &mdash; describe an app, watch it build itself, live.</figcaption></figure>
-        <figure><img loading="lazy" src="https://demartinlabs.com/shots/chat.png" alt="DeMartinville home"><figcaption><b>One private hub</b> &mdash; every room, all local, all free to start.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/build.png" alt="Berner Builder"><figcaption><b>Berner Builder</b> &mdash; describe an app, watch it build itself, live.</figcaption></figure>
+        <figure><img loading="lazy" src="https://demartinlabs.com/shots/chat.png" alt="DeMartinville home"><figcaption><b>One private hub</b> &mdash; every room, all free to start.</figcaption></figure>
       </div>
+      <div class="grid2" style="margin-top:22px">
+        <div class="gcell"><h4>🎚 DeMartin Audio Labs</h4><p>A real DAW: multitrack record, comp your takes, edit, automate, and mix through real DSP — then bounce to WAV or MP3. The <b>Vocal Doctor</b> listens to a vocal and builds the whole chain; an auto-mix assistant makes real, bounded moves and tells you why. Host your own VST3/AU/Waves plugins too.</p></div>
+        <div class="gcell"><h4>🥁 Leon Production Labs</h4><p>Cook a beat from scratch — 808s, synths, wavetables, a piano roll, and an AI in every plugin you talk to that turns its own knobs. Song mode, chord / melody / Euclidean generators, and export to WAV, stems, or <b>MIDI.</b> Plugs right into the Audio Lab.</p></div>
+        <div class="gcell"><h4>🎬 LePrince Visual Labs</h4><p>Cut video on a real timeline — trim, keyframe, mask, title, and around <b>190 working effects</b> — then render out to MP4, GPU-accelerated when you've got the card.</p></div>
+        <div class="gcell"><h4>🎨 Imagination Station</h4><p>Make images on your own machine with FLUX, or on your own cloud key — with prompt-polish, a gallery, and one-click re-rolls.</p></div>
+        <div class="gcell"><h4>🛠 Berner Builder</h4><p>Describe an app or a tool and watch it build itself live in a sandbox. It'll even write a custom plugin straight into the Audio Lab.</p></div>
+        <div class="gcell"><h4>📡 The Stream</h4><p>Your own Spotify&nbsp;+&nbsp;YouTube: publish music to <b>Notifi</b> and video to <b>Cratel</b> in one click from any room. Drop your own Cash App, PayPal, or Ko-fi and fans support you directly — <b>0% middleman, the money never touches us.</b></p></div>
+      </div>
+      <p class="sub" style="margin-top:16px">Free and local by default. Light machine? Plug in your own cloud key — <b>Groq's free,</b> and one OpenRouter key opens Claude, GPT, Grok, and Gemini. Either way, your work stays on your machine.</p>
     </div>
   </section>
 
   <main class="wrap">
 
+    <section class="blk">
+      <div class="kicker">the part nobody else has</div>
+      <h2>It's not just tools. It's <span class="accent">agents that run the tools.</span></h2>
+      <p>Every room comes with AI you can talk to — but the real move is building your <em>own</em> agent (more on that below), then dragging it into a room where it works <em>with its hands.</em> Drop it on a vocal in the Audio Lab and it parents to the stem, hears what's actually there, and makes the moves — brighter, less harsh, fix it — every change <b>measured and shown back to you,</b> so it can't lie about what it did. The plan is an agent in every room, all working together; we're building toward it out loud.</p>
+      <div class="grid2">
+        <div class="gcell"><h4>Build a whole crew</h4><p>Make as many agents as you want — a mix engineer, a beatmaker, an editor — each trained on a different craft, each one yours, deployed across the rooms.</p></div>
+        <div class="gcell"><h4>Free brain, or your own</h4><p>Runs on a free local model with no key at all — or plug in your own (Groq's free; one OpenRouter key opens Claude, GPT, Grok, Gemini). On Claude, a real <b>God-Mode</b> reasoning dial unlocks.</p></div>
+        <div class="gcell"><h4>Deep research, swarmed</h4><p>Ask something hard and it splits the question, fans it across your models, reads the live web itself, and hands back one answer with the sources cited.</p></div>
+        <div class="gcell"><h4>All contained, all private</h4><p>Build, train, and deploy agents inside one environment that lives on your machine. Your packs, your work, your keys — local by default, nothing phoned home.</p></div>
+      </div>
+      <div class="note teal">Straight up: real knob-turning lives in the Audio Lab today; the other rooms chat and generate. The rest is the road we're driving — in the open.</div>
+    </section>
+
     <section class="blk" id="how">
       <div class="kicker">the core of it</div>
       <h2>It's not our marketplace. It's <span class="accent">your</span> studio.</h2>
-      <p><b>First, it's just yours — and free.</b> A real studio on your own machine: record and mix music, cut video, generate images. All private, nothing leaves your computer. That's worth downloading on its <em>own</em> — and it's live <span class="accent">today</span>, not someday.</p>
+      <p><b>First, it's just yours — and free.</b> A real studio on your own machine: record and mix music, cook beats, cut video, make images, build apps, and train your own AI agents. All private, nothing leaves your computer. That's worth it on its <em>own</em> — and it's live <span class="accent">today</span>, not someday.</p>
       <p><b>Where it's headed</b> — the part nobody's built yet: you'll be able to train a version of your <em>own</em> craft — your sound, your moves — into something your people can tap, in your style, with your name on it. Some will want the whole studio; some just want your sound for one session. We're building that part <span class="accent">in the open.</span></p>
       <div class="note">Your name. Your people. Your money, all of it. We just build the rooms.</div>
     </section>
@@ -219,7 +252,7 @@
     <section class="blk">
       <div class="kicker">the idea</div>
       <h2>What if your skill could clock in without you?</h2>
-      <p>Picture a version of you that lives inside a real creative studio. Not a chatbot that <em>talks</em> about mixing — one that actually mixes. Edits. Arranges. Writes. In your style. You drag your agent into a room and it goes to work. Drop it in the audio room, it's an audio brain. Drop the same agent in the video room, it flips and thinks like a video pro. It doesn't just answer — it makes the move, inside safe rails, the way you taught it.</p>
+      <p>Picture a version of you that lives inside a real creative studio. Not a chatbot that <em>talks</em> about mixing — one that actually makes the move. You drag your agent into a room and it gets to work: in the Audio Lab it parents right onto a stem and rides it the way you would, inside safe rails, the way you taught it. The vision is that same agent shifting to fit every room — an audio brain here, a video brain there — and we're building toward it, room by room.</p>
       <p>And here's what makes it real instead of hype: <span class="accent">the app already does this today.</span> DeMartinville has tools right now that listen to a vocal and actually fix it — EQ, de-ess, compression, the whole chain — and a mix assistant that analyzes a session and makes real, bounded moves. That's the engine, runnable on your own machine. The marketplace just puts <b>your</b> taste in the driver's seat.</p>
       <div class="note">Nobody's doing this yet. The board is empty. That's the whole pitch.</div>
     </section>
@@ -248,13 +281,13 @@
 
     <section class="blk">
       <div class="kicker">what it looks like</div>
-      <h2>Say there's a guy named Boogie</h2>
+      <h2>Now picture it with <span class="accent">your</span> name on it</h2>
       <div class="story">
-        <p>Boogie's been mixing records 30 years. Golden ears. But there's one Boogie and only so many hours in his week — he turns down more work than he takes. So Boogie opens DeMartinville and just mixes, like he always has. The app watches how he rides a vocal, carves a low-mid, glues a chorus. His readiness bar fills.</p>
-        <p>One day, Boogie the agent goes on the board. Now a kid in another city — who could never afford a day with the real Boogie — drags Boogie into their session. The agent pulls up a vocal chain the way Boogie would, in his style. The kid's record sounds like it passed through golden ears, because in a way it did. And when that kid wants to go all the way? There's a button to book the <b>real</b> Boogie, live — screen-shared into the actual session.</p>
-        <p><span class="gold">Boogie didn't add an hour to his week, but his taste works in a thousand sessions at once — and the ones who want the human find the human.</span></p>
+        <p>You've spent years getting your sound right — the moves you make without thinking, the taste people come to you for. But there's only one of you, and only so many hours in a week; you turn down more work than you take. So you open DeMartinville and just work, the way you always have. The app watches how you ride a vocal, carve a low-mid, glue a chorus — your real moves, in real time. Your readiness bar fills.</p>
+        <p>One day your agent goes on the board. Now someone in another city — who could never afford a day with you — drags your agent into their session. It pulls up a chain the way <em>you</em> would, in your style. Their record comes out sounding like it passed through your hands, because in a way it did. And when they want the real thing? One button books <b>you</b>, live — screen-shared into the actual session.</p>
+        <p><span class="gold">You didn't add an hour to your week, but your taste works in a thousand sessions at once — and the ones who want the human find the human.</span></p>
       </div>
-      <div class="note teal">Swap "Boogie" for a producer, beatmaker, videographer, editor, colorist, lighting pro, topline writer. Craft + audience = an agent.</div>
+      <div class="note teal">Works for any craft — producer, beatmaker, videographer, editor, colorist, lighting pro, topline writer. Craft + audience = an agent.</div>
     </section>
 
     <section class="blk">
@@ -306,7 +339,7 @@
       <h2>This is early. We're building it in the open. We're not hiding that.</h2>
       <p>Some of what you just read is live and working today — the studio, the rooms, the tools that already analyze and take real action on your audio. Some of it is the road we're driving toward, out loud, in public. We're telling you that on purpose, because the people we want aren't looking for a finished, locked-down platform — those get built by committee, for the masses, and they never have soul.</p>
       <p>We want the <span class="gold">builders.</span> The ones who get hyped about getting in before it's obvious, who want a say in how their craft gets represented for the next ten years. If you need it perfect before you'll touch it, no hard feelings — come back when it's everywhere. But if reading this made something light up, if you're already thinking <em>"yo, holy shit, we gotta get in on this"</em> — that's the feeling. That's exactly who this is for.</p>
-      <div class="truth"><b>What's true right now:</b> free to start · your work stays on your machine · you set your price and keep 100% · no fake names or knockoffs · we build in the open — no vaporware.</div>
+      <div class="truth"><b>What's true right now:</b> free to start · a full studio — music, beats, video, images, apps · build &amp; train your own agents, local and private · your work stays on your machine · you set your price and keep 100% · no fake names, no vaporware.</div>
     </section>
 
   </main>
@@ -315,9 +348,8 @@
     <div class="wrap">
       <h2>The chair's open. Get in before it's obvious.</h2>
       <div class="cta-row">
-        <a class="btn go dl-mac" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville-mac-arm64.zip">⬇&nbsp; Download for Mac</a>
+        <a class="btn try" href="https://demartinlabs.com/app">▶&nbsp; Open it free in your browser</a>
         <a class="btn go" href="https://github.com/tiffagnx/Arkitect/releases/latest/download/DeMartinville.zip">⬇&nbsp; Download for Windows</a>
-        <a class="btn try" href="/static/beats.html">🥁&nbsp; Try The Kitchen — free, in your browser</a>
         <a class="btn ghost" href="mailto:koonce47@gmail.com?subject=DeMartinville%20%E2%80%94%20founding%20creator&body=Tell%20me%20about%20your%20craft%20%2B%20who%20you%27d%20bring%20in%3A%0A%0A" id="ctaJoin">Become a founding creator →</a>
       </div>
     </div>
@@ -325,17 +357,13 @@
 
   <section id="mac-help" class="wrap" style="margin:30px auto 50px">
     <details class="machelp">
-      <summary>🍎 On a Mac and it won't open? Read this — 30-second one-time step</summary>
+      <summary>🍎 On a Mac? Read this first</summary>
       <div class="mh-body">
-        <p>macOS blocks <em>every</em> app that didn't come from Apple's own store — tiny indie tools and big-name ones alike, ours included (we're getting it Apple-signed so this step disappears). So if you see <em>"Apple could not verify…"</em> or <em>"app is damaged,"</em> nothing's wrong — you just tell your Mac to trust it once:</p>
-        <ol>
-          <li>Download <b>DeMartinville</b> above and unzip it (drop the app in Applications or on your Desktop).</li>
-          <li>Open <b>Terminal</b> — press <b>⌘&nbsp;+&nbsp;Space</b>, type <i>Terminal</i>, hit <b>Enter</b>.</li>
-          <li>Type this <b>with a space at the end</b>: <code>xattr -dr com.apple.quarantine </code></li>
-          <li><b>Drag the DeMartinville app onto the Terminal window</b> — it fills in the location for you — then press <b>Enter</b>.</li>
-          <li>Double-click <b>DeMartinville</b>. It opens, and it never asks again. 🎉</li>
-        </ol>
-        <p class="mh-small">Older Macs can instead use System&nbsp;Settings → Privacy&nbsp;&amp;&nbsp;Security → "Open Anyway." Newer Macs need the Terminal step above. On Windows there are no steps — it just runs.</p>
+        <p><b>The honest version:</b> we keep DeMartinville <em>free</em> — which means we're not paying Apple's $99/yr "developer toll." Without that toll paid, <b>newer Macs (M1/M2/M3/M4) won't let the downloaded app open at all.</b> That's Apple's wall, not a bug in our app — and we're not paying to get around it.</p>
+        <p><b>So if you're on a newer Mac, skip the download — open it free in your browser instead:</b></p>
+        <p style="text-align:center;margin:18px 0"><a class="btn try" href="https://demartinlabs.com/app" style="display:inline-flex">▶&nbsp; Open DeMartinville in your browser</a></p>
+        <p>Same studio, nothing to install, runs on your own AI key. Works on <em>any</em> Mac.</p>
+        <p class="mh-small"><b>Got an older Mac</b> (pre-2020 Intel)? The Windows-style download can still work: open <b>System&nbsp;Settings → Privacy&nbsp;&amp;&nbsp;Security</b>, scroll to the bottom, and click <b>"Open Anyway"</b> next to DeMartinville. If it instead says <em>"damaged,"</em> open <b>Terminal</b>, type <code>xattr -cr </code> (with a trailing space), drag the app onto the window, and hit Enter. On Windows there's none of this — it just runs.</p>
       </div>
     </details>
   </section>
@@ -397,6 +425,9 @@
    as it crosses your reading line (and dims back on scroll up). Airbyte-style. */
 (function(){
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // Phones/tablets: skip the word-by-word scroll reveal entirely — on touch + small screens it's
+  // heavy (hundreds of animated word-spans) and can leave text stuck dimmed. Plain, readable, smooth.
+  if (window.innerWidth <= 760 || matchMedia('(hover: none) and (pointer: coarse)').matches) return;
   var SEL  = '.manifesto p, section.blk > p, .story p';
   var KEEP = '.gold, .accent, b, strong, a';   // keep these words' own color — only lift them
   var blocks = document.querySelectorAll(SEL);

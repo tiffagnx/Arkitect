@@ -4,6 +4,23 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="theme-color" content="#0C0D10" />
+<script>
+/* Phone front door — on the HOSTED site only, send phone visitors at the bare root to the
+   For Creators page (mobile-friendly, all the info + the open/download buttons). The full
+   studio is a desktop tool; this NEVER fires on the desktop app (localhost) or on /app. */
+(function(){
+  try{
+    var h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '' || /\.local$/.test(h)) return;
+    var p = (location.pathname || '/').replace(/\/+$/,'') || '/';
+    if (p !== '' && p !== '/' && p !== '/index.html') return;        // only the bare root, not /app
+    if (sessionStorage.getItem('dmv_stay')) return;                  // user explicitly chose to stay
+    var phone = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)
+             || (matchMedia('(max-width:768px)').matches && matchMedia('(pointer:coarse)').matches);
+    if (phone) location.replace('/for-creators');
+  }catch(e){}
+})();
+</script>
 <link rel="icon" href="/static/kit.ico" />
 <link rel="manifest" href="/static/manifest.json?v=3" />
 <title>DeMartinville</title>
@@ -122,7 +139,7 @@
     background:radial-gradient(circle at 38% 34%, #6FC0D8, #3E9CB8 60%, rgba(62,156,184,0) 76%);
     transition:opacity .2s, transform .2s, box-shadow .2s; }
   .wallegg:hover { opacity:1; transform:scale(1.25); box-shadow:0 0 9px rgba(62,156,184,.7); }
-  .wallegg::after { content:"sign the wall"; position:absolute; top:140%; right:-7px; white-space:nowrap; transform:rotate(-8deg); transform-origin:right top;
+  .wallegg::after { content:"sign the wall"; position:absolute; top:430%; right:4px; white-space:nowrap; transform:rotate(-15deg); transform-origin:right top;
     font:700 8px 'Space Mono',monospace; letter-spacing:.09em; text-transform:uppercase; color:#9FCFDD; opacity:0; transition:opacity .2s; pointer-events:none; }
   .wallegg:hover::after { opacity:.95; }
   .arkhero .crew.active { border-color:rgba(62,156,184,.7); background:rgba(62,156,184,.1); box-shadow:0 0 0 1px rgba(62,156,184,.3); }
@@ -398,16 +415,16 @@
     <div class="roomsearch"><span class="rs-ic">⌕</span><input id="roomSearch" type="search" placeholder="Search rooms…" autocomplete="off" aria-label="Search rooms" /></div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
-      <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
-      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>The Kitchen</span></a>
+      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>Leon Production Labs</span></a>
     </div>
     <div class="raillabel">More</div>
     <div class="roomrail">
+      <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
-      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Blueprint Builds</span></a>
-      <a class="roomlink" href="/static/join.html"><span class="ri">🎭</span><span>For Creators</span></a>
+      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Berner Builder</span></a>
+      <a class="roomlink" href="/for-creators"><span class="ri">🎭</span><span>For Creators</span></a>
     </div>
     <div class="sidefoot">
       <div id="prStatus" style="display:flex; gap:16px; justify-content:center; padding:2px 0 8px; font:600 10px Inter; letter-spacing:.06em; color:var(--dim);">
@@ -440,7 +457,7 @@
         <div class="arkhero">
           <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
-          <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+          <p class="ark-go">Start typing to talk to your agent — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
         <a class="streamfeat" href="/static/stream.html">
@@ -467,7 +484,7 @@
       </div>
       <div class="chips" id="chips"></div>
       <div class="inputrow" id="inputrow">
-        <button class="attach" id="attach" title="Attach images, PDFs, Word docs, text or code — she sees images, reads the rest">＋</button>
+        <button class="attach" id="attach" title="Attach images, PDFs, Word docs, text or code — images get seen, the rest gets read">＋</button>
         <textarea id="input" rows="1" placeholder="Talk to Tiff…"></textarea>
         <button class="send" id="mic" title="Tap to talk · pause all you want · tap again when you're done · then press ➤"
           style="background:rgba(255,255,255,.07); color:#D8CCE4; box-shadow:none; border:1px solid var(--hairline); font-size:15px;">🎙</button>
@@ -489,7 +506,7 @@
   <div class="memlist" id="memList"></div>
   <div class="memadd">
     <input id="memTitle" placeholder="Title — e.g. 'New song: Static'" />
-    <textarea id="memText" rows="3" placeholder="What should she never forget?"></textarea>
+    <textarea id="memText" rows="3" placeholder="What should your agents always remember?"></textarea>
     <button class="newchat" id="memAdd" style="margin:0">Remember it</button>
   </div>
 </div>
@@ -539,6 +556,34 @@ window.addEventListener("ark:providers-changed", arkRebuildModels);   // Setting
   think.value = localStorage.getItem("pinkroom-think") || "low";
   think.onchange = () => localStorage.setItem("pinkroom-think", think.value);
   loadSessions();
+  // ── WARM HANDOFF — carry what you were just working on INTO the room you open, so the idea
+  //    doesn't vanish. Right before you navigate to a room, stash a SHORT brief of the recent chat
+  //    (your last few turns) in localStorage; the room's agent picks it up and opens already caught
+  //    up. One-time + scoped + free — NOT persistent cross-room memory (that's the bloat we avoid).
+  (function () {
+    const ROOM_OF = { "/static/studio.html": "studio", "/static/beats.html": "beats", "/static/editor.html": "editor",
+      "/static/images.html": "images", "/static/build.html": "build", "/static/stream.html": "stream", "/static/character.html": "character" };
+    const _mtext = (m) => { if (!m) return ""; if (m._typed) return m._typed; const c = m.content;
+      if (typeof c === "string") return c;
+      if (Array.isArray(c)) return c.filter(p => p && p.type === "text").map(p => p.text || "").join(" ");
+      return ""; };
+    document.addEventListener("click", (e) => {
+      try {
+        const a = e.target.closest && e.target.closest("a"); if (!a) return;
+        const dest = (a.dataset && a.dataset.dest) ? a.dataset.dest : a.getAttribute("href");
+        const room = dest && ROOM_OF[dest]; if (!room) return;
+        if (!messages || !messages.length) return;
+        const users = [];
+        for (let i = messages.length - 1; i >= 0 && users.length < 3; i--) { if (messages[i].role === "user") users.unshift(_mtext(messages[i])); }
+        let lastReply = "";
+        for (let j = messages.length - 1; j >= 0; j--) { if (messages[j].role === "assistant") { lastReply = _mtext(messages[j]); break; } }
+        const brief = users.filter(Boolean).join("\n").slice(0, 900);
+        if (!brief) return;
+        localStorage.setItem("dmv_handoff", JSON.stringify({ room, brief,
+          gist: (users[users.length - 1] || "").slice(0, 160), lastReply: (lastReply || "").slice(0, 300), ts: Date.now() }));
+      } catch (_) {}
+    }, true);   // capture phase → fires before the nav handler below
+  })();
   // pro polish: strip internal hrefs so hovering a nav tile doesn't flash localhost URLs in the corner
   document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.dataset.dest = dest; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
 })();
@@ -631,6 +676,49 @@ function addMsg(role, text, atts) {
   scrollDown(role === "user");   // your own message always snaps to view; agent replies respect your scroll
   return bub;
 }
+
+/* ── ROOM ESCORT — when what you typed clearly belongs in a room, the active agent offers to take
+      you there AND carry the context over (reuses the warm-handoff stash on the chip click — the
+      capture-phase listener above fires first). Client-side, any brain, free, agent-neutral. One
+      offer per topic (won't re-nag the same room back-to-back). ── */
+(function () {
+  const ROOMS = [
+    { room:"studio", path:"/static/studio.html", label:"DeMartin Audio",      icon:"🎚", re:/\b(vocals?|mixing|master(ing)?|auto-?tune|de-?ess|acapella|pitch[- ]?correct|my voice|record(ing)?\s+(a|my|the)?\s*(verse|vocal|song)|comp the takes?)\b/i },
+    { room:"beats",  path:"/static/beats.html",  label:"Leon Production Labs", icon:"🥁", re:/\b(beats?|808s?|drums?|hi-?hats?|snares?|kicks?|instrumental|boom ?bap|trap beat|melody loop|chord progression|make a beat|cook (up )?a beat)\b/i },
+    { room:"editor", path:"/static/editor.html", label:"LePrince Visual",      icon:"🎬", re:/\b(footage|edit (the|my|this)\s+(video|clip|footage)|color ?grade|timeline|transitions?|vfx|trim the clip|cut the (video|clip)|export.*(mp4|reel))\b/i },
+    { room:"images", path:"/static/images.html", label:"Imagination Station",  icon:"🎨", re:/\b(artwork|cover art|album cover|\blogo\b|thumbnail|poster|generate (an?|some)?\s*(image|picture|art)|make (an?)?\s*(image|logo|cover)|draw (me|a))\b/i },
+    { room:"build",  path:"/static/build.html",  label:"Berner Builder",       icon:"🛠", re:/\b(website|web ?app|web ?site|landing page|webpage)\b|\b(build|make|create|code)\b[^.!?]{0,18}\b(app|site|tool|page|dashboard|bot)\b/i },
+    { room:"stream", path:"/static/stream.html", label:"The Stream",           icon:"📡", re:/\b(release|drop|publish|distribute|stream)\b\s+(my\s+)?(song|music|track|single|album|ep|tape|project)\b|\bput (my music|it|my song) out\b/i },
+  ];
+  let lastRoom = "";
+  function detect(text) { const s = (text || ""); if (s.length < 6) return null; for (const r of ROOMS) if (r.re.test(s)) return r; return null; }
+  function offer(r) {
+    const wrap = document.createElement("div"); wrap.className = "msg tiff escort-row";
+    wrap.innerHTML = '<div class="tag escort-tag">→</div><div class="msgcol"><a class="escort-chip" data-dest="' + r.path + '">'
+      + '<span class="escort-ic">' + r.icon + '</span><span class="escort-txt"><b>' + r.label + '</b> is built for this<span class="escort-sub">take me there — I’ll bring what we’re working on</span></span><span class="escort-go">→</span></a></div>';
+    wrap.querySelector(".escort-chip").addEventListener("click", function () { location.href = r.path; });   // capture-phase warm-handoff listener stashes the brief first
+    $("col").appendChild(wrap); scrollDown(false);
+  }
+  const _add = addMsg;
+  addMsg = function (role, text, atts) {
+    const bub = _add.apply(this, arguments);
+    try { if (role === "user") { const r = detect(text); if (r && r.room !== lastRoom) { lastRoom = r.room; offer(r); } } } catch (e) {}
+    return bub;
+  };
+  document.head.insertAdjacentHTML("beforeend", `<style>
+    .escort-row .escort-tag{background:linear-gradient(135deg,#7BF0E4,#3E9CB8);color:#06161b;font-weight:800}
+    .escort-chip{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer;
+      background:linear-gradient(180deg,rgba(62,156,184,.16),rgba(40,48,58,.9));border:1px solid rgba(120,182,205,.4);
+      border-radius:12px;padding:9px 13px;transition:all .15s;max-width:340px}
+    .escort-chip:hover{border-color:rgba(150,210,228,.95);background:linear-gradient(180deg,rgba(62,156,184,.3),rgba(40,48,58,.97));box-shadow:0 0 16px rgba(62,156,184,.4);transform:translateY(-1px)}
+    .escort-ic{font-size:19px;line-height:1}
+    .escort-txt{display:flex;flex-direction:column;color:#DDEEF4;font:600 13px Inter,system-ui,sans-serif}
+    .escort-txt b{color:#fff}
+    .escort-sub{font-weight:400;font-size:11px;color:#9FC4D0;margin-top:1px}
+    .escort-go{margin-left:auto;color:#7BF0E4;font-size:18px;font-weight:800}
+  </style>`);
+})();
+
 // display text for a stored message (what B typed, never the folded file dump)
 function msgText(m) {
   if (typeof m._typed === "string") return m._typed;
@@ -702,11 +790,12 @@ function setChatBrain(id){
   document.querySelectorAll('.csf[data-brain]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-brain')===id); });
   if(av) av.style.boxShadow = (id==='kit' ? '0 0 0 2px rgba(62,156,184,.75)' : '0 0 0 2px rgba(233,75,156,.75)');
   try { window.activeBrain = id; if (window.setMascotChar) window.setMascotChar(id); } catch(_){}   // switch the bottom animation to match
+  try { var _ip = $('input'); if (_ip && typeof chatPlaceholder === 'function') _ip.placeholder = chatPlaceholder(); } catch(_){}   // the box names whoever's active
   // theme the whole UI to the active character — Tiff pink, Kit blue
   var _rs = document.documentElement.style;
   _rs.setProperty('--pink',    id==='kit' ? '#3E9CB8' : '#D9568F');
   _rs.setProperty('--accent2', id==='kit' ? '#5FB4CE' : '#F2A0C8');
-  if(_changed){ charFlash(id==='kit' ? 'rgba(62,156,184,.5)' : 'rgba(217,86,143,.5)'); charDing(id); }   // flash + sound only on a real switch
+  if(_changed){ charFlash(id==='kit' ? 'rgba(62,156,184,.5)' : 'rgba(217,86,143,.5)'); charDing(id); if(typeof startArkTips==='function' && document.getElementById('arkTag')) startArkTips(true); }   // flash + sound + swap the welcome tips to the new agent
 }
 document.addEventListener('click', function(e){ var c = e.target.closest ? e.target.closest('.crew[data-brain],.csf[data-brain],.cstile[data-brain]') : null; if(c) setChatBrain(c.getAttribute('data-brain')); });
 // the welcome-screen character shelf — the roster. REAL characters only: Tiff + Kit, plus a "build your own" tile.
@@ -876,7 +965,7 @@ function newChat() {
         <div class="arkhero">
           <span class="dmv hero-dmv" role="img" aria-label="DeMartinville"><span class="r"></span><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span><span class="r"></span></span>
           <p class="ark-tag" id="arkTag">Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.</p>
-          <p class="ark-go">Start typing to talk to Tiff — or step into a wing on the left.</p>
+          <p class="ark-go">Start typing to talk to your agent — or step into a wing on the left.</p>
           <button class="ark-smarter" type="button" onclick="(window.arkOpenSettings||function(){var g=document.querySelector('.as-gear');if(g)g.click();})()">☁ Make DeMartinville smarter<small>Light PC? Plug in a cloud model with your own key →</small></button>
         </div>
         <a class="streamfeat" href="/static/stream.html">
@@ -893,15 +982,15 @@ function newChat() {
 }
 $("newChat").onclick = newChat;
 
-/* ── memory drawer — two stores: LOCAL (quick facts) + CLOUD (deep HeyTiff brain) ── */
+/* ── memory drawer — two stores: LOCAL (quick facts) + CLOUD (the deep memory) ── */
 let memScope = "local";
 const MEM_COPY = {
   local: { head: "🧠 LOCAL MEMORY",
-    hint: "Her quick scratchpad — the simple facts she picks up as you talk. She files these herself; add or forget any.",
-    title: "Title — e.g. 'New song: Static'", text: "What should she never forget?" },
+    hint: "A quick scratchpad — the simple facts your agents pick up as you talk. Filed automatically; add or forget any.",
+    title: "Title — e.g. 'New song: Static'", text: "What should your agents always remember?" },
   cloud: { head: "☁ CLOUD MEMORY",
-    hint: "Her deep knowledge, carried over from HeyTiff — B's catalog, his people, his craft, the whole world. The smart memory.",
-    title: "Title — e.g. 'New collaborator: Swig 616'", text: "Deep knowledge to fold into her HeyTiff brain…" },
+    hint: "Deep memory — the knowledge that carries across every room and grows as you work. Add what matters and your agents fold it in.",
+    title: "Title — e.g. 'New collaborator'", text: "Deep knowledge to fold into memory…" },
 };
 function selectMem(scope) {
   memScope = scope;
@@ -963,14 +1052,18 @@ $("memAdd").onclick = async () => {
 };
 
 /* ── modes + input ── */
+function chatPlaceholder() {
+  var name = (activeBrain === "kit") ? "Kit" : "Tiff";
+  return mode === "research" ? "What should I dig into?"
+    : mode === "write" ? "Drop your bars — I'll go off what YOU wrote…"
+    : "Talk to " + name + "…";
+}
 function setMode(m) {
   mode = m;
   ["modeChat", "modeWrite", "modeResearch"].forEach(id => $(id).classList.remove("on"));
   ({ chat: "modeChat", write: "modeWrite", research: "modeResearch" })[m] &&
     $({ chat: "modeChat", write: "modeWrite", research: "modeResearch" }[m]).classList.add("on");
-  $("input").placeholder = m === "research" ? "What should she dig into?"
-    : m === "write" ? "Drop your bars — she goes off what YOU wrote…"
-    : "Talk to Tiff…";
+  $("input").placeholder = chatPlaceholder();
 }
 $("modeChat").onclick = () => setMode("chat");
 $("modeWrite").onclick = () => setMode("write");
@@ -1117,40 +1210,98 @@ $("input").addEventListener("paste", (e) => {
   fetch('/api/version').then(r=>r.json()).then(d=>{ const v=document.getElementById('ark-ver-badge'); if(v) v.textContent='v'+(d.version||'?'); }).catch(()=>{});
 })();
 
-/* ── rotating welcome line: the studio intro, then real per-room tips ──
-   Pure client-side, no network. Opens on the ARKITECT intro, then cycles
-   through genuine tips (a daily offset keeps the first tip fresh). ── */
+/* ── rotating welcome line: the studio intro, then tips that adapt to WHO
+   you're talking to + cover the whole site. Pure client-side, no network. ──
+   - AGENT_TIPS[tiff|kit] — about whoever you're chatting with right NOW. Switch
+     agents (the topbar switcher) and these swap to match (restarted on switch).
+   - personalTips() — if YOU built an agent (character.html -> dmv_characters),
+     tips that call them by name and point them at the room where they work.
+   - SITE_TIPS — the whole platform (every room + cross-site feature), shown no
+     matter who's active. A daily offset keeps the site tips fresh. ── */
 const ARK_INTRO = "Your private creative studio — running on your own machine. Local and free by default; reach for the cloud only when you want it, on your own keys.";
-const ARK_TIPS = [
-  { room: "Chat",        t: "Talk to Tiff like a real person. Use the ⚡ Quick / 🧠 Balanced / 🔥 Deep dial to set how hard she thinks before she answers." },
-  { room: "Memory",      t: "Tiff keeps two memories — ⚡ Local for quick facts she picks up, ☁ Cloud for her deep HeyTiff knowledge. Open either from the sidebar." },
-  { room: "Research",    t: "Flip to 🔬 Research and Tiff searches the live web for free, reads the pages, and writes back a synthesized answer — every step visible." },
-  { room: "Write",       t: "Switch to ✍️ Write for long-form — lyrics, bios, treatments — and Tiff stretches out in her full voice instead of quick replies." },
-  { room: "Attach",      t: "Drag images, PDFs, or docs straight into the chat — Tiff sees the images and reads the rest before she answers." },
-  { room: "Voice",       t: "Tap 🎙 to talk to Tiff out loud — pause as long as you need, tap again when you're done, then hit send." },
-  { room: "DeMartin Audio Labs", t: "DeMartin is a full DAW — record, edit, mix, and bounce. Hit the 🩺 Vocal Doctor on a vocal track for an instant pro chain." },
-  { room: "The Kitchen", t: "The Kitchen is where you make the beat — step-sequence drums, play 808s, and every instrument has an AI brain you can talk to that turns its own knobs." },
-  { room: "LePrince Visual Labs", t: "LePrince cuts video on a real timeline — drop clips, layer text, render it out. No subscription, all on your machine." },
-  { room: "Imagination Station",  t: "Imagination Station makes images locally with FLUX — just describe what you want; the engine spins itself up on the first ask." },
-  { room: "Blueprint Builds",     t: "Blueprint Builds is where Kit turns your idea into a working app — describe the thing and watch him build it." },
-  { room: "Cloud",       t: "Light PC? Open ⚙ Settings and plug in a cloud model with your own key — Tiff runs off that instead of leaning on your GPU." },
-  { room: "Private",     t: "Everything here stays on your machine. Nothing phones home — local by default, the cloud only when you choose it." },
+
+// who you're talking to RIGHT NOW — leads the rotation, swaps when you switch agent
+const AGENT_TIPS = {
+  tiff: [
+    { who: "Tiff", t: "Tiff is your all-rounder — vibe, words, and ideas. Use the ⚡ Quick / 🧠 Balanced / 🔥 Deep dial to set how hard she thinks before she answers." },
+    { who: "Tiff", t: "Flip Tiff to 🔬 Research and she searches the live web for free, reads the pages, then writes back a synthesized answer — every step visible." },
+    { who: "Tiff", t: "Switch to ✍️ Write and Tiff stretches into long-form — lyrics, bios, treatments — in her full voice instead of quick replies." },
+    { who: "Tiff", t: "Drag Tiff onto a room on the left and she comes in to work inside it — not just talk to you from out here." },
+  ],
+  kit: [
+    { who: "Kit", t: "Kit is the specialist — deeper, hands-on, technical work. Reach for him when you want the precise move, not the vibe." },
+    { who: "Kit", t: "Take Kit into 🛠 Berner Builder and he turns your idea into a working app — just describe the thing you want." },
+    { who: "Kit", t: "Drag Kit into any room and he works with his hands — turning knobs, editing, building — not just answering from the chat." },
+    { who: "Kit", t: "On a Claude model the thinking dial unlocks a 4th stop, 🔱 God Particle — Kit reasons at full depth before he moves." },
+  ],
+};
+
+// the whole site — true no matter who you're talking to
+const SITE_TIPS = [
+  { room: "DeMartin Audio Labs", t: "DeMartin Audio Labs is a full DAW — record, edit, mix, and bounce. Hit the 🩺 Vocal Doctor on a vocal track for an instant pro chain." },
+  { room: "Leon Production Labs", t: "Leon Production Labs is where you build the beat — step-sequence drums, play 808s, and every instrument has an AI you can talk to that turns its own knobs." },
+  { room: "LePrince Visual Labs", t: "LePrince Visual Labs cuts video on a real timeline — drop clips, layer text, render it out. No subscription, all on your machine." },
+  { room: "The Stream", t: "The Stream is your own Spotify + YouTube — push a track to Notifi or a video to Cratel straight from any room. No label, no middleman." },
+  { room: "Imagination Station", t: "Imagination Station makes images locally with FLUX — just describe what you want; the engine spins itself up on the first ask." },
+  { room: "Berner Builder", t: "Berner Builder turns an idea into a working app — describe the thing and watch it get built, right here on your machine." },
+  { room: "Memory", t: "Two memories live in the sidebar — ⚡ Local for quick facts picked up as you talk, ☁ Cloud memory for the deep stuff that carries across every room." },
+  { room: "Voice", t: "Tap 🎙 to talk out loud instead of typing — pause as long as you need, tap again when you're done, then hit send." },
+  { room: "Attach", t: "Drag images, PDFs, or docs straight into the chat — the images get seen and the rest gets read before you get an answer." },
+  { room: "Your roster", t: "Build your OWN agent — the ＋ tile on the welcome screen. Name them, pick their craft, feed them what you know, then drag them into a room to work." },
+  { room: "Cloud", t: "Light machine? Open ⚙ Settings and plug in a cloud model with your own key — the chat runs off that instead of leaning on your GPU." },
+  { room: "Private", t: "Everything here stays on your machine. Nothing phones home — local by default, the cloud only when you choose it." },
 ];
+
+// the agents YOU built (character.html -> dmv_characters) — named, personal
+const CRAFT_ROOM = {
+  producer: "DeMartin Audio Labs", mix: "DeMartin Audio Labs",
+  beatmaker: "Leon Production Labs", editor: "LePrince Visual Labs",
+  builder: "Berner Builder", writer: "the ✍️ Write tab right here",
+};
+function personalTips() {
+  let arr = [];
+  try { const p = JSON.parse(localStorage.getItem("dmv_characters") || "[]"); if (Array.isArray(p)) arr = p; } catch (_) {}
+  const mine = arr.filter(c => c && c.mine && c.name && c.name.trim());
+  const out = [];
+  mine.slice(0, 3).forEach(c => {
+    const name = c.name.trim();
+    const role = (c.craftLabel || "your agent").toLowerCase();
+    const room = CRAFT_ROOM[c.craft];
+    out.push(room
+      ? { who: name, you: true, t: `${name} is your ${role}. Drag them into ${room} and they'll work with their hands — and learn your moves while they do.` }
+      : { who: name, you: true, t: `${name} is on your roster, ready to go. Drag them into a room to put them to work — they answer as themselves, grounded in what you taught them.` });
+  });
+  if (mine.length) out.push({ who: "You", you: true, t: `That's ${mine.length} agent${mine.length > 1 ? "s" : ""} of your own. Keep feeding them in their room — hit ⏺ Watch while you work and they pick up how YOU do it.` });
+  return out;
+}
+
+// round-robin weave so the agent + your own agents surface early and often,
+// interleaved with the rest of the site
+function weaveTips(lists) {
+  const out = []; let i = 0, more = true;
+  while (more) { more = false; for (const L of lists) { if (i < L.length) { out.push(L[i]); more = true; } } i++; }
+  return out;
+}
+
 let arkTipTimer = null;
-function startArkTips() {
+function startArkTips(skipIntro) {
   if (arkTipTimer) { clearInterval(arkTipTimer); arkTipTimer = null; }
   const el = document.getElementById("arkTag");
   if (!el) return;
-  // sequence = intro first, then every tip, starting from today's offset so it feels fresh daily
-  const off = new Date().getDate();
-  const seq = [{ intro: true }];
-  for (let i = 0; i < ARK_TIPS.length; i++) seq.push(ARK_TIPS[(off + i) % ARK_TIPS.length]);
+  const who = (window.activeBrain === "kit") ? "kit" : "tiff";
+  const agent = AGENT_TIPS[who] || [];
+  const personal = personalTips();
+  // daily offset rotates the site tips so the first one feels fresh each day
+  const off = new Date().getDate() % (SITE_TIPS.length || 1);
+  const siteRot = SITE_TIPS.slice(off).concat(SITE_TIPS.slice(0, off));
+  const woven = weaveTips([agent, personal, siteRot]);   // active agent leads
+  const seq = skipIntro ? woven : [{ intro: true }].concat(woven);
   let idx = 0;
   const render = () => {
     const item = seq[idx];
-    el.innerHTML = item.intro
-      ? ARK_INTRO
-      : `<span class="tiptag">💡 ${item.room} tip</span><span>${item.t}</span>`;
+    if (item.intro) { el.innerHTML = ARK_INTRO; return; }
+    const label = item.you ? `🌟 ${item.who}` : (item.who ? `💡 ${item.who}` : `💡 ${item.room} tip`);
+    el.innerHTML = `<span class="tiptag">${label}</span><span>${item.t}</span>`;
   };
   render();
   arkTipTimer = setInterval(() => {
@@ -1160,6 +1311,8 @@ function startArkTips() {
     setTimeout(() => { idx = (idx + 1) % seq.length; render(); cur.classList.remove("fading"); }, 350);
   }, 12000);
 }
+// rebuild when the user creates/edits one of their own agents
+window.addEventListener("dmv-characters-changed", () => { if (document.getElementById("arkTag")) startArkTips(true); });
 startArkTips();
 </script>
 <script>
@@ -1257,6 +1410,10 @@ startArkTips();
   window.addEventListener("resize",function(){ apply(idx); });
 })();
 </script>
+<!-- CLOUD: browser-direct AI engine + fetch bridge. No-op on the desktop app (localhost);
+     on demartinlabs.com they make the room run on the user's own key, no server needed. -->
+<script src="/static/cloud-ai.js?v=4"></script>
+<script src="/static/cloud-bridge.js?v=4"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
 <script src="/static/copy-anywhere.js"></script>

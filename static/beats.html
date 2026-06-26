@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>The Kitchen — DeMartinville</title>
+<title>Leon Production Labs — DeMartinville</title>
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
 <style>
-  /* ── THE KITCHEN — the production room (FL-Studio-class beat maker). Sibling of
+  /* ── LEON PRODUCTION LABS — the production room (FL-Studio-class beat maker). Sibling of
      DeMartin Audio Labs (mixing) + LePrince Visual Labs (video). Same graphite family,
      same fonts, but its own identity: electric violet→magenta energy on near-black, amber
      steps, green transport. Everything is its own self-contained Web-Audio engine. ── */
@@ -595,7 +595,7 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
-   THE KITCHEN — engine + channel rack (Layer 1)
+   LEON PRODUCTION LABS — engine + channel rack (Layer 1)
    Pure Web Audio. Lookahead scheduler (Chris Wilson "two clocks" pattern).
    Everything is synthesized so a beat bangs with zero samples / zero network.
    ════════════════════════════════════════════════════════════════════════════ */
@@ -2939,8 +2939,8 @@ const STATIC_MENUS={
     {l:'Ask Kit about this room',ic:'🧠',act:()=>{const f=document.querySelector('.kit-fab'); if(f)f.click(); else toast('Kit is loading…');}},
   ],
   help:()=>[
-    {l:'How The Kitchen works',ic:'❔',act:helpToast},
-    {l:'About The Kitchen',ic:'◢',act:()=>toast('The Kitchen — part of DeMartinville. A beat maker on the Web Audio API, with an AI brain in every plugin.')},
+    {l:'How Leon Production Labs works',ic:'❔',act:helpToast},
+    {l:'About Leon Production Labs',ic:'◢',act:()=>toast('Leon Production Labs — part of DeMartinville. Named for Leon Theremin, pioneer of electronic instruments. A beat maker on the Web Audio API, with an AI brain in every plugin.')},
   ],
 };
 function menuItems(name){
@@ -3569,7 +3569,7 @@ fetch('/api/plugins/bundle.js').then(r=>r.ok?r.text():'').then(js=>{ if(js){ try
   var b=document.createElement("div");
   b.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:99999;display:flex;align-items:center;gap:12px;max-width:min(720px,94vw);padding:10px 14px;border-radius:14px;background:linear-gradient(180deg,#1b1c22,#141519);border:1px solid rgba(120,182,205,.42);box-shadow:0 14px 44px rgba(0,0,0,.55);color:#E7E9EE;font:500 12.5px/1.45 Inter,system-ui,sans-serif";
   b.innerHTML='<span style="font-size:18px;line-height:1">🥁</span>'
-    +'<span style="flex:1;min-width:0">You\'re playing <b>The Kitchen</b> free, right in your browser — nothing to install. This is <b>one room</b> of DeMartinville.</span>'
+    +'<span style="flex:1;min-width:0">You\'re playing <b>Leon Production Labs</b> free, right in your browser — nothing to install. This is <b>one room</b> of DeMartinville.</span>'
     +'<a href="/" style="flex:none;text-decoration:none;border-radius:9px;padding:8px 13px;font:700 12px Inter;color:#0c0d10;background:linear-gradient(120deg,#7BF0E4,#3E9CB8)">⬇ Get the full studio</a>'
     +'<a href="mailto:koonce47@gmail.com?subject=Beat%20Lab%20feedback" style="flex:none;text-decoration:none;font:600 10px \'Space Mono\',monospace;letter-spacing:.04em;color:#9FCFDD">early · feedback</a>'
     +'<button id="dmvBeatX" title="dismiss" style="flex:none;cursor:pointer;border:0;background:none;color:#9AA0AC;font-size:17px;line-height:1;padding:0 2px">×</button>';

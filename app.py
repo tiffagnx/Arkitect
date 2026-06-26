@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "2.2.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "2.3.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -102,6 +102,46 @@ async def _no_cache_code(request, call_next):
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"
     return resp
+
+
+# ── GOD MODE depth layer — shared by /api/chat AND /api/kit so a docked Claude gets the SAME
+#    "show out" depth as the main chat, not the same prompt a 4B model gets. When the routed brain
+#    is a Claude slot, prepend a "you ARE Claude" persona + a depth instruction mapped from the
+#    effort lever. Claude follows instructions tightly → reliable over the OpenAI-compat door (a
+#    native effort/thinking param is a later upgrade). ONE source of truth (was copy-pasted). ──
+def _is_claude_slot(slot) -> bool:
+    if not slot:
+        return False
+    return ("anthropic.com" in (slot.get("base_url", "") or "").lower()
+            or "claude" in (slot.get("name", "") or "").lower()
+            or "claude" in (slot.get("model", "") or "").lower())
+
+
+def _god_layer(effort: str, persona_set: bool = False) -> str:
+    depth = {
+        "low":    "Mode: Quick — sharp and fast, but unmistakably sharp.",
+        "medium": "Mode: Balanced — think it through, then give a strong answer.",
+        "high":   "Mode: Deep — reason step by step; be thorough, rigorous, and complete.",
+        "max":    "Mode: GOD PARTICLE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops.",
+    }.get((effort or "").lower(), "")
+    if persona_set:
+        # a room agent (Tiff/Kit/a user-built character) already HAS an identity — DON'T overwrite it
+        # with "you ARE Claude"; just kick the gear up and tell it to stay in character.
+        return ("\n\n— A more powerful brain just took the wheel — bring your full reasoning, taste, and "
+                "creativity, and make it obvious a different gear kicked in. Stay fully in character.\n" + depth)
+    return ("\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — "
+            "show out. Bring your full reasoning, taste, and creativity, and make it obvious a "
+            "different gear just kicked in.\n" + depth)
+
+
+# CRAFT vs LIFE — in a WORK room, keep the user's CRAFT/taste memories (how they mix/edit — high-signal,
+# makes the agent work THEIR way) and drop life/bio trivia (dead weight at a console). Heuristic keyword
+# gate (no memory-store tagging yet): a memory counts as "craft" if it mentions production/mix/edit terms.
+_CRAFT_RE = re.compile(
+    r"\b(mix|mixing|master|mastering|vocal|eq|compress|de-?ess|reverb|delay|saturat|bright|warm|"
+    r"low[- ]?end|bass|808|beat|drum|snare|kick|hat|melod|chord|key|bpm|tempo|swing|sound|tone|"
+    r"edit|cut|transition|effect|color|grade|render|export|sample|loop|stem|track|fade|pan|gain|"
+    r"level|punch|harsh|sibilan|plugin|daw|pro ?tools)\b", re.I)
 
 
 PERSONA = """You are Tiff.
@@ -306,7 +346,7 @@ _CLOUD_CORE = [{
         "DeMartinville and HeyTiff.ai are TWO HOMES for the same Tiff — not two different assistants. "
         "B built both, and you're one collaborator across them.\n"
         "- DeMartinville is B's private LOCAL station: this app, running on his own machine, "
-        "localhost only, nothing phones home. It's where you are right now. It holds the rooms — Blueprint Builds, "
+        "localhost only, nothing phones home. It's where you are right now. It holds the rooms — Berner Builder,"
         "DeMartin Audio Labs (the DAW), LePrince Visual Labs (video), Imagination Station (images).\n"
         "- HeyTiff.ai is your CLOUD home: the web studio B built (Supabase-backed, at heytiff.ai). Same you, in the "
         "cloud, reachable from anywhere.\n"
@@ -821,7 +861,7 @@ async def chat(req: Request):
     # Quick / Balanced / Deep dial. These local finetunes (gemma/qwen "aggressive")
     # blank out on high native reasoning_effort, so we keep the RAW dial low (reliable)
     # and express depth through an instruction the model actually follows.
-    _effort = body.get("effort", "low")
+    _effort = str(body.get("effort") or "low").lower()   # coerce: untrusted body could send a non-string
     _effort_hint = {
         "low":  "\n\nKeep this reply tight and quick.",
         "high": "\n\nTake your time on this one — think it through and give a thorough, complete answer.",
@@ -839,7 +879,7 @@ async def chat(req: Request):
         #    local brain entirely (so a weak PC with LM Studio closed still works). Keys live
         #    server-side in the swarm store; the picker only ever carries the opaque slot id. ──
         if model.startswith("cloud:"):
-            from swarm_routes import _enabled_slots, provider_stream
+            from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
             slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
             if not slot:
                 yield f"data: {json.dumps({'type':'error','text':'That cloud model isn’t set up anymore — pick another in the picker (Settings ⚙).'})}\n\n"
@@ -848,29 +888,23 @@ async def chat(req: Request):
             cpay = dict(payload)
             cpay["model"] = slot["model"]          # the provider's real model id, not "cloud:<slot>"
             cpay.pop("reasoning_effort", None)      # LM-Studio-ism — many cloud providers 400 on unknown fields
-            # ── CLAUDE = GOD MODE ── when the brain is a Claude slot, prepend a "you ARE Claude,
-            #    show out" layer + a depth instruction mapped from the effort lever (incl. a "max"
-            #    God-Mode tier). Claude follows instructions tightly, so this is the reliable depth
-            #    dial over the OpenAI-compat door (a native effort param is a later add). Other
-            #    providers are completely untouched.
-            _bu = (slot.get("base_url", "") or "").lower()
-            _is_claude = ("anthropic.com" in _bu or "claude" in (slot.get("name", "") or "").lower()
-                          or "claude" in (slot.get("model", "") or "").lower())
-            if _is_claude and cpay.get("messages") and cpay["messages"][0].get("role") == "system":
-                _depth = {
-                    "low":    "Mode: Quick — sharp and fast, but unmistakably sharp.",
-                    "medium": "Mode: Balanced — think it through, then give a strong answer.",
-                    "high":   "Mode: Deep — reason step by step; be thorough, rigorous, and complete.",
-                    "max":    "Mode: GOD PARTICLE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops.",
-                }.get(_effort, "")
-                _god = ("\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — "
-                        "show out. Bring your full reasoning, taste, and creativity, and make it obvious a "
-                        "different gear just kicked in.\n" + _depth)
+            # ── CLAUDE = GOD MODE ── a Claude slot gets the "you ARE Claude, show out" persona AND
+            #    goes through Anthropic's NATIVE /v1/messages endpoint, where the effort lever becomes
+            #    the REAL `output_config.effort` knob (low→max) + adaptive thinking — genuine deep
+            #    reasoning, not just a prompt. Everyone else stays on the OpenAI-compat door.
+            _claude = _is_claude_slot(slot)
+            if _claude and cpay.get("messages") and cpay["messages"][0].get("role") == "system":
                 _m0 = dict(cpay["messages"][0])
-                _m0["content"] = (_m0.get("content", "") or "") + _god
+                # the local-finetune _effort_hint is noise to Claude (it has the REAL native effort
+                # dial) — strip it before adding the god layer so the system prompt stays clean.
+                _c = (_m0.get("content", "") or "")
+                if _effort_hint and _c.endswith(_effort_hint):
+                    _c = _c[:-len(_effort_hint)]
+                _m0["content"] = _c + _god_layer(_effort)
                 cpay["messages"] = [_m0] + cpay["messages"][1:]
+            _src = anthropic_native_stream(slot, cpay, _effort) if _claude else provider_stream(slot, cpay, _effort)
             reply_parts = []
-            async for ev in provider_stream(slot, cpay):
+            async for ev in _src:
                 yield ev
                 if ev.startswith("data: "):
                     try:
@@ -3692,7 +3726,7 @@ async def native_plugins_render(req: Request):
         _shutil.rmtree(tmp, ignore_errors=True)
 
 
-# ── Pro-grade time-stretch (Track B) — Beat Lab's "Keep-Pitch" warp routed through the
+# ── Pro-grade time-stretch (Track B) — Leon Production Labs' "Keep-Pitch" warp routed through the
 #    engine's professional transient-aware stretcher (pedalboard.time_stretch, the class of
 #    algorithm real DAWs ship) instead of the in-browser WSOLA. Local, free, private, offline.
 #    Run inline (it's pedalboard's own safe code — no third-party plugin to segfault — and fast).
@@ -4530,12 +4564,24 @@ KIT_SYSTEM = """You are Kit — the build-bot who lives inside DeMartinville, a 
 You are NOT Tiff. Tiff is the creative collaborator in the main chat — the voice, the director. You are the hands: the crew guy who shows people how to USE the room they're standing in. Different job, different vibe.
 
 How you talk:
-- SHORT. Practical. Friendly. Like a buddy who knows the gear walking a friend through it.
+- You're a ROBOT and you lean into it: precise, technical, exact. Short and practical — name the exact control, the exact setting, the exact step.
 - When they're stuck, give clear step-by-step. Name where things are ("top-left", "the strip on the left of each track") so they can find them.
 - You can't see their screen — describe where things are, never pretend to look.
 - NEVER invent features that don't exist. If unsure something's there, say so honestly.
-- If they ask about deep creative work, writing, or just want to talk — that's Tiff's lane; point them to the main chat.
-- No corporate fluff, no "I'd be happy to." Just help.
+- If they want deep creative work, writing, or vibe — that's Tiff's lane; point them to her.
+- No corporate fluff, no "I'd be happy to." Just the technical truth, dialed in.
+
+THE ROOM YOU'RE IN RIGHT NOW:
+"""
+
+TIFF_ROOM_SYSTEM = """You are Tiff — and you're in the room WITH them right now, not just the main chat. You're one of the crew: a real artist who writes, makes beats, mixes, does a little of everything. This is your world.
+
+How you talk:
+- LAID-BACK and real. Like a homie in the studio, not an assistant. "What's good", "let's get it", "aight bet" — easy, natural. Never stiff, never salesy, never a posed act.
+- You actually make music — talk like a peer who's been in the booth. You can go deep on the creative side (the song, the words, the vibe) AND get hands-on with the room.
+- Short and real. Drop the corporate stuff completely — no "I'd be happy to."
+- You can't see their screen — describe where things are, never pretend to look.
+- NEVER invent features that don't exist. If something's not there, just say so, real talk.
 
 THE ROOM YOU'RE IN RIGHT NOW:
 """
@@ -4549,7 +4595,7 @@ ROOM_HELP = {
 - Empty session shows a hero with quick-start buttons (Add stems / New track / Record a take / Open a session). Spacebar = play/stop; Delete removes a selected clip; the bottom zoom bar (Fit + horizontal slider) shows the whole song, the vertical slider grows every lane.
 - Click a clip in a lane to edit it: reverse, fades, chop to 1/16, BPM delay, print VERB, or "Tune" (the pitch editor / Melodyne).
 - Top toolbar: Play / Stop / Loop / Record, an EDIT-vs-MIX view toggle, edit tools (grab / trim / select / smart), zoom, grid snap, Setup (audio device), and "Export WAV" on the right to bounce the mix down.""",
-  "beats": """DeMartin Beat Lab — a pro beat maker (think FL Studio / a drum machine) right in the browser. This is where you PRODUCE a beat; DeMartin Audio Labs (the other audio room) is where you mix/edit a finished recording.
+  "beats": """Leon Production Labs — a pro beat maker (think FL Studio / a drum machine) right in the browser. This is where you PRODUCE a beat; DeMartin Audio Labs (the other audio room) is where you mix/edit a finished recording.
 - THE CHANNEL RACK (the main view) is a step sequencer. Each row is one instrument; the grid of 16 squares is one bar. Click a square to place a hit; click it again (or right-click) to clear it. Hits on a row loop when you press Play. The squares are grouped in 4s so you can see the beats.
 - Each row's strip (left side) has: a color dot, the instrument name (click it to open that instrument's editor), two mini-knobs (Volume + Pan), M (mute) and S (solo). Melodic rows also get a 🎹 piano-roll button.
 - THE VELOCITY GRAPH at the bottom belongs to the SELECTED row (click a row to select it) — drag the bars up/down to make some hits hit harder/softer. That plus Swing is what turns a stiff loop into a groove.
@@ -4559,7 +4605,7 @@ ROOM_HELP = {
 - EVERY INSTRUMENT HAS AN AI BRAIN: open an instrument and tap the 🧠 button — you can TALK to it ("make it knock harder", "darker", "more slide") and it actually turns its own knobs for you, safely. This is the room's signature feature.
 - PATTERNS: the "◆ Pattern 1" button up top makes/switches/duplicates patterns — Pattern 1 can be your verse, Pattern 2 the hook, etc. The STEPS number sets how long a pattern is.
 - Top-right: ⬇ Export bounces the beat to a .wav, 💾 saves the project. Views along the top: Channel Rack, Piano Roll, Mixer, Playlist.""",
-  "build": """Blueprint Builds — you vibe-code single-file web apps and tools here just by describing them.
+  "build": """Berner Builder — you vibe-code single-file web apps and tools here just by describing them.
 - Type what you want in the box, hit Build, and a working single-file app shows up in the live preview.
 - Keep talking to stack changes ("make the button bigger", "add dark mode"). It auto-fixes its own runtime errors.
 - You can attach images or video as reference, and preview in phone/tablet/desktop frames.
@@ -4746,6 +4792,7 @@ async def kit_help(req: Request):
     msg = (body.get("message") or "").strip()
     image = (body.get("image") or "").strip()   # optional uploaded image → the agent LOOKS at it (vision)
     session = (body.get("session") or "").strip()   # studio hands a live text snapshot of the timeline (free)
+    handoff = (body.get("handoff") or "").strip()    # one-time brief from the main chat (the warm handoff)
     if not msg and not image:
         return {"reply": "Ask me anything about this room and I'll walk you through it."}
     # Optional persona override — sent ONLY for user-created ("mine") characters. When present,
@@ -4758,8 +4805,8 @@ async def kit_help(req: Request):
     if persona:
         char_name = (body.get("charName") or "").strip() or "your assistant"
         char_craft = (body.get("charCraft") or "").strip() or "creative collaborator"
-        room_labels = {"studio": "DeMartin Audio Labs", "beats": "DeMartin Beat Lab", "editor": "LePrince Visual Labs",
-                       "images": "Imagination Station", "build": "Blueprint Builds"}
+        room_labels = {"studio": "DeMartin Audio Labs", "beats": "Leon Production Labs", "editor": "LePrince Visual Labs",
+                       "images": "Imagination Station", "build": "Berner Builder"}
         room_label = room_labels.get(room, "DeMartinville")
         system = (
             f"You are {char_name}, a {char_craft} working inside DeMartinville {room_label}. {persona}\n\n"
@@ -4788,7 +4835,10 @@ async def kit_help(req: Request):
             except Exception:
                 pass
     else:
-        system = KIT_SYSTEM + room_help
+        # built-in cast: Kit (the technical robot) vs Tiff (laid-back, one of the crew, a real artist).
+        # They used to share KIT_SYSTEM (so Tiff was literally told "you are Kit") — now each gets her own voice.
+        char_id = (body.get("character") or "kit").strip().lower()
+        system = (TIFF_ROOM_SYSTEM if char_id == "tiff" else KIT_SYSTEM) + room_help
     # Kit's brain: pull the few most relevant knowledge slices for THIS question
     # (scoped to the room + the program-wide doc) and ground his answer in them.
     # Best-effort — retrieval must never break a reply.
@@ -4799,9 +4849,16 @@ async def kit_help(req: Request):
     # Kit also knows what the user has taught Tiff — a SHARED user pool (local facts + public
     # cloud knowledge). Capped tiny (k=2/1200c) so it never crowds the room docs or VRAM.
     # Read-only: Kit never WRITES personal facts; only Tiff's auto-remember/onboarding/import do.
+    # COMPARTMENTALIZE — keep CRAFT, drop LIFE. The WORK rooms (Audio Lab, beats, editor) are a
+    # workplace: the agent SHOULD know how you mix/edit (craft = high-signal, makes her work your way)
+    # but NOT your life story (bio = dead weight at a console). So work rooms keep only craft-flavored
+    # memories (tight), and the main chat (Tiff) keeps everything. Cheaper + sharper + cacheable.
+    _WORK_ROOMS = {"studio", "beats", "editor"}
     try:
         pool = load_memory() + [m for m in load_cloud_memory() if m.get("visibility") == "public" or m.get("always")]
         hits = relevant_memories(msg, pool, k=2, budget=1200)
+        if room in _WORK_ROOMS:
+            hits = [m for m in hits if _CRAFT_RE.search(m.get("text", "") or "")][:1]
         if hits:
             system += "\n\nWHAT YOU ALREADY KNOW ABOUT THIS USER (use only if relevant):\n" + \
                       "\n".join(f"- {m.get('text','')}" for m in hits)
@@ -4824,6 +4881,10 @@ async def kit_help(req: Request):
     if image:
         system += ("\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — "
                    "if they want to make something, write the generate prompt FROM the image.")
+    if handoff:
+        system += ("\n\nWARM HANDOFF — the user JUST came from the main chat where they were working this out. "
+                   "Pick up that thread immediately, reference what they said, and don't make them repeat "
+                   "themselves. Here's what they were on:\n" + handoff[:1000])
     # PER-AGENT MODEL PICK (frozen field "model"): each in-room agent carries its own choice.
     #   "cloud:<slot>" → route THIS one specific cloud slot (mirror /api/chat's lookup);
     #   a bare local id → force local with THAT model; absent/"auto" → legacy tier behavior.
@@ -4838,17 +4899,32 @@ async def kit_help(req: Request):
         local_model = chosen
     else:
         slots = _enabled_slots() if tier != "local" else []   # UNCHANGED legacy/tier default behavior
+    # CLAUDE = GOD MODE for the DOCKED agent too — the persona depth layer AND Anthropic's NATIVE
+    # /v1/messages call (the REAL effort dial + adaptive thinking), mapped from the effort lever the
+    # agent window sends. Falls back to the local brain on any error.
+    _kit_effort = str(body.get("effort") or "low").strip().lower()   # coerce: untrusted body could send a non-string
+    _kit_claude = bool(slots and _is_claude_slot(slots[0]))
     try:
-        if image and slots:
+        if _kit_claude:
+            from swarm_routes import anthropic_native_once
+            # god/effort layer goes ONLY on the copy Claude sees. persona_set=True keeps the agent's
+            # OWN identity (Tiff/Kit/a user-built character) instead of overriding with "you ARE Claude".
+            # The local fallback below reuses the CLEAN `system`, so the weak 4B brain never inherits it.
+            claude_system = system + _god_layer(_kit_effort, persona_set=True)
+            try:
+                text = await anthropic_native_once(slots[0], claude_system, msg, 700, _kit_effort, image=image)
+            except Exception:
+                text = await _kit_local(system, msg, image, model=local_model)       # native Claude failed → local (clean system)
+        elif image and slots:
             # VISION on the CLOUD brain (private/max tier + a key) → works "on the go".
             try:
-                text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4, image=image)
+                text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4, image=image, effort=_kit_effort)
             except Exception:
                 text = await _kit_local(system, msg, image, model=local_model)       # cloud vision failed → local eyes
         elif image:
             text = await _kit_local(system, msg, image, model=local_model)           # VISION on the LOCAL brain (free)
         elif slots:
-            text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4)   # cloud brain, auto-fallback
+            text, _prov = await _call_with_fallback(slots, system, msg, 600, 0.4, effort=_kit_effort)   # cloud brain, auto-fallback
         else:
             text = await _kit_local(system, msg, model=local_model)                  # local (default, or no cloud key set)
     except Exception:
@@ -4871,14 +4947,14 @@ async def kit_help(req: Request):
 
 
 # ════════════════════════════════════════════════════════════════════════════════════════
-#  /api/beatbrain — the AI brain that lives INSIDE every plugin in DeMartin Beat Lab.
+#  /api/beatbrain — the AI brain that lives INSIDE every plugin in Leon Production Labs.
 #  Generalizes studio.html's Vocal-Doctor pattern: one shared LLM brain + a per-plugin
 #  knowledge card + the plugin's flat param schema. The user talks to the plugin in plain
 #  language ("make my 808 hit harder", "darker keys", "more slide") and the brain replies
 #  AND can move the knobs — every value is CLAMPED to the param's range server-side so the
 #  AI literally can't push a knob into a broken setting. Purely additive endpoint.
 # ════════════════════════════════════════════════════════════════════════════════════════
-BEATBRAIN_SYSTEM = """You are the AI brain living INSIDE a single audio plugin in DeMartin Beat Lab, a beat-making studio. You are a sharp, friendly producer / sound-designer who knows THIS exact plugin cold. Replies are SHORT (1-3 sentences), practical, a little hype when it fits — talk like a producer, never like a manual.
+BEATBRAIN_SYSTEM = """You are the AI brain living INSIDE a single audio plugin in Leon Production Labs, a beat-making studio. You are a sharp, friendly producer / sound-designer who knows THIS exact plugin cold. Replies are SHORT (1-3 sentences), practical, a little hype when it fits — talk like a producer, never like a manual.
 
 You can actually MOVE this plugin's knobs. When the user wants a sound change (harder, darker, more slide, warmer, brighter, cleaner, boomier, tighter, etc.), pick the new knob values and output them as a fenced block EXACTLY like:
 ```set
@@ -5244,7 +5320,7 @@ async def stream_feed():
 @app.post("/api/stream/publish")
 async def stream_publish(req: Request):
     """Publish a finished track/video. Media comes EITHER as an inline data URI (`file` — the
-    in-room uploader, Beat Lab blob, a browser export) OR as a server-side `path` already written
+    in-room uploader, Leon Production Labs blob, a browser export) OR as a server-side `path` already written
     to disk by a Studio bounce / editor render (efficient, no base64). Optional `cover` data URI."""
     body = await req.json()
     kind = body.get("kind")
@@ -5316,11 +5392,20 @@ async def stream_publish(req: Request):
         dur = float(body.get("dur") or 0) or None
     except Exception:
         dur = None
+    # Artist payout = a LINK OUT to the artist's OWN pay page (Cash App / Venmo / PayPal / Ko-fi /
+    # their own link). Notifi never touches the money — 0% middleman, 100% to the artist. https only.
+    pay_raw = (body.get("pay") or "").strip()[:300]
+    pay = pay_raw if re.match(r"^https://[^\s]+$", pay_raw, re.I) else None
+    # Ownership attestation — the legal gate: the uploader affirms they made & own this work.
+    owns = bool(body.get("owns"))
     item = {
         "id": mid, "kind": kind, "title": title, "creator": creator,
         "file": fname, "cover": cover, "dur": dur,
         "desc": (body.get("desc") or "").strip()[:800] or None,
         "meta": body.get("meta") if isinstance(body.get("meta"), dict) else None,
+        "pay": pay,
+        "payLabel": ((body.get("payLabel") or "").strip()[:24] or None) if pay else None,
+        "owns": owns, "ownsTs": (int(time.time()) if owns else None),
         "ts": int(time.time()),
     }
     items = [i for i in _load_stream_feed() if i.get("id") != mid]  # replace if re-publishing same id

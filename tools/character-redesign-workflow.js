@@ -48,7 +48,7 @@ const CONTRACT = [
   '    studio  = "DeMartin Audio Labs"   -> /static/studio.html  -> img /static/shots/daw.png',
   '    chat    = "Chat (with Tiff)"      -> /                     -> img /static/shots/chat.png',
   '    editor  = "LePrince Visual Labs"  -> /static/editor.html  -> img /static/shots/editor.png',
-  '    build   = "Blueprint Builds"      -> /static/build.html   -> img /static/shots/build.png',
+  '    build   = "Berner Builder"      -> /static/build.html   -> img /static/shots/build.png',
   '',
   'VOICE (keep it, restyle premium, NO emoji): 4 voice options as clean cards/segments — keys frozen:',
   '  chill-mentor, precise-tech, hype, zen-teacher. Each a one-line sample of how they talk.',

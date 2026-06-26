@@ -11,6 +11,14 @@
 (function () {
   if (window.publishToStream) return;
   const CY = "#3E9CB8", CY2 = "#6FC0D8";
+  const PAYLABEL = { cashapp: "Cash App", venmo: "Venmo", paypal: "PayPal", kofi: "Ko-fi", link: "Support" };
+  function payUrl(m, raw) { raw = (raw || "").trim(); if (!raw) return "";
+    if (m === "link") return "https://" + raw.replace(/^https?:\/\//i, "").replace(/^\/+/, "");
+    if (m === "cashapp") return "https://cash.app/$" + raw.replace(/^[$@]/, "");
+    if (m === "venmo") return "https://venmo.com/u/" + raw.replace(/^@/, "");
+    if (m === "paypal") return "https://paypal.me/" + raw.replace(/^@/, "");
+    if (m === "kofi") return "https://ko-fi.com/" + raw.replace(/^@/, "");
+    return ""; }
 
   function blobToDataURL(b) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); }); }
   function probeDur(src, kind) {
@@ -72,11 +80,20 @@
               <input data-cover type="file" accept="image/*" style="display:none"></div></div>` : ""}
           ${kind === "video" ? `<div><div style="font:600 10px Oxanium;letter-spacing:.1em;color:#9aa0ab;text-transform:uppercase;margin-bottom:6px">Description</div>
             <textarea data-desc rows="2" maxlength="800" placeholder="What's this about? (optional)" style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#E9EAED;font:400 13.5px Inter;padding:10px 12px;resize:vertical;outline:none"></textarea></div>` : ""}
+          <div><div style="font:600 10px Oxanium;letter-spacing:.1em;color:#9aa0ab;text-transform:uppercase;margin-bottom:6px">Where fans pay you <span style="opacity:.6;text-transform:none;font-weight:500">— 100% yours, 0% to Notifi</span></div>
+            <div style="display:flex;gap:8px">
+              <select data-paym style="flex:none;width:100px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#E9EAED;font:600 12px Inter;padding:9px 7px;outline:none">
+                <option value="">— none —</option><option value="cashapp">Cash App</option><option value="venmo">Venmo</option><option value="paypal">PayPal</option><option value="kofi">Ko-fi</option><option value="link">Link</option></select>
+              <input data-payh placeholder="$cashtag · @handle · link" maxlength="200" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#E9EAED;font:400 13px Inter;padding:9px 11px;outline:none"></div></div>
+          <label data-ownrow style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;border-radius:8px">
+            <input type="checkbox" data-own style="margin-top:2px;width:16px;height:16px;accent-color:#3E9CB8;flex:none">
+            <span style="font-size:11.5px;color:#9aa0ab;line-height:1.5">I made this &amp; own the rights — not uploading anyone else's music. <span style="opacity:.7">(Required.)</span></span></label>
           <button data-go style="height:46px;border:none;border-radius:12px;cursor:pointer;color:#0B1417;background:linear-gradient(135deg,${CY2},${CY});font:700 12.5px Oxanium;letter-spacing:.08em;box-shadow:0 0 18px rgba(62,156,184,.4)">Publish to ${svc}</button>
           <div style="font-size:11px;color:#9aa0ab;text-align:center">Goes live on The Stream — local &amp; private to this machine.</div>
         </div>
       </div>`;
     document.body.appendChild(ov);
+    try { const p = JSON.parse(localStorage.getItem("dmv_pay") || "{}"); if (p.method) ov.querySelector("[data-paym]").value = p.method; if (p.handle) ov.querySelector("[data-payh]").value = p.handle; } catch (_) {}
     const close = () => ov.remove();
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
     ov.querySelector("[data-x]").onclick = close;
@@ -97,9 +114,12 @@
       const title = tIn.value.trim(); if (!title) { tIn.focus(); return; }
       const by = ov.querySelector("[data-by]").value.trim();
       try { localStorage.setItem("dmv_creator", by); } catch (_) {}
+      if (!ov.querySelector("[data-own]").checked) { const r = ov.querySelector("[data-ownrow]"); r.style.outline = "1px solid rgba(255,94,114,.75)"; setTimeout(() => r.style.outline = "", 1800); toast("Check the box to confirm you own this"); return; }
+      const pmethod = ov.querySelector("[data-paym]").value, phandle = ov.querySelector("[data-payh]").value.trim(), pay = payUrl(pmethod, phandle);
+      try { localStorage.setItem("dmv_pay", JSON.stringify({ method: pmethod, handle: phandle })); } catch (_) {}
       const go = ov.querySelector("[data-go]"); go.disabled = true; go.style.opacity = ".6"; go.textContent = "Publishing…";
       try {
-        const body = { kind, title, creator: by, ext: opts.ext || "", meta: opts.meta || null };
+        const body = { kind, title, creator: by, ext: opts.ext || "", meta: opts.meta || null, pay, payLabel: pay ? (PAYLABEL[pmethod] || "Support") : "", owns: true };
         if (opts.dur) body.dur = opts.dur;
         const descEl = ov.querySelector("[data-desc]"); if (descEl) body.desc = descEl.value.trim();
         if (opts.editor_jid) body.editor_jid = opts.editor_jid;

@@ -28,7 +28,7 @@ const CONTRACT = [
   'CRAFT to ROOM map (use exactly): producer=studio, mix=studio, beatmaker=studio,',
   '  songwriter=studio, editor=editor, visual=images, builder=build.',
   'Room keys to labels: studio="DeMartin Audio Labs", editor="LePrince Visual Labs",',
-  '  images="Imagination Station", build="Blueprint Builds", bit16="Bit1Six".',
+  '  images="Imagination Station", build="Berner Builder", bit16="Bit1Six".',
   '',
   'READINESS formula (HONEST — must cap at 80 today; final 20 is a LOCKED tier NOT built yet,',
   'shown locked, never auto-granted):',

@@ -790,8 +790,8 @@
   <div class="tgroup"><span class="tg-l">FX</span>
     <button class="tb" id="throwToggle" onclick="toggleThrowBar()" title="FX Throw — print a tempo-synced delay/reverb throw onto the selected clip" style="width:auto;padding:0 10px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">⟿ THROW</button>
   </div>
-  <div class="tgroup"><span class="tg-l">THE KITCHEN</span>
-    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open The Kitchen as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 THE KITCHEN</button>
+  <div class="tgroup"><span class="tg-l">PRODUCTION LABS</span>
+    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open Leon Production Labs as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 LEON PRODUCTION LABS</button>
   </div>
   <div class="tgroup"><span class="tg-l">ZOOM · GRID</span>
     <div class="zoomctl">
@@ -943,6 +943,7 @@
 const $ = (id) => document.getElementById(id);
 let ctx = null;                 // AudioContext (created on first interaction)
 const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
+window.tracks = tracks;         // exposed for agent-dock.js (dock scope + the Phase 1 "act on the docked stem" moves)
 let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
 let metroOn = false;   // count-in metronome click — OFF by default (never forced); toggle with the ♪ Click button
 // linear fader gain → Pro-Tools-style dB readout ("0.0" = unity, "−∞" = silence)
@@ -4685,13 +4686,13 @@ function makeDraggable(win, handle){
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   THE KITCHEN AS A PLUGIN  —  load The Kitchen in a floating window (a
-   same-origin <iframe>) and "Send to Studio" bounces the current beat onto a
-   new track. This is 100% Studio-side: it reaches into the embedded The Kitchen's
+   LEON PRODUCTION LABS AS A PLUGIN  —  load Leon Production Labs in a floating
+   window (a same-origin <iframe>) and "Send to Studio" bounces the current beat
+   onto a new track. This is 100% Studio-side: it reaches into the embedded room's
    OWN renderPatternWav()/wavBase64() across the same-origin frame boundary, so
    beats.html is never modified. The embedded instance is also blocked from
    overwriting the shared `dmv_beats_auto` autosave slot, so it can't disturb
-   anyone working in the standalone The Kitchen room.
+   anyone working in the standalone Leon Production Labs room.
    ════════════════════════════════════════════════════════════════════════════ */
 function openBeatLab(){
   let w = document.getElementById('beatlab-win');
@@ -4705,7 +4706,7 @@ function openBeatLab(){
   w.style.boxShadow=`0 24px 70px rgba(0,0,0,.64), 0 0 0 1px ${hexA(col,.16)}, 0 0 52px ${hexA(col,.12)}`;
   w.innerHTML =
     `<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}">`+
-      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 THE KITCHEN</span>`+
+      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 LEON PRODUCTION LABS</span>`+
       `<span class="pw-track" style="max-width:none">plugin · cook a beat, then send it to a track</span>`+
       `<button class="bl-send" onmousedown="event.stopPropagation()" title="Bounce the current beat onto a new Studio track" `+
         `style="background:${hexA(col,.18)};border:1px solid ${hexA(col,.5)};color:${col};font:800 10px 'Space Mono',monospace;letter-spacing:.04em;padding:5px 11px;border-radius:7px;cursor:pointer">⤓ Send to Studio</button>`+
@@ -4717,7 +4718,7 @@ function openBeatLab(){
     `</div>`;
   document.body.appendChild(w);
   const frame = w.querySelector('.bl-frame');
-  // protect whoever's in the standalone The Kitchen: stop THIS embedded instance from
+  // protect whoever's in the standalone Leon Production Labs: stop THIS embedded instance from
   // ever writing the shared autosave key (best-effort, same-origin realm patch).
   frame.addEventListener('load', ()=>{
     try{
@@ -4737,23 +4738,23 @@ function openBeatLab(){
 
 async function beatlabSend(frame, btn){
   const bw = frame && frame.contentWindow;
-  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("The Kitchen's still warming up — give it a second"); return; }
+  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("Leon Production Labs is still warming up — give it a second"); return; }
   const label = btn ? btn.textContent : '';
   if(btn){ btn.disabled=true; btn.textContent='Bouncing…'; }
   try{
     if(typeof bw.stopPlay === 'function'){ try{ bw.stopPlay(); }catch(e){} }   // freeze playback before the offline render
-    const buf = await bw.renderPatternWav(4);              // The Kitchen's own offline bounce — 4 bars, bit-identical to playback
+    const buf = await bw.renderPatternWav(4);              // Leon Production Labs' own offline bounce — 4 bars, bit-identical to playback
     if(!buf) throw new Error('empty render');
     const b64 = await bw.wavBase64(buf);                   // AudioBuffer -> base64 WAV
     const bin = atob(b64), u = new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-    const name = 'The Kitchen ' + (tracks.filter(t=>/^The Kitchen/.test(t.name||'')).length + 1);
+    const name = 'Leon Production Labs ' + (tracks.filter(t=>/^Leon Production Labs/.test(t.name||'')).length + 1);
     const file = new File([u], name + '.wav', {type:'audio/wav'});
     await addFiles([file]);                                // reuse the proven import path → new track + lane
     flash('Beat dropped onto “' + name + '” ✦');
   }catch(err){
     console.error('[BeatLab→Studio] send failed', err);
-    flash("Couldn't bounce that beat — hit Play in The Kitchen first, then send");
+    flash("Couldn't bounce that beat — hit Play in Leon Production Labs first, then send");
   }finally{
     if(btn){ btn.disabled=false; btn.textContent = label || '⤓ Send to Studio'; }
   }
@@ -6210,6 +6211,8 @@ const VDOC_MACROS = [
       { ins:'De-Ess', param:'thr', delta:-6 }, { ins:'De-Ess', param:'ratio', delta:1.5 } ] },
   { id:'space',  label:'Space',  hint:'reverb send', targets:[ { send:true, delta:0.14 } ] },
   { id:'throw',  label:'Throw',  hint:'slap-delay amount', targets:[ { ins:'Slap', param:'mix', delta:0.15 } ] },
+  { id:'demud',  label:'De-Mud', hint:'clear boxy low-mids — right = cleaner', targets:[ { ins:'EQ-6', param:'mG', delta:-3.5 } ] },
+  { id:'tight',  label:'Tighten',hint:'high-pass the low rumble — right = tighter', targets:[ { ins:'EQ-6', param:'hpf', delta:60 } ] },
 ];
 function vdIsDoc(ins){ return !!(ins && (ins._doc || (ins.params && ins.params.__doc))); }
 function vdInsByName(t, name){ return (t.inserts||[]).find(ins => vdIsDoc(ins) && ins.name===name) || null; }
@@ -6359,6 +6362,7 @@ function vdOpenPanel(t){
   // ── TALK TO IT — the AI vocal engineer moves the SAFE macros (clamped 0..1 → it physically can't wreck a mix) ──
   const talkIn = w.querySelector('.vdoc-talk-in'), talkGo = w.querySelector('.vdoc-talk-go'), replyEl = w.querySelector('.vdoc-reply');
   async function vdTalk(){
+    if (window.WEB_DEMO){ replyEl.textContent = 'The talk-to-it AI engineer lives in the free desktop app ⬇'; return; }
     const q = (talkIn.value || '').trim(); if (!q || talkGo._busy) return;
     talkGo._busy = true; talkGo.textContent = '…'; replyEl.textContent = '';
     try {
@@ -6821,7 +6825,7 @@ function openBounceDialog() {
     <div class="bdlg">
       <div class="bdlg-h">Bounce Down</div>
       <label class="bdlg-row"><span>Source</span><select id="bSrc">${bounceSourceOptions().map(o=>`<option value="${o.v}">${o.label}</option>`).join("")}</select></label>
-      <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option><option value="mp3">MP3 · 320 kbps</option></select></label>
+      <label class="bdlg-row"><span>File type</span><select id="bType"><option value="wav">WAV (PCM)</option>${window.WEB_DEMO?'':`<option value="mp3">MP3 · 320 kbps</option>`}</select></label>
       <label class="bdlg-row"><span>Bit depth</span><select id="bBits"><option value="24">24-bit</option><option value="16">16-bit</option></select></label>
       <label class="bdlg-row"><span>Sample rate</span><select id="bRate"><option value="">Project · ${Math.round(ctx.sampleRate)} Hz</option><option value="48000">48 000 Hz</option><option value="44100">44 100 Hz</option></select></label>
       <label class="bdlg-row"><span>Range</span><select id="bRange"><option value="all">Whole session</option>${hasSel?`<option value="sel">Selection</option>`:``}</select></label>
@@ -6915,6 +6919,7 @@ $("exportBtn").onclick = () => openBounceDialog();
 // 📡 Publish to Notifi — render the full master mix and drop it on The Stream
 (function(){ const _pn=document.getElementById('pubNotifiBtn'); if(!_pn) return;
   _pn.onclick = async () => {
+    if(window.WEB_DEMO){ webDemoNudge('Publishing to The Stream'); return; }
     if(!window.streamPublishDialog){ flash('The Stream is still loading…'); return; }
     if(!contentDur()){ flash('Nothing to publish yet — record or import some audio first.'); return; }
     flash('Rendering mix for Notifi…');
@@ -7079,6 +7084,7 @@ async function buildProjectPayload(title) {
 }
 
 async function saveProject() {
+  if (window.WEB_DEMO) { webDemoNudge('Saving projects'); return; }
   if (!tracks.length) { studioStatus("Nothing to save — add a track first.", true); return; }
   if (currentFolderDir) {                       // a disk session is open → Save writes back to the folder, no prompt
     studioStatus("Saving…");
@@ -7424,6 +7430,7 @@ function closeLoadMenu() { const m = $("loadMenu"); if (m) m.remove(); }
 
 let _loadAnchor = null;
 async function openLoadMenu(anchor) {
+  if (window.WEB_DEMO) { webDemoNudge('Loading saved projects'); return; }
   if (anchor) _loadAnchor = anchor;          // remember it so the in-place refresh re-anchors
   closeLoadMenu();
   const menu = document.createElement("div");
@@ -8614,7 +8621,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "2.2.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "2.3.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;
@@ -8750,6 +8757,92 @@ function laneUiTake(t, placeAt) {
   // setInterval(() => checkForUpdates(false), CHECK_EVERY);
 })();
 </script>
-<script src="/static/pinkroom-nav.js"></script>
+<script src="/static/agent-dock.js?v=10"></script>
+<script src="/static/pinkroom-nav.js?v=5"></script>
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     WEB PREVIEW MODE — when DeMartin Audio Labs is served from the public site
+     (a static host with no Python backend), keep the music-making core alive
+     (record · mix · effects · WAV export) and gracefully gate the few features
+     that need the desktop app. Desktop app / localhost = untouched (full studio).
+     Fully reversible: delete this block + the `window.WEB_DEMO` guards above.
+     ───────────────────────────────────────────────────────────────────────── -->
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var h  = (location.hostname || '').toLowerCase();
+  var local = !h || h==='localhost' || h==='127.0.0.1' || h==='0.0.0.0'
+    || /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(h);
+  // public host => no backend. ?web=1 forces preview ON (for testing), ?full=1 forces it OFF.
+  window.WEB_DEMO = qs.get('web')==='1' ? true : (qs.get('full')==='1' ? false : !local);
+
+  var _t = 0;
+  window.webDemoNudge = function(what){
+    var now = (window.performance && performance.now) ? performance.now() : 0;
+    if (now && now - _t < 1200) return; _t = now;            // throttle repeat taps
+    var msg = (what || 'That') + ' lives in the free desktop app — get it at demartinlabs.com ⬇';
+    try { if (typeof flash === 'function') return flash(msg);
+          if (typeof studioStatus === 'function') return studioStatus(msg, false); } catch(e){}
+  };
+
+  if (!window.WEB_DEMO) return;                  // desktop app / local dev → nothing changes
+  document.body.classList.add('webdemo');
+
+  function build(){
+    if (document.getElementById('webDemoBanner')) return;
+    var bar = document.createElement('div');
+    bar.id = 'webDemoBanner';
+    bar.innerHTML =
+        '<span class="wdb-dot"></span>'
+      + '<span class="wdb-txt"><b>Browser preview.</b> Record, mix &amp; export WAV right here. '
+      + 'Saving, MP3 &amp; the AI engineer live in the desktop app.</span>'
+      + '<a class="wdb-get" href="https://demartinlabs.com">Get the full studio ⬇</a>'
+      + '<button class="wdb-x" title="dismiss" aria-label="dismiss">✕</button>';
+    document.body.appendChild(bar);
+    bar.querySelector('.wdb-x').onclick = function(){ bar.remove(); };
+
+    if (window.matchMedia && window.matchMedia('(max-width: 860px)').matches){
+      var ov = document.createElement('div');
+      ov.id = 'webDemoMobile';
+      ov.innerHTML =
+          '<div class="wdm-card">'
+        + '<div class="wdm-emoji">🖥️</div>'
+        + '<div class="wdm-h">This is a desktop studio</div>'
+        + '<div class="wdm-p">DeMartin Audio Labs is a full mixing console — built for a real '
+        + 'screen, mouse &amp; keyboard. For the experience it\'s meant to be, open it on your computer.</div>'
+        + '<a class="wdm-get" href="https://demartinlabs.com">See the download ⬇</a>'
+        + '<button class="wdm-look">Look around anyway →</button>'
+        + '</div>';
+      document.body.appendChild(ov);
+      ov.querySelector('.wdm-look').onclick = function(){ ov.remove(); };
+    }
+  }
+  if (document.body) build(); else document.addEventListener('DOMContentLoaded', build);
+})();
+</script>
+<style>
+  #webDemoBanner{ position:fixed; left:14px; bottom:14px; right:auto; z-index:9000; max-width:430px;
+    display:flex; align-items:center; gap:11px; padding:10px 12px;
+    background:linear-gradient(180deg,#161a23,#11141b); border:1px solid #2a3142; border-radius:13px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45); font:500 12px/1.45 'Space Mono',ui-monospace,monospace; color:#c7d1e0; }
+  #webDemoBanner .wdb-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto;
+    background:var(--teal,#39d4c4); box-shadow:0 0 9px var(--teal,#39d4c4); }
+  #webDemoBanner .wdb-txt{ flex:1 1 auto; } #webDemoBanner .wdb-txt b{ color:#fff; }
+  #webDemoBanner .wdb-get{ flex:0 0 auto; text-decoration:none; color:#08120f; white-space:nowrap;
+    background:var(--teal,#39d4c4); font-weight:700; padding:6px 11px; border-radius:8px; }
+  #webDemoBanner .wdb-x{ flex:0 0 auto; background:none; border:none; color:#7c889c; cursor:pointer;
+    font-size:13px; padding:3px 5px; line-height:1; } #webDemoBanner .wdb-x:hover{ color:#fff; }
+  @media (max-width:860px){ #webDemoBanner{ display:none; } }
+  #webDemoMobile{ position:fixed; inset:0; z-index:9600; display:flex; align-items:center;
+    justify-content:center; padding:22px; background:rgba(7,9,13,.94); }
+  #webDemoMobile .wdm-card{ max-width:350px; text-align:center; background:#12151d;
+    border:1px solid #2a3142; border-radius:16px; padding:28px 22px; }
+  #webDemoMobile .wdm-emoji{ font-size:42px; margin-bottom:8px; }
+  #webDemoMobile .wdm-h{ font:700 18px/1.3 'Space Grotesk',system-ui,sans-serif; color:#fff; margin-bottom:9px; }
+  #webDemoMobile .wdm-p{ font:400 13px/1.55 system-ui,sans-serif; color:#a7b1c2; margin-bottom:18px; }
+  #webDemoMobile .wdm-get{ display:block; text-decoration:none; color:#08120f; background:var(--teal,#39d4c4);
+    font-weight:700; padding:12px; border-radius:11px; margin-bottom:10px; }
+  #webDemoMobile .wdm-look{ background:none; border:none; color:#8893a6; font-size:13px; cursor:pointer; }
+</style>
 </body>
 </html>

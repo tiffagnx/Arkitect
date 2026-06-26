@@ -112,6 +112,14 @@
     padding:0 20px; background:rgba(14,15,19,.93); backdrop-filter:blur(30px); border-top:1px solid var(--hairline);
     box-shadow:0 -8px 30px rgba(0,0,0,.4); transform:translateY(100%); transition:transform .26s cubic-bezier(.2,.8,.2,1); z-index:40; }
   .nowbar.up { transform:translateY(0); }
+  /* Support — link out to the artist's own pay page (0% to Notifi) */
+  .support { display:inline-flex; align-items:center; gap:6px; text-decoration:none; cursor:pointer; white-space:nowrap;
+    background:linear-gradient(135deg,#36E08B,#1FAE6B); color:#072216; font:700 12px Inter; padding:8px 13px;
+    border-radius:10px; border:none; transition:filter .14s, transform .06s; }
+  .support:hover { filter:brightness(1.08); } .support:active { transform:scale(.97); }
+  .support.sm { padding:5px 10px; font-size:11px; border-radius:8px; }
+  .support.ghost { background:rgba(54,224,139,.13); color:#7BF0C2; border:1px solid rgba(54,224,139,.4); }
+  .nbsupport { flex:none; }
   .nb-left { display:flex; align-items:center; gap:12px; width:248px; min-width:0; }
   .nb-art { width:50px; height:50px; border-radius:9px; overflow:hidden; flex:none; position:relative; }
   .nb-info { min-width:0; }
@@ -294,6 +302,7 @@
       </div>
     </div>
     <div class="nb-right">
+      <a id="nbSupport" class="support nbsupport" target="_blank" rel="noopener" style="display:none"></a>
       <span class="vico">🔊</span>
       <input type="range" class="bar" id="nbVol" min="0" max="100" value="100" />
     </div>
@@ -310,6 +319,7 @@
           <div class="thby" id="thBy"></div>
           <div class="thwhen" id="thWhen"></div>
           <div class="thdesc" id="thDesc"></div>
+          <a id="thSupport" class="support" target="_blank" rel="noopener" style="display:none;margin-top:12px"></a>
         </div>
       </div>
       <div class="thup">
@@ -335,6 +345,16 @@
           <div class="coverdrop" id="coverDrop"><div class="cd-thumb" id="coverThumb">🎨</div><div class="cd-txt" id="coverTxt">Add album art for Notifi</div>
             <input type="file" id="coverIn" accept="image/*" style="display:none" /></div></div>
         <div class="fld" id="descFld" style="display:none"><label>Description</label><textarea id="pDesc" rows="2" placeholder="What's this video about? (optional)" maxlength="800"></textarea></div>
+        <div class="fld" id="payFld"><label>Where fans pay you <span style="opacity:.6;text-transform:none;font-weight:500">— 100% yours, Notifi takes 0%</span></label>
+          <div style="display:flex;gap:8px">
+            <select id="payMethod" style="flex:none;width:104px;background:rgba(255,255,255,.04);border:1px solid var(--hairline);border-radius:10px;color:var(--text);font:600 12px Inter;padding:9px 7px;cursor:pointer;outline:none">
+              <option value="">— none —</option><option value="cashapp">Cash App</option><option value="venmo">Venmo</option><option value="paypal">PayPal</option><option value="kofi">Ko-fi</option><option value="link">Link</option>
+            </select>
+            <input type="text" id="payHandle" placeholder="$cashtag · @handle · paste a link" maxlength="200" style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--hairline);border-radius:10px;color:var(--text);font:400 13px Inter;padding:9px 11px;outline:none" /></div>
+          <div class="hint" style="margin-top:5px">Fans tap <b>Support</b> → your own Cash App / PayPal / Ko-fi. The money never touches Notifi.</div></div>
+        <label id="ownRow" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:2px 2px 0">
+          <input type="checkbox" id="pOwn" style="margin-top:2px;width:16px;height:16px;accent-color:#3E9CB8;flex:none" />
+          <span style="font-size:12px;color:var(--dim);line-height:1.5">I made this and own the rights — I'm not uploading anyone else's music. <span style="opacity:.7">(Required — keeps The Stream legal.)</span></span></label>
         <button class="pubGo" id="pubGo">Publish it</button>
         <div class="hint">Stored locally on this machine. Big videos take a moment to upload.</div>
       </div>
@@ -391,6 +411,17 @@
   function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2600); }
 
   function byline(c){ return `<span class="byline" data-creator="${esc(c)}">${esc(c)}</span>`; }
+  /* artist payout — a LINK OUT to their own pay page; Notifi never touches the money */
+  function payUrl(method, raw){ raw=(raw||"").trim(); if(!raw) return "";
+    if(method==="link"){ let u=raw.replace(/^https?:\/\//i,""); return "https://"+u.replace(/^\/+/,""); }
+    if(method==="cashapp") return "https://cash.app/$"+raw.replace(/^[$@]/,"");
+    if(method==="venmo")   return "https://venmo.com/u/"+raw.replace(/^@/,"");
+    if(method==="paypal")  return "https://paypal.me/"+raw.replace(/^@/,"");
+    if(method==="kofi")    return "https://ko-fi.com/"+raw.replace(/^@/,"");
+    return ""; }
+  function payLabelOf(m){ return ({cashapp:"Cash App",venmo:"Venmo",paypal:"PayPal",kofi:"Ko-fi",link:"Support"})[m]||"Support"; }
+  function paySupport(it, cls){ if(!it||!it.pay) return ""; return `<a class="support ${cls||""}" href="${esc(it.pay)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">💸 Support${it.payLabel?` · ${esc(it.payLabel)}`:""}</a>`; }
+  function creatorPay(name){ const hit=[...MUSIC,...VIDEO].find(x=>x.creator===name && x.pay); return hit||null; }   // an artist's pay link from any of their drops
   function applyView(arr){ let v = arr.map((it,i)=>({it,i}));
     if(filterCreator) v = v.filter(o=>o.it.creator===filterCreator);
     if(query){ const q=query.toLowerCase(); v = v.filter(o=>((o.it.title||"")+" "+(o.it.creator||"")).toLowerCase().includes(q)); }
@@ -401,7 +432,8 @@
     const m=MUSIC.filter(x=>x.creator===filterCreator).length, v=VIDEO.filter(x=>x.creator===filterCreator).length;
     return `<div class="chanbar"><div class="chav">${esc(((filterCreator||"·").trim()[0]||"·")).toUpperCase()}</div>
       <div><div class="chname">${esc(filterCreator)}</div><div class="chsub">${m} track${m!==1?"s":""} · ${v} video${v!==1?"s":""} on The Stream</div></div>
-      <button class="chclear" id="chClear">✕ All</button></div>`; }
+      ${(()=>{ const p=creatorPay(filterCreator); return p?`<span style="margin-left:auto">${paySupport(p)}</span>`:""; })()}
+      <button class="chclear" id="chClear"${creatorPay(filterCreator)?' style="margin-left:10px"':""}>✕ All</button></div>`; }
   function noMatch(kind){ return `<div class="empty"><div class="ico">🔍</div><h2>Nothing here</h2><p>${
     filterCreator ? "No "+kind+"s from "+esc(filterCreator)+" — try the other tab." : "No "+kind+"s match “"+esc(query)+"”."}</p></div>`; }
   function wireChan(){ const c=$("#chClear"); if(c) c.onclick=clearChannel; }
@@ -420,7 +452,7 @@
   function renderListen(){
     const body = $("#listenBody");
     if(!MUSIC.length){ queue=[]; body.innerHTML = emptyState("🎧","Notifi's quiet — for now.",
-      "No tracks dropped yet. Bounce something in the Audio Labs or the Kitchen, hit Publish, and you're the first drop on Notifi.<br><span class='slogan' style='margin:0'>“Listen to Spotify?” — <b>not if I can help it.</b></span>","music"); wireEmpty(); return; }
+      "No tracks dropped yet. Bounce something in the Audio Labs or Leon Production Labs, hit Publish, and you're the first drop on Notifi.<br><span class='slogan' style='margin:0'>“Listen to Spotify?” — <b>not if I can help it.</b></span>","music"); wireEmpty(); return; }
     const view = applyView(MUSIC); queue = view.map(o=>o.i);
     if(!view.length){ body.innerHTML = channelBanner() + noMatch("track"); wireChan(); return; }
     const feat = view[0].it, fi = view[0].i, clean = !filterCreator && !query && sort==="new";
@@ -431,7 +463,7 @@
           <div class="kick">${filterCreator?esc(filterCreator):(clean?"Latest drop · Notifi":"Notifi")}</div>
           <div class="ftitle">${esc(feat.title)}</div>
           <div class="fby">${byline(feat.creator)}${feat.dur?" · "+fmtTime(feat.dur):""}</div>
-          <button class="fplay" data-i="${fi}">▶ Play</button>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px"><button class="fplay" data-i="${fi}">▶ Play</button>${paySupport(feat)}</div>
         </div>
       </div>`;
     if(clean) html += `<div class="slogan">“Listen to Spotify?” — <b>not if I can help it.</b></div>`;
@@ -459,6 +491,7 @@
     audio.src = media(it.file); audio.play().catch(()=>{});
     $("#nbArt").innerHTML = artMusic(it);
     $("#nbT").textContent = it.title; $("#nbB").textContent = it.creator;
+    const sup=$("#nbSupport"); if(it.pay){ sup.href=it.pay; sup.innerHTML=`💸 Support${it.payLabel?` · ${esc(it.payLabel)}`:""}`; sup.style.display="inline-flex"; } else { sup.style.display="none"; }
     $("#nowbar").classList.add("up");
     markPlaying();
   }
@@ -508,6 +541,7 @@
     $("#thTitle").textContent = it.title; $("#thBy").innerHTML = byline(it.creator);
     $("#thWhen").textContent = ago(it.ts) + (it.dur?" · "+fmtTime(it.dur):"");
     $("#thDesc").textContent = it.desc || "";
+    const ths=$("#thSupport"); if(it.pay){ ths.href=it.pay; ths.innerHTML=`💸 Support${it.payLabel?` · ${esc(it.payLabel)}`:""}`; ths.style.display="inline-flex"; } else { ths.style.display="none"; }
     const up = $("#thUp");
     const order = vqueue.length ? vqueue : VIDEO.map((_,j)=>j);
     const others = order.filter(j=>j!==i).map(j=>({v:VIDEO[j],j}));
@@ -601,7 +635,10 @@
   function openPublish(kind){ setKind(kind||"music"); pubFile=null; pubCover=null; $("#fileIn").value=""; $("#coverIn").value="";
     $("#dropTxt").innerHTML = `Click to choose a <b>${pubKind}</b> file`; $("#drop").classList.remove("has");
     $("#coverDrop").classList.remove("has"); $("#coverThumb").textContent="🎨"; $("#coverTxt").textContent="Add album art for Notifi";
-    $("#pTitle").value=""; $("#pBy").value=handle(); $("#pDesc").value=""; $("#pubModal").classList.add("on"); $("#pTitle").focus(); }
+    $("#pTitle").value=""; $("#pBy").value=handle(); $("#pDesc").value="";
+    try{ const p=JSON.parse(localStorage.getItem("dmv_pay")||"{}"); $("#payMethod").value=p.method||""; $("#payHandle").value=p.handle||""; }catch(_){ $("#payMethod").value=""; $("#payHandle").value=""; }
+    $("#pOwn").checked=false;
+    $("#pubModal").classList.add("on"); $("#pTitle").focus(); }
   function setKind(k){ pubKind=k;
     document.querySelectorAll("#kindPick label").forEach(l=> l.classList.toggle("sel", l.dataset.kind===k));
     $("#kindPick").querySelector(`input[value="${k}"]`).checked=true;
@@ -631,12 +668,16 @@
   $("#pubGo").addEventListener("click", async ()=>{
     if(!pubFile){ toast("Pick a "+pubKind+" file first"); return; }
     const title=$("#pTitle").value.trim(); if(!title){ toast("Give it a title"); $("#pTitle").focus(); return; }
+    if(!$("#pOwn").checked){ toast("Check the box to confirm you own this"); const r=$("#ownRow"); r.style.outline="1px solid rgba(255,94,114,.75)"; r.style.borderRadius="8px"; setTimeout(()=>r.style.outline="",1800); return; }
     const go=$("#pubGo"); go.disabled=true; go.textContent="Publishing…";
     try{
       const dur = await probeDur(pubFile, pubKind);
       const file = await readAsDataURL(pubFile);
+      const pmethod=$("#payMethod").value, phandle=$("#payHandle").value.trim(), pay=payUrl(pmethod, phandle);
+      try{ localStorage.setItem("dmv_pay", JSON.stringify({method:pmethod, handle:phandle})); }catch(_){}
       const body = { kind:pubKind, title, creator:$("#pBy").value.trim(), file, dur,
-        ext:(pubFile.name.split(".").pop()||"").toLowerCase(), desc: pubKind==="video"?$("#pDesc").value.trim():"" };
+        ext:(pubFile.name.split(".").pop()||"").toLowerCase(), desc: pubKind==="video"?$("#pDesc").value.trim():"",
+        pay, payLabel: pay?payLabelOf(pmethod):"", owns:true };
       if(pubKind==="music" && pubCover){ try{ body.cover = await readAsDataURL(pubCover); }catch(_){} }
       try{ localStorage.setItem("dmv_creator", body.creator); }catch(_){}
       const r = await fetch(api+"/publish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});

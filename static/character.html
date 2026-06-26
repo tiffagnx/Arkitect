@@ -400,6 +400,9 @@ textarea{width:100%;min-height:140px;resize:vertical;padding:13px;color:var(--te
 .savedbar .sb-t b{font-family:Oxanium,sans-serif;font-weight:800}
 .savedbar .sb-a{display:flex;gap:9px;flex-wrap:wrap;flex:none}
 </style>
+<!-- CLOUD: browser-direct AI + bridge (no-op on desktop). character.html doesn't use pinkroom-nav, so include directly. -->
+<script src="/static/cloud-ai.js"></script>
+<script src="/static/cloud-bridge.js"></script>
 </head>
 <body>
 
@@ -690,7 +693,7 @@ const ROOMS = {
   studio:{ label:"DeMartin Audio Labs", url:"/static/studio.html", img:"/static/shots/daw.png" },
   chat:  { label:"Chat (with Tiff)",    url:"/",                   img:"/static/shots/chat.png" },
   editor:{ label:"LePrince Visual Labs",url:"/static/editor.html", img:"/static/shots/editor.png" },
-  build: { label:"Blueprint Builds",    url:"/static/build.html",  img:"/static/shots/build.png" }
+  build: { label:"Berner Builder",    url:"/static/build.html",  img:"/static/shots/build.png" }
 };
 const CRAFTS = [
   { key:"producer",  label:"Producer",            room:"studio" },

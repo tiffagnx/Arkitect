@@ -18,6 +18,13 @@
   a.pr-back img{height:14px;width:auto;display:block;opacity:.95;}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  // CLOUD: on the hosted site, inject the browser-direct AI engine + bridge into every room (pure no-op on
+  // the desktop, where DMV_AI sees localhost and stands down). async=false keeps order (cloud-ai before
+  // cloud-bridge); injected first so the fetch override is installed before any room AI call fires.
+  if (!document.querySelector('script[data-dmvai]')) {
+    const a1 = document.createElement("script"); a1.src = "/static/cloud-ai.js"; a1.async = false; a1.setAttribute("data-dmvai", "1"); document.head.appendChild(a1);
+    const a2 = document.createElement("script"); a2.src = "/static/cloud-bridge.js"; a2.async = false; a2.setAttribute("data-dmvbridge", "1"); document.head.appendChild(a2);
+  }
   // force the app-window (Edge/Chrome --app mode) title bar to graphite, overriding the OS accent color
   if(!document.querySelector('meta[name="theme-color"]')){ const tc = document.createElement("meta"); tc.name = "theme-color"; tc.content = "#0C0D10"; document.head.appendChild(tc); }
   // app/taskbar icon = Tec (matches the desktop shortcut), not the generic Edge icon
@@ -25,11 +32,11 @@
   // pro polish: strip internal hrefs so hovering a button doesn't flash localhost URLs in the corner
   document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
   // load Kit, the in-room build-bot helper (kit-helper.js self-skips the main chat + non-rooms)
-  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
+  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js?v=6"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
   // The ONE agent button in every room: "Summon agent" opens the agent window (with the Kit/Tiff/your-agents
   // chooser inside) — works even if nobody's been dragged in yet. The little agent name-chip in the bar is a
   // PASSIVE indicator (shows who's in the room), NOT a button — so there's only ever one thing to click.
-  if (!document.querySelector('[data-summon]')) {
+  if (window.self === window.top && !document.querySelector('[data-summon]')) {   // not inside an embedded-plugin iframe
     const sb = document.createElement("button");
     sb.textContent = "Summon agent"; sb.setAttribute("data-summon", "1");
     sb.style.cssText = "background:rgba(255,255,255,.05);border:1px solid rgba(120,182,205,.4);color:#9FCFDD;" +
@@ -37,9 +44,17 @@
     sb.onmouseover = () => { sb.style.borderColor = "rgba(120,182,205,.8)"; sb.style.color = "#CFE6EE"; };
     sb.onmouseout = () => { sb.style.borderColor = "rgba(120,182,205,.4)"; sb.style.color = "#9FCFDD"; };
     sb.onclick = () => {
-      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent already in the room → just open the window
-      try { const u = new URL(location.href); u.searchParams.set("brain", "kit"); location.href = u.toString(); }  // none yet → bring Kit in
-      catch (_) { location.href = location.pathname + "?brain=kit"; }
+      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent already in the room → just open it
+      // No agent in the room yet. The OLD code reloaded with ?brain=kit to bring Kit in — but a reload
+      // WIPES an unsaved studio/beats session (the data-loss bug). Instead: remember Kit as active +
+      // (re)run kit-helper IN PLACE (it bailed earlier when no agent was set) → builds the window → open
+      // it. No reload, no data loss. kit-helper's own guard means a 2nd click just re-opens.
+      try { localStorage.setItem("dmv_active_brain", "kit"); } catch (e) {}
+      if (!window.__kit) { var ks = document.createElement("script"); ks.src = "/static/kit-helper.js?summon=1"; document.body.appendChild(ks); }
+      var _n = 0, _t = setInterval(function () {
+        if (window.__kitOpen) { clearInterval(_t); window.__kitOpen(); }
+        else if (++_n > 60) { clearInterval(_t); }   // ~3s; give up quietly — NEVER reload/wipe
+      }, 50);
     };
     (document.querySelector(".kit-mount") || document.querySelector(".top") || document.querySelector(".menubar") || document.body).appendChild(sb);
   }
