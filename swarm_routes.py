@@ -486,7 +486,9 @@ async def _call_with_fallback(slots: list[dict], system: str, user: str,
             txt = await provider_once(slot, system, user, max_tokens, temperature, image, effort)
             if txt:
                 return txt, slot["name"]
-        except (RateLimited, ProviderError) as e:
+        except Exception as e:
+            # Rotate past ANY failure (429, provider error, or a raw network blip like
+            # httpx.ConnectError/timeout) — one bad slot must never sink the whole turn.
             last_err = e
             continue
     raise (last_err or ProviderError("no provider answered"))
