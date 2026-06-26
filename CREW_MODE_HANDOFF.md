@@ -1,22 +1,26 @@
-# CREW MODE — handoff (2026-06-26, SHIPPED v2.4.0)
+# CREW MODE — handoff (2026-06-26, SHIPPED v2.5.0 — IN-ROOM)
 
-> **Status: SHIPPED.** Commit `feb081d` on master · tag `v2.4.0` · GitHub release
-> https://github.com/tiffagnx/DeMartinville/releases/tag/v2.4.0 (Win `DeMartinville.zip` attached,
-> Mac arm64 `.app` building from the tag). Existing exe — **no rebuild**. The in-app updater offers
-> 2.4.0 to older builds (sessions + keys stay put). **Website NOT deployed:** owner is reworking
-> demartinlabs.com (pulled the program out of the .com), so this ship is GitHub + zip ONLY — gh-pages
-> left untouched by his call. When the new hosting plan lands, decide if/where Crew Mode shows publicly.
+> **Status: SHIPPED v2.5.0.** The feature now lives WHERE THE OWNER WANTED IT — **inside the docked
+> agent's window**, not the front door. The original front-door "Crew Mode" toggle (v2.4.0) was the
+> wrong read and has been **REMOVED** (`static/crew.js` deleted; front-door + pinkroom-nav includes
+> gone). GitHub + zip only; **website (gh-pages) NOT deployed** — owner is reworking demartinlabs.com,
+> and he's the only user right now, so releases are kept lean (no fuss on notes/versioning).
+> ⚠️ The architecture sections further down describe the OLD front-door `/api/chat` build — now removed,
+> kept only as history. The live feature is the in-room one described here.
 
-**One switch turns your single brain into a team.** You already drop API keys in the Keys
-hub. Flip **Crew Mode** on and the app reads *whatever models you have enabled* and runs them
-as a crew — a **lead/conductor** brain + **specialists** — instead of one brain. We never
-prescribe which model does what; the system configures the crew around *your* list. Off by
-default. With fewer than 2 brains it's a silent passthrough (zero overhead, zero behavior change).
+**The in-room crew (the real version).** You drag an agent (Tiff / Kit / your own) into a room → open
+their window → hit **"+ crew"** (in the Brain row, next to model + effort) → a checklist of EVERY brain
+you have keys for (Grok, Gemini, Claude, GPT, local — pick ANY combo). The agent stays the **lead/voice**
+and still drives the room; your picked crew weighs in behind it and the agent **synthesizes** the best
+of it. Per-agent, opt-in, saved. **God Mode (depth on Claude) + crew (breadth across models) STACK.**
 
-This is **Slice 1** of the owner's bigger vision: *"why use one LLM when you can send out a
-team — a model in the stem while another builds the beat?"* Slice 1 proves the conductor on the
-**front-door main chat**. Slice 2 takes it into the rooms / the docked agent (the real
-"team in the stems").
+Files: `static/kit-helper.js` — the "+ crew" button + picker popover + per-agent storage
+(`dmv_agent_crew_<id>` for built-ins, `dmv_characters[].crew` for user agents) + a `crew:[modelIds]`
+field on the `/api/kit` payload. `app.py` `kit_help` — gathers each picked brain's take in parallel,
+folds them into the LEAD's `system` so the agent synthesizes in its own voice (action-driving + Claude
+god-layer preserved); logs `[crew] N/M brain(s) backed …`. Verified live: button, picker, per-agent
+save, payload. Backend is syntax-clean but only fires after an app restart (dev server doesn't
+hot-reload) — live for everyone on the v2.5.0 update.
 
 ---
 

@@ -597,7 +597,7 @@ function md(t) { // safe formatter: fenced lyric/code blocks, links, bold, inlin
   const blocks = [];
   t = t.replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, (m, body) => {
     blocks.push(body.replace(/\n+$/, ""));
-    return " B" + (blocks.length - 1) + " ";
+    return " B" + (blocks.length - 1) + " ";
   });
   // 2) escape HTML
   t = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -608,7 +608,7 @@ function md(t) { // safe formatter: fenced lyric/code blocks, links, bold, inlin
   // 5) bold + inline code + line breaks
   t = t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>");
   // 6) restore fenced blocks as copy-on-their-own blocks
-  t = t.replace(/ B(\d+) /g, (m, i) => {
+  t = t.replace(/ B(\d+) /g, (m, i) => {
     const esc = blocks[+i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return '<div class="codeblock"><button class="copyblk" type="button" onclick="copyBlock(this)" title="Copy just this">⧉ copy</button><pre>' + esc + '</pre></div>';
   });
@@ -1414,9 +1414,6 @@ startArkTips();
      on demartinlabs.com they make the room run on the user's own key, no server needed. -->
 <script src="/static/cloud-ai.js?v=4"></script>
 <script src="/static/cloud-bridge.js?v=4"></script>
-<!-- CREW MODE — opt-in multi-LLM conductor. Loads AFTER cloud-bridge (captures its fetch override).
-     Self-contained; wraps /api/chat only; off by default; passthrough under 2 brains. -->
-<script src="/static/crew.js"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
 <script src="/static/copy-anywhere.js"></script>

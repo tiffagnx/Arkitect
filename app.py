@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "2.4.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "2.5.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -4904,6 +4904,68 @@ async def kit_help(req: Request):
     # agent window sends. Falls back to the local brain on any error.
     _kit_effort = str(body.get("effort") or "low").strip().lower()   # coerce: untrusted body could send a non-string
     _kit_claude = bool(slots and _is_claude_slot(slots[0]))
+    # ── CREW (multi-model BREADTH) — back this agent with a TEAM of OTHER brains the user picked
+    #    (Grok + Gemini + Claude + …). Each weighs in ONCE in parallel; their takes are folded into the
+    #    LEAD's system so the docked agent SYNTHESIZES the best of them IN ITS OWN VOICE and still drives
+    #    the room. Opt-in, per-agent, additive: absent/empty => byte-for-byte the single path below.
+    #    God Mode (depth on Claude) and crew (breadth across models) STACK — they're different powers. ──
+    _crew_ids = body.get("crew") or []
+    if isinstance(_crew_ids, list) and _crew_ids:
+        try:
+            from swarm_routes import provider_once as _prov_once, anthropic_native_once as _anthro_once
+            _enabled = _enabled_slots()
+            _targets, _seen = [], set()
+            for _cid in _crew_ids:
+                _cid = (str(_cid) if _cid is not None else "").strip()
+                if not _cid or _cid == chosen or _cid in _seen:
+                    continue            # skip blanks, the lead itself, and dupes
+                _seen.add(_cid)
+                if _cid.startswith("cloud:"):
+                    _s = next((x for x in _enabled if x["id"] == _cid[6:]), None)
+                    if _s:
+                        _targets.append(("cloud", _s))
+                elif _cid != "auto":
+                    _targets.append(("local", _cid))
+                if len(_targets) >= 4:    # cap the crew so latency/cost stays sane
+                    break
+            if _targets:
+                _crew_brief = (
+                    "You are a specialist brain on a crew, helping answer a request inside DeMartinville's "
+                    + (room or "studio") + " room. Give your sharpest, most useful take — concise and concrete, "
+                    "no preamble, no fluff. Another agent will combine your input with the rest into the final "
+                    "answer.\n" + room_help
+                )
+
+                async def _crew_take(_t):
+                    _kind, _ref = _t
+                    try:
+                        if _kind == "cloud":
+                            if _is_claude_slot(_ref):
+                                _txt = await _anthro_once(_ref, _crew_brief, msg, 350, _kit_effort, image=image)
+                            else:
+                                _txt = await _prov_once(_ref, _crew_brief, msg, 350, 0.5, image, _kit_effort)
+                            _label = _ref.get("name") or _ref.get("model") or "brain"
+                        else:
+                            _txt = await _kit_local(_crew_brief, msg, image, model=_ref)
+                            _label = "local"
+                        _txt = (_txt or "").strip()
+                        return (_label, _txt) if _txt else None
+                    except Exception:
+                        return None
+
+                _takes = [r for r in await asyncio.gather(*[_crew_take(t) for t in _targets]) if r]
+                try:
+                    print("[crew] %d/%d brain(s) backed %s" % (len(_takes), len(_targets), body.get("charName") or body.get("character") or "agent"), flush=True)
+                except Exception:
+                    pass
+                if _takes:
+                    system += (
+                        "\n\nYOUR CREW — other brains weighed in to back you up. Take the best of each, answer in "
+                        "YOUR OWN voice, and you have the final say (do NOT mention the crew or that you synthesized "
+                        "anything):\n" + "\n".join("— " + _l + ": " + _t for _l, _t in _takes)
+                    )
+        except Exception:
+            pass        # crew is a bonus layer — any hiccup falls straight through to the solo lead
     try:
         if _kit_claude:
             from swarm_routes import anthropic_native_once
