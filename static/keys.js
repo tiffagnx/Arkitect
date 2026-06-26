@@ -34,6 +34,10 @@
   .kw-cat:first-child { margin-top:2px; }
   .kw-card { border:1px solid rgba(255,255,255,.08); border-radius:13px; background:rgba(255,255,255,.025); padding:12px 13px; margin-bottom:10px; }
   .kw-card.rec { border-color:rgba(217,164,65,.4); background:rgba(217,164,65,.06); }
+  .kw-card.hero { border-color:rgba(120,182,205,.6); background:linear-gradient(180deg,rgba(62,156,184,.14),rgba(62,156,184,.04)); box-shadow:0 0 24px rgba(62,156,184,.14); }
+  .kw-card.hero .kw-nm { font-size:14.5px; }
+  .kw-card.hero .kw-rec { background:linear-gradient(120deg,#7BF0E4,#3E9CB8); color:#06161b; }
+  .kw-card.hero .kw-get { border-color:rgba(120,182,205,.75); background:rgba(62,156,184,.22); color:#DFF2F7; }
   .kw-crow { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
   .kw-nm { font:700 13.5px Oxanium,sans-serif; letter-spacing:.02em; color:#EAF0F4; }
   .kw-rec { font:700 8.5px 'Space Mono',monospace; letter-spacing:.1em; color:#0C0D10; background:linear-gradient(120deg,#F0CE8C,#D9A441); padding:2px 7px; border-radius:6px; }
@@ -66,19 +70,28 @@
   ov.addEventListener("mousedown", e => { if (e.target === ov) ov.classList.remove("open"); });
 
   function card(p, opts) {
-    const d = document.createElement("div"); d.className = "kw-card" + (p.rec ? " rec" : "");
+    const d = document.createElement("div"); d.className = "kw-card" + (p.rec ? " rec" : "") + (opts.hero ? " hero" : "");
     d.innerHTML =
-      `<div class="kw-crow"><span class="kw-nm">${p.name}</span>${p.rec ? '<span class="kw-rec">CHEAPEST</span>' : ''}` +
+      `<div class="kw-crow"><span class="kw-nm">${p.name}</span>${p.rec ? '<span class="kw-rec">' + (opts.recLabel || "CHEAPEST") + '</span>' : ''}` +
       `<span class="kw-saved" style="display:${opts.saved ? "inline" : "none"}">✓ saved</span>` +
       `<a class="kw-get" href="${p.url}" target="_blank" rel="noopener">Get key ↗</a></div>` +
       `<div class="kw-note">${p.note || ""}</div>` +
-      `<div class="kw-paste"><input type="password" placeholder="paste your ${p.name} key here" autocomplete="off" /><button>Save</button></div>`;
+      `<div class="kw-paste"><input type="password" placeholder="paste your ${(p.name || '').split(/\s+[—–-]\s+/)[0].trim()} key here" autocomplete="off" /><button>Save</button></div>`;
     const inp = d.querySelector("input"), btn = d.querySelector("button"), savedTag = d.querySelector(".kw-saved");
     btn.onclick = async () => {
       const k = inp.value.trim(); if (!k) { inp.focus(); return; }
       btn.disabled = true; btn.textContent = "…";
-      try { await opts.save(k); savedTag.style.display = "inline"; inp.value = ""; inp.placeholder = "saved ✓ — paste a new one to replace"; }
-      catch (e) { btn.textContent = "Retry"; }
+      try {
+        await opts.save(k);
+        savedTag.style.display = "inline"; savedTag.textContent = "✓ saved"; savedTag.style.color = ""; savedTag.title = "";
+        inp.value = ""; inp.placeholder = "saved ✓ — paste a new one to replace";
+        if (opts.verify) {   // confirm the key actually works so they KNOW it landed (no guessing)
+          savedTag.textContent = "✓ saved · checking…";
+          let r = null; try { r = await opts.verify(k); } catch (e) {}
+          if (r && r.ok) { savedTag.textContent = "✓ saved & verified"; savedTag.style.color = "#7FD3B0"; }
+          else { savedTag.textContent = "✓ saved"; savedTag.title = "couldn't auto-verify from here — that's fine if your key's right"; }
+        }
+      } catch (e) { btn.textContent = "Retry"; }
       finally { if (btn.textContent === "…") btn.textContent = "Save"; btn.disabled = false; }
     };
     inp.addEventListener("keydown", e => { if (e.key === "Enter") btn.click(); });
@@ -95,20 +108,37 @@
     const haveName = new Set(configured.map(c => (c.name || "").toLowerCase()));
     body.innerHTML = "";
 
-    const bh = document.createElement("div"); bh.className = "kw-cat"; bh.textContent = "Cloud brain — for Private / Max Drive"; body.appendChild(bh);
-    body.insertAdjacentHTML("beforeend", '<div class="kw-explain"><b>Groq is free to start</b> — make an account, paste the key, done. The others are pay-as-you-go on your own key.</div>');
-    const brain = presets.filter(p => p.name && p.name !== "Custom").slice(0, 4);
-    if (!brain.length) { const e = document.createElement("div"); e.className = "kw-foot"; e.textContent = "Add a provider in Settings (the gear)."; body.appendChild(e); }
-    brain.forEach(p => {
-      const model = (p.models_hint || "").split(",")[0].trim();
+    const bh = document.createElement("div"); bh.className = "kw-cat"; bh.textContent = "Cloud brain — your key powers the cloud lane"; body.appendChild(bh);
+
+    // first model in the hint, unless it's a description ("pick any model…") → no default
+    const realModel = (p) => { const m = (p.models_hint || "").split(",")[0].trim(); return (m && !/pick any|any open/i.test(m)) ? m : ""; };
+    const saveBrain = (p, k) => fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: p.name, base_url: p.base_url, model: (realModel(p) || p._defModel || ""), api_key: k, enabled: true, grounded: /generativelanguage/i.test(p.base_url || "") }) })
+      .then(r => r.json()).then(r => { if (!r.ok) throw new Error(r.error || "failed"); try { window.dispatchEvent(new Event("ark:providers-changed")); } catch (e) {} });
+    // verify = does the KEY work? GET /models (credit-free, model-agnostic — best for OpenRouter's free tier).
+    const verifyBrain = (p, k) => fetch("/api/swarm/models", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base_url: p.base_url, api_key: k }) }).then(r => r.json()).then(j => ({ ok: !!(j && j.ok && j.total) })).catch(() => ({ ok: false }));
+
+    const brain = presets.filter(p => p.name && p.name !== "Custom");
+    const orp = brain.find(p => /openrouter/i.test(p.name));
+    const rest = brain.filter(p => !/openrouter/i.test(p.name));
+
+    // HERO — OpenRouter = ONE key, every model (the "I don't wanna chase ten sites" option)
+    if (orp) {
+      body.insertAdjacentHTML("beforeend", '<div class="kw-explain"><b>🌐 Want it all in one?</b> One OpenRouter key → Claude, GPT, Grok, Gemini, Llama &amp; dozens more — one signup, one bill. It has <b>free models</b> (the <code>:free</code> tag' + (orp.free ? ', ' + orp.free : '') + ') <i>and</i> top-tier ones for <b>pennies</b>. Heads up: the recommended default is a strong <i>paid</i> model (sees + thinks + uses tools) — swap to a <code>:free</code> one anytime if you want $0. Per-model best is a direct key below; this is the easy button.</div>');
+      orp._defModel = "google/gemini-3.5-flash";   // capable default (sees + thinks + tool-calls); switch anytime
       body.appendChild(card(
-        { name: p.name, note: (p.free && p.free !== "—" ? p.free + " · " : "") + (model || ""), rec: /groq/i.test(p.name), url: p.key_url || "#" },
-        { saved: haveName.has((p.name || "").toLowerCase()),
-          save: (k) => fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: p.name, base_url: p.base_url, model, api_key: k, enabled: true, grounded: /generativelanguage/i.test(p.base_url || "") }) })
-            .then(r => r.json()).then(r => { if (!r.ok) throw new Error(r.error || "failed"); try { window.dispatchEvent(new Event("ark:providers-changed")); } catch (e) {} }) }
+        { name: "OpenRouter — one key, every model", note: "Claude · GPT · Grok · Gemini · Llama & dozens more, on a single key", rec: true, url: orp.key_url || "#" },
+        { saved: haveName.has("openrouter"), hero: true, recLabel: "ONE KEY, ALL MODELS", save: (k) => saveBrain(orp, k), verify: (k) => verifyBrain(orp, k) }
       ));
-    });
+      const orh = document.createElement("div"); orh.className = "kw-cat"; orh.style.marginTop = "14px"; orh.textContent = "Or connect a provider directly — all the options"; body.appendChild(orh);
+    }
+    body.insertAdjacentHTML("beforeend", '<div class="kw-explain"><b>Groq is free to start.</b> The rest are pay-as-you-go on your own key — and a direct key gets each provider at its best (e.g. Claude\'s real God-Mode depth).</div>');
+    if (!rest.length) { const e = document.createElement("div"); e.className = "kw-foot"; e.textContent = "Add a provider in Settings (the gear)."; body.appendChild(e); }
+    rest.forEach(p => body.appendChild(card(
+      { name: p.name, note: (p.free && p.free !== "—" ? p.free + " · " : "") + (realModel(p) || ""), rec: /groq/i.test(p.name), url: p.key_url || "#" },
+      { saved: haveName.has((p.name || "").toLowerCase()), save: (k) => saveBrain(p, k), verify: (k) => verifyBrain(p, k) }
+    )));
 
     const mh = document.createElement("div"); mh.className = "kw-cat"; mh.textContent = "Images & video"; body.appendChild(mh);
     body.insertAdjacentHTML("beforeend", '<div class="kw-explain">Heads up — these run on <b>your own account</b>, and image/video isn\'t free: most start you with <b>free credits</b>, then it\'s pay-as-you-go (usually pennies per image). You add a little money on their site to keep going.' +

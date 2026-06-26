@@ -452,7 +452,7 @@
   function renderListen(){
     const body = $("#listenBody");
     if(!MUSIC.length){ queue=[]; body.innerHTML = emptyState("🎧","Notifi's quiet — for now.",
-      "No tracks dropped yet. Bounce something in the Audio Labs or the Kitchen, hit Publish, and you're the first drop on Notifi.<br><span class='slogan' style='margin:0'>“Listen to Spotify?” — <b>not if I can help it.</b></span>","music"); wireEmpty(); return; }
+      "No tracks dropped yet. Bounce something in the Audio Labs or Leon Production Labs, hit Publish, and you're the first drop on Notifi.<br><span class='slogan' style='margin:0'>“Listen to Spotify?” — <b>not if I can help it.</b></span>","music"); wireEmpty(); return; }
     const view = applyView(MUSIC); queue = view.map(o=>o.i);
     if(!view.length){ body.innerHTML = channelBanner() + noMatch("track"); wireChan(); return; }
     const feat = view[0].it, fi = view[0].i, clean = !filterCreator && !query && sort==="new";

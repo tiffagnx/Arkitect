@@ -11,9 +11,13 @@
    non-Kit ones are honestly marked "preview." */
 (function () {
   if (window.__kit) return;
+  // EMBEDDED-as-a-plugin (e.g. Leon Production Labs opened INSIDE the Studio via <iframe>): the host room
+  // already has THE agent — don't spawn a duplicate Tiff window inside the plugin frame. The one
+  // agent in the host works through the embedded room as a plugin.
+  if (window.self !== window.top) return;
   const path = location.pathname.toLowerCase();
   const ROOMS = {
-    studio: "DeMartin Audio Labs", beats: "The Kitchen", build: "Blueprint Builds",
+    studio: "DeMartin Audio Labs", beats: "Leon Production Labs", build: "Berner Builder",
     editor: "LePrince Visual Labs", images: "Imagination Station", "imagine-cloud": "Imagination Station",
     stream: "The Stream", character: "Agent Forge",
   };
@@ -40,12 +44,12 @@
   //    and Tiff (the creative partner). Everyone else in the roster is a REAL character a human
   //    builds for themselves — we never ship invented people. ──
   const CHARACTERS_BUILTIN = [
-    { id: "kit",  name: "Kit",  tag: "creative partner · build", color: "#7BB6CD", sprite: true,
-      intro: r => `Yo — I'm Kit. I know my way around ${r}. Stuck on anything? Ask me and I'll walk you through it.` },
-    { id: "tiff", name: "Tiff", tag: "your creative partner",  color: "#E58FB5",
+    { id: "kit",  name: "Kit",  tag: "the technical one · build", color: "#7BB6CD", sprite: true,
+      intro: r => `Kit online. I run the technical side of ${r} — the levels, the settings, the exact moves. Tell me the target and I'll dial it in precise.` },
+    { id: "tiff", name: "Tiff", tag: "one of the crew · artist",  color: "#E58FB5",
       intro: r => r === "Agent Forge"
-        ? `Hey — welcome! First time forging an agent? Here's the cool part: I'm one, so this is a live demo of how it works. Tell me what you do and I'll walk you through the whole thing — you talk, I do the rest. (Or just fill it in yourself below.) Want me to run you through it?`
-        : `Hey — it's Tiff. I usually live up in the main chat, but I'm here in ${r} too. Talk to me about the song, the vision, the words — the creative side of what you're making.` },
+        ? `Yo, welcome — first time building an agent? Cool part: I'm one, so this is me showing you live. Tell me what you do and I'll handle the whole thing — you talk, I build. (Or fill it in yourself below.) Wanna run it together?`
+        : `What's good — it's Tiff. I'm right here in ${r} making stuff with you — I write, I make beats, I do a little of everything. So whatchu working on? Let's get it.` },
   ];
   let CHARACTERS = CHARACTERS_BUILTIN.slice();   // merged cast (built-in + user-made); rebuilt on load/refresh
   let active = CHARACTERS[0];
@@ -156,6 +160,8 @@
   .kt-pill.on[data-tier="local"] { border-color:rgba(120,182,205,.85); background:rgba(62,156,184,.18); color:#BFE6F2; }
   .kt-pill.on[data-tier="private"] { border-color:rgba(217,164,65,.85); background:rgba(217,164,65,.2); color:#F0CE8C; }
   .kt-pill.on[data-tier="max"] { border-color:rgba(240,90,120,.9); background:rgba(240,90,120,.22); color:#FFB4C4; }
+  .kt-effort { flex:none; white-space:nowrap; }
+  .kt-effort.god { color:#FFE6A3; border-color:rgba(230,193,106,.6); background:rgba(230,193,106,.10); box-shadow:0 0 10px rgba(230,193,106,.4); }
   .kt-keylink { margin-left:auto; font:700 9px 'Space Mono',monospace; letter-spacing:.06em; color:#9FCFDD; background:none; border:none; cursor:pointer; padding:3px 4px; }
   .kt-keylink:hover { color:#CFE6EE; text-decoration:underline; }
   /* per-agent MODEL picker — a pill-styled <select>; each agent shows ITS own saved brain (honest, from /api/models) */
@@ -258,7 +264,7 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
      <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
@@ -562,6 +568,21 @@
   // It is NOT a button — the single "Summon agent" button (pinkroom-nav.js) opens the window.
   win.querySelector(".kit-x").onclick = () => win.classList.remove("open");
   window.__kitOpen = () => { win.classList.add("open"); input.focus(); };   // opener used by the "Summon agent" button
+  // push a message into her chat from outside (e.g. the dock posts the "hearing report") + open the window
+  window.__kitSay = (text) => { try { addMsg("kit", text); win.classList.add("open"); } catch (e) {} };
+
+  // ── WARM HANDOFF — if the user just walked in from the main chat, pick up the idea they came with
+  //    instead of starting cold (the "it vanished" fix). The brief was stashed in localStorage by the
+  //    chat right before nav; we greet them already caught up + seed her first reply with it (ONE time,
+  //    scoped — then she runs on the room's own thread). Read HERE (window exists = an agent's in) so
+  //    it isn't consumed before there's a window to show it in; waits in localStorage (10-min TTL) if not. ──
+  let handoff = null;
+  try { const _h = JSON.parse(localStorage.getItem("dmv_handoff") || "null"); if (_h && _h.room === room && (Date.now() - (_h.ts || 0)) < 600000) { handoff = _h; localStorage.removeItem("dmv_handoff"); } } catch (e) {}
+  if (handoff && handoff.gist) {
+    // defer past the agent's own intro — setActive() wipes the chat body on mount, so post AFTER it
+    const _hoGist = handoff.gist;
+    setTimeout(function () { try { addMsg("kit", "🔗 Caught up from chat — you were on: “" + _hoGist + "”. Let's pick it up right here."); win.classList.add("open"); } catch (e) {} }, 450);
+  }
 
   // ── DOCK — rooms with a dock slot (image / cloud) can DOCK the agent into the layout (part of the
   //    room, above the generator) instead of floating. Reversible toggle + remembered. Other rooms
@@ -621,6 +642,7 @@
   function applyGlow(){
     win.classList.toggle("tier-max", isTopClaude(modelSel ? modelSel.value : ""));
     win.classList.remove("tier-private");   // private no longer applies (lever retired)
+    try { paintEffort(); } catch (e) {}      // keep the effort chip's 🔱 God stop locked/unlocked with the brain
   }
 
   // rebuild the option list from /api/models: auto, then local 🖥, then cloud ☁ — or, when there's no
@@ -659,6 +681,31 @@
     applyGlow();
   };
   { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
+
+  // ── EFFORT LEVER (agent window) — tap to set how hard THIS agent thinks; rides every /api/kit call
+  //    as `effort`. 🔱 God only unlocks on a Claude brain (same as the main chat); on a Claude brain the
+  //    backend now injects the "show out" depth layer AT THIS LEVEL, so a docked Claude really shows out
+  //    instead of getting the same prompt a 4B model gets. ──
+  var kitEffort = "low";
+  var effortBtn = win.querySelector("#ktEffort");
+  var EFFORT_STOPS = [{ v: "low", t: "⚡ Quick" }, { v: "medium", t: "🧠 Balanced" }, { v: "high", t: "🔥 Deep" }];
+  var EFFORT_GOD = { v: "max", t: "🔱 God" };
+  function effortStops() { return isTopClaude(modelSel ? modelSel.value : "") ? EFFORT_STOPS.concat([EFFORT_GOD]) : EFFORT_STOPS; }
+  function paintEffort() {
+    if (!effortBtn) return;
+    var stops = effortStops();
+    if (!stops.some(function (s) { return s.v === kitEffort; })) kitEffort = "high";   // God lost (brain isn't Claude) → drop to Deep
+    var cur = stops.filter(function (s) { return s.v === kitEffort; })[0] || stops[0];
+    effortBtn.textContent = cur.t;
+    effortBtn.classList.toggle("god", kitEffort === "max");
+  }
+  if (effortBtn) effortBtn.onclick = function () {
+    var stops = effortStops();
+    var i = stops.findIndex(function (s) { return s.v === kitEffort; }); if (i < 0) i = 0;
+    kitEffort = stops[(i + 1) % stops.length].v;
+    paintEffort();
+  };
+  paintEffort();
   refreshModels();
   window.addEventListener("ark:providers-changed", () => setTimeout(refreshModels, 80));
   window.addEventListener("focus", refreshModels);
@@ -695,6 +742,23 @@
   // ── ask the active character (carries `character`; backend may route per-character later) ──
   let busy = false;
   async function ask() {
+    // ── DOCKED-AGENT FIX (Studio). If she's parented to stem(s) and you give a fix command
+    //    ("brighter", "less harsh", "fix it"…), she DOES it — clamped-safe, in-house, free —
+    //    instead of just talking. Guarded so it's a pure no-op in every other room / when
+    //    nothing's parented / when it's not a fix verb (then the brain answers as normal). ──
+    if (window.DMV_DOCK_FIX && !busy) {
+      const dq = input.value.trim();
+      if (dq) {
+        try {
+          const res = await window.DMV_DOCK_FIX(dq, (active && active.id) || "");
+          if (res && res.handled) {
+            addMsg("you", dq); input.value = ""; input.style.height = "auto";
+            addMsg("kit", res.reply); winSpr && winSpr.setSpeed && winSpr.setSpeed(2);
+            return;
+          }
+        } catch (_) {}
+      }
+    }
     const q = input.value.trim(); if ((!q && !pendingImage) || busy) return;   // allow an image-only ask
     busy = true; go.disabled = true;
     const sentImage = pendingImage;
@@ -707,7 +771,8 @@
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier, model: getAgentModel(active) };
+      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      if (handoff && handoff.brief) { payload.handoff = handoff.brief; handoff = null; }   // seed the room ONCE with the chat brief, then run on the room's own thread
       if (sentImage) payload.image = sentImage;
       // session-aware: if this room exposes a live snapshot (the studio does), hand the agent the REAL session
       if (typeof window.dmvSessionSnapshot === "function") { const snap = window.dmvSessionSnapshot(); if (snap) payload.session = snap; }

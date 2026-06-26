@@ -82,7 +82,7 @@
   }
   function deleteProvider(id) {
     _write(LS_PROV, getProviders().filter(function (x) { return x.id !== id; }));
-    if (localStorage.getItem(LS_ACTIVE) && JSON.parse(localStorage.getItem(LS_ACTIVE)) === id) localStorage.removeItem(LS_ACTIVE);
+    if (_read(LS_ACTIVE, null) === id) localStorage.removeItem(LS_ACTIVE);   // guarded read (parity with getActive — a malformed LS value won't throw mid-delete)
     try { window.dispatchEvent(new Event("dmv:ai-changed")); } catch (e) {}
   }
   function setActive(id) { _write(LS_ACTIVE, id); try { window.dispatchEvent(new Event("dmv:ai-changed")); } catch (e) {} }
@@ -123,11 +123,115 @@
     return m;
   }
 
+  // ── ANTHROPIC NATIVE (/v1/messages) — the REAL effort dial in the browser ────────────────────
+  //    When the slot is Claude we skip the OpenAI-compat door and call Anthropic's own endpoint, so
+  //    the effort lever becomes the genuine output_config.effort knob + adaptive thinking. NO
+  //    temperature/top_p (they 400 on Opus 4.8). Mirrors anthropic_native_stream() server-side.
+  function _isClaudeBase(base) { return ((base || "").toLowerCase().indexOf("api.anthropic.com") >= 0); }
+  function _flatText(content) {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) return content.filter(function (c) { return c && c.type === "text"; }).map(function (c) { return c.text || ""; }).join(" ");
+    return "";
+  }
+  function _oaContentToAnthropic(content) {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      var blocks = [];
+      content.forEach(function (c) {
+        if (!c || typeof c !== "object") return;
+        if (c.type === "text") blocks.push({ type: "text", text: c.text || "" });
+        else if (c.type === "image_url") {
+          var u = (c.image_url && c.image_url.url) || "";
+          if (u.indexOf("data:") === 0) { try { var p = u.split(","); var media = p[0].split(":")[1].split(";")[0]; blocks.push({ type: "image", source: { type: "base64", media_type: media, data: p[1] } }); } catch (e) {} }
+          else if (u) blocks.push({ type: "image", source: { type: "url", url: u } });
+        }
+      });
+      return blocks.length ? blocks : "";
+    }
+    return String(content);
+  }
+  async function _chatStreamClaudeNative(opts, slot) {
+    var base = (slot.base_url || "").replace(/\/+$/, "");
+    var url = /\/v1$/.test(base) ? base + "/messages" : base + "/v1/messages";
+    var src = _buildMessages(opts), system = "", out = [];
+    for (var i = 0; i < src.length; i++) {
+      var m = src[i];
+      if (m.role === "system") system += (typeof m.content === "string" ? m.content : _flatText(m.content)) + "\n\n";
+      else if (m.role === "user" || m.role === "assistant") out.push({ role: m.role, content: _oaContentToAnthropic(m.content) });
+    }
+    while (out.length && out[0].role === "assistant") out.shift();   // Anthropic: first message MUST be user (a trimmed window can start on assistant → 400)
+    if (!out.length) out = [{ role: "user", content: "Hello" }];
+    var body = { model: opts.model || slot.model, max_tokens: opts.max_tokens || 1024, messages: out,
+      output_config: { effort: opts.effort || "high" }, thinking: { type: "adaptive" }, stream: true };
+    if (system.trim()) body.system = system.trim();
+    var headers = { "Content-Type": "application/json", "x-api-key": slot.key || "",
+      "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+    var res;
+    try { res = await fetch(url, { method: "POST", headers: headers, body: JSON.stringify(body), signal: opts.signal }); }
+    catch (e) { if (opts.onError) opts.onError(_corsHint(slot, e)); return; }
+    if (!res.ok) { var t = ""; try { t = await res.text(); } catch (e) {} if (opts.onError) opts.onError("Claude error " + res.status + ": " + String(t).slice(0, 220)); return; }
+    if (!res.body || !res.body.getReader) { if (opts.onError) opts.onError("Claude: no stream"); return; }
+    var reader = res.body.getReader(), dec = new TextDecoder(), buf = "";
+    try {
+      while (true) {
+        var rr = await reader.read(); if (rr.done) break;
+        buf += dec.decode(rr.value, { stream: true });
+        var nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          var line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+          if (line.indexOf("data:") !== 0) continue;
+          var data = line.slice(5).trim(); if (!data) continue;
+          try {
+            var d = JSON.parse(data);
+            if (d.type === "content_block_delta" && d.delta && d.delta.type === "text_delta" && d.delta.text) { if (opts.onDelta) opts.onDelta(d.delta.text); }
+            else if (d.type === "message_stop") { if (opts.onDone) opts.onDone(); return; }
+            else if (d.type === "error") { if (opts.onError) opts.onError((d.error && d.error.message) || "Claude stream error"); return; }
+          } catch (e) {}
+        }
+      }
+      // flush a final event delivered with no trailing newline + no message_stop sentinel
+      var _tail = buf.trim();
+      if (_tail.indexOf("data:") === 0) {
+        try { var _td = JSON.parse(_tail.slice(5).trim());
+          if (_td.type === "content_block_delta" && _td.delta && _td.delta.type === "text_delta" && _td.delta.text && opts.onDelta) opts.onDelta(_td.delta.text);
+        } catch (e) {}
+      }
+      if (opts.onDone) opts.onDone();
+    } catch (e) { if (e.name !== "AbortError" && opts.onError) opts.onError("stream error: " + e.message); }
+  }
+
+  // ── REASONING EFFORT for browser-direct non-Claude brains (Grok / Gemini; GPT-5 isn't CORS-direct).
+  //    Mirror of swarm_routes._provider_of/_effort_field: add reasoning_effort only when the MODEL
+  //    supports it, send nothing when unsure, and strip temperature for GPT-5 reasoning (hard 400).
+  function _providerOf(base) { base = (base || "").toLowerCase();
+    if (base.indexOf("api.x.ai") >= 0) return "xai";
+    if (base.indexOf("generativelanguage.googleapis") >= 0) return "gemini";
+    if (base.indexOf("api.openai.com") >= 0) return "openai";
+    return "other"; }
+  function _effortField(provider, model, effort) {
+    model = (model || "").toLowerCase(); var e = (effort || "high").toLowerCase();
+    var map = function (top) { return ({ low: "low", medium: "medium", high: "high", max: top })[e] || "high"; };
+    if (provider === "xai") {
+      if (/fast|vision/.test(model) || !(/grok-3-mini/.test(model) || /grok-(4\.[3-9]|[5-9])/.test(model))) return null;
+      return ["reasoning_effort", map("high")];
+    }
+    if (provider === "gemini") {
+      if (!/gemini-(2\.5|3)/.test(model) || /image/.test(model)) return null;
+      var v = map("high"); if (/pro/.test(model) && v === "medium") v = "low"; return ["reasoning_effort", v];
+    }
+    if (provider === "openai") {
+      if (!/^(gpt-5|o[134])/.test(model) || /chat/.test(model)) return null;
+      return ["reasoning_effort", map(/gpt-5\.[45]|codex/.test(model) ? "xhigh" : "high")];
+    }
+    return null;
+  }
+
   // STREAM chat deltas. Calls opts.onDelta(text) per chunk, onDone(), onError(msg).
   // Mirrors provider_stream() in swarm_routes.py but runs in the browser.
   async function chatStream(opts) {
     var slot = opts.slot || getActive();
     if (!slot) { if (opts.onError) opts.onError("No AI key yet — add one to use AI here."); return; }
+    if (_isClaudeBase(slot.base_url)) return _chatStreamClaudeNative(opts, slot);   // REAL effort dial via /v1/messages
     var url = (slot.base_url || "").replace(/\/+$/, "") + "/chat/completions";
     var body = {
       model: opts.model || slot.model,
@@ -137,6 +241,10 @@
       max_tokens: opts.max_tokens || 1024
     };
     if (opts.reasoning_effort) body.reasoning_effort = opts.reasoning_effort;
+    // engage the provider's native reasoning dial from the effort lever (safe per-model gate)
+    var _prov = _providerOf(slot.base_url), _mdl = (body.model || "").toLowerCase();
+    if (_prov === "openai" && /^(gpt-5|o[134])/.test(_mdl) && !/chat/.test(_mdl)) delete body.temperature;   // GPT-5 reasoning 400s on temperature
+    if (opts.effort) { var _ef = _effortField(_prov, body.model, opts.effort); if (_ef) body[_ef[0]] = _ef[1]; }
     var res;
     try {
       res = await fetch(url, { method: "POST", headers: headersFor(slot), body: JSON.stringify(body), signal: opts.signal });
@@ -170,6 +278,16 @@
             else if (delta.reasoning_content) { reasoningBuf += delta.reasoning_content; }
           } catch (e) {}
         }
+      }
+      // flush a final frame delivered with no trailing newline + no [DONE] sentinel
+      var _tail2 = buf.trim();
+      if (_tail2.indexOf("data:") === 0) {
+        var _td2 = _tail2.slice(5).trim();
+        if (_td2 && _td2 !== "[DONE]") { try { var _d3 = JSON.parse(_td2);
+          var _dl = (_d3.choices && _d3.choices[0] && _d3.choices[0].delta) || {};
+          if (_dl.content) { sawContent = true; if (opts.onDelta) opts.onDelta(_dl.content); }
+          else if (_dl.reasoning_content) { reasoningBuf += _dl.reasoning_content; }
+        } catch (e) {} }
       }
       finish();
     } catch (e) { if (e.name !== "AbortError" && opts.onError) opts.onError("stream error: " + e.message); }

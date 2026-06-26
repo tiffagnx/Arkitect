@@ -32,11 +32,11 @@
   // pro polish: strip internal hrefs so hovering a button doesn't flash localhost URLs in the corner
   document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
   // load Kit, the in-room build-bot helper (kit-helper.js self-skips the main chat + non-rooms)
-  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
+  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js?v=6"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
   // The ONE agent button in every room: "Summon agent" opens the agent window (with the Kit/Tiff/your-agents
   // chooser inside) — works even if nobody's been dragged in yet. The little agent name-chip in the bar is a
   // PASSIVE indicator (shows who's in the room), NOT a button — so there's only ever one thing to click.
-  if (!document.querySelector('[data-summon]')) {
+  if (window.self === window.top && !document.querySelector('[data-summon]')) {   // not inside an embedded-plugin iframe
     const sb = document.createElement("button");
     sb.textContent = "Summon agent"; sb.setAttribute("data-summon", "1");
     sb.style.cssText = "background:rgba(255,255,255,.05);border:1px solid rgba(120,182,205,.4);color:#9FCFDD;" +
@@ -44,14 +44,16 @@
     sb.onmouseover = () => { sb.style.borderColor = "rgba(120,182,205,.8)"; sb.style.color = "#CFE6EE"; };
     sb.onmouseout = () => { sb.style.borderColor = "rgba(120,182,205,.4)"; sb.style.color = "#9FCFDD"; };
     sb.onclick = () => {
-      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent in the room → just open the window
-      // kit-helper.js is injected on every room load and defines __kitOpen once it finishes setting up —
-      // it can lag a split-second right after load. ⚠️ NEVER reload here: a reload WIPES an unsaved
-      // studio/beats session (the data-loss bug B hit summoning an agent). Wait for __kitOpen instead.
-      var _tries = 0;
-      var _t = setInterval(function () {
+      if (window.__kitOpen) { window.__kitOpen(); return; }     // agent already in the room → just open it
+      // No agent in the room yet. The OLD code reloaded with ?brain=kit to bring Kit in — but a reload
+      // WIPES an unsaved studio/beats session (the data-loss bug). Instead: remember Kit as active +
+      // (re)run kit-helper IN PLACE (it bailed earlier when no agent was set) → builds the window → open
+      // it. No reload, no data loss. kit-helper's own guard means a 2nd click just re-opens.
+      try { localStorage.setItem("dmv_active_brain", "kit"); } catch (e) {}
+      if (!window.__kit) { var ks = document.createElement("script"); ks.src = "/static/kit-helper.js?summon=1"; document.body.appendChild(ks); }
+      var _n = 0, _t = setInterval(function () {
         if (window.__kitOpen) { clearInterval(_t); window.__kitOpen(); }
-        else if (++_tries > 60) { clearInterval(_t); }   // ~3s; give up quietly — do NOT reload/wipe
+        else if (++_n > 60) { clearInterval(_t); }   // ~3s; give up quietly — NEVER reload/wipe
       }, 50);
     };
     (document.querySelector(".kit-mount") || document.querySelector(".top") || document.querySelector(".menubar") || document.body).appendChild(sb);

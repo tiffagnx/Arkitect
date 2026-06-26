@@ -147,6 +147,11 @@ You're Tiff. Sharpest person in the room who's also the funniest one. Honest, wa
     high: "Mode: Deep — reason step by step; be thorough, rigorous, and complete.",
     max: "Mode: GOD PARTICLE — bring your absolute best: deep multi-step reasoning, real taste, creativity, and rigor. Pull out all the stops."
   };
+  // ONE source for the god layer — used by /api/chat AND /api/kit (the docked agent) so a Claude
+  // brain "shows out" at the picked depth in both, mirroring app.py _god_layer.
+  function godLayer(effort) {
+    return "\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — show out. Bring your full reasoning, taste, and creativity, and make it obvious a different gear just kicked in.\n" + (GOD_DEPTH[effort] || "");
+  }
 
   // ── localStorage-backed stores (replace the server's data/ files) ──
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
@@ -207,9 +212,7 @@ You're Tiff. Sharpest person in the room who's also the funniest one. Honest, wa
       if ((body.character || "").toLowerCase() === "kit") mem += KIT_VOICE;
       var effort = body.effort || "low";
       system += (EFFORT_HINT[effort] || "");
-      if (isClaude(slot)) {
-        system += "\n\n— You ARE Claude, the most powerful brain in this studio. This is your room now — show out. Bring your full reasoning, taste, and creativity, and make it obvious a different gear just kicked in.\n" + (GOD_DEPTH[effort] || "");
-      }
+      if (isClaude(slot)) system += godLayer(effort);
       var msgs = (body.messages || []).slice(-12).map(cleanMsg);
       if (mem) {
         for (var i = msgs.length - 1; i >= 0; i--) {
@@ -224,7 +227,7 @@ You're Tiff. Sharpest person in the room who's also the funniest one. Honest, wa
       }
       var messages = [{ role: "system", content: system }].concat(msgs);
       return DMV_AI.chatStream({
-        slot: slot, messages: messages,
+        slot: slot, messages: messages, effort: effort,   // Claude → real output_config.effort dial
         temperature: body.temperature != null ? body.temperature : (mode === "write" ? 0.95 : 0.85),
         max_tokens: 2048,
         onDelta: function (t) { send({ type: "delta", text: t }); },
@@ -441,8 +444,8 @@ function buildKitSystem(body, room, image, session) {
     const charName = (body.charName || '').trim() || 'your assistant';
     const charCraft = (body.charCraft || '').trim() || 'creative collaborator';
     const roomLabels = {
-      studio: 'DeMartin Audio Labs', beats: 'DeMartin Beat Lab', editor: 'LePrince Visual Labs',
-      images: 'Imagination Station', build: 'Blueprint Builds',
+      studio: 'DeMartin Audio Labs', beats: 'Leon Production Labs', editor: 'LePrince Visual Labs',
+      images: 'Imagination Station', build: 'Berner Builder',
     };
     const roomLabel = roomLabels[room] || 'DeMartinville';
     system =
@@ -455,7 +458,10 @@ function buildKitSystem(body, room, image, session) {
     }
     // LEARNED PACK (per-agent server file) has no browser store — omitted.
   } else {
-    system = P.KIT_SYSTEM + roomHelp;
+    // Kit (technical robot) vs Tiff (laid-back, one of the crew, real artist) — each her own voice,
+    // mirroring app.py kit_help. Falls back to KIT_SYSTEM if the Tiff prompt isn't present.
+    const charId = (body.character || 'kit').trim().toLowerCase();
+    system = (charId === 'tiff' ? (P.TIFF_ROOM_SYSTEM || P.KIT_SYSTEM) : P.KIT_SYSTEM) + roomHelp;
   }
   system += P.AGENT_TOOL_RULES;     // shared toolbelt — every in-room agent gets it
   system += actionsPrompt(room);    // let the agent DRIVE this room via a validated action block
@@ -469,6 +475,11 @@ function buildKitSystem(body, room, image, session) {
   if (image) {
     system += '\n\nThe user just ATTACHED an image. Look at it closely and base your answer on what you SEE — ' +
       'if they want to make something, write the generate prompt FROM the image.';
+  }
+  if (body.handoff) {   // WARM HANDOFF — the brief the chat passed in when the user walked into this room
+    system += '\n\nWARM HANDOFF — the user JUST came from the main chat where they were working this out. ' +
+      "Pick up that thread immediately, reference what they said, and don't make them repeat themselves. " +
+      "Here's what they were on:\n" + String(body.handoff).slice(0, 1000);
   }
   return system;
 }
@@ -780,7 +791,7 @@ async function handleKit(body) {
     return J({ reply: "Ask me anything about this room and I'll walk you through it.", action: null });
   }
 
-  const system = buildKitSystem(body, room, image, session);
+  let system = buildKitSystem(body, room, image, session);
 
   // PER-AGENT MODEL PICK — 'cloud:<slot>' routes that one slot; a bare id or 'auto'
   // falls to the tier default. resolveProvider mirrors the server's slot lookup.
@@ -788,6 +799,8 @@ async function handleKit(body) {
   const tier = (body.tier || 'local').trim().toLowerCase();
   // tier 'local' honors the "private, on your machine" promise → no cloud provider.
   const slot = (tier === 'local' && !chosen.startsWith('cloud:')) ? null : resolveProvider(chosen);
+  // CLAUDE = GOD MODE for the docked agent too (mirrors app.py) — same "show out" depth at the picked effort.
+  if (slot && isClaude(slot)) system += godLayer((body.effort || 'low').trim().toLowerCase());
 
   // Vision: user content carries the image so the brain LOOKS at it (mirrors the
   // server's image_url convention). Text-only otherwise.
@@ -799,7 +812,7 @@ async function handleKit(body) {
   let text;
   try {
     if (slot) {
-      text = await DMV_AI.chatOnce({ slot, system, user, temperature: 0.4, max_tokens: 600 });
+      text = await DMV_AI.chatOnce({ slot, system, user, temperature: 0.4, max_tokens: 600, effort: (body.effort || 'low') });
     } else {
       // No provider (or local tier): heuristic fallback — hand back the room walk-through
       // so the helper still works with no key, the way the local brain did server-side.

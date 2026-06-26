@@ -673,6 +673,8 @@ body.mode-simple .director-only{display:none!important}
 <div class="toast" id="toast"></div>
 
 <script src="/static/ae-menus.js"></script>
+<script>window.LP_FX={list:[],byField:{},resolve:[],register(d){this.list.push(d);}};</script>
+<script src="/static/leprince-fx.js?v=1"></script>
 <script>
 // ════════════════════════════════════════════════════════════════════════
 //  THE EDITOR — vanilla JS. Times are in FRAMES everywhere (A/V-drift proof);
@@ -1538,7 +1540,9 @@ function hasLayerBufferFX(c,f){const fr=f-c.start;
     ||pval(c,'fxOuterGlow',fr,0)>0||pval(c,'fxDropShadow2',fr,0)>0
     ||pval(c,'fxLongShadow',fr,0)>0||pval(c,'fxFloorShadow',fr,0)>0||pval(c,'fxStroke',fr,0)>0||pval(c,'fxBevelAlpha',fr,0)>0||pval(c,'fxInnerShadow',fr,0)>0||pval(c,'fxRimLight',fr,0)>0
     ||pval(c,'fxMatteChoke',fr,0)!==0||pval(c,'fxChoker',fr,0)!==0||pval(c,'fxFeatherAlpha',fr,0)>0||pval(c,'fxAlphaLevels',fr,0)>0||pval(c,'fxDespot',fr,0)>0||pval(c,'fxRefineEdge',fr,0)>0||pval(c,'fxEdgeBlur',fr,0)>0||pval(c,'fxGrowBounds',fr,0)>0||pval(c,'fxInvertMatte',fr,0)>0||pval(c,'fxMatteThresh',fr,0)>0||pval(c,'fxChannelMath',fr,0)>0;}
-function needsLayerBuffer(c,f){return clipMasks(c).length>0||hasLayerBufferFX(c,f);}
+function hasLPFX(c,f){const fr=f-c.start;if(!window.LP_FX||!LP_FX.list.length)return false;for(const fx of LP_FX.list){if(pval(c,fx.field,fr,fx.def||0)!==(fx.def||0))return true;}return false;}
+function clipNeeds2nd(c,f){const fr=f-c.start;if(!window.LP_FX||!LP_FX.list.length)return false;for(const fx of LP_FX.list){if(fx.needs2nd&&pval(c,fx.field,fr,fx.def||0)!==(fx.def||0))return true;}return false;} // any active registry effect that samples the layer above
+function needsLayerBuffer(c,f){return clipMasks(c).length>0||hasLayerBufferFX(c,f)||hasLPFX(c,f);}
 
 // ── MASKS (per-clip vector mattes) ───────────────────────────────────────
 // A mask is a rectangle/ellipse box in COMP coordinates, combined per mode
@@ -2310,6 +2314,13 @@ function withLayerFX(ctx,c,f,W,H,drawInner){
       if(op==='add')res=Math.min(255,a+bb);else if(op==='subtract')res=Math.max(0,a-bb);else if(op==='multiply')res=a*bb/255;else res=Math.abs(a-bb);
       if(oc==='All'||oc==='R')d[i]+=(res-d[i])*cmath;if(oc==='All'||oc==='G')d[i+1]+=(res-d[i+1])*cmath;if(oc==='All'||oc==='B')d[i+2]+=(res-d[i+2])*cmath;}
     lg.putImageData(im,0,0);}
+  // ── LePrince FX registry — registered effect modules render here (after built-ins, before masks) ──
+  if(window.LP_FX&&LP_FX.list.length){
+    const _api={lg,sg,L,M,S,W,H,c,fr,f,k,pval,clamp,hex2rgb,morphMatte,blurMatte,reset,project,fbm:_fbm,vnoise:_vnoise,
+      getLayer2(){ return window.__lp2ndCanvas||null; }};   // the layer above, pre-rendered by drawFrameInto (avoids clobbering the shared canvas pool mid-render)
+    for(const _fx of LP_FX.list){ const _v=pval(c,_fx.field,fr,_fx.def||0); if(_v===(_fx.def||0))continue;
+      try{ _fx.render(_api,_v); }catch(_e){ if(!_fx._err){_fx._err=1;console.warn('[LP_FX]',_fx.field,_e);} } }
+  }
   // Masks
   if(clipMasks(c).length){buildMaskAlpha(M,S,c,f,W,H);
     reset(lg);lg.globalCompositeOperation='destination-in';lg.drawImage(M,0,0);reset(lg);}
@@ -2548,6 +2559,9 @@ function drawFrameInto(ctx,W,H,f,srcOverride){
     if(c.trackMatte&&i+1<vis.length){const me=vis[i+1];consumed.add(i+1); // layer above = the matte
       if(me.c.guide&&srcOverride){drawOneClip(ctx,entry,f,W,H,srcOverride);continue;} // a guide matte is preview-only → ignore on export
       drawMatted(ctx,entry,me,c.trackMatte,f,W,H,srcOverride);continue;}
+    if(i+1<vis.length&&!consumed.has(i+1)&&clipNeeds2nd(c,f)){const _ab=vis[i+1];consumed.add(i+1); // 2nd-layer: render the layer above to a dedicated canvas FIRST, before this clip's withLayerFX claims the shared pool
+      const _l2=document.createElement('canvas');_l2.width=W;_l2.height=H;window.__lp2ndCanvas=null;try{drawOneClipMB(_l2.getContext('2d'),_ab,f,W,H);}catch(e){}window.__lp2ndCanvas=_l2;}
+    else window.__lp2ndCanvas=null;
     drawOneClipMB(ctx,entry,f,W,H,srcOverride);
   }
   for(const c of activeTexts(f)){if(c.guide&&srcOverride)continue;drawTextClip(ctx,effClip(c),f,W,H);}
@@ -3363,6 +3377,19 @@ const FX_EXTRA={
 // Colour props that live OFF KDEF (the generic FX_EXTRA `sub` clear can't reach them, since gradmap has no sub
 // and duotone has no FX_EXTRA entry). Wiped on effect remove/clear so a re-added effect starts from default colours.
 const FX_COLOR_SUBS={fxGradMap:['fxGMShadow','fxGMMid','fxGMHi'],fxDuotone:['fxDuoA','fxDuoB']};
+// ── LePrince FX registry integration: fold registered effect modules (static/leprince-fx.js) into the
+// declarative tables so the inspector, menu resolver and add-effect flow treat them like native effects. ──
+if(window.LP_FX&&LP_FX.list&&LP_FX.list.length){
+  for(const _fx of LP_FX.list){
+    FX_DEFS.push([_fx.field,_fx.name,_fx.def||0,_fx.paramLabel||'Amount',_fx.applyVal!=null?_fx.applyVal:1]);
+    FX_CAT[_fx.field]=[_fx.cat||'Effect',_fx.color||'#3E9CB8'];
+    FX_RANGE[_fx.field]=_fx.range||[0,1,0.01];
+    if(_fx.extra&&_fx.extra.length){ FX_EXTRA[_fx.field]=_fx.extra; for(const ex of _fx.extra) if(ex.sub&&ex.def!=null) KDEF[ex.sub]=ex.def; }
+    if(_fx.colorSubs) FX_COLOR_SUBS[_fx.field]=_fx.colorSubs;
+    LP_FX.byField[_fx.field]=_fx;
+    for(const re of (_fx.match||[])) LP_FX.resolve.push({re,field:_fx.field});
+  }
+}
 function mountEffectControls(c){
   const host=document.getElementById('efxMount');if(!host||!c)return;
   host.innerHTML='';
@@ -4357,6 +4384,7 @@ window.addEventListener('resize',fitScreen);
   const scrub=s=>{if(s==null)return s;return String(s)
     .replace(/Adobe After Effects/gi,'LePrince Visual Labs')
     .replace(/After Effects/gi,'LePrince')
+    .replace(/\bCC\s+(?=\S)/g,'LePrince ')   // Cycore "CC" plugin prefix → LePrince house brand
     // third-party marks (handled before the bare \bAE\b rule so "Mocha AE" resolves as a unit)
     .replace(/Boris ?FX ?Mocha|Mocha ?AE/gi,'planar tracker')
     .replace(/Paste Mocha Mask/gi,'Paste Tracked Mask')
@@ -4470,9 +4498,17 @@ window.addEventListener('resize',fitScreen);
         [/Sepia/i,'fxSepia'],
         [/Drop Shadow/i,'fxShadow'],
         [/Vignette/i,'fxVignette'],
+        [/^Linear Wipe$/i,'fxWipeLinear'],   // surface the existing Banded Wipe under its real AE name
+        [/^Radial Wipe$/i,'fxWipeClock'],    // surface the existing Clock Sweep under its real AE name
+        [/^Magnify$/i,'fxLoupe'],            // existing Magnifier
+        [/^Offset$/i,'fxOffset'],            // existing Drift (toroidal pan)
+        [/^Optics Compensation$/i,'fxFisheye'], // existing Lens Warp
+        [/^Ripple$/i,'fxRipple'],            // existing Pond Ripple
+        [/^Compound Blur$/i,'fxCompoundBlur'],  // existing Luma Soften
+        [/^Smear$/i,'fxW3smear'],            // plain Smear → the registry Smear effect
         [/Color Overlay|^Fill$|Solid Composite/i,'fxTint'],
         [/Fractal Noise|Turbulent Noise|Cell Pattern/i,'fxNoise'],
-        [/Add Grain|^Noise$|Noise HLS|Match Grain|Remove Grain|Median/i,'fxGrain'],
+        [/Add Grain|^Noise$|Noise HLS/i,'fxGrain'],   // Remove Grain (ADDS grain — backwards), Match Grain (no source match) & Median (≠ grain) UNMAPPED — real versions live in the registry
         [/Mosaic/i,'fxPixel'],
         [/Glow\b/i,'fxGlow'],
         [/Gradient Map|Tritone/i,'fxGradMap'],
@@ -4502,7 +4538,6 @@ window.addEventListener('resize',fitScreen);
         [/Radial Shadow/i,'fxShadow'],
         [/CC Color Offset/i,'fxRGB'],
         [/CC Toner|Colorama/i,'fxDuotone'],
-        [/CC Spotlight/i,'fxVignette'],
       ];
       if(/^Last Effect$/i.test(L))return lastEffect;
       if(/^Mirror$/i.test(L))return flipH;
@@ -4512,6 +4547,7 @@ window.addEventListener('resize',fitScreen);
         else if(field==='fxRadBlur'){sub='fxRadType';val=/Spin/i.test(L)?'spin':'zoom';}
         if(sub)return ()=>{const s=sc();if(s&&s.clip)s.clip[sub]=val;fn();};
         return fn;}}
+      if(window.LP_FX&&LP_FX.resolve.length){ const _Ls=scrub(L); for(const a of LP_FX.resolve){ if(a.re.test(L)||a.re.test(_Ls)){ const fn=applyFx(a.field); if(fn)return fn; } } }
       if(/^Effect Controls/i.test(L))return ()=>{document.querySelector('.col.insp').scrollIntoView();toast('Adjust effects in the stem ▸ Effects, or Properties →');};
       if(/^Remove All$/i.test(L))return clearEffects;
     }
@@ -4563,7 +4599,42 @@ window.addEventListener('resize',fitScreen);
 
   let flyouts=[];
   const clearFly=from=>{while(flyouts.length>from){const f=flyouts.pop();if(f&&f.parentNode)f.remove();}};
+  // ── ZERO-FAKE prune (owner rule): effects that CANNOT be built faithfully on a flat-2D, single-frame
+  // canvas are removed from the menu entirely — no grayed stubs, no lies. Reasons + LePrince-native
+  // alternatives are documented in EFFECTS_AUDIT.md. Matched on the SCRUBBED display label.
+  const LP_KILL = new Set([
+    // 3D Channel — needs Z-depth/object-ID/normal channels flat video has none of
+    "3D Channel Extract","ID Matte","Depth Matte","Depth of Field","3D Channel","Fog 3D","Material Edge",
+    // Audio — audio samples are not in the visual render pass
+    "Backwards","Bass & Treble","Delay","Flange & Chorus","High-Low Pass","Modulator","Parametric EQ","Reverb","Stereo Mixer","Tone",
+    // Blur — need motion-vector map / blind deconvolution
+    "Camera-Shake Deblur","LePrince Vector Blur",
+    // 3D / tracking — need 3D scene or multi-frame track solve
+    "3D Link","planar tracker","Color Stabilizer","Rolling Shutter Repair","Warp Stabilizer VFX","Detail-preserving Upscale",
+    // Expression Controls — render no pixels; only feed expressions (no expression engine)
+    "3D Point Control","Angle Control","Checkbox Control","Color Control","Dropdown Menu Control","Layer Control","Point Control","Slider Control",
+    // Generate — need real audio FFT data
+    "Audio Spectrum","Audio Waveform",
+    // Matte / Perspective — need track solve / facing-normal / back-face
+    "tracked shape","3D Camera","Sided","Basic Text",
+    // Simulation — need persistent particle state + true 3D
+    "Card Dance","LePrince Ball Action","LePrince Hair","LePrince Mr. Mercury","LePrince Pixel Polly","Shatter","Wave World",
+    // Time — need optical flow / deep multi-frame access
+    "LePrince Wide Time","Pixel Motion Blur","Time Displacement","Timewarp",
+    // Utility — need HDR/float buffers or ICC/OCIO colour-management the engine has none of
+    "LePrince Overbrights","Color Profile Converter","Grow Bounds","HDR Compander","HDR Highlight Compression","OpenColorIO",
+  ]);
+  function lpPruneItems(items){
+    const out=[];
+    for(const it of items){
+      const sub=it.submenu;
+      if(sub&&sub.length){ const ps=lpPruneItems(sub); if(ps.length)out.push({...it,submenu:ps}); } // drop categories emptied by the prune
+      else if(!LP_KILL.has(scrub(it.label))) out.push(it);
+    }
+    return out;
+  }
   function buildPanel(menu,items,level){
+    if(menu.id==='effect') items=lpPruneItems(items);   // zero-fake: hide un-buildable effects + emptied categories
     const panel=document.createElement('div');panel.className='mb-panel';
     items.forEach(it=>{
       const row=document.createElement('div');row.className='mb-item';

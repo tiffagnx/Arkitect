@@ -790,8 +790,8 @@
   <div class="tgroup"><span class="tg-l">FX</span>
     <button class="tb" id="throwToggle" onclick="toggleThrowBar()" title="FX Throw — print a tempo-synced delay/reverb throw onto the selected clip" style="width:auto;padding:0 10px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">⟿ THROW</button>
   </div>
-  <div class="tgroup"><span class="tg-l">THE KITCHEN</span>
-    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open The Kitchen as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 THE KITCHEN</button>
+  <div class="tgroup"><span class="tg-l">PRODUCTION LABS</span>
+    <button class="tb" id="beatlabBtn" onclick="openBeatLab()" title="Open Leon Production Labs as a plugin — cook a beat, then Send it onto a track" style="width:auto;padding:0 11px;font:700 11px 'Space Mono',monospace;letter-spacing:.04em">🥁 LEON PRODUCTION LABS</button>
   </div>
   <div class="tgroup"><span class="tg-l">ZOOM · GRID</span>
     <div class="zoomctl">
@@ -943,6 +943,7 @@
 const $ = (id) => document.getElementById(id);
 let ctx = null;                 // AudioContext (created on first interaction)
 const tracks = [];              // {id,name,buffer,gain,pan,eq:{lo,mid,hi},comp,send,inserts:[{name,params}],muted,solo,live}
+window.tracks = tracks;         // exposed for agent-dock.js (dock scope + the Phase 1 "act on the docked stem" moves)
 let playing = false, startCtxTime = 0, startOffset = 0, loop = false;
 let metroOn = false;   // count-in metronome click — OFF by default (never forced); toggle with the ♪ Click button
 // linear fader gain → Pro-Tools-style dB readout ("0.0" = unity, "−∞" = silence)
@@ -4685,13 +4686,13 @@ function makeDraggable(win, handle){
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   THE KITCHEN AS A PLUGIN  —  load The Kitchen in a floating window (a
-   same-origin <iframe>) and "Send to Studio" bounces the current beat onto a
-   new track. This is 100% Studio-side: it reaches into the embedded The Kitchen's
+   LEON PRODUCTION LABS AS A PLUGIN  —  load Leon Production Labs in a floating
+   window (a same-origin <iframe>) and "Send to Studio" bounces the current beat
+   onto a new track. This is 100% Studio-side: it reaches into the embedded room's
    OWN renderPatternWav()/wavBase64() across the same-origin frame boundary, so
    beats.html is never modified. The embedded instance is also blocked from
    overwriting the shared `dmv_beats_auto` autosave slot, so it can't disturb
-   anyone working in the standalone The Kitchen room.
+   anyone working in the standalone Leon Production Labs room.
    ════════════════════════════════════════════════════════════════════════════ */
 function openBeatLab(){
   let w = document.getElementById('beatlab-win');
@@ -4705,7 +4706,7 @@ function openBeatLab(){
   w.style.boxShadow=`0 24px 70px rgba(0,0,0,.64), 0 0 0 1px ${hexA(col,.16)}, 0 0 52px ${hexA(col,.12)}`;
   w.innerHTML =
     `<div class="pw-bar" style="border-bottom-color:${hexA(col,.3)}">`+
-      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 THE KITCHEN</span>`+
+      `<span class="vw-title" style="background:none;color:${col};-webkit-text-fill-color:${col};font:800 13px Oxanium;letter-spacing:.06em">🥁 LEON PRODUCTION LABS</span>`+
       `<span class="pw-track" style="max-width:none">plugin · cook a beat, then send it to a track</span>`+
       `<button class="bl-send" onmousedown="event.stopPropagation()" title="Bounce the current beat onto a new Studio track" `+
         `style="background:${hexA(col,.18)};border:1px solid ${hexA(col,.5)};color:${col};font:800 10px 'Space Mono',monospace;letter-spacing:.04em;padding:5px 11px;border-radius:7px;cursor:pointer">⤓ Send to Studio</button>`+
@@ -4717,7 +4718,7 @@ function openBeatLab(){
     `</div>`;
   document.body.appendChild(w);
   const frame = w.querySelector('.bl-frame');
-  // protect whoever's in the standalone The Kitchen: stop THIS embedded instance from
+  // protect whoever's in the standalone Leon Production Labs: stop THIS embedded instance from
   // ever writing the shared autosave key (best-effort, same-origin realm patch).
   frame.addEventListener('load', ()=>{
     try{
@@ -4737,23 +4738,23 @@ function openBeatLab(){
 
 async function beatlabSend(frame, btn){
   const bw = frame && frame.contentWindow;
-  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("The Kitchen's still warming up — give it a second"); return; }
+  if(!bw || typeof bw.renderPatternWav !== 'function'){ flash("Leon Production Labs is still warming up — give it a second"); return; }
   const label = btn ? btn.textContent : '';
   if(btn){ btn.disabled=true; btn.textContent='Bouncing…'; }
   try{
     if(typeof bw.stopPlay === 'function'){ try{ bw.stopPlay(); }catch(e){} }   // freeze playback before the offline render
-    const buf = await bw.renderPatternWav(4);              // The Kitchen's own offline bounce — 4 bars, bit-identical to playback
+    const buf = await bw.renderPatternWav(4);              // Leon Production Labs' own offline bounce — 4 bars, bit-identical to playback
     if(!buf) throw new Error('empty render');
     const b64 = await bw.wavBase64(buf);                   // AudioBuffer -> base64 WAV
     const bin = atob(b64), u = new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
-    const name = 'The Kitchen ' + (tracks.filter(t=>/^The Kitchen/.test(t.name||'')).length + 1);
+    const name = 'Leon Production Labs ' + (tracks.filter(t=>/^Leon Production Labs/.test(t.name||'')).length + 1);
     const file = new File([u], name + '.wav', {type:'audio/wav'});
     await addFiles([file]);                                // reuse the proven import path → new track + lane
     flash('Beat dropped onto “' + name + '” ✦');
   }catch(err){
     console.error('[BeatLab→Studio] send failed', err);
-    flash("Couldn't bounce that beat — hit Play in The Kitchen first, then send");
+    flash("Couldn't bounce that beat — hit Play in Leon Production Labs first, then send");
   }finally{
     if(btn){ btn.disabled=false; btn.textContent = label || '⤓ Send to Studio'; }
   }
@@ -6210,6 +6211,8 @@ const VDOC_MACROS = [
       { ins:'De-Ess', param:'thr', delta:-6 }, { ins:'De-Ess', param:'ratio', delta:1.5 } ] },
   { id:'space',  label:'Space',  hint:'reverb send', targets:[ { send:true, delta:0.14 } ] },
   { id:'throw',  label:'Throw',  hint:'slap-delay amount', targets:[ { ins:'Slap', param:'mix', delta:0.15 } ] },
+  { id:'demud',  label:'De-Mud', hint:'clear boxy low-mids — right = cleaner', targets:[ { ins:'EQ-6', param:'mG', delta:-3.5 } ] },
+  { id:'tight',  label:'Tighten',hint:'high-pass the low rumble — right = tighter', targets:[ { ins:'EQ-6', param:'hpf', delta:60 } ] },
 ];
 function vdIsDoc(ins){ return !!(ins && (ins._doc || (ins.params && ins.params.__doc))); }
 function vdInsByName(t, name){ return (t.inserts||[]).find(ins => vdIsDoc(ins) && ins.name===name) || null; }
@@ -8618,7 +8621,7 @@ function laneUiTake(t, placeAt) {
    Pass 2 will wire save → download → swap → restart through the backend.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function arkUpdater(){
-  const APP_VERSION = "2.2.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
+  const APP_VERSION = "2.3.0";            // ← bump to match each GitHub release tag (vX.Y.Z) when you cut a release
   const REPO        = "tiffagnx/Arkitect";
   const CHECK_EVERY = 6 * 3600 * 1000;    // background re-check cadence (a few times a day)
   window.APP_VERSION  = APP_VERSION;
@@ -8754,7 +8757,8 @@ function laneUiTake(t, placeAt) {
   // setInterval(() => checkForUpdates(false), CHECK_EVERY);
 })();
 </script>
-<script src="/static/pinkroom-nav.js"></script>
+<script src="/static/agent-dock.js?v=10"></script>
+<script src="/static/pinkroom-nav.js?v=5"></script>
 
 <!-- ─────────────────────────────────────────────────────────────────────────
      WEB PREVIEW MODE — when DeMartin Audio Labs is served from the public site

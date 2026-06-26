@@ -113,14 +113,19 @@
           <div class="as-formhead">＋ Add a provider</div>
           <div class="as-form" id="asForm">
             <div class="as-field"><label>Provider</label><select id="asPreset"></select><div class="h" id="asHint"></div></div>
+            <div class="as-field"><label>Models — pick one or more (each becomes its own brain)</label>
+              <div id="asModelChips" style="margin:2px 0 7px"></div>
+              <div class="as-modelrow"><input id="asModel" list="asModelList" placeholder="type or pick a model, then ＋ add" /><button type="button" class="as-listbtn" id="asAddModel" title="Add this model to the list">＋ add</button><button type="button" class="as-listbtn" id="asListModels" title="List ALL this provider's models (uses your key)">↻ all</button></div>
+              <datalist id="asModelList"></datalist>
+              <div class="h" id="asModelHint">One key, as many models as you want. Pick models that can SEE + THINK + use TOOLS — the agent drives the app with tool calls, so tiny/old models can't run it. Hit <b>↻ all</b> to list the agent-ready ones.</div>
+            </div>
             <div class="as-field"><label>API key — your own free key</label><input id="asKey" type="password" placeholder="paste your key here" autocomplete="off" /></div>
-            <button type="button" class="as-advtoggle" id="asAdvToggle">⚙ Advanced — name, model &amp; URL (auto-filled, leave them) ▾</button>
+            <button type="button" class="as-advtoggle" id="asAdvToggle">⚙ Advanced — name &amp; URL (auto-filled, leave them) ▾</button>
             <div class="as-adv" id="asAdv">
               <div class="as-frow">
                 <div class="as-field"><label>Name</label><input id="asName" placeholder="Groq" /></div>
-                <div class="as-field"><label>Model</label><div class="as-modelrow"><input id="asModel" list="asModelList" placeholder="llama-3.3-70b-versatile" /><button type="button" class="as-listbtn" id="asListModels" title="List this provider's current models (uses your key)">↻ list</button></div><datalist id="asModelList"></datalist><div class="h" id="asModelHint"></div></div>
+                <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
               </div>
-              <div class="as-field"><label>Base URL</label><input id="asBase" placeholder="https://api.groq.com/openai/v1" /></div>
             </div>
             <div class="as-btns">
               <button class="save" id="asSave">Save</button>
@@ -150,12 +155,50 @@
     PRESETS.forEach((p, i) => { const o = document.createElement("option"); o.value = i; o.textContent = p.name; sel.appendChild(o); });
     sel.onchange = applyPreset; applyPreset();
   }
+  // Some presets' models_hint is a DESCRIPTION, not a model id (OpenRouter = "pick any model id ending
+  // in :free"). Dropping that sentence into the Model box made Save/Test choke ("that's not a model").
+  // Map those to a REAL default model + real suggestions so it just works; the user can still change it
+  // or hit ↻ for the live list.
+  // MULTI-MODEL — one key → as many models as you want, each saved as its own brain (slot). The
+  // chips are the models the user picked; Save loops them into one provider record each (same key).
+  let pendingModels = [];
+  function renderChips() {
+    const c = $("asModelChips"); if (!c) return; c.innerHTML = "";
+    pendingModels.forEach((m, i) => {
+      const ch = document.createElement("span");
+      ch.style.cssText = "display:inline-flex;align-items:center;gap:5px;font:600 11px Inter,sans-serif;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:14px;padding:3px 4px 3px 9px;margin:0 5px 5px 0;";
+      ch.innerHTML = '<span></span><button type="button" style="border:none;background:rgba(0,0,0,.25);color:#9FCFDD;width:15px;height:15px;border-radius:50%;cursor:pointer;font-size:9px;line-height:1">✕</button>';
+      ch.firstChild.textContent = m;
+      ch.querySelector("button").onclick = () => { pendingModels.splice(i, 1); renderChips(); };
+      c.appendChild(ch);
+    });
+  }
+  function addModel(m) { m = (m || ($("asModel").value || "")).trim(); if (!m) return; if (pendingModels.indexOf(m) < 0) pendingModels.push(m); $("asModel").value = ""; renderChips(); $("asModel").focus(); }
+
+  // Some presets' models_hint is a DESCRIPTION, not a model id (OpenRouter = "pick any model id ending
+  // in :free"). Map those to a REAL default model + suggestions so the Model box never gets a sentence.
+  const _hintIsDesc = (h) => /pick any|any open|ending in|any model|openai-compat/i.test(h || "");
+  const _provDefaults = {
+    // OpenRouter ids use DOTS (claude-opus-4.8, not -4-8) and rotate fast — these are the CURRENT
+    // capable set: every one SEES (vision) + THINKS + TOOL-CALLS, which the agent needs. The ↻ all
+    // pull also filters the live catalog to vision+tools models, so it self-heals when versions bump.
+    openrouter: { model: "google/gemini-3.5-flash", picks: ["google/gemini-3.5-flash", "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-4.6", "x-ai/grok-4.3", "openai/gpt-5.5", "google/gemini-3.1-flash-lite"] },
+  };
+  const _provKey = (p) => (p.name || "").toLowerCase().replace(/[^a-z]/g, "");
   function applyPreset() {
     const p = PRESETS[+$("asPreset").value]; if (!p) return;
-    if (p.name !== "Custom") { $("asName").value = p.name; $("asBase").value = p.base_url; $("asModel").value = (p.models_hint || "").split(",")[0].trim(); }
+    const firstHint = (p.models_hint || "").split(",")[0].trim();
+    const def = _provDefaults[_provKey(p)];
+    const defModel = _hintIsDesc(firstHint) ? (def ? def.model : "") : firstHint;   // never a placeholder sentence
+    if (p.name !== "Custom") { $("asName").value = p.name; $("asBase").value = p.base_url; }
     else { $("asName").value = ""; $("asBase").value = ""; }
-    // good-model dropdown for this provider (vision / tool-use / reasoning picks) — editable
-    const dl = $("asModelList"); if (dl) { dl.innerHTML = ""; (p.models_hint || "").split(",").map(s => s.trim()).filter(Boolean).forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }); }
+    $("asModel").value = "";                          // the input is for ADDING more models
+    pendingModels = defModel ? [defModel] : [];       // start with the provider's default model selected
+    renderChips();
+    // model suggestions (datalist): real picks when the hint was a description, else the preset's list.
+    const dl = $("asModelList"); if (dl) { dl.innerHTML = "";
+      const picks = _hintIsDesc(firstHint) ? (def ? def.picks : []) : (p.models_hint || "").split(",").map(s => s.trim()).filter(Boolean);
+      picks.forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }); }
     const hint = (p.free && p.free !== "—" ? `${p.free}. ` : "") + (p.models_hint ? `models: ${p.models_hint}.` : "");
     const el = $("asHint"); el.textContent = hint;
     if (p.key_url) { el.appendChild(document.createTextNode(" · ")); const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "get a free key ↗"; el.appendChild(a); }
@@ -283,25 +326,41 @@
     const r = await fetch("/api/swarm/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_url: base, api_key: key }) }).then(r => r.json()).catch(() => ({ ok: false, error: "couldn't reach it" }));
     btn.disabled = false; btn.textContent = lbl;
     if (r.ok) {
-      const dl = $("asModelList"); dl.innerHTML = ""; (r.models || []).forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); });
-      const hint = $("asModelHint"); if (hint) hint.textContent = (r.models || []).length + " live models" + (r.total > (r.models || []).length ? (" (of " + r.total + ", showing first " + r.models.length + ")") : "") + " — click the Model box to pick";
-      setStatus("✓ pulled " + (r.models || []).length + " live models", "ok");
+      // prefer CAPABLE models (vision + tool-calling) when the provider tells us — the agent needs tools
+      const capable = (r.capable && r.capable.length) ? r.capable : null;
+      const show = capable || (r.models || []);
+      const dl = $("asModelList"); dl.innerHTML = ""; show.forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); });
+      const hint = $("asModelHint"); if (hint) hint.textContent = capable
+        ? (capable.length + " agent-ready models (can SEE + use TOOLS) — click the Model box to pick" + (r.total > capable.length ? " · " + r.total + " total" : ""))
+        : ((r.models || []).length + " live models" + (r.total > (r.models || []).length ? (" (of " + r.total + ")") : "") + " — click the Model box to pick");
+      setStatus("✓ " + show.length + (capable ? " agent-ready models" : " models"), "ok");
       $("asModel").focus();
     } else setStatus("couldn't list models: " + (r.error || "?"), "bad");
   };
-  $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus(""); };
+  $("asAddModel").onclick = () => addModel();
+  $("asModel").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addModel(); } });
+  $("asCancel").onclick = () => { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); pendingModels = []; renderChips(); setStatus(""); };
   $("asAdvToggle").onclick = () => { $("asAdv").classList.toggle("open"); };
   $("asTest").onclick = async () => {
-    const body = { base_url: $("asBase").value.trim(), model: $("asModel").value.trim(), api_key: $("asKey").value.trim() };
-    if (!body.base_url || !body.model || !body.api_key) { setStatus("fill in base URL, model and key first", "bad"); return; }
+    const m = ($("asModel").value.trim()) || pendingModels[0] || "";   // test the typed/first picked model
+    const body = { base_url: $("asBase").value.trim(), model: m, api_key: $("asKey").value.trim() };
+    if (!body.base_url || !body.model || !body.api_key) { setStatus("add a model + your key first", "bad"); return; }
     setStatus("testing…");
     const r = await fetch("/api/swarm/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({ ok: false, error: "couldn't reach it" }));
     setStatus(r.ok ? `✓ works — "${(r.reply || "ok").slice(0, 30)}"` : `✕ ${r.error}`, r.ok ? "ok" : "bad");
   };
   $("asSave").onclick = async () => {
-    const payload = { name: $("asName").value.trim(), base_url: $("asBase").value.trim(), model: $("asModel").value.trim(), api_key: $("asKey").value.trim(), enabled: true, grounded: /generativelanguage/i.test($("asBase").value) };
-    if (!payload.name || !payload.base_url || !payload.model || !payload.api_key) { setStatus("need name, base URL, model and key", "bad"); return; }
-    const r = await saveProvider(payload);
-    if (r.ok) { ["asName","asModel","asBase","asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ saved — added to your providers", "ok"); } else setStatus(r.error || "save failed", "bad");
+    const typed = $("asModel").value.trim(); if (typed) addModel(typed);   // fold an un-added typed model in
+    const models = pendingModels.slice();
+    const name = $("asName").value.trim(), base = $("asBase").value.trim(), key = $("asKey").value.trim();
+    if (!name || !base || !key) { setStatus("need name, base URL and key", "bad"); return; }
+    if (!models.length) { setStatus("pick at least one model", "bad"); return; }
+    setStatus("saving " + models.length + " model" + (models.length > 1 ? "s" : "") + "…");
+    const grounded = /generativelanguage/i.test(base);
+    let ok = 0, lastErr = "";
+    // one provider RECORD per model, same key → each shows as its own brain in the picker
+    for (const m of models) { const r = await saveProvider({ name, base_url: base, model: m, api_key: key, enabled: true, grounded }); if (r && r.ok) ok++; else lastErr = (r && r.error) || "save failed"; }
+    if (ok) { pendingModels = []; renderChips(); ["asModel", "asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ added " + ok + " model" + (ok > 1 ? "s" : "") + " on your key", "ok"); }
+    else setStatus(lastErr, "bad");
   };
 })();
