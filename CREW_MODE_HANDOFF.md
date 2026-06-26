@@ -1,4 +1,11 @@
-# CREW MODE — handoff (2026-06-26, uncommitted)
+# CREW MODE — handoff (2026-06-26, SHIPPED v2.4.0)
+
+> **Status: SHIPPED.** Commit `feb081d` on master · tag `v2.4.0` · GitHub release
+> https://github.com/tiffagnx/DeMartinville/releases/tag/v2.4.0 (Win `DeMartinville.zip` attached,
+> Mac arm64 `.app` building from the tag). Existing exe — **no rebuild**. The in-app updater offers
+> 2.4.0 to older builds (sessions + keys stay put). **Website NOT deployed:** owner is reworking
+> demartinlabs.com (pulled the program out of the .com), so this ship is GitHub + zip ONLY — gh-pages
+> left untouched by his call. When the new hosting plan lands, decide if/where Crew Mode shows publicly.
 
 **One switch turns your single brain into a team.** You already drop API keys in the Keys
 hub. Flip **Crew Mode** on and the app reads *whatever models you have enabled* and runs them
@@ -65,7 +72,11 @@ team — a model in the stem while another builds the beat?"* Slice 1 proves the
 ---
 
 ## Status / coordination
-- **UNCOMMITTED** — left for the owner's morning batch (parallel-session rule: no solo push/deploy).
+- **SHIPPED v2.4.0** (`feb081d`, master). Committed by EXPLICIT path (crew.js, index.html,
+  pinkroom-nav.js, app.py, studio.html, this doc) — a parallel session's `AUDIT_HANDOFF.md` was in
+  the tree and was deliberately **left untouched** (never `git add -A`).
+- Bumped `APP_VERSION` 2.3.0 → 2.4.0 in BOTH homes (app.py + studio.html). Zip built with the
+  existing exe (no rebuild); crew.js ships as a loose `static/` file, so it lands without a rebuild.
 - Safe alongside cloud-port, brain/God-Mode-dock, agent-training, welcome-tips, notifi, leprince,
   launch-kit sessions (all audited; no localStorage / global / fetch-order / SSE-shape collisions).
 - Files are additive: 1 new file + 2 one-line includes. Nothing clobbered.
