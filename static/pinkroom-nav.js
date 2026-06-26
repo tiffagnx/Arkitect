@@ -24,6 +24,9 @@
   if (!document.querySelector('script[data-dmvai]')) {
     const a1 = document.createElement("script"); a1.src = "/static/cloud-ai.js"; a1.async = false; a1.setAttribute("data-dmvai", "1"); document.head.appendChild(a1);
     const a2 = document.createElement("script"); a2.src = "/static/cloud-bridge.js"; a2.async = false; a2.setAttribute("data-dmvbridge", "1"); document.head.appendChild(a2);
+    // CREW MODE — opt-in multi-LLM conductor. MUST load AFTER cloud-bridge (it captures the bridge's
+    // fetch override + delegates to it). Self-contained; wraps /api/chat only; off by default.
+    const a3 = document.createElement("script"); a3.src = "/static/crew.js"; a3.async = false; a3.setAttribute("data-crew", "1"); document.head.appendChild(a3);
   }
   // force the app-window (Edge/Chrome --app mode) title bar to graphite, overriding the OS accent color
   if(!document.querySelector('meta[name="theme-color"]')){ const tc = document.createElement("meta"); tc.name = "theme-color"; tc.content = "#0C0D10"; document.head.appendChild(tc); }

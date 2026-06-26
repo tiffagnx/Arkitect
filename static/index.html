@@ -1414,6 +1414,9 @@ startArkTips();
      on demartinlabs.com they make the room run on the user's own key, no server needed. -->
 <script src="/static/cloud-ai.js?v=4"></script>
 <script src="/static/cloud-bridge.js?v=4"></script>
+<!-- CREW MODE — opt-in multi-LLM conductor. Loads AFTER cloud-bridge (captures its fetch override).
+     Self-contained; wraps /api/chat only; off by default; passthrough under 2 brains. -->
+<script src="/static/crew.js"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
 <script src="/static/copy-anywhere.js"></script>
