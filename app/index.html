@@ -17,7 +17,7 @@
     if (sessionStorage.getItem('dmv_stay')) return;                  // user explicitly chose to stay
     var phone = /Android|iPhone|iPod|Mobi/i.test(navigator.userAgent)
              || (matchMedia('(max-width:768px)').matches && matchMedia('(pointer:coarse)').matches);
-    if (phone) location.replace('/for-creators');
+    location.replace('/for-creators');
   }catch(e){}
 })();
 </script>
