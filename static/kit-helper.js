@@ -162,6 +162,18 @@
   .kt-pill.on[data-tier="max"] { border-color:rgba(240,90,120,.9); background:rgba(240,90,120,.22); color:#FFB4C4; }
   .kt-effort { flex:none; white-space:nowrap; }
   .kt-effort.god { color:#FFE6A3; border-color:rgba(230,193,106,.6); background:rgba(230,193,106,.10); box-shadow:0 0 10px rgba(230,193,106,.4); }
+  .kt-crew { flex:none; white-space:nowrap; }
+  .kt-crew.on { color:#CDEBF5; border-color:rgba(120,182,205,.9); background:rgba(62,156,184,.24); box-shadow:0 0 9px rgba(62,156,184,.4); }
+  .kit-crewpop { position:fixed; z-index:9999; width:250px; max-width:88vw; background:rgba(20,23,29,.99); border:1px solid rgba(120,182,205,.42); border-radius:12px; box-shadow:0 14px 38px rgba(0,0,0,.62); padding:11px 12px; display:none; }
+  .kit-crewpop.open { display:block; }
+  .kit-crewpop h5 { margin:0 0 3px; font:800 12.5px Oxanium,sans-serif; color:#EAF2F6; letter-spacing:.02em; }
+  .kit-crewpop .cw-sub { font:500 10.5px Inter,sans-serif; color:#9FB4C0; line-height:1.45; margin-bottom:7px; }
+  .kit-crewpop .cw-lead { font:700 10px Inter,sans-serif; color:#7FD3B0; padding:4px 5px 7px; border-bottom:1px solid rgba(255,255,255,.07); margin-bottom:5px; }
+  .kit-crewpop label { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:7px; cursor:pointer; font:600 11.5px Inter,sans-serif; color:#D7DCE4; }
+  .kit-crewpop label:hover { background:rgba(62,156,184,.15); }
+  .kit-crewpop input[type=checkbox] { accent-color:#3E9CB8; width:14px; height:14px; flex:none; }
+  .kit-crewpop .cw-empty { font:500 11px Inter,sans-serif; color:#9FB4C0; line-height:1.5; padding:3px 5px; }
+  .kit-crewpop a { color:#7CC7DC; cursor:pointer; text-decoration:underline; }
   .kt-keylink { margin-left:auto; font:700 9px 'Space Mono',monospace; letter-spacing:.06em; color:#9FCFDD; background:none; border:none; cursor:pointer; padding:3px 4px; }
   .kt-keylink:hover { color:#CFE6EE; text-decoration:underline; }
   /* per-agent MODEL picker — a pill-styled <select>; each agent shows ITS own saved brain (honest, from /api/models) */
@@ -264,7 +276,7 @@
     `<div class="kit-bar"><span class="kit-host"></span><span><span class="kit-t">KIT</span><span class="kit-s">${ROOMS[room]}</span></span><button class="kit-x" title="close">✕</button></div>
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
-     <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
+     <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-crew kt-pill" id="ktCrew" type="button" title="Back this agent with a crew of other brains — they weigh in, this agent gives you the answer">+ crew</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
      <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
@@ -284,6 +296,7 @@
 
   // ── 📎 image upload — so the agent can SEE what you show her and write the prompt from it ──
   let pendingImage = "";
+  let pendingAudio = null;   // {dataURL, meta, name} — a song/clip the agent will HEAR (same 📎)
   const picRow = win.querySelector(".kit-pic"), upBtn = win.querySelector(".kit-up");
   function renderPic(){
     if (!picRow) return;
@@ -291,11 +304,30 @@
       picRow.innerHTML = '<img src="' + pendingImage + '" alt=""><button class="kit-picx" title="remove">✕</button>';
       picRow.style.display = "flex";
       const x = picRow.querySelector(".kit-picx"); if (x) x.onclick = () => { pendingImage = ""; renderPic(); };
+    } else if (pendingAudio){
+      const dur = pendingAudio.meta && pendingAudio.meta.durationSec;
+      picRow.innerHTML = '<span style="display:inline-flex;align-items:center;gap:7px;font:600 11px Inter;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:9px;padding:6px 10px">🎵 ' +
+        String(pendingAudio.name || "audio").replace(/[<>&]/g, "") + (dur ? " · " + Math.floor(dur / 60) + ":" + ("0" + Math.floor(dur % 60)).slice(-2) : "") +
+        "</span><button class=\"kit-picx\" title=\"remove\">✕</button>";
+      picRow.style.display = "flex";
+      const x = picRow.querySelector(".kit-picx"); if (x) x.onclick = () => { pendingAudio = null; renderPic(); };
     } else { picRow.innerHTML = ""; picRow.style.display = "none"; }
   }
   if (upBtn) upBtn.onclick = () => {
-    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*,audio/*";   // ONE clip — image OR a song
     inp.onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return;
+      if ((f.type || "").indexOf("audio") === 0 || /\.(wav|mp3|m4a|flac|aac|ogg|aiff?)$/i.test(f.name || "")) {
+        pendingImage = "";
+        const rd = new FileReader();
+        rd.onload = async () => {
+          let meta = {};
+          try { if (window.DMV_EAR) meta = await window.DMV_EAR.analyze(f); } catch (_) {}
+          pendingAudio = { dataURL: rd.result, meta: meta, name: f.name || "audio" }; renderPic();
+        };
+        rd.readAsDataURL(f);
+        return;
+      }
+      pendingAudio = null;
       const rd = new FileReader(); rd.onload = () => { pendingImage = rd.result; renderPic(); }; rd.readAsDataURL(f); };
     inp.click();
   };
@@ -661,6 +693,7 @@
     const has = [...modelSel.options].some(o => o.value === want);
     modelSel.value = has ? want : "auto";
     applyGlow();
+    try { paintCrew(); } catch (_) {}
   }
   function refreshModels(){
     fetch("/api/models").then(r => r.json()).then(j => populateModels(j)).catch(() => populateModels(null));
@@ -672,15 +705,97 @@
     const has = [...modelSel.options].some(o => o.value === want);
     modelSel.value = has ? want : "auto";
     applyGlow();
+    try { paintCrew(); } catch (_) {}
   }
 
   if (modelSel) modelSel.onchange = () => {
     const v = modelSel.value;
     if (v === "__addkey") { if (window.openKeys) window.openKeys("brain"); modelSel.value = getAgentModel(active); return; }
     setAgentModel(active, v);
+    { let _c = getAgentCrew(active); if (_c.indexOf(v) >= 0) setAgentCrew(active, _c.filter(x => x !== v)); paintCrew(); if (crewPop) crewPop.classList.remove("open"); }   // a brain can't be both lead AND its own crew member
     applyGlow();
   };
   { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
+
+  // ── CREW (per-agent BREADTH) — back THIS agent with a team of OTHER brains the user picks. The
+  //    agent you dragged in stays the LEAD (it speaks + drives the room); the crew weighs in and the
+  //    agent synthesizes the best of it. Opt-in, per-agent. Storage mirrors the model picker:
+  //    built-ins → dmv_agent_crew_<id>; user-made → a `crew` field on the dmv_characters entry.
+  //    NOT the same as the front-door "Your Crew" roster — this is one agent's backing brains. ──
+  const crewBtn = win.querySelector("#ktCrew");
+  let crewPop = null;
+  function cwEsc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function getAgentCrew(ch){
+    if (!ch) return [];
+    try {
+      if (ch.mine) return Array.isArray(ch.crew) ? ch.crew : [];
+      const v = localStorage.getItem("dmv_agent_crew_" + ch.id); const a = v ? JSON.parse(v) : [];
+      return Array.isArray(a) ? a : [];
+    } catch (_) { return []; }
+  }
+  function setAgentCrew(ch, arr){
+    if (!ch) return;
+    arr = (arr || []).filter(Boolean);
+    if (ch.mine) {
+      ch.crew = arr;
+      try { const all = JSON.parse(localStorage.getItem("dmv_characters") || "[]");
+        const i = all.findIndex(c => c && c.id === ch.id);
+        if (i >= 0) { all[i].crew = arr; localStorage.setItem("dmv_characters", JSON.stringify(all));
+          window.dispatchEvent(new CustomEvent("dmv-characters-changed")); } } catch (_) {}
+    } else {
+      try { localStorage.setItem("dmv_agent_crew_" + ch.id, JSON.stringify(arr)); } catch (_) {}
+    }
+  }
+  function paintCrew(){
+    if (!crewBtn) return;
+    const n = getAgentCrew(active).length;
+    crewBtn.textContent = n ? ("🧠 crew ×" + n) : "+ crew";
+    crewBtn.classList.toggle("on", n > 0);
+  }
+  // candidate backups = every brain in the model dropdown EXCEPT auto/add-key and the agent's own lead
+  function crewOptions(){
+    const lead = modelSel ? modelSel.value : "auto", out = [];
+    if (modelSel) [...modelSel.options].forEach(o => {
+      if (o.value === "auto" || o.value === "__addkey" || o.value === lead) return;
+      out.push({ id: o.value, label: o.textContent });
+    });
+    return out;
+  }
+  function renderCrewPop(){
+    if (!crewPop) { crewPop = document.createElement("div"); crewPop.className = "kit-crewpop"; document.body.appendChild(crewPop); }
+    const opts = crewOptions(), sel = getAgentCrew(active);
+    const leadLbl = (modelSel && modelSel.selectedOptions[0]) ? modelSel.selectedOptions[0].textContent : "this agent";
+    const who = (active && active.name) || "this agent";
+    let html = '<h5>🧠 ' + cwEsc(who) + "'s crew</h5>" +
+      '<div class="cw-sub">Pick other brains to back ' + cwEsc(who) + ' up — they weigh in, ' + cwEsc(who) + ' gives you the answer.</div>' +
+      '<div class="cw-lead">🎖️ Lead (answers): ' + cwEsc(leadLbl.replace(/^☁ ?/, "")) + '</div>';
+    if (!opts.length) {
+      html += '<div class="cw-empty">No other brains yet — a crew needs more than one. <a data-cw-keys>Add a cloud key →</a><br><span style="color:#7E92A0">One OpenRouter key gives you Claude, GPT, Grok, Gemini &amp; more.</span></div>';
+    } else {
+      opts.forEach(o => { const on = sel.indexOf(o.id) >= 0;
+        html += '<label><input type="checkbox" data-cw="' + cwEsc(o.id) + '"' + (on ? " checked" : "") + '>' + cwEsc(o.label.replace(/^☁ ?/, "")) + '</label>'; });
+    }
+    crewPop.innerHTML = html;
+    const kk = crewPop.querySelector("[data-cw-keys]"); if (kk) kk.onclick = () => { if (window.openKeys) window.openKeys("brain"); };
+    crewPop.querySelectorAll("[data-cw]").forEach(cb => cb.onchange = () => {
+      let cur = getAgentCrew(active); const id = cb.getAttribute("data-cw");
+      if (cb.checked) { if (cur.indexOf(id) < 0) cur = cur.concat([id]); } else cur = cur.filter(x => x !== id);
+      setAgentCrew(active, cur); paintCrew();
+    });
+  }
+  if (crewBtn) crewBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (crewPop && crewPop.classList.contains("open")) { crewPop.classList.remove("open"); return; }
+    renderCrewPop();
+    const r = crewBtn.getBoundingClientRect();
+    crewPop.style.top = (r.bottom + 6) + "px";
+    crewPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 260)) + "px";
+    crewPop.classList.add("open");
+  };
+  document.addEventListener("click", (e) => {
+    if (crewPop && crewPop.classList.contains("open") && !crewPop.contains(e.target) && e.target !== crewBtn && !(crewBtn && crewBtn.contains(e.target))) crewPop.classList.remove("open");
+  });
+  paintCrew();
 
   // ── EFFORT LEVER (agent window) — tap to set how hard THIS agent thinks; rides every /api/kit call
   //    as `effort`. 🔱 God only unlocks on a Claude brain (same as the main chat); on a Claude brain the
@@ -759,21 +874,24 @@
         } catch (_) {}
       }
     }
-    const q = input.value.trim(); if ((!q && !pendingImage) || busy) return;   // allow an image-only ask
+    const q = input.value.trim(); if ((!q && !pendingImage && !pendingAudio) || busy) return;   // allow an image- OR audio-only ask
     busy = true; go.disabled = true;
     const sentImage = pendingImage;
-    addMsg("you", q || "(image)");
+    const sentAudio = pendingAudio;
+    addMsg("you", q || (sentAudio ? "🎵 " + (sentAudio.name || "audio") : "(image)"));
     if (sentImage) { const im = document.createElement("img"); im.src = sentImage;
       im.style.cssText = "max-width:130px;border-radius:9px;margin-top:5px;display:block;border:1px solid rgba(120,182,205,.4);";
       body.appendChild(im); body.scrollTop = body.scrollHeight; }
-    input.value = ""; input.style.height = "auto"; pendingImage = ""; renderPic();
-    const think = addMsg("kit", active.name + "'s on it…"); think.classList.add("think"); winSpr.setSpeed(9);
+    input.value = ""; input.style.height = "auto"; pendingImage = ""; pendingAudio = null; renderPic();
+    const think = addMsg("kit", active.name + (sentAudio ? " is having a listen…" : "'s on it…")); think.classList.add("think"); winSpr.setSpeed(9);
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q || "Look at this image and write a great prompt I can generate from it.", character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      const payload = { room, message: q || (sentImage && !sentAudio ? "Look at this image and write a great prompt I can generate from it." : ""), character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      { const _crew = getAgentCrew(active); if (_crew && _crew.length) payload.crew = _crew; }   // CREW: the user-picked backing brains for THIS agent
       if (handoff && handoff.brief) { payload.handoff = handoff.brief; handoff = null; }   // seed the room ONCE with the chat brief, then run on the room's own thread
       if (sentImage) payload.image = sentImage;
+      if (sentAudio) { payload.audio = sentAudio.dataURL; payload.audio_meta = sentAudio.meta || {}; payload.audio_name = sentAudio.name || "audio"; }   // HEAR it: Whisper transcript + the free measured numbers
       // session-aware: if this room exposes a live snapshot (the studio does), hand the agent the REAL session
       if (typeof window.dmvSessionSnapshot === "function") { const snap = window.dmvSessionSnapshot(); if (snap) payload.session = snap; }
       if (active.mine) {

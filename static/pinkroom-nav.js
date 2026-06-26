@@ -32,7 +32,7 @@
   // pro polish: strip internal hrefs so hovering a button doesn't flash localhost URLs in the corner
   document.querySelectorAll('a[href^="/"]').forEach(a => { const dest = a.getAttribute('href'); if(!dest) return; a.removeAttribute('href'); a.style.cursor = 'pointer'; a.addEventListener('click', e => { e.preventDefault(); location.href = dest; }); });
   // load Kit, the in-room build-bot helper (kit-helper.js self-skips the main chat + non-rooms)
-  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js?v=6"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
+  if (!document.querySelector('script[data-kit]')) { const ks = document.createElement("script"); ks.src = "/static/kit-helper.js?v=7"; ks.setAttribute("data-kit", "1"); document.body.appendChild(ks); }
   // The ONE agent button in every room: "Summon agent" opens the agent window (with the Kit/Tiff/your-agents
   // chooser inside) — works even if nobody's been dragged in yet. The little agent name-chip in the bar is a
   // PASSIVE indicator (shows who's in the room), NOT a button — so there's only ever one thing to click.
@@ -61,6 +61,8 @@
   // the in-room FEEDBACK BUDDY (separate from Kit) — "you're early = you're a builder", collects bugs/ideas
   if (!document.querySelector('script[data-fbk]')) { const fs = document.createElement("script"); fs.src = "/static/feedback-buddy.js"; fs.setAttribute("data-fbk", "1"); document.body.appendChild(fs); }
   // KEYS — the unified API-key window (exposes window.openKeys): curated picks + deep links + paste, saved locally
+  // AUDIO EAR — free in-browser audio analysis (loudness/brightness/dynamics) so docked agents can HEAR uploads
+  if (!document.querySelector('script[data-ear]')) { const ear = document.createElement("script"); ear.src = "/static/audio-ear.js"; ear.setAttribute("data-ear", "1"); document.body.appendChild(ear); }
   if (!document.querySelector('script[data-keys]')) { const kys = document.createElement("script"); kys.src = "/static/keys.js"; kys.setAttribute("data-keys", "1"); document.body.appendChild(kys); }
   // COPY ANYWHERE — reliable right-click→copy in the native shell (where the OS menu is flaky)
   if (!document.querySelector('script[data-copy]')) { const cpy = document.createElement("script"); cpy.src = "/static/copy-anywhere.js"; cpy.setAttribute("data-copy", "1"); document.body.appendChild(cpy); }

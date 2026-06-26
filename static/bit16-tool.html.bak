@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The 16-Bit Room — Tiff’s Pink Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+<style>
+  :root { --pink:#E91E8C; --teal:#00D1C4; --violet:#8B5CF6; --amber:#F5A623;
+          --bg0:#07050C; --bg1:#14101C; --panel:rgba(16,11,22,0.8);
+          --hairline:rgba(255,255,255,0.08); --text:#F2EDF4; --dim:rgba(220,210,228,0.55); }
+  * { box-sizing:border-box; margin:0; }
+  body { height:100vh; overflow:hidden; font-family:Inter,system-ui,sans-serif; color:var(--text);
+         background: radial-gradient(1100px 600px at 50% -15%, #1E1228 0%, var(--bg1) 50%, var(--bg0) 100%); }
+  /* drifting aurora + grain — lifted from the room */
+  .aura { position:fixed; inset:-20%; pointer-events:none; z-index:0; filter:blur(90px); opacity:.45; }
+  .aura div { position:absolute; width:44vw; height:44vw; border-radius:50%; }
+  .aura .a1 { background:radial-gradient(circle, rgba(233,30,140,.16), transparent 65%); animation:drift1 26s ease-in-out infinite alternate; left:4%; top:8%; }
+  .aura .a2 { background:radial-gradient(circle, rgba(139,92,246,.13), transparent 65%); animation:drift2 32s ease-in-out infinite alternate; right:2%; top:30%; }
+  .aura .a3 { background:radial-gradient(circle, rgba(0,209,196,.08), transparent 65%); animation:drift1 38s ease-in-out infinite alternate-reverse; left:36%; bottom:-6%; }
+  @keyframes drift1 { to { transform:translate(7vw,5vh) scale(1.15); } }
+  @keyframes drift2 { to { transform:translate(-6vw,-4vh) scale(0.9); } }
+  .grain { position:fixed; inset:0; pointer-events:none; z-index:50; opacity:.05; mix-blend-mode:soft-light;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+  .top { position:relative; z-index:2; display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--hairline); flex-wrap:wrap; }
+  .top a.home { color:var(--dim); text-decoration:none; font:500 12px Inter; padding:7px 12px; border:1px solid var(--hairline); border-radius:10px; }
+  .top a.home:hover { color:var(--text); border-color:rgba(233,30,140,.45); }
+  .top h1 { font:700 15px Oxanium; letter-spacing:.12em;
+    background:linear-gradient(100deg,#FF8FC9,var(--pink) 40%,var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .pills { display:flex; gap:6px; }
+  .tbtn { padding:8px 14px; border-radius:10px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 12.5px Inter; transition:all .12s; }
+  .tbtn:hover { border-color:rgba(233,30,140,.5); }
+  .tbtn.hot { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent;
+    box-shadow:0 3px 14px rgba(233,30,140,.4); }
+  .tbtn.teal { color:#9BF0E8; } .tbtn.teal.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); }
+  .tbtn.sm { padding:6px 10px; font-size:11.5px; }
+  .top .right { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .readout { font:600 12px 'Space Mono'; color:var(--teal); min-width:64px; text-align:center; }
+  label.tbtn { display:inline-flex; align-items:center; gap:5px; }
+
+  .body { position:relative; z-index:1; display:flex; height:calc(100vh - 54px); }
+  /* left rail — per-mode controls */
+  .rail { width:264px; min-width:264px; border-right:1px solid var(--hairline); background:var(--panel);
+    backdrop-filter:blur(22px); padding:14px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+  .module { border:1px solid var(--hairline); border-radius:14px; padding:12px; background:rgba(255,255,255,.02); }
+  .module h3 { font:700 10px 'Space Mono'; letter-spacing:.22em; color:var(--dim); margin-bottom:10px; text-transform:uppercase; }
+  .module h3.pink { color:#FF9DCE; }
+  .krow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .krow label { font:500 10.5px Inter; color:var(--dim); width:66px; }
+  .krow input[type=range] { flex:1; accent-color:var(--pink); cursor:pointer; height:4px; min-width:0; }
+  .krow output { font:500 10px 'Space Mono'; color:var(--teal); width:46px; text-align:right; }
+  .krow select { flex:1; background:rgba(255,255,255,.05); color:var(--text); border:1px solid var(--hairline);
+    border-radius:8px; font:500 10.5px Inter; padding:5px 7px; outline:none; min-width:0; }
+  .krow select option { background:var(--bg1); }
+  .ibtn { width:100%; padding:8px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer;
+    background:rgba(255,255,255,.045); color:var(--text); font:600 10.5px Inter; transition:all .12s; margin-bottom:6px; }
+  .ibtn:hover { border-color:rgba(233,30,140,.5); }
+  .ibtn.on { background:rgba(0,209,196,.14); border-color:rgba(0,209,196,.5); color:#9BF0E8; }
+  .ibtn.pink { background:linear-gradient(120deg,#FF73BE,var(--pink)); color:#14040E; border-color:transparent; font-weight:800; }
+  .ibtn:disabled { opacity:.4; cursor:default; }
+  .note { font:400 10px 'Space Mono'; color:var(--dim); line-height:1.55; margin-top:4px; }
+  .swatches { display:grid; grid-template-columns:repeat(8,1fr); gap:4px; margin-top:6px; }
+  .swatch { aspect-ratio:1; border-radius:5px; border:1px solid rgba(255,255,255,.12); cursor:pointer; }
+  .swatch.sel { box-shadow:0 0 0 2px var(--pink); border-color:var(--pink); }
+  .toolgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .tool { padding:9px 4px; border-radius:9px; border:1px solid var(--hairline); cursor:pointer; text-align:center;
+    background:rgba(255,255,255,.045); color:var(--dim); font:600 10px Inter; transition:all .12s; }
+  .tool:hover { border-color:rgba(233,30,140,.4); color:var(--text); }
+  .tool.sel { background:rgba(233,30,140,.16); border-color:var(--pink); color:#FFD6EA; }
+
+  /* center stage */
+  .stage { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .stagebody { flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:18px; position:relative; }
+  .drop { border:2px dashed rgba(233,30,140,.35); border-radius:18px; padding:54px 40px; text-align:center;
+    color:var(--dim); font-size:13.5px; cursor:pointer; transition:all .15s; max-width:560px; }
+  .drop:hover, .drop.over { border-color:var(--pink); color:var(--text); background:rgba(233,30,140,.05); }
+  .drop b { color:#FFD6EA; }
+  /* checker bg behind the preview/editor */
+  .checker { background:repeating-conic-gradient(#16111e 0% 25%, #20182c 0% 50%) 50% / 22px 22px; }
+  canvas.preview { image-rendering:pixelated; border:1px solid var(--hairline); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  canvas.editor { image-rendering:pixelated; border:1px solid var(--hairline); cursor:crosshair; touch-action:none; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+  .stagefoot { border-top:1px solid var(--hairline); padding:8px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:rgba(0,0,0,.2); }
+  .stagefoot .lbl { font:600 9px 'Space Mono'; letter-spacing:.18em; color:var(--dim); text-transform:uppercase; }
+
+  /* right filmstrip = timeline */
+  .strip { width:184px; min-width:184px; border-left:1px solid var(--hairline); background:var(--panel);
+    backdrop-filter:blur(22px); display:flex; flex-direction:column; }
+  .strip .sh { padding:12px 14px 8px; font:700 10px 'Space Mono'; letter-spacing:.22em; color:var(--dim); text-transform:uppercase; }
+  .frames { flex:1; overflow-y:auto; padding:0 12px 12px; display:flex; flex-direction:column; gap:8px; }
+  .cell { position:relative; border:1px solid var(--hairline); border-radius:10px; background:rgba(0,0,0,.35); padding:6px; cursor:pointer; transition:all .12s; }
+  .cell.sel { border-color:var(--violet); box-shadow:0 0 0 1px var(--violet), 0 0 14px rgba(139,92,246,.3); }
+  .cell.skip { opacity:.42; }
+  .cell canvas { display:block; width:100%; image-rendering:pixelated; background:repeating-conic-gradient(#16111e 0% 25%, #20182c 0% 50%) 50% / 12px 12px; border-radius:6px; }
+  .cell .meta { display:flex; align-items:center; justify-content:space-between; margin-top:4px; font:500 9px 'Space Mono'; color:var(--dim); }
+  .cell .ms { color:var(--teal); }
+  .cell.dragover { border-color:var(--pink); }
+  .stripfoot { border-top:1px solid var(--hairline); padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:80;
+    background:rgba(12,8,18,.94); border:1px solid rgba(233,30,140,.4); border-radius:12px; padding:10px 18px;
+    font:500 12px Inter; color:#FFD6EA; box-shadow:0 8px 30px rgba(0,0,0,.5); opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .spin { display:inline-block; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  ::-webkit-scrollbar { width:9px; } ::-webkit-scrollbar-thumb { background:rgba(233,30,140,.25); border-radius:99px; }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(233,30,140,.45); }
+  .empty { color:var(--dim); font:500 11px Inter; text-align:center; padding:20px 8px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="aura"><div class="a1"></div><div class="a2"></div><div class="a3"></div></div>
+<div class="grain"></div>
+
+<div class="top">
+  <a class="home" href="/">← Pink Room</a>
+  <h1>👾 THE 16-BIT ROOM</h1>
+  <div class="pills">
+    <button class="tbtn hot" id="pillAnimate">ANIMATE</button>
+    <button class="tbtn" id="pillDraw">DRAW</button>
+    <button class="tbtn" id="pillMake">PIXELATE</button>
+  </div>
+  <div class="right">
+    <span class="readout" id="readout">0 / 0</span>
+    <button class="tbtn teal sm" id="onionBtn">◐ Onion</button>
+    <button class="tbtn hot sm" id="playBtn">▶ Play</button>
+    <label class="tbtn sm" title="Load a sprite sheet or a folder of PNG frames">📂 Load<input type="file" id="loadFile" accept="image/*" multiple hidden /></label>
+    <button class="tbtn sm" id="expGif">⬇ GIF</button>
+    <button class="tbtn sm" id="expVid">⬇ WebM/MP4</button>
+    <button class="tbtn sm" id="expSheet">⬇ Sheet</button>
+    <button class="tbtn sm" id="expZip">⬇ ZIP</button>
+  </div>
+</div>
+
+<div class="body">
+  <!-- LEFT RAIL — swapped per mode -->
+  <aside class="rail" id="rail"></aside>
+
+  <!-- CENTER STAGE -->
+  <section class="stage">
+    <div class="stagebody checker" id="stageBody">
+      <div class="drop" id="drop">
+        Drop a <b>sprite sheet</b> (8 poses on magenta #FF00FF) or a <b>folder of PNG frames</b> here.<br/>
+        <span style="font:400 11px 'Space Mono';color:var(--dim)">— or paste a screenshot (Ctrl+V) · click to browse —</span>
+      </div>
+    </div>
+    <div class="stagefoot" id="stageFoot">
+      <span class="lbl">no frames loaded</span>
+    </div>
+  </section>
+
+  <!-- RIGHT — TIMELINE -->
+  <aside class="strip">
+    <div class="sh">Timeline</div>
+    <div class="frames" id="frames"><div class="empty">frames show up here — drag to reorder, click to select</div></div>
+    <div class="stripfoot">
+      <button class="ibtn" id="dupFrame">⧉ Duplicate selected</button>
+      <button class="ibtn" id="delFrame">🗑 Delete selected</button>
+      <button class="ibtn" id="addBlank">＋ Add blank frame</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════
+   THE 16-BIT ROOM — sprite animator + pixel-art editor.
+   100% client-side, $0, no CDN. Ported from heytiff:
+     mv-sprite-atlas.ts  → chromaKey / extractFrames / mergeAccessories /
+                            extractAtlas / drawFrame / despill helpers
+     mv-types.ts          → pickFrame / ANIM_FRAME_RANGES
+     mv-zip.ts            → makeZip (STORE-only ZIP writer)
+     CastStage.tsx        → AtlasPreview loop / renderAnimWebM / exportPngSequence
+   GIF export = inline GIF89a LZW encoder (exact-palette ≤256 colors,
+   transparent index 0, per-frame centisecond delays, NETSCAPE loop).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const $ = (id) => document.getElementById(id);
+
+/* ─────────────────────────────── shared data model (spec §2) ──────────── */
+let frames = [];             // each: { canvas, w, h, ms, skip:false, name }
+let cur = 0;                 // selected / playing frame index
+let playing = false, loop = true, onionOn = false;
+let mode = 'animate';        // 'animate' | 'draw' | 'make'
+const state = { fps: 12, zoom: 6 };
+
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function fileToImage(f) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); }); }
+function loadImageUrl(src) { return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => rej(new Error('image load failed')); i.src = src; }); }
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 10000); }
+function toast(msg, ms = 2200) { const t = $('toast'); t.innerHTML = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
+
+/* ═══════════════════════ PORTED: mv-sprite-atlas.ts ═══════════════════════
+   chroma-key auto-detect (magenta/green/blue/black/white/checker) + spill
+   suppression + flood-fill blob extraction + uniform-cell bottom-aligned
+   packing. Verbatim port, TypeScript annotations stripped. ───────────────── */
+
+const ATLAS_DEFAULTS = { minW: 16, minH: 24, pad: 6, expected: 8, mergeWithin: 40, maxFrames: 24, maxAtlasW: 8000 };
+
+/** Chroma-key in-place. Returns the detected bg mode for downstream sanity. */
+function chromaKey(imgData) {
+  const px = imgData.data;
+  const W = imgData.width, H = imgData.height;
+  const sample = (x, y) => { const i = (y * W + x) * 4; return [px[i], px[i + 1], px[i + 2]]; };
+  const corners = [sample(5, 5), sample(W - 6, 5), sample(5, H - 6), sample(W - 6, H - 6)];
+  const isMagentaPx = (r, g, b) => r > 200 && b > 200 && g < 80;
+  const magentaCorners = corners.filter(([r, g, b]) => isMagentaPx(r, g, b)).length;
+  const avgLum = corners.reduce((s, c) => s + (c[0] + c[1] + c[2]) / 3, 0) / corners.length;
+  const avgBlue = corners.reduce((s, c) => s + (c[2] - (c[0] + c[1]) / 2), 0) / corners.length;
+  const isGreenPx = (r, g, b) => g > 180 && g > r + 40 && g > b + 40;
+  const greenCorners = corners.filter(([r, g, b]) => isGreenPx(r, g, b)).length;
+  const isWhitePx = (r, g, b) => r > 240 && g > 240 && b > 240 && Math.max(r, g, b) - Math.min(r, g, b) < 12;
+  const whiteCorners = corners.filter(([r, g, b]) => isWhitePx(r, g, b)).length;
+
+  let mode = 'checker';
+  if (magentaCorners >= 3) mode = 'magenta';
+  else if (greenCorners >= 3) mode = 'green';
+  else if (whiteCorners >= 3) mode = 'white';
+  else if (avgLum < 40) mode = 'black';
+  else if (avgBlue > 40) mode = 'blue';
+
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    let kill = false;
+    switch (mode) {
+      case 'magenta': if (r > 180 && b > 180 && g < 120 && Math.abs(r - b) < 50) kill = true; break;
+      case 'green': if (g > 160 && g > r + 30 && g > b + 30) kill = true; break;
+      case 'black': { const lum = (r + g + b) / 3; if (lum < 30) kill = true; break; }
+      case 'blue': if (b > r + 30 && b > g + 20 && b > 80) kill = true; break;
+      case 'checker': { const max = Math.max(r, g, b), min = Math.min(r, g, b); const lum = (r + g + b) / 3; if (max - min < 18 && lum >= 180) kill = true; break; }
+      case 'white': if (r > 235 && g > 235 && b > 235 && Math.max(r, g, b) - Math.min(r, g, b) < 14) kill = true; break;
+    }
+    if (kill) px[i + 3] = 0;
+  }
+
+  // SPILL SUPPRESSION — clamp the contaminating channel on surviving edge pixels.
+  if (mode === 'green') {
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const maxRB = Math.max(r, b);
+      if (g > maxRB + 8) px[i + 1] = (maxRB + g) >> 1;
+    }
+  } else if (mode === 'magenta') {
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      if (r > g + 12 && b > g + 12) { px[i] = (g + r) >> 1; px[i + 2] = (g + b) >> 1; }
+    }
+  } else if (mode === 'blue') {
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const maxRG = Math.max(r, g);
+      if (b > maxRG + 10) px[i + 2] = (maxRG + b) >> 1;
+    }
+  }
+  return mode;
+}
+
+/** Iterative flood-fill connected-component extraction. */
+function extractFrames(imgData, W, H, minW, minH) {
+  const px = imgData.data;
+  const visited = new Uint8Array(W * H);
+  const blobs = [];
+  const isFG = (x, y) => px[(y * W + x) * 4 + 3] > 32;
+  const stack = new Int32Array(W * H * 2);
+  for (let sy = 0; sy < H; sy++) {
+    for (let sx = 0; sx < W; sx++) {
+      if (visited[sy * W + sx] || !isFG(sx, sy)) continue;
+      let top = 0;
+      stack[top++] = sx; stack[top++] = sy;
+      let minX = sx, maxX = sx, minY = sy, maxY = sy, count = 0;
+      while (top > 0) {
+        const y = stack[--top], x = stack[--top];
+        const idx = y * W + x;
+        if (x < 0 || x >= W || y < 0 || y >= H || visited[idx] || !isFG(x, y)) continue;
+        visited[idx] = 1; count++;
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        stack[top++] = x + 1; stack[top++] = y;
+        stack[top++] = x - 1; stack[top++] = y;
+        stack[top++] = x; stack[top++] = y + 1;
+        stack[top++] = x; stack[top++] = y - 1;
+      }
+      const bw = maxX - minX + 1, bh = maxY - minY + 1;
+      if (bw >= minW && bh >= minH) blobs.push({ x: minX, y: minY, w: bw, h: bh, count });
+    }
+  }
+  if (blobs.length > 0) {
+    const heights = blobs.map(b => b.h).sort((a, b) => a - b);
+    const medianH = heights[Math.floor(heights.length / 2)];
+    const bandH = Math.max(40, Math.floor(medianH * 0.55));
+    blobs.sort((a, b) => {
+      const rowA = Math.floor((a.y + a.h / 2) / bandH);
+      const rowB = Math.floor((b.y + b.h / 2) / bandH);
+      if (rowA !== rowB) return rowA - rowB;
+      return a.x - b.x;
+    });
+  }
+  return blobs;
+}
+
+/** Merge tiny outlier blobs (loose accessories) into nearest large blob. */
+function mergeAccessories(framesIn, maxDist) {
+  if (framesIn.length < 2) return framesIn;
+  const areas = framesIn.map(f => f.w * f.h).sort((a, b) => a - b);
+  const medianArea = areas[Math.floor(areas.length / 2)];
+  const tinyThreshold = medianArea / 4;
+  const result = [];
+  const consumed = new Set();
+  for (let i = 0; i < framesIn.length; i++) {
+    if (consumed.has(i)) continue;
+    let merged = { ...framesIn[i] };
+    for (let j = 0; j < framesIn.length; j++) {
+      if (i === j || consumed.has(j)) continue;
+      const other = framesIn[j];
+      if (other.w * other.h > tinyThreshold) continue;
+      const dx = Math.max(0, Math.max(merged.x - (other.x + other.w), other.x - (merged.x + merged.w)));
+      const dy = Math.max(0, Math.max(merged.y - (other.y + other.h), other.y - (merged.y + merged.h)));
+      if (dx <= maxDist && dy <= maxDist) {
+        const nx = Math.min(merged.x, other.x);
+        const ny = Math.min(merged.y, other.y);
+        const nx2 = Math.max(merged.x + merged.w, other.x + other.w);
+        const ny2 = Math.max(merged.y + merged.h, other.y + other.h);
+        merged = { x: nx, y: ny, w: nx2 - nx, h: ny2 - ny, count: merged.count + other.count };
+        consumed.add(j);
+      }
+    }
+    result.push(merged);
+  }
+  return result;
+}
+
+/**
+ * Extract a sprite atlas from an image (or canvas). Chroma-keys, flood-fills,
+ * packs into a uniform-cell bottom-aligned atlas. Returns
+ *   { sourceW, sourceH, cellW, cellH, count, frames, atlasCanvas, atlasDataUrl, bgMode }
+ * Accepts an HTMLImageElement or an HTMLCanvasElement directly (sync).
+ */
+function extractAtlas(srcEl, opts = {}) {
+  const o = { ...ATLAS_DEFAULTS, ...opts };
+  const sw = srcEl.naturalWidth || srcEl.width;
+  const sh = srcEl.naturalHeight || srcEl.height;
+  const srcCanvas = makeCanvas(sw, sh);
+  const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+  sctx.drawImage(srcEl, 0, 0);
+  const imgData = sctx.getImageData(0, 0, sw, sh);
+  const bgMode = chromaKey(imgData);
+  sctx.putImageData(imgData, 0, 0);
+
+  let fr = extractFrames(imgData, sw, sh, o.minW, o.minH);
+  if (fr.length < o.expected) {
+    const looser = extractFrames(imgData, sw, sh,
+      Math.max(8, Math.floor(o.minW * 0.5)),
+      Math.max(12, Math.floor(o.minH * 0.5)));
+    if (looser.length > fr.length) fr = looser;
+  }
+  fr = mergeAccessories(fr, o.mergeWithin);
+  if (fr.length === 0) throw new Error('no sprite frames detected — check the background (use pure magenta #FF00FF for best results)');
+
+  if (fr.length > o.maxFrames) {
+    const stride = fr.length / o.maxFrames;
+    const sampled = [];
+    for (let i = 0; i < o.maxFrames; i++) sampled.push(fr[Math.floor(i * stride)]);
+    fr = sampled;
+  }
+
+  let cellW = Math.max(...fr.map(f => f.w)) + o.pad;
+  let cellH = Math.max(...fr.map(f => f.h)) + o.pad;
+  let frameScale = 1;
+  if (cellW * fr.length > o.maxAtlasW) {
+    frameScale = o.maxAtlasW / (cellW * fr.length);
+    cellW = Math.floor(cellW * frameScale);
+    cellH = Math.floor(cellH * frameScale);
+  }
+
+  const atlas = makeCanvas(cellW * fr.length, cellH);
+  const actx = atlas.getContext('2d');
+  actx.imageSmoothingEnabled = false;
+  fr.forEach((f, i) => {
+    const drawW = Math.floor(f.w * frameScale);
+    const drawH = Math.floor(f.h * frameScale);
+    const dx = i * cellW + Math.floor((cellW - drawW) / 2);
+    const dy = cellH - drawH - Math.floor(o.pad / 2);   // BOTTOM-ALIGN (feet on a line)
+    actx.drawImage(srcCanvas, f.x, f.y, f.w, f.h, dx, dy, drawW, drawH);
+  });
+
+  return { sourceW: sw, sourceH: sh, cellW, cellH, count: fr.length, frames: fr, atlasCanvas: atlas, atlasDataUrl: atlas.toDataURL('image/png'), bgMode };
+}
+
+/** Draw a specific atlas cell onto a context (preview helper, from mv-sprite-atlas). */
+function drawFrame(ctx, atlasCanvas, atlas, frameIdx, dx, dy, scale = 1) {
+  const i = Math.max(0, Math.min(atlas.count - 1, frameIdx | 0));
+  const sx = i * atlas.cellW;
+  ctx.drawImage(atlasCanvas, sx, 0, atlas.cellW, atlas.cellH, dx, dy, atlas.cellW * scale, atlas.cellH * scale);
+}
+
+/* ═══════════════════════ PORTED: mv-types.ts ═══════════════════════
+   8-pose convention + frame-cycling engine. ───────────────────────── */
+
+const ANIM_FRAME_RANGES = {
+  idle:   [[0, 0]],
+  walk:   [[1, 1], [0, 0]],
+  run:    [[2, 2], [1, 1]],
+  dance:  [[4, 4], [5, 5], [6, 6], [5, 5]],
+  point:  [[5, 5]],
+  pose:   [[6, 6]],
+  pose2:  [[5, 5], [6, 6]],
+  crouch: [[7, 7]],
+};
+
+/** Pick the frame to render for a given anim mode at time t (seconds). */
+function pickFrame(modeName, t, count) {
+  if (modeName === 'playall') {
+    const fps = 6;
+    const step = Math.floor(t * fps) % Math.max(1, count);
+    return Math.max(0, Math.min(count - 1, step));
+  }
+  if (typeof modeName === 'string' && modeName.startsWith('frame:')) {
+    const n = parseInt(modeName.slice(6), 10);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(count - 1, n));
+    return 0;
+  }
+  const range = ANIM_FRAME_RANGES[modeName] || ANIM_FRAME_RANGES.idle;
+  const fps = 6;
+  const step = Math.floor(t * fps) % range.length;
+  const [a] = range[step];
+  return Math.max(0, Math.min(count - 1, a));
+}
+
+/* ═══════════════════════ PORTED: mv-zip.ts ═══════════════════════
+   STORE-only ZIP writer, no deps. ────────────────────────────────── */
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(data) { let crc = 0xffffffff; for (let i = 0; i < data.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ data[i]) & 0xff]; return (crc ^ 0xffffffff) >>> 0; }
+function pushU32(out, v) { out.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff); }
+function pushU16(out, v) { out.push(v & 0xff, (v >>> 8) & 0xff); }
+function makeZip(files) {
+  const parts = []; const cdrs = []; const enc = new TextEncoder();
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const dataLen = f.data.length;
+    const crc = crc32(f.data);
+    const localOffset = parts.length;
+    pushU32(parts, 0x04034b50); pushU16(parts, 20); pushU16(parts, 0); pushU16(parts, 0);
+    pushU16(parts, 0); pushU16(parts, 0); pushU32(parts, crc); pushU32(parts, dataLen); pushU32(parts, dataLen);
+    pushU16(parts, nameBytes.length); pushU16(parts, 0);
+    for (let i = 0; i < nameBytes.length; i++) parts.push(nameBytes[i]);
+    for (let i = 0; i < f.data.length; i++) parts.push(f.data[i]);
+    const cdr = [];
+    pushU32(cdr, 0x02014b50); pushU16(cdr, 20); pushU16(cdr, 20); pushU16(cdr, 0); pushU16(cdr, 0);
+    pushU16(cdr, 0); pushU16(cdr, 0); pushU32(cdr, crc); pushU32(cdr, dataLen); pushU32(cdr, dataLen);
+    pushU16(cdr, nameBytes.length); pushU16(cdr, 0); pushU16(cdr, 0); pushU16(cdr, 0); pushU16(cdr, 0);
+    pushU32(cdr, 0); pushU32(cdr, localOffset);
+    for (let i = 0; i < nameBytes.length; i++) cdr.push(nameBytes[i]);
+    cdrs.push(cdr);
+  }
+  const cdStart = parts.length;
+  for (const cdr of cdrs) for (const b of cdr) parts.push(b);
+  const cdSize = parts.length - cdStart;
+  pushU32(parts, 0x06054b50); pushU16(parts, 0); pushU16(parts, 0);
+  pushU16(parts, files.length); pushU16(parts, files.length);
+  pushU32(parts, cdSize); pushU32(parts, cdStart); pushU16(parts, 0);
+  return new Uint8Array(parts);
+}
+
+/* ═══════════════════════ THE 16-BIT LOOK PIPELINE (spec §6) ═══════════════
+   Client-side pixelate / quantize / dither / retro palettes. ───────────── */
+
+// DOWNSCALE with smoothing ON (box-average), then upscale NEAREST = crisp blocks.
+function pixelateJS(srcCanvas, targetW, targetH) {
+  const small = makeCanvas(targetW, targetH);
+  const s = small.getContext('2d', { willReadFrequently: true });
+  s.imageSmoothingEnabled = true; s.imageSmoothingQuality = 'high';
+  s.drawImage(srcCanvas, 0, 0, targetW, targetH);
+  return small;
+}
+function upscaleNearest(small, f) {
+  const big = makeCanvas(small.width * f, small.height * f);
+  const b = big.getContext('2d'); b.imageSmoothingEnabled = false;
+  b.drawImage(small, 0, 0, big.width, big.height);
+  return big;
+}
+function nearestColor(r, g, b, pal) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < pal.length; i++) {
+    const dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+    const d = 0.30 * dr * dr + 0.59 * dg * dg + 0.11 * db * db;   // perceptual weighting
+    if (d < bd) { bd = d; bi = i; }
+  }
+  return pal[bi];
+}
+
+// Snap every opaque pixel to the nearest palette entry, in place.
+function quantizeToPalette(imgData, pal) {
+  const px = imgData.data;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] === 0) continue;
+    const c = nearestColor(px[i], px[i + 1], px[i + 2], pal);
+    px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
+  }
+}
+
+// Median-cut adaptive palette of N colors from opaque pixels.
+function medianCut(imgData, N) {
+  const px = imgData.data;
+  let box = [];
+  for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 8) box.push([px[i], px[i + 1], px[i + 2]]);
+  if (box.length === 0) return [[0, 0, 0]];
+  let boxes = [box];
+  while (boxes.length < N) {
+    // pick the box with the widest channel range to split
+    let widest = -1, wb = -1, wc = 0;
+    boxes.forEach((bx, bi) => {
+      if (bx.length < 2) return;
+      for (let ch = 0; ch < 3; ch++) {
+        let mn = 255, mx = 0;
+        for (const p of bx) { if (p[ch] < mn) mn = p[ch]; if (p[ch] > mx) mx = p[ch]; }
+        const range = mx - mn;
+        if (range > widest) { widest = range; wb = bi; wc = ch; }
+      }
+    });
+    if (wb < 0) break;
+    const bx = boxes[wb];
+    bx.sort((a, b) => a[wc] - b[wc]);
+    const mid = bx.length >> 1;
+    boxes.splice(wb, 1, bx.slice(0, mid), bx.slice(mid));
+  }
+  return boxes.map(bx => {
+    let r = 0, g = 0, b = 0;
+    for (const p of bx) { r += p[0]; g += p[1]; b += p[2]; }
+    const n = Math.max(1, bx.length);
+    return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+  });
+}
+
+// Ordered Bayer 4x4 dither toward a palette (the authentic console look).
+const BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+function ditherBayer(imgData, pal, strength = 28) {
+  const px = imgData.data, W = imgData.width;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] === 0) continue;
+    const p = i / 4, x = p % W, y = (p / W) | 0;
+    const thr = (BAYER4[y & 3][x & 3] / 16 - 0.5) * strength;
+    const c = nearestColor(
+      Math.max(0, Math.min(255, px[i] + thr)),
+      Math.max(0, Math.min(255, px[i + 1] + thr)),
+      Math.max(0, Math.min(255, px[i + 2] + thr)), pal);
+    px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
+  }
+}
+// Floyd-Steinberg error diffusion toward a palette.
+function ditherFloyd(imgData, pal) {
+  const W = imgData.width, H = imgData.height, px = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (px[i + 3] === 0) continue;
+      const old = [px[i], px[i + 1], px[i + 2]];
+      const nc = nearestColor(old[0], old[1], old[2], pal);
+      px[i] = nc[0]; px[i + 1] = nc[1]; px[i + 2] = nc[2];
+      const err = [old[0] - nc[0], old[1] - nc[1], old[2] - nc[2]];
+      const spread = (dx, dy, f) => {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H) return;
+        const ni = (ny * W + nx) * 4;
+        if (px[ni + 3] === 0) return;
+        px[ni] = Math.max(0, Math.min(255, px[ni] + err[0] * f));
+        px[ni + 1] = Math.max(0, Math.min(255, px[ni + 1] + err[1] * f));
+        px[ni + 2] = Math.max(0, Math.min(255, px[ni + 2] + err[2] * f));
+      };
+      spread(1, 0, 7 / 16); spread(-1, 1, 3 / 16); spread(0, 1, 5 / 16); spread(1, 1, 1 / 16);
+    }
+  }
+}
+
+// Drop-in retro 16-color sub-palettes (the source of the "16-bit feel").
+const PALETTES = {
+  genesis16: [[0,0,0],[34,32,52],[69,40,60],[102,57,49],[143,86,59],[223,113,38],[217,160,102],[238,195,154],[251,242,54],[153,229,80],[106,190,48],[55,148,110],[75,105,47],[82,75,36],[50,60,57],[63,63,116]],
+  snes16:    [[0,0,0],[26,28,44],[51,60,87],[24,107,159],[58,184,221],[120,209,178],[160,231,229],[247,255,242],[255,247,189],[255,205,117],[255,144,73],[247,107,33],[230,72,46],[180,40,68],[120,52,98],[255,255,255]],
+  pico8:     [[0,0,0],[29,43,83],[126,37,83],[0,135,81],[171,82,54],[95,87,79],[194,195,199],[255,241,232],[255,0,77],[255,163,0],[255,236,39],[0,228,54],[41,173,255],[131,118,156],[255,119,168],[255,204,170]],
+  gameboy:   [[15,56,15],[48,98,48],[139,172,15],[155,188,15]],
+};
+
+/** Run the full pixelate pipeline on a source canvas -> a NEW canvas.
+ *  paletteKey: 'adaptive' | one of PALETTES keys.  dither: 'none'|'bayer'|'floyd'. */
+function pixelatePipeline(srcCanvas, { pxHeight = 64, colors = 24, paletteKey = 'adaptive', dither = 'none', removeBg = false } = {}) {
+  const w = srcCanvas.width, h = srcCanvas.height;
+  const tw = Math.max(1, Math.round(w * pxHeight / h));
+  const small = pixelateJS(srcCanvas, tw, pxHeight);
+  const sctx = small.getContext('2d', { willReadFrequently: true });
+  const data = sctx.getImageData(0, 0, tw, pxHeight);
+  if (removeBg) removeFlatBackground(data);
+  const pal = paletteKey === 'adaptive' ? medianCut(data, Math.max(2, colors)) : PALETTES[paletteKey] || medianCut(data, colors);
+  if (dither === 'bayer') ditherBayer(data, pal);
+  else if (dither === 'floyd') ditherFloyd(data, pal);
+  else quantizeToPalette(data, pal);
+  sctx.putImageData(data, 0, 0);
+  return small;   // caller upscales for display; store the small one as a frame
+}
+
+// Sample 4 corners, clear matching pixels to alpha 0 (for flat-bg sprites).
+function removeFlatBackground(imgData, tol = 24) {
+  const px = imgData.data, W = imgData.width, H = imgData.height;
+  const at = (x, y) => { const i = (y * W + x) * 4; return [px[i], px[i + 1], px[i + 2]]; };
+  const corners = [at(0, 0), at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)];
+  const close = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < tol * 3;
+  for (let i = 0; i < px.length; i += 4) {
+    const c = [px[i], px[i + 1], px[i + 2]];
+    if (corners.some(k => close(c, k))) px[i + 3] = 0;
+  }
+}
+
+/* ═══════════════════════ INLINE GIF89a LZW ENCODER (spec §8.1) ═══════════
+   Exact-palette when <=256 colors (lossless for pixel art), transparent
+   index 0, per-frame centisecond delays, NETSCAPE2.0 forever loop. ─────── */
+
+function GifWriter(width, height) {
+  this.w = width; this.h = height;
+  this.buf = [];
+  this.started = false;
+}
+GifWriter.prototype._byte = function (b) { this.buf.push(b & 0xff); };
+GifWriter.prototype._u16 = function (v) { this.buf.push(v & 0xff, (v >> 8) & 0xff); };
+GifWriter.prototype._str = function (s) { for (let i = 0; i < s.length; i++) this.buf.push(s.charCodeAt(i)); };
+
+// Build an indexed image (and palette) from RGBA. Index 0 = transparent.
+GifWriter.prototype._index = function (rgba) {
+  const n = this.w * this.h;
+  const indices = new Uint8Array(n);
+  // gather unique opaque colors
+  const map = new Map();           // 'r,g,b' -> index (1-based; 0 reserved for transparent)
+  const pal = [[0, 0, 0]];         // entry 0 = transparent placeholder
+  let over = false;
+  for (let p = 0; p < n; p++) {
+    const i = p * 4;
+    if (rgba[i + 3] < 128) { indices[p] = 0; continue; }
+    const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+    const key = r + ',' + g + ',' + b;
+    let idx = map.get(key);
+    if (idx === undefined) {
+      if (pal.length >= 256) { over = true; break; }
+      idx = pal.length; pal.push([r, g, b]); map.set(key, idx);
+    }
+    indices[p] = idx;
+  }
+  if (over) {
+    // >255 unique colors: median-cut to 255, then nearest-snap (index 0 stays transparent).
+    const fakeImg = { data: rgba, width: this.w, height: this.h };
+    const cut = medianCut(fakeImg, 255);
+    const cpal = [[0, 0, 0], ...cut];
+    for (let p = 0; p < n; p++) {
+      const i = p * 4;
+      if (rgba[i + 3] < 128) { indices[p] = 0; continue; }
+      const c = nearestColor(rgba[i], rgba[i + 1], rgba[i + 2], cut);
+      // find c's index in cut
+      let bi = 1;
+      for (let k = 0; k < cut.length; k++) { if (cut[k] === c) { bi = k + 1; break; } }
+      indices[p] = bi;
+    }
+    return { indices, pal: cpal };
+  }
+  return { indices, pal };
+};
+
+// LZW compress index stream with given code size (GIF variable-length codes).
+function gifLZW(minCodeSize, indices) {
+  const out = [];
+  const clear = 1 << minCodeSize;
+  const eoi = clear + 1;
+  let codeSize = minCodeSize + 1;
+  let dict = new Map();
+  const resetDict = () => { dict = new Map(); for (let i = 0; i < clear; i++) dict.set(String(i), i); };
+  let next = eoi + 1;
+  resetDict();
+
+  // bit packing into bytes (LSB-first), GIF sub-block framing handled by caller
+  let cur = 0, curBits = 0;
+  const emit = (code) => {
+    cur |= code << curBits; curBits += codeSize;
+    while (curBits >= 8) { out.push(cur & 0xff); cur >>= 8; curBits -= 8; }
+  };
+
+  emit(clear);
+  let prev = String(indices[0]);
+  for (let i = 1; i < indices.length; i++) {
+    const k = indices[i];
+    const combined = prev + ',' + k;
+    if (dict.has(combined)) { prev = combined; }
+    else {
+      emit(dict.get(prev));
+      dict.set(combined, next++);
+      if (next > (1 << codeSize) && codeSize < 12) codeSize++;
+      else if (next > 4095) { emit(clear); resetDict(); next = eoi + 1; codeSize = minCodeSize + 1; }
+      prev = String(k);
+    }
+  }
+  emit(dict.get(prev));
+  emit(eoi);
+  if (curBits > 0) out.push(cur & 0xff);
+  return out;
+}
+
+// addFrame(rgba Uint8ClampedArray, delayMs, {transparent})
+GifWriter.prototype.addFrame = function (rgba, delayMs, _opts) {
+  const { indices, pal } = this._index(rgba);
+  // pad palette to a power of two (min 2 entries)
+  let bits = 1;
+  while ((1 << bits) < pal.length) bits++;
+  if (bits < 1) bits = 1;
+  const palSize = 1 << bits;
+  const fullPal = pal.slice();
+  while (fullPal.length < palSize) fullPal.push([0, 0, 0]);
+
+  if (!this.started) {
+    this.started = true;
+    // Header
+    this._str('GIF89a');
+    this._u16(this.w); this._u16(this.h);
+    // Logical screen descriptor: NO global color table (we use per-frame local tables).
+    this._byte(0x00);    // packed: global table flag = 0
+    this._byte(0);       // bg color index
+    this._byte(0);       // pixel aspect ratio
+    // NETSCAPE2.0 loop forever
+    this._byte(0x21); this._byte(0xff); this._byte(0x0b);
+    this._str('NETSCAPE2.0');
+    this._byte(0x03); this._byte(0x01); this._u16(0); this._byte(0x00);
+  }
+
+  // Graphic Control Extension — transparency + delay
+  const delayCs = Math.max(2, Math.round(delayMs / 10));   // centiseconds, min 2
+  this._byte(0x21); this._byte(0xf9); this._byte(0x04);
+  this._byte(0x09);            // packed: disposal=1 (do not dispose) <<2 = 0x04 ... transparent flag = 1
+  // packed bits: reserved(3) disposal(3) userInput(1) transparentColorFlag(1)
+  // disposal method 2 (restore to bg) is safer for transparent sprite anim => (2<<2)|1 = 0x09
+  this._u16(delayCs);
+  this._byte(0x00);            // transparent color index = 0
+  this._byte(0x00);            // block terminator
+
+  // Image descriptor
+  this._byte(0x2c);
+  this._u16(0); this._u16(0);          // left, top
+  this._u16(this.w); this._u16(this.h);
+  // packed: local color table flag(1) interlace(0) sort(0) reserved(00) size(bits-1)
+  this._byte(0x80 | (bits - 1));
+  // Local color table
+  for (let i = 0; i < palSize; i++) { const c = fullPal[i]; this._byte(c[0]); this._byte(c[1]); this._byte(c[2]); }
+
+  // LZW data
+  const minCodeSize = Math.max(2, bits);
+  this._byte(minCodeSize);
+  const lzw = gifLZW(minCodeSize, indices);
+  // sub-block framing: max 255 bytes per block
+  for (let i = 0; i < lzw.length;) {
+    const len = Math.min(255, lzw.length - i);
+    this._byte(len);
+    for (let j = 0; j < len; j++) this._byte(lzw[i + j]);
+    i += len;
+  }
+  this._byte(0x00);   // block terminator for the image data
+};
+
+GifWriter.prototype.finish = function () {
+  this._byte(0x3b);   // trailer
+  return new Uint8Array(this.buf);
+};
+
+/* ═══════════════════════ SHARED PACKER (spec §8.4) ═══════════════════════ */
+function packSheet(frameList, opts = {}) {
+  const list = frameList.filter(f => !f.skip);
+  const pad = opts.pad != null ? opts.pad : 4;
+  const cellW = Math.max(...list.map(f => f.w)) + pad;
+  const cellH = Math.max(...list.map(f => f.h)) + pad;
+  const sheet = makeCanvas(cellW * list.length, cellH);
+  const ctx = sheet.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  list.forEach((f, i) => {
+    const dx = i * cellW + ((cellW - f.w) >> 1);   // center horizontally
+    const dy = cellH - f.h - (pad >> 1);            // BOTTOM-ALIGN (feet on a line)
+    ctx.drawImage(f.canvas, dx, dy);
+  });
+  return { canvas: sheet, dataUrl: sheet.toDataURL('image/png'), cellW, cellH, count: list.length };
+}
+
+/* ═══════════════════════ FRAME MODEL HELPERS ═══════════════════════ */
+
+// Turn an extracted atlas into the shared frames[] model (each cell = one frame).
+function framesFromAtlas(atlas) {
+  const out = [];
+  for (let i = 0; i < atlas.count; i++) {
+    const c = makeCanvas(atlas.cellW, atlas.cellH);
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(atlas.atlasCanvas, i * atlas.cellW, 0, atlas.cellW, atlas.cellH, 0, 0, atlas.cellW, atlas.cellH);
+    out.push({ canvas: c, w: atlas.cellW, h: atlas.cellH, ms: Math.round(1000 / state.fps), skip: false, name: 'frame_' + (i + 1) });
+  }
+  return out;
+}
+
+function addFrameCanvas(canvas, name) {
+  frames.push({ canvas, w: canvas.width, h: canvas.height, ms: Math.round(1000 / state.fps), skip: false, name: name || ('frame_' + (frames.length + 1)) });
+}
+
+function setFrames(next, keepCur) {
+  frames = next;
+  cur = keepCur ? Math.min(cur, frames.length - 1) : 0;
+  if (cur < 0) cur = 0;
+  renderStrip(); drawView(); updateReadout(); updateFoot();
+}
+
+/* ═══════════════════════ PREVIEW LOOP (spec §7.3) ═══════════════════════
+   rAF + time accumulator honoring each frame's ms. NOT setInterval. ────── */
+
+let raf = null, last = 0, acc = 0;
+function tick(now) {
+  if (!playing) { raf = null; return; }
+  if (!last) last = now;
+  acc += now - last; last = now;
+  const hold = (frames[cur] && frames[cur].ms) || (1000 / state.fps);
+  if (acc >= hold) { acc -= hold; advance(); drawView(); updateReadout(); highlightStripCur(); }
+  raf = requestAnimationFrame(tick);
+}
+function advance() {
+  // skip frames flagged skip
+  let guard = 0;
+  do {
+    cur++;
+    if (cur >= frames.length) { cur = loop ? 0 : frames.length - 1; if (!loop) { stop(); return; } }
+    guard++;
+  } while (frames[cur] && frames[cur].skip && guard < frames.length + 1);
+}
+function play() { if (!frames.length) return; playing = true; last = 0; acc = 0; $('playBtn').innerHTML = '❚❚ Pause'; $('playBtn').classList.add('on'); raf = requestAnimationFrame(tick); }
+function stop() { playing = false; $('playBtn').innerHTML = '▶ Play'; $('playBtn').classList.remove('on'); if (raf) cancelAnimationFrame(raf); raf = null; }
+
+/* ═══════════════════════ CENTER STAGE RENDER ═══════════════════════ */
+
+let previewCanvas = null;     // the big preview canvas in animate mode
+
+function ensurePreviewCanvas() {
+  const body = $('stageBody');
+  if (mode === 'draw') return;  // draw mode owns the stage
+  if (!frames.length) { showDrop(); return; }
+  if (!previewCanvas || !body.contains(previewCanvas)) {
+    body.innerHTML = '';
+    previewCanvas = makeCanvas(10, 10);
+    previewCanvas.className = 'preview';
+    body.appendChild(previewCanvas);
+  }
+}
+
+function showDrop() {
+  const body = $('stageBody');
+  if (body.querySelector('#drop')) return;
+  body.innerHTML = '<div class="drop" id="drop">Drop a <b>sprite sheet</b> (8 poses on magenta #FF00FF) or a <b>folder of PNG frames</b> here.<br/><span style="font:400 11px \'Space Mono\';color:var(--dim)">— or paste a screenshot (Ctrl+V) · click to browse —</span></div>';
+  wireDrop();
+}
+
+function drawView() {
+  if (mode === 'draw') { drawEditor(); return; }
+  ensurePreviewCanvas();
+  if (!frames.length || !previewCanvas) return;
+  const f = frames[cur]; if (!f) return;
+  const z = state.zoom;
+  previewCanvas.width = f.w * z;
+  previewCanvas.height = f.h * z;
+  const ctx = previewCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  // onion-skin ghosts: prev (teal) / next (pink)
+  if (onionOn && frames.length > 1) {
+    const drawGhost = (idx, tint) => {
+      const g = frames[idx]; if (!g) return;
+      ctx.globalAlpha = 0.28;
+      const tmp = makeCanvas(g.w, g.h); const tctx = tmp.getContext('2d');
+      tctx.drawImage(g.canvas, 0, 0);
+      // tint
+      tctx.globalCompositeOperation = 'source-atop';
+      tctx.fillStyle = tint; tctx.fillRect(0, 0, g.w, g.h);
+      ctx.drawImage(tmp, 0, 0, g.w, g.h, 0, 0, previewCanvas.width, previewCanvas.height);
+      ctx.globalAlpha = 1;
+    };
+    drawGhost((cur - 1 + frames.length) % frames.length, 'rgba(0,209,196,0.6)');
+    drawGhost((cur + 1) % frames.length, 'rgba(233,30,140,0.6)');
+  }
+  ctx.drawImage(f.canvas, 0, 0, f.w, f.h, 0, 0, previewCanvas.width, previewCanvas.height);
+}
+
+function updateReadout() { $('readout').textContent = frames.length ? `${cur + 1} / ${frames.length}` : '0 / 0'; }
+function updateFoot() {
+  const foot = $('stageFoot');
+  if (!frames.length) { foot.innerHTML = '<span class="lbl">no frames loaded</span>'; return; }
+  const f = frames[cur];
+  foot.innerHTML = `<span class="lbl">frame ${cur + 1}/${frames.length}</span>
+    <span class="lbl">· ${f.w}×${f.h}px</span>
+    <span class="lbl">· hold</span>
+    <input type="range" id="footMs" min="20" max="1000" step="10" value="${f.ms}" style="width:130px;accent-color:var(--pink)" />
+    <span class="ms" style="color:var(--teal);font:600 11px 'Space Mono';width:54px">${f.ms}ms</span>
+    <button class="tbtn sm ${f.skip ? 'teal on' : ''}" id="footSkip">${f.skip ? 'skipped' : 'skip in export'}</button>
+    <button class="tbtn sm" id="footRev">↺ reverse all</button>
+    <button class="tbtn sm" id="footPP">↔ ping-pong</button>`;
+  $('footMs').oninput = (e) => { f.ms = +e.target.value; foot.querySelector('.ms').textContent = f.ms + 'ms'; renderStrip(); };
+  $('footSkip').onclick = () => { f.skip = !f.skip; updateFoot(); renderStrip(); };
+  $('footRev').onclick = () => { frames.reverse(); cur = frames.length - 1 - cur; setFrames(frames, true); };
+  $('footPP').onclick = () => {
+    const fwd = frames.slice();
+    const back = frames.slice(1, -1).reverse().map(fr => ({ ...fr, name: fr.name + '_pp', canvas: cloneCanvas(fr.canvas) }));
+    setFrames(fwd.concat(back), true);
+    toast('ping-pong frames appended');
+  };
+}
+function cloneCanvas(src) { const c = makeCanvas(src.width, src.height); c.getContext('2d').drawImage(src, 0, 0); return c; }
+
+/* ═══════════════════════ TIMELINE / FILMSTRIP (spec §7.4) ═══════════════════════ */
+
+let dragIdx = null;
+function renderStrip() {
+  const el = $('frames');
+  if (!frames.length) { el.innerHTML = '<div class="empty">frames show up here — drag to reorder, click to select</div>'; return; }
+  el.innerHTML = '';
+  frames.forEach((f, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (i === cur ? ' sel' : '') + (f.skip ? ' skip' : '');
+    cell.draggable = true;
+    const thumb = makeCanvas(f.w, f.h);
+    thumb.getContext('2d').drawImage(f.canvas, 0, 0);
+    cell.appendChild(thumb);
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.innerHTML = `<span>#${i + 1}</span><span class="ms">${f.ms}ms</span>`;
+    cell.appendChild(meta);
+    cell.onclick = () => { cur = i; stop(); drawView(); updateReadout(); updateFoot(); highlightStripCur(); };
+    // drag-to-reorder
+    cell.ondragstart = () => { dragIdx = i; };
+    cell.ondragover = (e) => { e.preventDefault(); cell.classList.add('dragover'); };
+    cell.ondragleave = () => cell.classList.remove('dragover');
+    cell.ondrop = (e) => {
+      e.preventDefault(); cell.classList.remove('dragover');
+      if (dragIdx === null || dragIdx === i) return;
+      const [moved] = frames.splice(dragIdx, 1);
+      frames.splice(i, 0, moved);
+      cur = i; dragIdx = null;
+      renderStrip(); drawView(); updateReadout(); updateFoot();
+    };
+    el.appendChild(cell);
+  });
+}
+function highlightStripCur() {
+  const cells = $('frames').querySelectorAll('.cell');
+  cells.forEach((c, i) => c.classList.toggle('sel', i === cur));
+  const selEl = cells[cur]; if (selEl) selEl.scrollIntoView({ block: 'nearest' });
+}
+
+/* ═══════════════════════ LOADING (spec §7.1 / §7.2) ═══════════════════════ */
+
+async function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f => /image\//.test(f.type) || /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+  if (!files.length) { toast('no image files'); return; }
+  if (files.length === 1) {
+    // single file => treat as a SHEET (auto chroma + slice)
+    try {
+      const img = await fileToImage(files[0]);
+      const atlas = extractAtlas(img, { expected: 8 });
+      setFrames(framesFromAtlas(atlas));
+      toast(`sliced ${atlas.count} frames · bg: ${atlas.bgMode}`);
+    } catch (e) {
+      toast('⚠ ' + (e.message || 'could not slice — try the Slice panel'));
+      // still drop it in as a single frame so the user isn't stuck
+      try { const img = await fileToImage(files[0]); const c = makeCanvas(img.naturalWidth, img.naturalHeight); c.getContext('2d').drawImage(img, 0, 0); setFrames([{ canvas: c, w: c.width, h: c.height, ms: Math.round(1000 / state.fps), skip: false, name: files[0].name }]); } catch {}
+    }
+  } else {
+    // multiple files => each is a ready-made frame, natural filename order
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const next = [];
+    for (const f of files) {
+      const img = await fileToImage(f);
+      const c = makeCanvas(img.naturalWidth, img.naturalHeight);
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(img, 0, 0);
+      next.push({ canvas: c, w: c.width, h: c.height, ms: Math.round(1000 / state.fps), skip: false, name: f.name });
+    }
+    setFrames(next);
+    toast(`loaded ${next.length} frames`);
+  }
+  if (mode === 'make') renderRail();   // refresh pixelate source
+}
+
+// Re-slice the currently-loaded source via manual grid (Slice panel).
+let lastSheetCanvas = null;            // raw sheet for manual re-slice (set on single-file load)
+function sliceGrid({ cols, rows, fw, fh, margin = 0, spacing = 0, byCount }) {
+  if (!lastSheetCanvas) { toast('load a single sheet image first'); return; }
+  const sc = lastSheetCanvas, W = sc.width, H = sc.height;
+  let cw, ch, nc, nr;
+  if (byCount) { nc = cols; nr = rows; cw = Math.floor((W - margin * 2 - spacing * (nc - 1)) / nc); ch = Math.floor((H - margin * 2 - spacing * (nr - 1)) / nr); }
+  else { cw = fw; ch = fh; nc = Math.floor((W - margin * 2 + spacing) / (cw + spacing)); nr = Math.floor((H - margin * 2 + spacing) / (ch + spacing)); }
+  if (cw <= 0 || ch <= 0 || nc <= 0 || nr <= 0) { toast('bad grid'); return; }
+  const next = [];
+  for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+    const sx = margin + c * (cw + spacing), sy = margin + r * (ch + spacing);
+    const cell = makeCanvas(cw, ch);
+    const ctx = cell.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sc, sx, sy, cw, ch, 0, 0, cw, ch);
+    if (isBlank(cell)) continue;       // skip fully-transparent cells
+    next.push({ canvas: cell, w: cw, h: ch, ms: Math.round(1000 / state.fps), skip: false, name: `cell_${r}_${c}` });
+  }
+  if (!next.length) { toast('all cells blank — adjust grid'); return; }
+  setFrames(next);
+  toast(`sliced ${next.length} cells (${nc}×${nr})`);
+}
+function isBlank(canvas) {
+  const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 8) return false;
+  return true;
+}
+
+/* ═══════════════════════ DRAW MODE — pixel editor (spec §5) ═══════════════════════ */
+
+const draw = {
+  W: 32, H: 48, cell: 14,
+  tool: 'pencil',
+  color: '#E91E8C',
+  palette: ['#000000', '#1a1c2c', '#5d275d', '#b13e53', '#ef7d57', '#ffcd75', '#a7f070', '#38b764',
+            '#257179', '#29366f', '#3b5dc9', '#41a6f6', '#73eff7', '#f4f4f4', '#94b0c2', '#E91E8C'],
+  undo: [], redo: [],
+  underlay: null,            // {canvas, alpha} traced from a pixelated/loaded image
+};
+let editorCanvas = null;
+let drawing = false;
+
+function ensureEditorFrame() {
+  // draw mode operates on the current frame. If none, make a blank one.
+  if (!frames.length) {
+    const c = makeCanvas(draw.W, draw.H);
+    addFrameCanvas(c, 'frame_1');
+    cur = 0; renderStrip(); updateReadout();
+  } else {
+    // adopt the current frame's dims as the editor grid
+    draw.W = frames[cur].w; draw.H = frames[cur].h;
+  }
+}
+
+function buildEditor() {
+  const body = $('stageBody');
+  body.innerHTML = '';
+  ensureEditorFrame();
+  const cell = Math.max(4, Math.min(20, Math.floor(520 / Math.max(draw.W, draw.H))));
+  draw.cell = cell;
+  editorCanvas = makeCanvas(draw.W * cell, draw.H * cell);
+  editorCanvas.className = 'editor checker';
+  body.appendChild(editorCanvas);
+  drawEditor();
+  wireEditorEvents();
+}
+
+function drawEditor() {
+  if (!editorCanvas || !frames[cur]) return;
+  const ctx = editorCanvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
+  const cell = draw.cell;
+  // underlay (FLUX trace) under the pixels
+  if (draw.underlay) {
+    ctx.globalAlpha = draw.underlay.alpha;
+    ctx.drawImage(draw.underlay.canvas, 0, 0, draw.W, draw.H, 0, 0, editorCanvas.width, editorCanvas.height);
+    ctx.globalAlpha = 1;
+  }
+  // onion-skin ghosts
+  if (onionOn && frames.length > 1) {
+    const ghost = (idx, tint) => {
+      const g = frames[idx]; if (!g) return;
+      ctx.globalAlpha = 0.25;
+      const tmp = makeCanvas(g.w, g.h); const tc = tmp.getContext('2d');
+      tc.drawImage(g.canvas, 0, 0); tc.globalCompositeOperation = 'source-atop'; tc.fillStyle = tint; tc.fillRect(0, 0, g.w, g.h);
+      ctx.drawImage(tmp, 0, 0, g.w, g.h, 0, 0, editorCanvas.width, editorCanvas.height);
+      ctx.globalAlpha = 1;
+    };
+    ghost((cur - 1 + frames.length) % frames.length, 'rgba(0,209,196,0.7)');
+    ghost((cur + 1) % frames.length, 'rgba(233,30,140,0.7)');
+  }
+  // the actual pixels
+  ctx.drawImage(frames[cur].canvas, 0, 0, draw.W, draw.H, 0, 0, editorCanvas.width, editorCanvas.height);
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let x = 0; x <= draw.W; x++) { ctx.beginPath(); ctx.moveTo(x * cell + .5, 0); ctx.lineTo(x * cell + .5, editorCanvas.height); ctx.stroke(); }
+  for (let y = 0; y <= draw.H; y++) { ctx.beginPath(); ctx.moveTo(0, y * cell + .5); ctx.lineTo(editorCanvas.width, y * cell + .5); ctx.stroke(); }
+}
+
+function pushUndo() {
+  if (!frames[cur]) return;
+  draw.undo.push(cloneCanvas(frames[cur].canvas));
+  if (draw.undo.length > 60) draw.undo.shift();
+  draw.redo = [];
+}
+function applyUndo() { if (!draw.undo.length || !frames[cur]) return; draw.redo.push(cloneCanvas(frames[cur].canvas)); const c = draw.undo.pop(); frames[cur].canvas = c; drawEditor(); renderStrip(); }
+function applyRedo() { if (!draw.redo.length || !frames[cur]) return; draw.undo.push(cloneCanvas(frames[cur].canvas)); const c = draw.redo.pop(); frames[cur].canvas = c; drawEditor(); renderStrip(); }
+
+function pxAt(e) {
+  const r = editorCanvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / draw.cell);
+  const y = Math.floor((e.clientY - r.top) / draw.cell);
+  return { x, y };
+}
+function paintPixel(x, y) {
+  if (x < 0 || x >= draw.W || y < 0 || y >= draw.H) return;
+  const ctx = frames[cur].canvas.getContext('2d');
+  if (draw.tool === 'eraser') { ctx.clearRect(x, y, 1, 1); }
+  else { ctx.fillStyle = draw.color; ctx.clearRect(x, y, 1, 1); ctx.fillRect(x, y, 1, 1); }
+}
+function eyedrop(x, y) {
+  if (x < 0 || x >= draw.W || y < 0 || y >= draw.H) return;
+  const d = frames[cur].canvas.getContext('2d').getImageData(x, y, 1, 1).data;
+  if (d[3] < 8) return;
+  draw.color = '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+  draw.tool = 'pencil'; renderRail();
+}
+// flood fill (reuses the spirit of extractFrames' flood loop)
+function bucketFill(x, y) {
+  if (x < 0 || x >= draw.W || y < 0 || y >= draw.H) return;
+  const ctx = frames[cur].canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, draw.W, draw.H);
+  const px = img.data; const W = draw.W, H = draw.H;
+  const at = (i) => [px[i], px[i + 1], px[i + 2], px[i + 3]];
+  const start = (y * W + x) * 4;
+  const target = at(start);
+  // fill color rgba
+  const hex = draw.color.replace('#', '');
+  const fr = parseInt(hex.slice(0, 2), 16), fg = parseInt(hex.slice(2, 4), 16), fb = parseInt(hex.slice(4, 6), 16);
+  const fillRGBA = draw.tool === 'eraser' ? [0, 0, 0, 0] : [fr, fg, fb, 255];
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+  if (same(target, fillRGBA)) return;
+  const stack = [[x, y]];
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    if (cx < 0 || cx >= W || cy < 0 || cy >= H) continue;
+    const i = (cy * W + cx) * 4;
+    if (!same(at(i), target)) continue;
+    px[i] = fillRGBA[0]; px[i + 1] = fillRGBA[1]; px[i + 2] = fillRGBA[2]; px[i + 3] = fillRGBA[3];
+    stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function wireEditorEvents() {
+  const onDown = (e) => {
+    if (!frames[cur]) return;
+    pushUndo();
+    const { x, y } = pxAt(e);
+    if (draw.tool === 'fill') { bucketFill(x, y); drawEditor(); renderStrip(); return; }
+    if (draw.tool === 'eyedrop') { eyedrop(x, y); drawEditor(); return; }
+    drawing = true; paintPixel(x, y); drawEditor(); renderStrip();
+  };
+  const onMove = (e) => { if (!drawing) return; const { x, y } = pxAt(e); paintPixel(x, y); drawEditor(); };
+  const onUp = () => { if (drawing) { drawing = false; renderStrip(); } };
+  editorCanvas.addEventListener('pointerdown', onDown);
+  editorCanvas.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
+/* ═══════════════════════ PIXELATE / MAKE MODE (spec §6 client-only) ═══════════════════════ */
+
+let makeSource = null;        // {canvas} the uploaded image to pixelate
+const makeOpts = { pxHeight: 64, colors: 24, paletteKey: 'adaptive', dither: 'none', removeBg: false };
+
+async function loadMakeSource(file) {
+  const img = await fileToImage(file);
+  const c = makeCanvas(img.naturalWidth, img.naturalHeight);
+  c.getContext('2d').drawImage(img, 0, 0);
+  makeSource = { canvas: c };
+  renderMakePreview();
+}
+function renderMakePreview() {
+  const body = $('stageBody');
+  body.innerHTML = '';
+  if (!makeSource) {
+    body.innerHTML = '<div class="drop" id="makeDrop">Drop an image to <b>Pixelate</b> it into the 16-bit look.<br/><span style="font:400 11px \'Space Mono\';color:var(--dim)">no AI — pure downscale + quantize + dither · click to browse</span></div>';
+    $('makeDrop').onclick = () => pickMakeFile();
+    wireDropTarget($('makeDrop'), (files) => { if (files[0]) loadMakeSource(files[0]); });
+    return;
+  }
+  const out = pixelatePipeline(makeSource.canvas, makeOpts);
+  const big = upscaleNearest(out, Math.max(2, Math.floor(420 / out.height)));
+  big.className = 'preview';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:22px;align-items:center;flex-wrap:wrap;justify-content:center';
+  const orig = makeSource.canvas; orig.style.cssText = 'max-width:300px;max-height:300px;border:1px solid var(--hairline);border-radius:10px;opacity:.8';
+  wrap.appendChild(orig);
+  const arrow = document.createElement('div'); arrow.textContent = '→'; arrow.style.cssText = 'font-size:26px;color:var(--pink)';
+  wrap.appendChild(arrow);
+  wrap.appendChild(big);
+  body.appendChild(wrap);
+  makeOpts._lastSmall = out;   // remember the small (real-size) result for adding as a frame
+}
+function pickMakeFile() { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = () => { if (inp.files[0]) loadMakeSource(inp.files[0]); }; inp.click(); }
+
+/* ═══════════════════════ EXPORTS (spec §8) ═══════════════════════ */
+
+async function exportGif() {
+  const list = frames.filter(f => !f.skip);
+  if (!list.length) { toast('no frames to export'); return; }
+  const scale = exportScaleVal();
+  toast('<span class="spin">◐</span> encoding GIF…', 8000);
+  await new Promise(r => setTimeout(r, 30));   // let toast paint
+  const W = list[0].w * scale, H = list[0].h * scale;
+  const enc = new GifWriter(W, H);
+  const tmp = makeCanvas(W, H); const t = tmp.getContext('2d'); t.imageSmoothingEnabled = false;
+  for (const f of list) {
+    t.clearRect(0, 0, W, H);
+    t.drawImage(f.canvas, 0, 0, f.w, f.h, 0, 0, W, H);   // nearest upscale
+    enc.addFrame(t.getImageData(0, 0, W, H).data, Math.max(20, Math.round(f.ms)), { transparent: true });
+  }
+  download(new Blob([enc.finish()], { type: 'image/gif' }), 'sprite.gif');
+  toast('GIF downloaded ✓');
+}
+
+async function exportVideo() {
+  const list = frames.filter(f => !f.skip);
+  if (!list.length) { toast('no frames to export'); return; }
+  const scale = exportScaleVal();
+  const W = list[0].w * scale, H = list[0].h * scale;
+  const canvas = makeCanvas(W, H);
+  const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  // video drops alpha -> flatten onto deep navy bg (never true black per design)
+  const bg = '#16111e';
+  const mimes = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+  const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0];
+  const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  const done = new Promise(res => { rec.onstop = () => res(new Blob(chunks, { type: mimeType })); });
+  toast('<span class="spin">◐</span> recording ' + ext.toUpperCase() + '…', 12000);
+  rec.start();
+  const cycles = 3;
+  for (let c = 0; c < cycles; c++) {
+    for (const f of list) {
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(f.canvas, 0, 0, f.w, f.h, 0, 0, W, H);
+      if (track.requestFrame) track.requestFrame();
+      await new Promise(r => setTimeout(r, Math.max(20, f.ms)));
+    }
+  }
+  rec.stop();
+  const blob = await done;
+  download(blob, 'sprite-anim.' + ext);
+  toast(ext.toUpperCase() + ' downloaded ✓');
+}
+
+function exportSheet() {
+  if (!frames.length) { toast('no frames'); return; }
+  const { canvas } = packSheet(frames, { pad: 4 });
+  canvas.toBlob(b => { if (b) download(b, 'sprite-sheet.png'); }, 'image/png');
+  toast('sprite sheet PNG downloaded ✓');
+}
+
+async function exportZip() {
+  const list = frames.filter(f => !f.skip);
+  if (!list.length) { toast('no frames'); return; }
+  const scale = exportScaleVal();
+  const files = [];
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    const c = makeCanvas(f.w * scale, f.h * scale);
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(f.canvas, 0, 0, f.w, f.h, 0, 0, c.width, c.height);
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if (!blob) continue;
+    files.push({ name: `frame_${String(i + 1).padStart(3, '0')}.png`, data: new Uint8Array(await blob.arrayBuffer()) });
+  }
+  if (!files.length) { toast('nothing to zip'); return; }
+  const readme = `PNG SEQUENCE — ${files.length} frames (from The 16-Bit Room)
+
+AFTER EFFECTS:
+  1. Extract this ZIP into a folder
+  2. File -> Import -> File...
+  3. Select frame_001.png (the first frame)
+  4. CHECK the "PNG Sequence" checkbox at the bottom of the dialog
+  5. Click OK — AE imports all frames as one animated layer
+
+PREMIERE / DAVINCI / FINAL CUT: same idea — import as image sequence.
+Each PNG has a transparent background. Play in order at ~6-12 fps.`;
+  files.push({ name: 'HOW-TO-IMPORT.txt', data: new TextEncoder().encode(readme) });
+  download(new Blob([makeZip(files)], { type: 'application/zip' }), 'png-sequence.zip');
+  toast('PNG-sequence ZIP downloaded ✓');
+}
+
+function exportScaleVal() { const s = +(localStorage.getItem('bit16.scale') || 4); return [1, 2, 4].includes(s) ? s : 4; }
+
+/* ═══════════════════════ LEFT RAIL — per-mode controls ═══════════════════════ */
+
+function renderRail() {
+  const rail = $('rail');
+  if (mode === 'animate') rail.innerHTML = railAnimate();
+  else if (mode === 'draw') rail.innerHTML = railDraw();
+  else rail.innerHTML = railMake();
+  wireRail();
+}
+
+function railAnimate() {
+  return `
+  <div class="module">
+    <h3>Playback</h3>
+    <div class="krow"><label>Default FPS</label><input type="range" id="fpsR" min="2" max="24" step="1" value="${state.fps}" /><output id="fpsO">${state.fps}</output></div>
+    <div class="krow"><label>Preview zoom</label><input type="range" id="zoomR" min="1" max="14" step="1" value="${state.zoom}" /><output id="zoomO">${state.zoom}×</output></div>
+    <button class="ibtn" id="setAllMs">Set all holds to FPS</button>
+    <div class="krow" style="margin-top:6px"><label>Loop</label><input type="checkbox" id="loopChk" ${loop ? 'checked' : ''} style="accent-color:var(--pink)" /></div>
+  </div>
+  <div class="module">
+    <h3 class="pink">Slice a sheet</h3>
+    <div class="note">Single-file loads auto-slice via chroma-key. Use this to re-slice a packed/opaque sheet by grid.</div>
+    <div class="krow" style="margin-top:8px"><label>Mode</label>
+      <select id="sliceMode"><option value="count">Rows × Cols</option><option value="size">Frame W × H</option></select></div>
+    <div id="sliceCount">
+      <div class="krow"><label>Cols</label><input type="number" id="sCols" value="8" min="1" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+      <div class="krow"><label>Rows</label><input type="number" id="sRows" value="1" min="1" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    </div>
+    <div id="sliceSize" style="display:none">
+      <div class="krow"><label>Frame W</label><input type="number" id="sFW" value="64" min="1" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+      <div class="krow"><label>Frame H</label><input type="number" id="sFH" value="64" min="1" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    </div>
+    <div class="krow"><label>Margin</label><input type="number" id="sMar" value="0" min="0" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    <div class="krow"><label>Spacing</label><input type="number" id="sSpc" value="0" min="0" style="width:60px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    <button class="ibtn pink" id="doSlice" ${lastSheetCanvas ? '' : 'disabled'}>✂ Slice grid</button>
+    ${lastSheetCanvas ? '' : '<div class="note">load a single sheet to enable grid slicing</div>'}
+  </div>
+  <div class="module">
+    <h3>Export scale</h3>
+    <div class="krow"><label>GIF / video / ZIP</label>
+      <select id="scaleSel"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></div>
+    <div class="note">Nearest-neighbor upscale baked into GIF / WebM / PNG-seq so output stays chunky.</div>
+  </div>`;
+}
+
+function railDraw() {
+  const sw = draw.palette.map(c => `<div class="swatch ${c === draw.color ? 'sel' : ''}" data-c="${c}" style="background:${c}"></div>`).join('');
+  return `
+  <div class="module">
+    <h3 class="pink">Canvas</h3>
+    <div class="krow"><label>Width</label><input type="number" id="dW" value="${draw.W}" min="4" max="128" style="width:64px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    <div class="krow"><label>Height</label><input type="number" id="dH" value="${draw.H}" min="4" max="128" style="width:64px;background:rgba(255,255,255,.05);color:#fff;border:1px solid var(--hairline);border-radius:7px;padding:4px"/></div>
+    <button class="ibtn" id="dResize">Resize current frame</button>
+    <div class="note">Default 32×48 (heytiff sprite size). Resize clears the frame.</div>
+  </div>
+  <div class="module">
+    <h3>Tools</h3>
+    <div class="toolgrid">
+      <div class="tool ${draw.tool === 'pencil' ? 'sel' : ''}" data-tool="pencil">✏️ Pencil</div>
+      <div class="tool ${draw.tool === 'eraser' ? 'sel' : ''}" data-tool="eraser">🩹 Eraser</div>
+      <div class="tool ${draw.tool === 'fill' ? 'sel' : ''}" data-tool="fill">🪣 Fill</div>
+      <div class="tool ${draw.tool === 'eyedrop' ? 'sel' : ''}" data-tool="eyedrop">💧 Pick</div>
+    </div>
+    <div class="krow" style="margin-top:10px"><label>Color</label><input type="color" id="dColor" value="${draw.color}" style="flex:1;height:28px;background:transparent;border:1px solid var(--hairline);border-radius:7px;cursor:pointer"/></div>
+    <div class="swatches" id="dSwatch">${sw}</div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="ibtn" id="dUndo" style="margin:0">↩ Undo</button>
+      <button class="ibtn" id="dRedo" style="margin:0">↪ Redo</button>
+      <button class="ibtn" id="dClear" style="margin:0">✕ Clear</button>
+    </div>
+  </div>
+  <div class="module">
+    <h3 class="pink">Trace underlay</h3>
+    <div class="note">Drop a reference (or a Pixelate result) to trace by hand — the killer combo: rough it, then clean it.</div>
+    <label class="ibtn" style="display:block;text-align:center;cursor:pointer;margin-top:8px">📥 Load underlay<input type="file" id="dUnder" accept="image/*" hidden /></label>
+    <div class="krow" id="dUnderRow" style="${draw.underlay ? '' : 'display:none'}"><label>Opacity</label><input type="range" id="dUnderA" min="0" max="0.8" step="0.05" value="${draw.underlay ? draw.underlay.alpha : 0.4}" /><output id="dUnderO">${draw.underlay ? Math.round(draw.underlay.alpha * 100) : 40}%</output></div>
+    ${draw.underlay ? '<button class="ibtn" id="dUnderClr">✕ Remove underlay</button>' : ''}
+  </div>
+  <div class="module">
+    <button class="ibtn pink" id="dNewFrame">＋ New frame (dup current)</button>
+    <div class="note">Each frame draws walk-cycle deltas off the last pose. Turn on ◐ Onion to see prev/next ghosts.</div>
+  </div>`;
+}
+
+function railMake() {
+  return `
+  <div class="module">
+    <h3 class="pink">Pixelate</h3>
+    <div class="note">Drop or browse an image — pure client downscale + quantize + dither. No AI, $0, instant.</div>
+    <label class="ibtn pink" style="display:block;text-align:center;cursor:pointer;margin-top:8px">📥 Choose image<input type="file" id="mFile" accept="image/*" hidden /></label>
+  </div>
+  <div class="module">
+    <h3>Look</h3>
+    <div class="krow"><label>Px height</label><input type="range" id="mPx" min="24" max="128" step="4" value="${makeOpts.pxHeight}" /><output id="mPxO">${makeOpts.pxHeight}</output></div>
+    <div class="krow"><label>Colors</label><input type="range" id="mCol" min="4" max="64" step="2" value="${makeOpts.colors}" /><output id="mColO">${makeOpts.colors}</output></div>
+    <div class="krow"><label>Palette</label>
+      <select id="mPal">
+        <option value="adaptive">Adaptive (from image)</option>
+        <option value="genesis16">Genesis 16</option>
+        <option value="snes16">SNES 16</option>
+        <option value="pico8">PICO-8 16</option>
+        <option value="gameboy">Game Boy</option>
+      </select></div>
+    <div class="krow"><label>Dither</label>
+      <select id="mDith"><option value="none">None (clean snap)</option><option value="bayer">Ordered Bayer 4×4</option><option value="floyd">Floyd-Steinberg</option></select></div>
+    <div class="krow"><label>Cut bg</label><input type="checkbox" id="mBg" style="accent-color:var(--pink)" ${makeOpts.removeBg ? 'checked' : ''}/></div>
+    <div class="note">Subtle/fine = keep detail · chunky/low-colors = SNES rip.</div>
+  </div>
+  <div class="module">
+    <button class="ibtn pink" id="mAddFrame">＋ Add result as a frame</button>
+    <div class="note">Lands in the timeline + flows into ANIMATE. Or send it to DRAW as a trace underlay.</div>
+    <button class="ibtn" id="mToUnder" style="margin-top:6px">→ Send to DRAW underlay</button>
+  </div>`;
+}
+
+function wireRail() {
+  if (mode === 'animate') {
+    $('fpsR').oninput = (e) => { state.fps = +e.target.value; $('fpsO').textContent = state.fps; };
+    $('zoomR').oninput = (e) => { state.zoom = +e.target.value; $('zoomO').textContent = state.zoom + '×'; drawView(); };
+    $('setAllMs').onclick = () => { const ms = Math.round(1000 / state.fps); frames.forEach(f => f.ms = ms); renderStrip(); updateFoot(); toast('all holds = ' + ms + 'ms'); };
+    $('loopChk').onchange = (e) => { loop = e.target.checked; };
+    const sm = $('sliceMode');
+    sm.onchange = () => { const c = sm.value === 'count'; $('sliceCount').style.display = c ? '' : 'none'; $('sliceSize').style.display = c ? 'none' : ''; };
+    if ($('doSlice')) $('doSlice').onclick = () => {
+      const margin = +$('sMar').value || 0, spacing = +$('sSpc').value || 0;
+      if (sm.value === 'count') sliceGrid({ cols: +$('sCols').value, rows: +$('sRows').value, margin, spacing, byCount: true });
+      else sliceGrid({ fw: +$('sFW').value, fh: +$('sFH').value, margin, spacing, byCount: false });
+    };
+    const ss = $('scaleSel'); ss.value = String(exportScaleVal()); ss.onchange = () => localStorage.setItem('bit16.scale', ss.value);
+  } else if (mode === 'draw') {
+    document.querySelectorAll('#rail .tool').forEach(t => t.onclick = () => { draw.tool = t.dataset.tool; renderRail(); });
+    document.querySelectorAll('#dSwatch .swatch').forEach(s => s.onclick = () => { draw.color = s.dataset.c; $('dColor').value = s.dataset.c; renderRail(); });
+    $('dColor').oninput = (e) => { draw.color = e.target.value; };
+    $('dUndo').onclick = applyUndo;
+    $('dRedo').onclick = applyRedo;
+    $('dClear').onclick = () => { if (!frames[cur]) return; pushUndo(); frames[cur].canvas.getContext('2d').clearRect(0, 0, draw.W, draw.H); drawEditor(); renderStrip(); };
+    $('dResize').onclick = () => {
+      draw.W = Math.max(4, Math.min(128, +$('dW').value || 32));
+      draw.H = Math.max(4, Math.min(128, +$('dH').value || 48));
+      const c = makeCanvas(draw.W, draw.H);
+      if (frames[cur]) { frames[cur].canvas = c; frames[cur].w = draw.W; frames[cur].h = draw.H; }
+      buildEditor(); renderStrip();
+    };
+    $('dNewFrame').onclick = () => {
+      const src = frames[cur] ? frames[cur].canvas : makeCanvas(draw.W, draw.H);
+      const c = makeCanvas(draw.W, draw.H); c.getContext('2d').drawImage(src, 0, 0);
+      frames.splice(cur + 1, 0, { canvas: c, w: draw.W, h: draw.H, ms: Math.round(1000 / state.fps), skip: false, name: 'frame_' + (frames.length + 1) });
+      cur++; renderStrip(); drawEditor(); updateReadout();
+    };
+    $('dUnder').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const img = await fileToImage(f);
+      const c = makeCanvas(img.naturalWidth, img.naturalHeight); c.getContext('2d').drawImage(img, 0, 0);
+      draw.underlay = { canvas: c, alpha: 0.4 }; renderRail(); drawEditor();
+    };
+    if ($('dUnderA')) $('dUnderA').oninput = (e) => { draw.underlay.alpha = +e.target.value; $('dUnderO').textContent = Math.round(draw.underlay.alpha * 100) + '%'; drawEditor(); };
+    if ($('dUnderClr')) $('dUnderClr').onclick = () => { draw.underlay = null; renderRail(); drawEditor(); };
+  } else {
+    $('mFile').onchange = (e) => { if (e.target.files[0]) loadMakeSource(e.target.files[0]); };
+    const bind = (id, key, out, fmt) => { const el = $(id); if (!el) return; el.oninput = () => { makeOpts[key] = +el.value; if (out) $(out).textContent = fmt ? fmt(el.value) : el.value; renderMakePreview(); }; };
+    bind('mPx', 'pxHeight', 'mPxO');
+    bind('mCol', 'colors', 'mColO');
+    $('mPal').value = makeOpts.paletteKey; $('mPal').onchange = (e) => { makeOpts.paletteKey = e.target.value; renderMakePreview(); };
+    $('mDith').value = makeOpts.dither; $('mDith').onchange = (e) => { makeOpts.dither = e.target.value; renderMakePreview(); };
+    $('mBg').onchange = (e) => { makeOpts.removeBg = e.target.checked; renderMakePreview(); };
+    $('mAddFrame').onclick = () => {
+      if (!makeOpts._lastSmall) { toast('pixelate an image first'); return; }
+      addFrameCanvas(cloneCanvas(makeOpts._lastSmall), 'pixelated_' + (frames.length + 1));
+      renderStrip(); updateReadout(); toast('added to timeline ✓ — switch to ANIMATE to play');
+    };
+    $('mToUnder').onclick = () => {
+      if (!makeOpts._lastSmall) { toast('pixelate an image first'); return; }
+      draw.underlay = { canvas: cloneCanvas(makeOpts._lastSmall), alpha: 0.4 };
+      toast('sent to DRAW underlay — switch to DRAW');
+    };
+  }
+}
+
+/* ═══════════════════════ MODE SWITCHING ═══════════════════════ */
+
+function setMode(m) {
+  stop();
+  mode = m;
+  $('pillAnimate').classList.toggle('hot', m === 'animate');
+  $('pillDraw').classList.toggle('hot', m === 'draw');
+  $('pillMake').classList.toggle('hot', m === 'make');
+  renderRail();
+  const body = $('stageBody');
+  if (m === 'draw') { buildEditor(); }
+  else if (m === 'make') { renderMakePreview(); }
+  else {
+    previewCanvas = null;
+    if (frames.length) { body.innerHTML = ''; ensurePreviewCanvas(); drawView(); }
+    else showDrop();
+  }
+  updateFoot();
+}
+
+/* ═══════════════════════ WIRING ═══════════════════════ */
+
+function wireDropTarget(el, onFiles) {
+  el.ondragover = (e) => { e.preventDefault(); el.classList.add('over'); };
+  el.ondragleave = () => el.classList.remove('over');
+  el.ondrop = (e) => { e.preventDefault(); el.classList.remove('over'); onFiles(e.dataTransfer.files); };
+}
+function wireDrop() {
+  const d = $('drop'); if (!d) return;
+  d.onclick = () => $('loadFile').click();
+  wireDropTarget(d, handleFiles);
+}
+
+// Make the whole stage a drop target for animate mode (and capture single-sheet for re-slice)
+const origHandleFiles = handleFiles;
+handleFiles = async function (fileList) {
+  const files = Array.from(fileList);
+  if (files.length === 1 && (/image\//.test(files[0].type) || /\.(png|jpe?g|webp|gif)$/i.test(files[0].name))) {
+    try { const img = await fileToImage(files[0]); const c = makeCanvas(img.naturalWidth, img.naturalHeight); c.getContext('2d').imageSmoothingEnabled = false; c.getContext('2d').drawImage(img, 0, 0); lastSheetCanvas = c; } catch {}
+  }
+  await origHandleFiles(fileList);
+  if (mode === 'animate') renderRail();   // refresh slice panel enabled state
+};
+
+function boot() {
+  // pills
+  $('pillAnimate').onclick = () => setMode('animate');
+  $('pillDraw').onclick = () => setMode('draw');
+  $('pillMake').onclick = () => setMode('make');
+  // transport
+  $('playBtn').onclick = () => { if (mode === 'draw' || mode === 'make') setMode('animate'); playing ? stop() : play(); };
+  $('onionBtn').onclick = () => { onionOn = !onionOn; $('onionBtn').classList.toggle('on', onionOn); drawView(); };
+  // load
+  $('loadFile').onchange = (e) => { handleFiles(e.target.files); e.target.value = ''; };
+  // exports
+  $('expGif').onclick = exportGif;
+  $('expVid').onclick = exportVideo;
+  $('expSheet').onclick = exportSheet;
+  $('expZip').onclick = exportZip;
+  // strip footer
+  $('dupFrame').onclick = () => { if (!frames[cur]) return; const c = cloneCanvas(frames[cur].canvas); frames.splice(cur + 1, 0, { ...frames[cur], canvas: c, name: frames[cur].name + '_copy' }); cur++; renderStrip(); drawView(); updateReadout(); updateFoot(); };
+  $('delFrame').onclick = () => { if (!frames.length) return; frames.splice(cur, 1); if (cur >= frames.length) cur = Math.max(0, frames.length - 1); setFrames(frames, true); if (mode === 'draw') buildEditor(); };
+  $('addBlank').onclick = () => { const c = makeCanvas(frames[cur] ? frames[cur].w : draw.W, frames[cur] ? frames[cur].h : draw.H); frames.splice(cur + 1, 0, { canvas: c, w: c.width, h: c.height, ms: Math.round(1000 / state.fps), skip: false, name: 'blank_' + (frames.length + 1) }); cur++; renderStrip(); drawView(); updateReadout(); updateFoot(); if (mode === 'draw') buildEditor(); };
+  // paste a sheet/screenshot
+  window.addEventListener('paste', async (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const it of items) {
+      if (it.type && it.type.indexOf('image') === 0) { const f = it.getAsFile(); if (f) { await handleFiles([f]); return; } }
+    }
+  });
+  // keyboard: space=play/pause, arrows=step, z/y=undo/redo (draw)
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); if (mode !== 'animate') setMode('animate'); playing ? stop() : play(); }
+    else if (e.code === 'ArrowRight') { stop(); cur = (cur + 1) % Math.max(1, frames.length); drawView(); updateReadout(); updateFoot(); highlightStripCur(); }
+    else if (e.code === 'ArrowLeft') { stop(); cur = (cur - 1 + Math.max(1, frames.length)) % Math.max(1, frames.length); drawView(); updateReadout(); updateFoot(); highlightStripCur(); }
+    else if (mode === 'draw' && (e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); applyUndo(); }
+    else if (mode === 'draw' && (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); applyRedo(); }
+  });
+
+  setMode('animate');
+  wireDrop();
+}
+boot();
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>
