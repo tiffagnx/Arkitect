@@ -1000,6 +1000,32 @@ const INSTRUMENTS = {
       g.gain.setValueAtTime(0.0001,when); g.gain.exponentialRampToValueAtTime(Math.max(0.001,vel*0.5),when+0.004); g.gain.exponentialRampToValueAtTime(0.0001,when+p.len); lp.connect(g); g.connect(out);
     }},
   /* ── SAMPLER (melodic) — user-dropped audio ── */
+  /* ── VOX / CHOIR — a formant-filtered saw ensemble = a synthetic "aah/ooh" vocal. The bridge
+     between samples and synths; pairs with Vocal→Instrument so voices are first-class in here. ── */
+  vox:{ name:'Vox / Choir', kind:'vocal', melodic:true, color:'#E36B9F', root:60, params:[
+      {id:'vowel',label:'Vowel',min:0,max:1,step:.01,def:.45},
+      {id:'voices',label:'Voices',min:1,max:8,step:1,def:5},
+      {id:'detune',label:'Detune',min:0,max:40,step:1,def:14,unit:'c'},
+      {id:'atk',label:'Attack',min:.005,max:1,step:.005,def:.16,unit:'s'},
+      {id:'decay',label:'Length',min:.2,max:4,step:.05,def:1.8,unit:'s'},
+      {id:'vib',label:'Vibrato',min:0,max:1,step:.01,def:.25},
+      {id:'breath',label:'Breath',min:0,max:1,step:.01,def:.16}],
+    trigger(out,when,vel,note,p,ch){
+      const f=mtof(note);
+      const VOW=[[320,800],[700,1150],[440,2200]];   // ooh / aah / eee  (F1,F2)
+      const seg=clamp(p.vowel,0,0.999)*2, vi=Math.floor(seg), vf=seg-vi, va=VOW[vi], vb=VOW[Math.min(2,vi+1)];
+      const F1=va[0]+(vb[0]-va[0])*vf, F2=va[1]+(vb[1]-va[1])*vf;
+      const amp=ctx.createGain(); amp.connect(out);
+      const mk=(freq,q,g)=>{ const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq; bp.Q.value=q; const gg=ctx.createGain(); gg.gain.value=g; bp.connect(gg); gg.connect(amp); return bp; };
+      const f1=mk(F1,7,1), f2=mk(F2,9,0.7), f3=mk(2900,10,0.28);
+      const n=Math.max(1,Math.round(p.voices)), end=when+p.atk+p.decay+0.12;
+      const vibLfo=ctx.createOscillator(), vibG=ctx.createGain(); vibLfo.type='sine'; vibLfo.frequency.value=5.2; vibG.gain.value=p.vib*7; vibLfo.connect(vibG); vibLfo.start(when); vibLfo.stop(end);
+      for(let v=0;v<n;v++){ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f; o.detune.value=(n<2?0:(v/(n-1)-0.5)*2)*p.detune; vibG.connect(o.detune); o.connect(f1); o.connect(f2); o.connect(f3); o.start(when); o.stop(end); }
+      if(p.breath>0.02){ const nz=noiseSrc(), hp=ctx.createBiquadFilter(), ng=ctx.createGain(); hp.type='highpass'; hp.frequency.value=2200; ng.gain.setValueAtTime(0.0001,when); ng.gain.linearRampToValueAtTime(vel*p.breath*0.22,when+p.atk+0.02); ng.gain.exponentialRampToValueAtTime(0.0001,when+p.atk+p.decay); nz.connect(hp).connect(ng).connect(amp); nz.start(when); nz.stop(end); }
+      amp.gain.setValueAtTime(0.0001,when);
+      amp.gain.linearRampToValueAtTime(vel*0.5,when+p.atk+0.006);
+      amp.gain.exponentialRampToValueAtTime(0.0001,when+p.atk+p.decay+0.05);
+    }},
   sampler:{ name:'Sampler', kind:'sampler', melodic:true, color:'#9FE36B', root:60, params:[
       {id:'pitch',label:'Pitch',min:-24,max:24,step:1,def:0,unit:'st'},
       {id:'start',label:'Start',min:0,max:1,step:.01,def:0},
@@ -1036,7 +1062,7 @@ const INSTRUMENTS = {
     trigger(out,when,vel,note,p,ch){ playSlice(ch,out,when,vel,(note-(ch.root!=null?ch.root:60)),p); }},
 };
 const DRUM_TYPES=['kick','snare','clap','hat','ohat','tom','rim','cowbell','shaker','crash'];
-const MELO_TYPES=['808','bass','keys','fm','pluck','lead','pad','wt','string','organ','piano'];
+const MELO_TYPES=['808','bass','keys','fm','pluck','lead','pad','wt','string','organ','piano','vox'];
 
 /* ── PRESET BANKS — curated sounds over each instrument's engine (the FLEX-style value).
    Each preset is a partial param set; selecting it in the instrument window applies it. ── */
@@ -1086,12 +1112,17 @@ const PRESETS={
        {name:'Wave Bass',params:{pos:.2,morph:.3,cut:1400,atk:.005,decay:.6,detune:4}},
        {name:'Vector Keys',params:{pos:.35,morph:.4,cut:5000,atk:.01,decay:1.4,detune:8}},
        {name:'Formant',params:{pos:.85,morph:.25,cut:4500,atk:.02,decay:1.2,detune:6}} ],
+  vox:[ {name:'Aah Choir',params:{vowel:.5,voices:6,detune:16,atk:.3,decay:2.4,vib:.3,breath:.2}},
+        {name:'Ooh Choir',params:{vowel:0,voices:6,detune:14,atk:.4,decay:2.6,vib:.25,breath:.15}},
+        {name:'Eee Voices',params:{vowel:1,voices:5,detune:12,atk:.12,decay:1.6,vib:.35,breath:.1}},
+        {name:'Solo Voice',params:{vowel:.5,voices:1,detune:0,atk:.08,decay:1.4,vib:.5,breath:.25}},
+        {name:'Vox Stab',params:{vowel:.6,voices:5,detune:14,atk:.01,decay:.5,vib:.1,breath:.12}} ],
 };
 
 /* ── INSTRUMENT LIBRARY — a big suite of named, ready-to-play instruments built on the
    engines above. Browse them in the Browser window; clicking one adds it as a channel. ── */
 const CAT_COLOR={ 'Drums':'#FF8A6B','Bass':'#6B8BFF','Pianos & Keys':'#D8D8E0','Guitars':'#E3A86B',
-  'Synth Leads':'#E36BCB','Pads':'#5FB4CE','Strings':'#E3C06B','Brass':'#E39F6B','Bells & Mallets':'#6BE3C0','Plucks':'#6BD6E3','Organs':'#6BA8E3' };
+  'Synth Leads':'#E36BCB','Pads':'#5FB4CE','Strings':'#E3C06B','Brass':'#E39F6B','Bells & Mallets':'#6BE3C0','Plucks':'#6BD6E3','Organs':'#6BA8E3','Vocal':'#E36B9F','World':'#9FE3B5' };
 const LIBRARY=[
   // DRUMS
   {n:'Kick',c:'Drums',e:'kick'},{n:'Snare',c:'Drums',e:'snare'},{n:'Clap',c:'Drums',e:'clap'},
@@ -1204,8 +1235,58 @@ const LIBRARY=[
   {n:'Glass Pad',c:'Pads',e:'wt',p:{pos:.55,morph:.5,cut:4500,atk:.5,decay:3,detune:10}},
   {n:'Wave Bass',c:'Bass',e:'wt',p:{pos:.2,morph:.3,cut:1400,atk:.005,decay:.6,detune:4},r:36},
   {n:'Vector Keys',c:'Pianos & Keys',e:'wt',p:{pos:.35,morph:.4,cut:5000,atk:.01,decay:1.4,detune:8}},
+  // VOCAL — the synthetic-voice family (works hand-in-hand with Vocal→Instrument)
+  {n:'Aah Choir',c:'Vocal',e:'vox',p:{vowel:.5,voices:6,detune:16,atk:.3,decay:2.4,vib:.3,breath:.2}},
+  {n:'Ooh Choir',c:'Vocal',e:'vox',p:{vowel:0,voices:6,detune:14,atk:.4,decay:2.6,vib:.25,breath:.15}},
+  {n:'Eee Voices',c:'Vocal',e:'vox',p:{vowel:1,voices:5,detune:12,atk:.12,decay:1.6,vib:.35,breath:.1}},
+  {n:'Solo Voice',c:'Vocal',e:'vox',p:{vowel:.5,voices:1,detune:0,atk:.08,decay:1.4,vib:.5,breath:.25}},
+  {n:'Vocal Pad',c:'Vocal',e:'vox',p:{vowel:.3,voices:8,detune:22,atk:.6,decay:3.4,vib:.2,breath:.18}},
+  {n:'Gospel Choir',c:'Vocal',e:'vox',p:{vowel:.55,voices:8,detune:26,atk:.25,decay:2.8,vib:.4,breath:.22}},
+  {n:'Hum',c:'Vocal',e:'vox',p:{vowel:.1,voices:3,detune:8,atk:.2,decay:1.8,vib:.3,breath:.08}},
+  {n:'Vox Stab',c:'Vocal',e:'vox',p:{vowel:.6,voices:5,detune:14,atk:.01,decay:.5,vib:.1,breath:.12}},
+  // MORE BASS
+  {n:'808 Long',c:'Bass',e:'808',p:{drive:.2,tone:1400,decay:1.6,glide:0,click:.15},r:31},
+  {n:'Hard 808',c:'Bass',e:'808',p:{drive:.85,tone:5200,decay:.9,click:.5,glide:0},r:31},
+  {n:'Wobble Bass',c:'Bass',e:'bass',p:{detune:10,res:18,cut:800,sub:.4,env:.9,decay:.5},r:40},
+  {n:'FM Bass',c:'Bass',e:'fm',p:{ratio:1,index:220,decay:.5,fall:.5},r:36},
+  {n:'Saw Bass',c:'Bass',e:'lead',p:{voices:2,detune:6,cut:1200,atk:.005,decay:.5},r:40},
+  {n:'House Bass',c:'Bass',e:'bass',p:{detune:4,res:5,cut:850,sub:.7,env:.5,decay:.35},r:40},
+  // MORE KEYS
+  {n:'Toy Piano',c:'Pianos & Keys',e:'fm',p:{ratio:3,index:160,decay:.7,fall:.85}},
+  {n:'Tine EP',c:'Pianos & Keys',e:'fm',p:{ratio:1,index:140,decay:1.6,fall:.7}},
+  {n:'Pluck Keys',c:'Pianos & Keys',e:'keys',p:{wave:0,cut:4200,atk:.004,decay:.55,spread:5}},
+  // MORE LEADS
+  {n:'Pluck Lead',c:'Synth Leads',e:'pluck',p:{cut:5000,res:8,env:.85,decay:.4,detune:8}},
+  {n:'Trance Lead',c:'Synth Leads',e:'lead',p:{voices:7,detune:18,cut:7500,atk:.01,decay:1.4}},
+  {n:'Acid Lead',c:'Synth Leads',e:'bass',p:{detune:0,res:18,cut:900,sub:.2,env:.85,decay:.4},r:48},
+  {n:'Pulse Lead',c:'Synth Leads',e:'keys',p:{wave:1,cut:6000,atk:.003,decay:.5,spread:4}},
+  // MORE PADS
+  {n:'Ambient Pad',c:'Pads',e:'pad',p:{cut:2000,atk:1.0,decay:3.6,spread:22,sub:.25}},
+  {n:'Sci-Fi Pad',c:'Pads',e:'wt',p:{pos:.4,morph:.7,cut:3800,atk:.7,decay:3.4,detune:16}},
+  {n:'Saw Pad',c:'Pads',e:'lead',p:{voices:7,detune:24,cut:2600,atk:.6,decay:2.6}},
+  // MORE BELLS & PLUCKS
+  {n:'Glass Bell',c:'Bells & Mallets',e:'fm',p:{ratio:5,index:280,decay:1.8,fall:.6}},
+  {n:'Steel Tongue',c:'Bells & Mallets',e:'fm',p:{ratio:2.5,index:140,decay:1.4,fall:.75}},
+  {n:'Koto Pluck',c:'Plucks',e:'string',p:{bright:3200,sustain:.985,pick:.6,len:1.6,body:.6},r:60},
+  {n:'Mbira',c:'Plucks',e:'string',p:{bright:4200,sustain:.96,pick:.5,len:1.0,body:.5},r:60},
+  // WORLD — exotic textures built on the same engines
+  {n:'Steel Drum',c:'World',e:'fm',p:{ratio:3,index:120,decay:.9,fall:.8},r:60},
+  {n:'Handpan',c:'World',e:'fm',p:{ratio:2,index:90,decay:1.4,fall:.7},r:57},
+  {n:'Sitar',c:'World',e:'string',p:{bright:5000,sustain:.97,pick:.7,len:2.2,body:.5},r:52},
+  {n:'Shamisen',c:'World',e:'string',p:{bright:4200,sustain:.95,pick:.8,len:1.2,body:.4},r:52},
+  {n:'Pan Flute',c:'World',e:'pad',p:{cut:3800,atk:.06,decay:1.2,spread:6,sub:0},r:64},
+  {n:'Flute',c:'World',e:'pad',p:{cut:4400,atk:.08,decay:1.4,spread:4,sub:0},r:72},
+  {n:'Ocarina',c:'World',e:'keys',p:{wave:2,cut:3600,atk:.04,decay:.9,spread:3}},
+  {n:'Erhu',c:'World',e:'pad',p:{cut:3200,atk:.12,decay:1.8,spread:5,sub:.2},r:60},
+  // MORE DRUMS / PERC
+  {n:'Lo-Fi Kick',c:'Drums',e:'kick',p:{punch:.35,decay:.5,drive:.5,click:.2,tune:-3}},
+  {n:'Trap Snare 2',c:'Drums',e:'snare',p:{noise:.9,tone:.25,decay:.18,crisp:4200,tune:230}},
+  {n:'Rimshot',c:'Drums',e:'rim',p:{tune:1700,decay:.05}},
+  {n:'Perc Tom',c:'Drums',e:'tom',p:{tune:260,decay:.22,bend:.35}},
+  {n:'Shaker 2',c:'Drums',e:'shaker',p:{tone:8200,decay:.09}},
+  {n:'Crash 2',c:'Drums',e:'crash',p:{decay:1.6,tone:6500}},
 ];
-const LIB_CATS=['Drums','Bass','Pianos & Keys','Guitars','Synth Leads','Pads','Strings','Brass','Bells & Mallets','Plucks','Organs'];
+const LIB_CATS=['Drums','Bass','Pianos & Keys','Guitars','Synth Leads','Pads','Strings','Brass','Bells & Mallets','Plucks','Organs','Vocal','World'];
 function addFromLibrary(entry){
   const I=INSTRUMENTS[entry.e]; if(!I) return;
   const c=newChannel(entry.e);
@@ -1217,6 +1298,7 @@ function addFromLibrary(entry){
 /* per-plugin knowledge cards — what the AI brain inside each instrument knows. Kept short;
    the brain also gets the live param schema + current values, so it answers grounded. */
 const BRAIN_CARDS={
+  vox:"Synthetic choir/voice — formant-filtered saw ensemble. Vowel morphs ooh→aah→eee, Voices=ensemble size, Detune=width, Attack=how soft it swells in, Length=tail, Vibrato=human wobble, Breath=airy noise. Big slow pads love high Voices + long Attack; stabs want Attack near 0 + short Length. Pairs with Vocal→Instrument.",
   kick:"Synthesized kick drum. Tune=pitch in semis, Punch=initial thump/attack body, Decay=length & boom, Click=beater snap up top, Drive=saturation that adds loudness+grit. Trap kicks want more decay+drive (boomy); boom-bap wants tight decay + more click.",
   snare:"Synth snare. Tune=body pitch, Noise=the 'sss' rattle, Body=tonal weight, Decay=length, Crisp=how high the noise sits. More noise+crisp = trap/clap-ish; more body+lower crisp = fat boom-bap snare.",
   clap:"Synth handclap — staggered noise bursts. Spread=how loose/wide the claps are, Tone=center frequency, Body=resonance/thickness, Decay=tail. Wider spread = human/live; tight = electronic.",
@@ -3559,8 +3641,346 @@ setInterval(autosave, 9000);
 window.addEventListener('beforeunload', autosave);
 // extensibility: pull in any Builder-made / saved plugins so they appear in the ＋ FX menu
 fetch('/api/plugins/bundle.js').then(r=>r.ok?r.text():'').then(js=>{ if(js){ try{ (new Function(js))(); }catch(e){} } }).catch(()=>{});
+/* ════════════════════════════════════════════════════════════════════════════
+   🎛️  THE AI PRODUCTION SUITE  —  the agent (Tiff / Kit / yours) AND an MCP drive the
+   WHOLE room by command. ONE documented surface (window.RoomAPI) is the single source
+   of truth: the in-room agent calls it through beat-dock.js, and an external MCP calls
+   the very same verbs (RoomAPI.describe() is the self-manifest). Local-first — the
+   music engine is deterministic theory, so every verb works with NO model; a smart
+   brain just aims it better. Headline moves: make a beat, add / generate / design
+   instruments, turn a VOICE into a playable instrument, drop SFX (free synth or
+   ElevenLabs BYO-key), shape a sound & mix the session. Everything renders through
+   renderPatternWav() → so "⤓ Send to Studio" already carries ALL of it into DeMartin
+   Audio Labs, seamless. window.beat* aliases mirror studio.html's window.studio* set.
+   ════════════════════════════════════════════════════════════════════════════ */
+(function(){
+  function R(ok, extra){ return Object.assign({ ok:!!ok }, extra||{}); }
+  let _lastVocalBuf=null, _recState=null;
+
+  // ── channel finder: by name / type / role / family alias ──
+  const FAMILY={ drums:['kick','snare','clap','hat','ohat','tom','rim','cowbell','shaker','crash'],
+    bass:['808','bass'], keys:['keys','piano','fm','organ'], lead:['lead','pluck','wt'], pad:['pad'], vocal:['vox'] };
+  function findChannel(q){
+    if(q==null) return null; q=(''+q).toLowerCase().trim(); if(!q) return null;
+    let c=project.channels.find(x=>(x.name||'').toLowerCase()===q); if(c) return c;
+    c=project.channels.find(x=>(x.name||'').toLowerCase().includes(q)); if(c) return c;
+    c=project.channels.find(x=>x.type===q); if(c) return c;
+    c=project.channels.find(x=>x._role===q); if(c) return c;
+    for(const fam in FAMILY){ if(q.includes(fam)){ c=project.channels.find(x=>FAMILY[fam].includes(x.type)); if(c) return c; } }
+    return null;
+  }
+  function ensureType(type, libName){
+    let c=project.channels.find(x=>x.type===type); if(c) return c;
+    if(libName){ const e=LIBRARY.find(x=>x.n===libName); if(e){ addFromLibrary(e); return project.channels[project.channels.length-1]; } }
+    c=newChannel(type); project.channels.push(c); return c;
+  }
+
+  // ── ADD an instrument by name / family alias ──
+  function addInstrument(q){
+    if(!q) return R(false,{msg:'Name an instrument — e.g. "808", "Reese Bass", "choir", "Rhodes".'});
+    const s=(''+q).toLowerCase().trim();
+    let e=LIBRARY.find(x=>x.n.toLowerCase()===s) || LIBRARY.find(x=>x.n.toLowerCase().includes(s));
+    if(!e){ const ALIAS={ '808':'808 Clean', sub:'Sub Bass', reese:'Reese Bass', bass:'Sub Bass', piano:'Grand Piano',
+        rhodes:'Rhodes', wurli:'Wurli', ep:'Electric Piano', keys:'Soft Keys', clav:'Clavinet', guitar:'Acoustic Guitar',
+        pluck:'Trap Pluck', lead:'Supersaw Lead', supersaw:'Supersaw Lead', saw:'Saw Lead', pad:'Warm Pad',
+        strings:'String Ensemble', violin:'Violin', cello:'Cello', brass:'Brass Section', trumpet:'Trumpet',
+        bell:'Bell', marimba:'Marimba', organ:'Drawbar Organ', choir:'Aah Choir', vox:'Aah Choir', voice:'Solo Voice',
+        flute:'Flute', sitar:'Sitar', kalimba:'Kalimba', harp:'Harp', kick:'Kick', snare:'Snare', hat:'Closed Hat', clap:'Clap', cowbell:'Cowbell' };
+      for(const k in ALIAS){ if(s.includes(k)){ e=LIBRARY.find(x=>x.n===ALIAS[k]); if(e) break; } } }
+    if(e){ addFromLibrary(e); return R(true,{name:e.n, cat:e.c}); }
+    if(INSTRUMENTS[s]){ addCh(s); return R(true,{name:INSTRUMENTS[s].name}); }
+    return R(false,{msg:'No instrument like "'+q+'". Try RoomAPI.listInstruments().'});
+  }
+
+  // ── DESIGN an instrument: add a base, then sculpt its knobs toward the described vibe ──
+  function designInstrument(desc){
+    desc=(''+(desc||'')).toLowerCase();
+    let type='pluck';
+    if(/choir|voice|vocal|vox|aah|ooh/.test(desc)) type='vox';
+    else if(/808/.test(desc)) type='808';
+    else if(/bass|sub|reese|low end/.test(desc)) type='bass';
+    else if(/lead|saw|super|trance/.test(desc)) type='lead';
+    else if(/pad|atmos|ambient|wash|drone/.test(desc)) type='pad';
+    else if(/key|piano|rhodes|\bep\b/.test(desc)) type='keys';
+    else if(/bell|mallet|glass|chime|marimba/.test(desc)) type='fm';
+    else if(/organ/.test(desc)) type='organ';
+    else if(/wave|morph|evolv|vector/.test(desc)) type='wt';
+    const c=newChannel(type);
+    c.name=(desc.replace(/[^a-z0-9 ]/g,'').trim().slice(0,16)||INSTRUMENTS[type].name).replace(/\b\w/g,m=>m.toUpperCase());
+    const I=INSTRUMENTS[type], has=p=>I.params.find(x=>x.id===p);
+    const set=(id,v)=>{ const d=I.params.find(p=>p.id===id); if(d) c.params[id]=clamp(v,d.min,d.max); };
+    const at=(id,frac)=>{ const d=I.params.find(p=>p.id===id); return d? d.min+(d.max-d.min)*frac : 0; };
+    const ck=has('cut')?'cut':has('tone')?'tone':has('bright')?'bright':null;
+    if(ck){ if(/dark|warm|mellow|muffl|dull/.test(desc)) set(ck, at(ck,.3));
+            if(/bright|airy|crisp|sharp|open/.test(desc)) set(ck, at(ck,.82)); }
+    if(/hard|aggress|gritty|dirty|distort|growl/.test(desc)){ if(has('drive'))set('drive',.7); if(has('res'))set('res',at('res',.8)); if(has('index'))set('index',at('index',.7)); }
+    if(/soft|smooth|clean|gentle/.test(desc)){ if(has('drive'))set('drive',.1); if(has('res'))set('res',at('res',.15)); }
+    if(/wide|huge|lush|big|fat/.test(desc)){ if(has('detune'))set('detune',at('detune',.75)); if(has('voices'))set('voices',7); if(has('spread'))set('spread',at('spread',.8)); if(has('sub'))set('sub',.5); }
+    if(/tight|narrow|focused|mono/.test(desc)){ if(has('detune'))set('detune',at('detune',.1)); if(has('voices'))set('voices',2); if(has('spread'))set('spread',at('spread',.1)); }
+    if(/long|sustain|pad|drone/.test(desc)){ if(has('decay'))set('decay',at('decay',.85)); if(has('atk'))set('atk',at('atk',.4)); }
+    if(/short|stab|pluck/.test(desc)){ if(has('decay'))set('decay',at('decay',.12)); if(has('atk'))set('atk',at('atk',0)); }
+    project.channels.push(c); selChId=c.id; showWin('rack'); renderRack(); renderGraph(); openInstrument(c); autosave();
+    return R(true,{name:c.name, type});
+  }
+
+  // ── GENERATE a part into the current pattern ──
+  function generatePart(part, targetQ){
+    part=(''+(part||'')).toLowerCase();
+    if(/drum|groove|beat pattern/.test(part)){
+      ['kick','snare','hat','ohat'].forEach(t=>{ if(!project.channels.find(c=>c.type===t)) project.channels.push(newChannel(t)); });
+      generateGroove(); return R(true,{part:'drums'});
+    }
+    if(/hat|hi.?hat/.test(part)){ const h=ensureType('hat','Closed Hat'); const hits=[8,11,12,13][Math.floor(Math.random()*4)]; genEuclid(h,hits); return R(true,{part:'hats',channel:h.name}); }
+    let ch=targetQ?findChannel(targetQ):null;
+    if(/bass|808|sub/.test(part)){ ch=ch||ensureType('808','808 Clean'); genMelodyPart(ch); return R(true,{part:'bassline',channel:ch.name}); }
+    if(/chord|prog|harmon/.test(part)){ ch=ch||project.channels.find(c=>['keys','piano','pad','fm','pluck','vox'].includes(c.type))||ensureType('keys','Soft Keys'); genChords(ch); return R(true,{part:'chords',channel:ch.name}); }
+    if(/mel|lead|riff|topline/.test(part)){ ch=ch||project.channels.find(c=>['pluck','lead','keys','fm','wt'].includes(c.type)&&c._role!=='chords')||ensureType('pluck','Trap Pluck'); genMelodyPart(ch); return R(true,{part:'melody',channel:ch.name}); }
+    if(/arp/.test(part)){ ch=ch||selChannel(); if(!ch||!ch.melodic) return R(false,{msg:'Pick a melodic channel to arpeggiate.'}); genArp(ch); return R(true,{part:'arp',channel:ch.name}); }
+    return R(false,{msg:'Which part? drums, bassline, chords, melody, hats or arp.'});
+  }
+
+  // ── pitch-detect (autocorrelation) → MIDI, so a voice tunes itself ──
+  function _pitchMidi(buf){
+    try{ const sr=buf.sampleRate, d=buf.getChannelData(0), N=d.length, win=Math.min(N,Math.floor(sr*0.12));
+      let best=0,bi=0; for(let i=0;i+win<N;i+=Math.floor(win/2)){ let e=0; for(let j=i;j<i+win;j++)e+=d[j]*d[j]; if(e>best){best=e;bi=i;} }
+      const seg=d.subarray(bi,bi+win), minLag=Math.floor(sr/600), maxLag=Math.floor(sr/70);
+      let bestLag=-1,bestCorr=0; for(let lag=minLag;lag<=maxLag&&lag<seg.length;lag++){ let c=0; for(let j=0;j+lag<seg.length;j++)c+=seg[j]*seg[j+lag]; if(c>bestCorr){bestCorr=c;bestLag=lag;} }
+      if(bestLag<=0) return null; const hz=sr/bestLag; if(hz<60||hz>700) return null;
+      return Math.round(69+12*Math.log2(hz/440));
+    }catch(e){ return null; }
+  }
+
+  // ── VOCAL → INSTRUMENT — the headline: turn a loaded/recorded VOICE into a playable sound ──
+  function vocalToInstrument(opts){
+    opts=opts||{};
+    let src=opts.buf||null, srcName='vocal';
+    if(!src){ const sel=selChannel(); if(sel&&sel._buf&&['sampler','warp','slicer'].includes(sel.type)){ src=sel._buf; srcName=sel.name; } }
+    if(!src){ const samp=[...project.channels].reverse().find(c=>c._buf&&['sampler','warp','slicer'].includes(c.type)); if(samp){ src=samp._buf; srcName=samp.name; } }
+    if(!src && _lastVocalBuf){ src=_lastVocalBuf; srcName='Recording'; }
+    if(!src) return R(false,{msg:'Load or record a vocal first — drag a clip in, hit ⏺ to record, or 📁 a sample — then I’ll make it an instrument.', needsSource:true});
+    const mode=(opts.mode||'synth').toLowerCase();
+    if(mode==='chop'||mode==='slice'){ chopToSlicer({_buf:src,name:srcName,_sampleName:srcName}, opts.grid?'grid':'transient'); return R(true,{mode:'chop',name:srcName}); }
+    const c=newChannel('sampler'); c.name=(srcName.replace(/\.[^.]+$/,'').slice(0,12))+' Synth'; c._buf=src; c._sampleName=c.name;
+    const midi=_pitchMidi(src); c.root=clamp(midi||60,24,84);
+    c.params.decay=Math.min(2, src.duration||2); c.params.start=0;
+    try{ wavBase64(src).then(b=>{ c._sampleB64=b; }).catch(()=>{}); }catch(e){}
+    project.channels.push(c); selChId=c.id; showWin('rack'); renderRack(); renderGraph();
+    if(opts.riff!==false) genMelodyPart(c);          // lay an in-key phrase so it plays immediately
+    openInstrument(c); autosave();
+    return R(true,{mode:'synth', name:c.name, root:c.root, note:(midi!=null?noteName(midi):null)});
+  }
+
+  // ── MIC RECORD → a sampler channel (then vocalToInstrument it) ──
+  async function record(secs){
+    resumeAudio();
+    if(_recState){ try{ _recState.stop(); }catch(e){} return R(true,{stopping:true}); }
+    let stream; try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ toast('🎙 Mic blocked — allow the microphone, then try again'); return R(false,{msg:'Mic blocked — allow the microphone, then try again.'}); }
+    const mr=new MediaRecorder(stream), chunks=[];
+    mr.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+    const done=new Promise(res=>{ mr.onstop=async()=>{ stream.getTracks().forEach(t=>t.stop()); _recState=null;
+      const rb=$('#bRec'); if(rb) rb.classList.remove('on');
+      try{ const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'}); const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
+        _lastVocalBuf=buf; loadSampleBuf('Recording', buf); res(R(true,{recorded:true,dur:+buf.duration.toFixed(1)})); }
+      catch(e){ res(R(false,{msg:'Could not decode the recording.'})); } }; });
+    _recState=mr; mr.start(); const rb=$('#bRec'); if(rb) rb.classList.add('on');
+    toast('🎙 Recording'+(secs?(' '+secs+'s'):'… tap ⏺ again to stop'));
+    if(secs){ setTimeout(()=>{ try{ if(_recState===mr) mr.stop(); }catch(e){} }, Math.max(500,secs*1000)); return await done; }
+    return R(true,{recording:true});
+  }
+
+  // ── SFX — free synth bank (instant, no key) OR ElevenLabs for anything (BYO-key) ──
+  function _bars(n){ return (60/(project.bpm||120))*4*(n||1); }
+  const SFX_KINDS=['riser','downlifter','impact','braam','subdrop','whoosh','sweep','reverse','vinyl','buildup','zap','blip','boom'];
+  function matchSfxKind(t){ t=(''+(t||'')).toLowerCase().trim();
+    const M={ riser:['riser','uplifter','uplift','rise up','tension build'], downlifter:['downlifter','downer','fall down','descend'],
+      impact:['impact','cinematic hit','big hit','slam'], braam:['braam','brams','inception','brass hit','horn hit'],
+      subdrop:['sub drop','subdrop','808 drop','sub boom'], whoosh:['whoosh','swoosh','woosh','transition'],
+      sweep:['sweep','noise sweep','filter sweep'], reverse:['reverse','reverse cymbal','reverse crash','reverse swell'],
+      vinyl:['vinyl','crackle','dust','tape hiss','noise floor'], buildup:['buildup','build up','snare rush','snare roll','drum roll'],
+      zap:['zap','laser','pew'], blip:['blip','coin','beep','game'], boom:['boom','explosion'] };
+    for(const k in M){ if(M[k].some(w=>t.includes(w))) return k; }
+    return SFX_KINDS.includes(t)?t:null;
+  }
+  function sfxSecs(kind){ if(['riser','downlifter','buildup','reverse','sweep','vinyl'].includes(kind)) return _bars(2);
+    if(kind==='subdrop') return _bars(1); if(['impact','braam','boom'].includes(kind)) return 1.4; if(['zap','blip'].includes(kind)) return 0.5; if(kind==='whoosh') return 1.0; return 1.5; }
+  async function _sfxBuffer(kind, secs){
+    const sr=44100, dur=Math.max(0.3,Math.min(12,secs||1.5)), T=dur, off=new OfflineAudioContext(2,Math.ceil(sr*dur),sr);
+    const mg=off.createGain(); mg.gain.value=0.92; mg.connect(off.destination);
+    const noise=(d)=>{ const len=Math.ceil(sr*(d||dur)), b=off.createBuffer(1,len,sr), a=b.getChannelData(0); for(let i=0;i<len;i++)a[i]=Math.random()*2-1; const s=off.createBufferSource(); s.buffer=b; return s; };
+    const env=(g,a,pk,rel)=>{ g.gain.setValueAtTime(0.0001,0); g.gain.exponentialRampToValueAtTime(pk,a); g.gain.exponentialRampToValueAtTime(0.0001,Math.max(a+0.05,rel)); };
+    if(kind==='riser'||kind==='buildup'||kind==='sweep'){
+      const n=noise(), bp=off.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.4; bp.frequency.setValueAtTime(300,0); bp.frequency.exponentialRampToValueAtTime(9000,T);
+      const g=off.createGain(); g.gain.setValueAtTime(0.02,0); g.gain.exponentialRampToValueAtTime(0.9,T); n.connect(bp).connect(g).connect(mg); n.start(0); n.stop(T);
+      if(kind!=='sweep'){ const o=off.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(110,0); o.frequency.exponentialRampToValueAtTime(880,T); const og=off.createGain(); og.gain.setValueAtTime(0.02,0); og.gain.exponentialRampToValueAtTime(0.4,T); o.connect(og).connect(mg); o.start(0); o.stop(T); }
+      if(kind==='buildup'){ let t=0,gap=0.26; while(t<T){ const h=noise(0.09), hp=off.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1800; const hg=off.createGain(); hg.gain.setValueAtTime(0.0001,t); hg.gain.linearRampToValueAtTime(0.5,t+0.002); hg.gain.exponentialRampToValueAtTime(0.0001,t+0.09); h.connect(hp).connect(hg).connect(mg); h.start(t); h.stop(t+0.1); t+=gap; gap*=0.86; } }
+    } else if(kind==='downlifter'){
+      const n=noise(), bp=off.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.2; bp.frequency.setValueAtTime(8000,0); bp.frequency.exponentialRampToValueAtTime(200,T);
+      const g=off.createGain(); g.gain.setValueAtTime(0.8,0); g.gain.exponentialRampToValueAtTime(0.02,T); n.connect(bp).connect(g).connect(mg); n.start(0); n.stop(T);
+      const o=off.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(880,0); o.frequency.exponentialRampToValueAtTime(80,T); const og=off.createGain(); og.gain.setValueAtTime(0.35,0); og.gain.exponentialRampToValueAtTime(0.02,T); o.connect(og).connect(mg); o.start(0); o.stop(T);
+    } else if(kind==='impact'||kind==='boom'){
+      const o=off.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,0); o.frequency.exponentialRampToValueAtTime(40,0.4); const og=off.createGain(); env(og,0.004,1.0,Math.min(T,1.2)); o.connect(og).connect(mg); o.start(0); o.stop(T);
+      const n=noise(0.4), g=off.createGain(); env(g,0.002,0.7,0.4); n.connect(g).connect(mg); n.start(0); n.stop(0.45);
+      const o2=off.createOscillator(); o2.type='sine'; o2.frequency.value=68; const g2=off.createGain(); g2.gain.setValueAtTime(0.0001,0); g2.gain.exponentialRampToValueAtTime(0.4,0.05); g2.gain.exponentialRampToValueAtTime(0.0001,T); o2.connect(g2).connect(mg); o2.start(0); o2.stop(T);
+    } else if(kind==='braam'){
+      [55,55.4,82.5,110].forEach((hz,i)=>{ const o=off.createOscillator(); o.type='sawtooth'; o.frequency.value=hz; const lp=off.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; const g=off.createGain(); g.gain.setValueAtTime(0.0001,0); g.gain.linearRampToValueAtTime(0.3/(i+1),0.08); g.gain.setValueAtTime(0.3/(i+1),Math.min(T,0.9)); g.gain.exponentialRampToValueAtTime(0.0001,T); o.connect(lp).connect(g).connect(mg); o.start(0); o.stop(T); });
+    } else if(kind==='subdrop'){
+      const o=off.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(120,0); o.frequency.exponentialRampToValueAtTime(28,T*0.8); const g=off.createGain(); g.gain.setValueAtTime(0.0001,0); g.gain.linearRampToValueAtTime(0.9,0.02); g.gain.setValueAtTime(0.9,T*0.7); g.gain.exponentialRampToValueAtTime(0.0001,T); o.connect(g).connect(mg); o.start(0); o.stop(T);
+    } else if(kind==='whoosh'){
+      const n=noise(), bp=off.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=2; bp.frequency.setValueAtTime(500,0); bp.frequency.exponentialRampToValueAtTime(6000,T*0.5); bp.frequency.exponentialRampToValueAtTime(800,T); const g=off.createGain(); g.gain.setValueAtTime(0.02,0); g.gain.linearRampToValueAtTime(0.8,T*0.5); g.gain.exponentialRampToValueAtTime(0.02,T); n.connect(bp).connect(g).connect(mg); n.start(0); n.stop(T);
+    } else if(kind==='reverse'){
+      const n=noise(), hp=off.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=2000; const g=off.createGain(); g.gain.setValueAtTime(0.9,0); g.gain.exponentialRampToValueAtTime(0.02,T); n.connect(hp).connect(g).connect(mg); n.start(0); n.stop(T);
+      const r=await off.startRendering(); for(let c=0;c<r.numberOfChannels;c++) r.getChannelData(c).reverse(); return r;
+    } else if(kind==='vinyl'){
+      const len=Math.ceil(sr*dur), b=off.createBuffer(1,len,sr), a=b.getChannelData(0); for(let i=0;i<len;i++) a[i]=(Math.random()<0.003)?(Math.random()*2-1):0;
+      const s=off.createBufferSource(); s.buffer=b; const hp=off.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=2500; const g=off.createGain(); g.gain.value=0.6; s.connect(hp).connect(g).connect(mg); s.start(0); s.stop(T);
+      const hn=noise(), lp=off.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=5000; const lg=off.createGain(); lg.gain.value=0.04; hn.connect(lp).connect(lg).connect(mg); hn.start(0); hn.stop(T);
+    } else if(kind==='zap'){
+      const o=off.createOscillator(); o.type='square'; o.frequency.setValueAtTime(1800,0); o.frequency.exponentialRampToValueAtTime(120,Math.min(T,0.3)); const g=off.createGain(); env(g,0.002,0.6,Math.min(T,0.35)); o.connect(g).connect(mg); o.start(0); o.stop(T);
+    } else {
+      const o=off.createOscillator(); o.type='square'; o.frequency.setValueAtTime(880,0); o.frequency.setValueAtTime(1320,0.08); const g=off.createGain(); env(g,0.003,0.5,Math.min(T,0.25)); o.connect(g).connect(mg); o.start(0); o.stop(T);
+    }
+    return await off.startRendering();
+  }
+  function _dropSfx(name, buf){ loadSampleBuf(name, buf); const c=project.channels[project.channels.length-1];
+    if(c){ const d=patData(curPat(),c); if(d&&d.steps&&d.steps[0]) d.steps[0].on=true; renderRack(); renderGraph(); autosave(); } return c; }
+  async function sfx(prompt){
+    resumeAudio(); prompt=(''+(prompt||'')).trim();
+    if(!prompt) return R(false,{msg:'Say a sound — "riser", "impact", "whoosh", "vinyl crackle", or anything for ElevenLabs.'});
+    const kind=matchSfxKind(prompt);
+    if(kind){ try{ const buf=await _sfxBuffer(kind, sfxSecs(kind)); _dropSfx('FX: '+kind, buf); return R(true,{kind, source:'synth', dur:+buf.duration.toFixed(2)}); }
+      catch(e){ return R(false,{msg:'Synth FX failed — try again.'}); } }
+    // arbitrary description → ElevenLabs (the user's own key, proxied)
+    try{ const res=await fetch('/api/sfx',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text:prompt})}).then(r=>r.json());
+      if(res&&res.audio){ const raw=res.audio.split(',')[1], bin=atob(raw), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+        const buf=await ctx.decodeAudioData(u8.buffer); _dropSfx('SFX: '+prompt.slice(0,16), buf); return R(true,{source:'elevenlabs', dur:+buf.duration.toFixed(2)}); }
+      return R(false,{msg:(res&&res.error)||'SFX failed.', needKey:/key/i.test((res&&res.error)||'')});
+    }catch(e){ return R(false,{msg:'Couldn’t reach the SFX service.'}); }
+  }
+
+  // ── SHAPE a sound (sculpt an existing channel's knobs toward a direction) ──
+  function shape(targetQ, desc){
+    desc=(''+(desc||'')).toLowerCase(); const tq=(''+(targetQ||'')).toLowerCase();
+    let ch=tq?findChannel(tq):null;
+    if(!ch){ const m=(tq+' '+desc).match(/\b(kick|snare|clap|hi.?hat|hat|808|bass|pad|lead|pluck|piano|keys|chords?|melody|vox|choir|vocal|drum)\b/);
+      if(m) ch=findChannel(m[1].replace('hi-hat','hat').replace('hihat','hat').replace('chords','chord')); }
+    ch=ch||selChannel();
+    if(!ch) return R(false,{msg:'Add an instrument first, then tell me what to change.'});
+    const I=INSTRUMENTS[ch.type]||{params:[]}, has=p=>I.params.find(x=>x.id===p), moves=[];
+    const at=(id,frac)=>{ const d=I.params.find(p=>p.id===id); return d? d.min+(d.max-d.min)*frac : 0; };
+    const set=(id,v,word)=>{ const d=I.params.find(p=>p.id===id); if(!d)return; ch.params[id]=clamp(v,d.min,d.max); if(word&&moves.indexOf(word)<0)moves.push(word); };
+    if(/punch|knock|hard|harder|bang|slap|crack/.test(desc)){ if(has('punch'))set('punch',at('punch',.85),'more punch'); if(has('drive'))set('drive',Math.min(1,(+ch.params.drive||0)+.25),'more drive'); if(has('click'))set('click',Math.min(1,(+ch.params.click||0)+.2),'more click'); }
+    if(/bright|crisp|airy|sharp|open|cut through/.test(desc)){ ['cut','tone','bright','crisp'].forEach(id=>{ if(has(id)) set(id,at(id,.78),'brighter'); }); }
+    if(/dark|warm|mellow|dull|muffl/.test(desc)){ ['cut','tone','bright','crisp'].forEach(id=>{ if(has(id)) set(id,at(id,.3),'darker'); }); if(has('drive'))set('drive',Math.max(0,(+ch.params.drive||0)-.15)); }
+    if(/long|longer|sustain|boomy|more decay/.test(desc)){ if(has('decay'))set('decay',at('decay',.82),'longer'); }
+    if(/short|shorter|tight|tighter|snappy|less decay/.test(desc)){ if(has('decay'))set('decay',at('decay',.16),'tighter'); }
+    if(/fat|fatter|thick|more sub|low end|weight|deeper/.test(desc)){ if(has('sub'))set('sub',Math.min(1,(+ch.params.sub||0)+.3),'fatter'); if(has('tune')&&ch.type==='kick')set('tune',(+ch.params.tune||0)-2,'deeper'); }
+    if(/wide|wider|huge|spread|stereo/.test(desc)){ if(has('detune'))set('detune',at('detune',.8),'wider'); if(has('voices'))set('voices',7,'more voices'); if(has('spread'))set('spread',at('spread',.8),'wider'); }
+    if(/distort|dirty|gritty|grimy|saturate|growl/.test(desc)){ if(has('drive'))set('drive',at('drive',.8),'dirtier'); if(has('res'))set('res',at('res',.8),'more resonance'); }
+    if(/clean|smooth|gentle|soften/.test(desc)){ if(has('drive'))set('drive',at('drive',.1),'cleaner'); if(has('res'))set('res',at('res',.15),'less resonance'); }
+    if(!moves.length) return R(false,{msg:'Direction? punchier, brighter, darker, fatter, wider, longer, tighter, dirtier…', channel:ch.name});
+    selChId=ch.id; renderRack(); renderGraph(); if(typeof renderMixer==='function'&&winShown('mixer'))renderMixer(); autosave();
+    return R(true,{channel:ch.name, moves});
+  }
+
+  // ── MIX moves (session FX; FX bank is the dynamic /api/plugins/bundle.js set) ──
+  function _fxByNames(names){ const keys=Object.keys(FXDEFS||{}); for(const n of names){ if(FXDEFS[n]) return FXDEFS[n];
+      const k=keys.find(k=>k.toLowerCase()===n.toLowerCase()||k.toLowerCase().includes(n.toLowerCase())); if(k) return FXDEFS[k]; } return null; }
+  function _addFx(target, def, preset){ const ins=makeInsert(def); if(preset)Object.assign(ins.params,preset);
+    if(target==='master'){ (project.masterFx=project.masterFx||[]).push(ins); rebuildMaster(); } else { target.inserts=target.inserts||[]; target.inserts.push(ins); rebuildChannel(target); } return ins; }
+  function mix(move){
+    move=(''+(move||'')).toLowerCase();
+    if(/side ?chain|pump|duck/.test(move)){ const def=_fxByNames(['DeMartin Pump','Pump','Sidechain']); if(!def) return R(false,{msg:'Pump FX isn’t loaded.'}); const b=findChannel('808')||findChannel('bass'); if(!b) return R(false,{msg:'Add an 808/bass to sidechain.'}); _addFx(b,def,{amount:0.4}); renderRack(); renderGraph(); return R(true,{move:'sidechain pump on '+b.name}); }
+    if(/glue|bus comp|master comp|gel/.test(move)){ const def=_fxByNames(['Glue','Bus Comp','Compressor','Comp','Tape']); if(!def) return R(false,{msg:'No glue/comp FX loaded.'}); _addFx('master',def); return R(true,{move:'glue on master ('+def.name+')'}); }
+    if(/saturat|warm|tape|analog|drive/.test(move)){ const def=_fxByNames(['Tape','Saturator','Saturation','Drive']); if(!def) return R(false,{msg:'No saturation FX loaded.'}); _addFx('master',def,{drive:0.4}); return R(true,{move:'saturation on master ('+def.name+')'}); }
+    if(/wide|widen|stereo|width|spread/.test(move)){ const def=_fxByNames(['Widener','Width','Stereo','Dimension','Chorus']); if(!def) return R(false,{msg:'No stereo-width FX loaded — detune a synth instead.'}); _addFx('master',def); return R(true,{move:'widen master ('+def.name+')'}); }
+    if(/crush|bit|lo.?fi|degrade/.test(move)){ const def=_fxByNames(['Bitcrusher','Crusher','LoFi']); if(!def) return R(false,{msg:'No bitcrusher loaded.'}); _addFx('master',def,{bits:10,mix:0.3}); return R(true,{move:'lofi crush on master'}); }
+    if(/reverb|space|verb|room|wet/.test(move)){ const def=_fxByNames(['Reverb','Hall','Room','Space']); if(!def) return R(false,{msg:'No reverb loaded.'}); const ch=selChannel(); if(ch){ _addFx(ch,def,{mix:0.25}); return R(true,{move:'reverb on '+ch.name}); } }
+    return R(false,{msg:'Mix moves: sidechain/pump, glue, saturate, widen, lofi crush, reverb.'});
+  }
+
+  // ── render / send ──
+  async function bounce(){ const embedded=(location.search.indexOf('host=studio')>=0)||(window.self!==window.top);
+    if(embedded){ toast('Hit "⤓ Send to Studio" up top to drop this beat onto a track ✦'); return R(true,{hint:'use ⤓ Send to Studio'}); }
+    try{ await exportWav(); return R(true,{exported:true}); }catch(e){ return R(false,{msg:'Bounce failed.'}); } }
+
+  function state(){ return { ok:true, room:'Leon Production Labs', bpm:project.bpm, swing:project.swing,
+    key:NOTE_NAMES[prRootPc]+(keyMinor()?'m':''), scale:prScaleName, mode:songMode?'song':'pattern',
+    pattern:{name:curPat().name,len:curPat().len},
+    channels:project.channels.map(c=>({name:c.name,type:c.type,role:c._role||null,melodic:!!c.melodic,muted:!!c.mute})) }; }
+
+  function describe(){ return { room:'Leon Production Labs (beats)',
+    about:'AI music production — drive the whole beat by command. Local-first deterministic engine: every verb works with NO model; an MCP/agent just aims it.',
+    verbs:[
+      {verb:'cook', args:'{vibe?,genre?,bpm?,key?,scale?,energy?}', about:'Build a whole beat in key', ex:'cook({vibe:"dark drill in F minor 142"})'},
+      {verb:'state', args:'()'}, {verb:'describe', args:'()'},
+      {verb:'setTempo', args:'(bpm)'}, {verb:'setKey', args:'(rootPc 0-11, scale)'}, {verb:'swing', args:'(50..80)'}, {verb:'groove', args:'({genre?,energy?})'},
+      {verb:'addInstrument', args:'(name)', ex:'addInstrument("Reese Bass")'}, {verb:'listInstruments', args:'()'},
+      {verb:'designInstrument', args:'(description)', ex:'designInstrument("dark growly reese bass")'},
+      {verb:'generate', args:'(part, target?)', about:'part = drums|bassline|chords|melody|hats|arp'},
+      {verb:'vocalToInstrument', args:'({mode:"synth"|"chop", riff?})', about:'Turn a loaded/recorded VOICE into a playable instrument'},
+      {verb:'record', args:'(seconds?)', about:'Mic → sampler channel'},
+      {verb:'sfx', args:'(promptOrKind)', about:'Free synth FX ('+SFX_KINDS.join('/')+') or ElevenLabs for anything (BYO-key)'},
+      {verb:'shape', args:'(target, direction)', about:'punchier/brighter/darker/fatter/wider/longer/tighter/dirtier'},
+      {verb:'mix', args:'(move)', about:'sidechain|glue|saturate|widen|lofi|reverb'},
+      {verb:'humanize', args:'(0..1)'}, {verb:'randomize', args:'()'}, {verb:'play', args:'()'}, {verb:'stop', args:'()'},
+      {verb:'bounce', args:'()', about:'Render WAV (or ⤓ Send to Studio when embedded)'}, {verb:'exportStems', args:'()'}, {verb:'exportMidi', args:'()'}
+    ] }; }
+
+  function run(cmd){ if(!cmd) return R(false,{msg:'no command'}); if(typeof cmd==='string') return run({verb:cmd});
+    const v=(cmd.verb||cmd.action||cmd.cmd||'').toString(), A=window.RoomAPI;
+    switch(v){
+      case 'cook': return A.cook(cmd);
+      case 'addInstrument': return A.addInstrument(cmd.name||cmd.instrument||cmd.arg);
+      case 'designInstrument': case 'design': return A.designInstrument(cmd.description||cmd.desc||cmd.arg);
+      case 'generate': case 'generatePart': return A.generate(cmd.part||cmd.arg, cmd.target);
+      case 'vocalToInstrument': case 'voiceToInstrument': return A.vocalToInstrument(cmd);
+      case 'record': return A.record(cmd.seconds||cmd.secs);
+      case 'sfx': return A.sfx(cmd.prompt||cmd.kind||cmd.text||cmd.arg);
+      case 'shape': return A.shape(cmd.target, cmd.direction||cmd.move||cmd.desc||cmd.arg);
+      case 'mix': return A.mix(cmd.move||cmd.arg);
+      case 'setTempo': return A.setTempo(cmd.bpm||cmd.arg);
+      case 'setKey': return A.setKey(cmd.root!=null?cmd.root:cmd.rootPc, cmd.scale);
+      case 'swing': return A.swing(cmd.amount!=null?cmd.amount:cmd.arg);
+      case 'groove': return A.groove(cmd); case 'humanize': return A.humanize(cmd.amount!=null?cmd.amount:cmd.arg);
+      case 'randomize': return A.randomize(); case 'play': return A.play(); case 'stop': return A.stop();
+      case 'bounce': return A.bounce(); case 'sendToStudio': return A.sendToStudio();
+      case 'exportStems': return A.exportStems(); case 'exportMidi': return A.exportMidi();
+      case 'state': return A.state(); case 'describe': return A.describe();
+      default: return R(false,{msg:'unknown verb "'+v+'" — see RoomAPI.describe()'});
+    }
+  }
+
+  // ── extend the documented RoomAPI surface (keeps the existing cook/groove/play/etc.) ──
+  Object.assign(window.RoomAPI, {
+    room:'beats',
+    addInstrument, listInstruments:()=>LIBRARY.map(e=>e.n),
+    designInstrument, generate:generatePart, generatePart,
+    vocalToInstrument, sfx, shape, mix, record,
+    swing:(v)=>{ project.swing=clamp(Math.round(+v||50),50,80); project.swingOn=project.swing>50; refreshTopNums(); return R(true,{swing:project.swing}); },
+    exportStems:()=>{ exportStems(); return R(true); }, exportMidi:()=>{ exportMidi(); return R(true); },
+    bounce, sendToStudio:bounce, state, describe, run
+  });
+
+  // ── window.beat* aliases (mirror studio.html's window.studio* convention for the dock + MCP) ──
+  window.beatCook=(o)=>window.RoomAPI.cook(o);
+  window.beatAddInstrument=addInstrument; window.beatDesign=designInstrument; window.beatGenerate=generatePart;
+  window.beatVocalToInstrument=vocalToInstrument; window.beatSfx=sfx; window.beatShape=shape; window.beatMix=mix; window.beatRecord=record;
+
+  // ── SESSION SNAPSHOT — hands the brain the REAL beat (so non-command chat is session-aware, like the Studio) ──
+  window.dmvSessionSnapshot=function(){ try{ const s=state();
+    return 'Leon Production Labs — '+s.bpm+' BPM, key '+s.key+' '+s.scale+', pattern "'+s.pattern.name+'" ('+s.pattern.len+' steps), '+s.mode+' mode.\nChannels: '+(s.channels.map(c=>c.name+' ['+c.type+']'+(c.muted?' (muted)':'')).join(', ')||'(empty — nothing added yet)')+'.'; }catch(e){ return ''; } };
+
+  // ── wire ⏺ record (replaces the "coming soon" toast) ──
+  try{ const recBtn=$('#bRec'); if(recBtn){ recBtn.title='Record from your mic → a sampler channel (then ✨ make it an instrument)';
+    recBtn.onclick=async()=>{ const wasOn=!!_recState; await record(); if(!wasOn) recBtn.classList.add('on'); }; } }catch(e){}
+
+  try{ console.info('[Leon] AI production suite ready — window.RoomAPI.describe() lists every verb. The agent + an MCP drive it.'); }catch(e){}
+})();
 // shared room chrome: back-pill style + Kit (the in-room brain) + feedback buddy
 (function(){const s=document.createElement('script');s.src='/static/pinkroom-nav.js';document.body.appendChild(s);})();
+// the in-room agent's PRODUCTION control layer (DMV_DOCK_FIX) — mirrors studio's agent-dock.js
+(function(){const s=document.createElement('script');s.src='/static/beat-dock.js?v=1';document.body.appendChild(s);})();
 // ── WEB-DEMO banner — shows ONLY on the public site (demartinlabs.com), never in the local app ──
 (function(){
   var h=location.hostname||"";
