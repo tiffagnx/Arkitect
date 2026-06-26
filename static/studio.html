@@ -1190,6 +1190,7 @@ function fxVariFi(buf, dir){
   return out;
 }
 function curTempo(){ const v=parseFloat(($("recBpm")||{}).value); return (v>0?v:120); }
+function divSec(beats){ return (60/curTempo())*beats; }   // beats: 1=quarter, .5=eighth, .25=16th, .125=32nd, .75=dotted-8
 // ── SESSION SNAPSHOT — a plain-English picture of the timeline RIGHT NOW, handed to Tiff/Kit so she
 //    answers about THIS mix (your real stems / inserts / tempo), not mixing in general. Free: it's just
 //    text appended to a message you're already sending. Exposed on window so the shared in-room bot
@@ -3143,6 +3144,14 @@ TIFF_PLUGINS.register({ name:"Maximizer", master:true, subtitle:"loudness — ke
     const curve=(cl)=>{ const n=2048,cu=new Float32Array(n); for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; cu[i]=Math.tanh(x*1.6)*cl; } return cu; };
     ws.curve=curve(Math.pow(10,-0.3/20)); inG.connect(ws); ws.connect(out);
     return { input:inG, output:out, set(id,v){ if(id==="drive")inG.gain.value=Math.pow(10,v/20); else if(id==="ceil")ws.curve=curve(Math.pow(10,v/20)); } }; } });
+TIFF_PLUGINS.register({ name:"Pultec Punch", master:true, subtitle:"low-end punch — boost 60 + scoop the upper-bass",
+  params:[ {id:"boost",label:"BOOST",min:0,max:9,step:0.1,value:4,fmt:v=>'+'+v.toFixed(1)},
+           {id:"scoop",label:"SCOOP",min:0,max:9,step:0.1,value:3,fmt:v=>'-'+v.toFixed(1)},
+           {id:"freq", label:"FREQ", min:40,max:100,step:1,value:60,fmt:v=>v+'Hz'} ],
+  create(c){ const lo=c.createBiquadFilter(); lo.type="lowshelf"; lo.frequency.value=60; lo.gain.value=4;
+    const sc=c.createBiquadFilter(); sc.type="peaking"; sc.frequency.value=200; sc.Q.value=0.7; sc.gain.value=-3;
+    lo.connect(sc);
+    return { input:lo, output:sc, set(id,v){ if(id==="boost")lo.gain.value=v; else if(id==="scoop")sc.gain.value=-v; else if(id==="freq"){ lo.frequency.value=v; sc.frequency.value=v*3.3; } } }; } });
 function makeIR(c, seconds, tone) {
   const rate = c.sampleRate, len = Math.max(1, Math.floor(rate * seconds));
   const ir = c.createBuffer(2, len, rate);
@@ -6226,6 +6235,344 @@ function vdSourceBuffer(t){
   return src;
 }
 // measured features → a full vocal-ready baseline (each value clamped to the plugin's range)
+// ════════════════════════════════════════════════════════════════════════
+//  SESSION-WIDE AGENT PASSES — the agent works the WHOLE mix, not one track.
+//  studioGainStage: measure every track, trim its pre-insert gain to leave
+//    headroom, then RENDER THE MASTER and report where it actually landed
+//    (honest receipt — measured, never claimed).
+//  studioRecipe: apply a "vibe" (reverb/chorus/delay/EQ) across tracks, roll-
+//    aware (classified by name), per-track or per-bus, and report the routing.
+// ════════════════════════════════════════════════════════════════════════
+function _ssTrackClips(t){ try { return (typeof clipsOf==='function') ? clipsOf(t) : (t.clips||[]); } catch(e){ return t.clips||[]; } }
+function _ssHasAudio(t){ const c=_ssTrackClips(t); return !!(t.buffer || (c&&c.some(x=>x&&x.buffer))); }
+function _ssAudioTracks(){ return (window.tracks||[]).filter(t=> t.type!=='aux' && t.type!=='master' && _ssHasAudio(t)); }
+function _ssEnd(){ try { return (typeof contentDur==='function') ? contentDur() : null; } catch(e){ return null; } }
+function _ssMeasureBuf(t){ try { return (typeof vdSourceBuffer==='function' && vdSourceBuffer(t)) || t.buffer || (_ssTrackClips(t)[0]||{}).buffer || null; } catch(e){ return t.buffer||null; } }
+
+// Gain-stage the whole session. opts.hi/lo = desired MASTER headroom band (dBFS, negative).
+async function studioGainStage(opts){
+  opts = opts||{};
+  const hi = (opts.hi!=null?opts.hi:-6), lo = (opts.lo!=null?opts.lo:-3);
+  const ceil = Math.max(hi,lo), floor = Math.min(hi,lo);   // ceil = loudest allowed (e.g. -3), floor = quietest target (e.g. -6)
+  const masterTarget = (ceil+floor)/2;
+  const audio = _ssAudioTracks();
+  if (!audio.length) return { ok:false, msg:'No audio tracks to gain-stage — record or drop something first.' };
+  const perTarget = masterTarget - 10*Math.log10(audio.length);   // per-track peak so the incoherent sum lands near the master target
+  const staged=[], skipped=[];
+  for (const t of audio){
+    const clips=_ssTrackClips(t), buf=_ssMeasureBuf(t);
+    let m=null; try { m = await measure(buf); } catch(e){}
+    if (!m || !m.ok || !m.features || !isFinite(m.features.peakDb)){ skipped.push(t.name); continue; }
+    const curGain = clips.length ? (clips[0].gain!=null?clips[0].gain:1) : (t.gain!=null?t.gain:1);
+    const effPeak = m.features.peakDb + 20*Math.log10(Math.max(1e-4,curGain));   // current effective peak
+    let trimDb = Math.max(-36, Math.min(24, perTarget - effPeak));
+    const lin = Math.pow(10, trimDb/20);
+    if (clips.length) clips.forEach(cl=>{ cl.gain = Math.max(1e-4,(cl.gain!=null?cl.gain:1)*lin); });
+    else t.gain = Math.max(1e-4,(t.gain!=null?t.gain:1)*lin);
+    staged.push({ name:t.name, trimDb:+trimDb.toFixed(1) });
+  }
+  // HONEST RECEIPT: render the master and see where it actually landed
+  let masterPeak=null, corrected=false;
+  try {
+    const end=_ssEnd();
+    let mb = await renderBounce({ source:'master', startT:0, endT:end, tap:'post' });
+    let mm = await measure(mb); if (mm&&mm.ok&&mm.features&&isFinite(mm.features.peakDb)) masterPeak=mm.features.peakDb;
+    if (masterPeak!=null && (masterPeak>ceil || masterPeak<floor)){      // one corrective global trim
+      const lin2 = Math.pow(10,(masterTarget-masterPeak)/20);
+      audio.forEach(t=>{ const cs=_ssTrackClips(t); if(cs.length) cs.forEach(cl=>cl.gain=Math.max(1e-4,(cl.gain!=null?cl.gain:1)*lin2)); else t.gain=Math.max(1e-4,(t.gain!=null?t.gain:1)*lin2); });
+      corrected=true;
+      mb = await renderBounce({ source:'master', startT:0, endT:end, tap:'post' });
+      mm = await measure(mb); if (mm&&mm.ok&&mm.features&&isFinite(mm.features.peakDb)) masterPeak=mm.features.peakDb;
+    }
+  } catch(e){}
+  try { audio.forEach(t=>{ if(typeof drawLane==='function') drawLane(t); }); if(typeof renderMixWindow==='function') renderMixWindow(); if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function') restartPlayback(); } catch(e){}
+  return { ok:true, staged, skipped, count:staged.length, total:audio.length, masterPeak:(masterPeak!=null?+masterPeak.toFixed(1):null), masterTarget:+masterTarget.toFixed(1), ceil, floor, corrected };
+}
+window.studioGainStage = studioGainStage;
+
+// Roll-aware classification by track name.
+function _ssRole(t){
+  const n=(t.name||'').toLowerCase();
+  if(/\b(master|main|mix ?bus|2 ?bus)\b/.test(n)) return 'skip';
+  if(/kick|snare|hat|hi-?hat|\bdrum|perc|clap|tom\b|\bcym|\brim|cymbal|shaker|crash/.test(n)) return 'drums';
+  if(/\bbass\b|\bsub\b|\b808\b|\bdi\b|bassline/.test(n)) return 'bass';
+  if(/\bvox|vocal|\blead\b|adlib|ad-?lib|\brap\b|verse|\bhook\b|sing|chant|\bvoc\b/.test(n)) return 'vocal';
+  if(/guitar|\bgtr\b|acoustic|\belec\b|strat|\briff/.test(n)) return 'guitar';
+  if(/\bkey|piano|rhodes|synth|\bpad\b|chord|organ|wurli|e-?piano|melody|\barp\b|bell/.test(n)) return 'keys';
+  if(/sample|\bloop\b|vibe|\bhorn|string|brass|flute|\bsax\b|choir|texture|\bfx\b|riser|atmos/.test(n)) return 'sample';
+  return 'other';
+}
+function _ssMatchRecipe(text){ const s=(text||'').toLowerCase();
+  if(/glue|cohes|tape|analog|warm(th)?|stick together/.test(s)) return 'boom-bap glue';
+  if(/\bwide|modern|\bbig\b|huge|spacious|stadium|lush|massive|widen/.test(s)) return 'modern wide';
+  return '90s dimension';   // default vibe (also matches 90s / dimension / boom-bap / vintage / dusty)
+}
+// Recipes: per-role moves. inserts = [[pluginName, partialParams], …]; send = global reverb send 0..0.4.
+const SS_RECIPES = {
+  '90s dimension': { label:'90s Dimension', note:'spacing + reverb + chorus to fill the slots, samples widened, slap on vocals', roles:{
+    vocal:  { send:0.16, inserts:[['Slap',{time:120,fb:0.16,tone:4500,mix:0.16}],['DeMartin Air',{air:0.4}]] },
+    sample: { send:0.22, inserts:[['DeMartin Chorus',{}],['Wide',{amt:0.45}]] },
+    keys:   { send:0.18, inserts:[['DeMartin Chorus',{}]] },
+    guitar: { send:0.18, inserts:[['DeMartin Chorus',{}]] },
+    drums:  { send:0.05, inserts:[] },
+    bass:   { skip:true, why:'bass stays dry & centered' },
+    other:  { send:0.14, inserts:[['DeMartin Chorus',{}]] },
+  }},
+  'boom-bap glue': { label:'Boom-Bap Glue', note:'tape-style saturation glue, punchy, mostly dry', roles:{
+    drums:  { send:0,    inserts:[['Saturator',{mode:1,drive:5,mix:0.30}]] },
+    bass:   { skip:true, why:'bass stays clean' },
+    vocal:  { send:0.08, inserts:[['Saturator',{mode:1,drive:3,mix:0.20}]] },
+    sample: { send:0.06, inserts:[['Saturator',{mode:1,drive:6,mix:0.35}]] },
+    keys:   { send:0.06, inserts:[['Saturator',{mode:1,drive:4,mix:0.25}]] },
+    guitar: { send:0.06, inserts:[['Saturator',{mode:1,drive:4,mix:0.25}]] },
+    other:  { send:0.06, inserts:[['Saturator',{mode:1,drive:4,mix:0.25}]] },
+  }},
+  'modern wide': { label:'Modern Wide', note:'wide, bright, big space', roles:{
+    vocal:  { send:0.20, inserts:[['Slap',{time:90,fb:0.2,mix:0.18}],['DeMartin Air',{air:0.5}]] },
+    sample: { send:0.24, inserts:[['Wide',{amt:0.6}],['DeMartin Chorus',{}]] },
+    keys:   { send:0.22, inserts:[['Wide',{amt:0.5}]] },
+    guitar: { send:0.22, inserts:[['Wide',{amt:0.5}]] },
+    drums:  { send:0.08, inserts:[] },
+    bass:   { skip:true, why:'bass stays mono & dry' },
+    other:  { send:0.20, inserts:[['Wide',{amt:0.5}]] },
+  }},
+};
+// Apply a vibe across the session. Idempotent (recipe inserts tagged _rcp are replaced on re-run).
+async function studioRecipe(recipeId){
+  const rec = SS_RECIPES[recipeId] || SS_RECIPES[_ssMatchRecipe(recipeId)];
+  if (!rec) return { ok:false, msg:'Unknown recipe.' };
+  const audio=_ssAudioTracks();
+  if (!audio.length) return { ok:false, msg:'No tracks to work on — drop something in first.' };
+  const applied=[], skipped=[];
+  for (const t of audio){
+    const role=_ssRole(t), spec=rec.roles[role]||rec.roles.other;
+    t.inserts = (t.inserts||[]).filter(ins=>!(ins.params&&ins.params._rcp));   // drop previous recipe inserts, keep user's + Doctor's
+    if (!spec || spec.skip){ skipped.push({ name:t.name, role, why:(spec&&spec.why)||'left clean' }); try{ if(typeof renderInserts==='function')renderInserts(t); }catch(e){} continue; }
+    const moves=[];
+    (spec.inserts||[]).forEach(pair=>{ const nm=pair[0], pp=pair[1]||{}; if (TIFF_PLUGINS && TIFF_PLUGINS.byName(nm)){ t.inserts.push({ name:nm, params:Object.assign({_rcp:1}, pp) }); moves.push(nm); } });
+    if (spec.send!=null){ t.send=spec.send; if(spec.send>0) moves.push('reverb '+Math.round(spec.send*100)+'%'); }
+    try{ if(typeof renderInserts==='function')renderInserts(t); if(typeof applyTrack==='function')applyTrack(t); }catch(e){}
+    applied.push({ name:t.name, role, moves });
+  }
+  try{ if(typeof renderMixWindow==='function')renderMixWindow(); if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback(); }catch(e){}
+  return { ok:true, recipe:rec.label, note:rec.note, applied, skipped, count:applied.length, total:audio.length };
+}
+window.studioRecipe = studioRecipe;
+
+// ════════════════════════════════════════════════════════════════════════
+//  AI-VOCAL (the "ACE lane", our way) — harmony, choir, vocal→instrument.
+//  100% in-browser DSP on the USER'S OWN voice. No key, no cloud, no legal risk.
+// ════════════════════════════════════════════════════════════════════════
+function _ssSelClipBuf(){
+  if(!selClip) return null;
+  const t=tracks.find(x=>x.id===selClip.trackId); if(!t) return null;
+  const cs=_ssTrackClips(t); const cl=cs.find(c=>c.id===selClip.clipId)||cs[0];
+  if(!cl||!cl.buffer) return null;
+  return { t, cl, buf:cl.buffer, start:(cl.start!=null?cl.start:0) };
+}
+function _absCurve(){ const n=257,c=new Float32Array(n); for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; c[i]=Math.abs(x); } return c; }
+function _peakNorm(buf, target){ let pk=0; for(let ch=0;ch<buf.numberOfChannels;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk)pk=a; } } if(pk<1e-5) return buf; const g=(target||0.7)/pk; if(g>=0.999&&g<=1.001) return buf; for(let ch=0;ch<buf.numberOfChannels;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<d.length;i++) d[i]*=g; } return buf; }
+function _newBufTrack(name, buffer, start, stereo, gainDb, pan){
+  const t=makeAudioTrack(name, !!stereo);
+  if(gainDb!=null) t.gain=Math.pow(10,gainDb/20);
+  if(pan!=null) t.pan=pan;
+  t.clips.push({ id:rid(), buffer, start:start||0 }); syncPrimary(t); drawLane(t);
+  return t;
+}
+// Harmony — pitched copies of the selected vocal on new tracks (key-agnostic safe intervals by default).
+function studioHarmonize(set){
+  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first (click it in the timeline).' };
+  ensureCtx();
+  const sets={
+    safe:   [ {semis:7,pan:-0.4,name:'5th'}, {semis:12,pan:0.4,name:'8va'} ],
+    triad:  [ {semis:4,pan:-0.4,name:'maj 3rd'}, {semis:7,pan:0.4,name:'5th'} ],
+    minor:  [ {semis:3,pan:-0.4,name:'min 3rd'}, {semis:7,pan:0.4,name:'5th'} ],
+    octave: [ {semis:12,pan:-0.3,name:'8va up'}, {semis:-12,pan:0.3,name:'8va dn'} ],
+    thick:  [ {semis:4,pan:-0.5,name:'3rd'}, {semis:7,pan:0.5,name:'5th'}, {semis:12,pan:0,name:'8va'} ],
+  };
+  const voices=sets[set]||sets.safe, made=[];
+  voices.forEach(v=>{ let b; try{ b=fxPitchBuf(s.buf, v.semis); }catch(e){ return; } if(!b) return;
+    _newBufTrack('Harmony '+v.name, b, s.start, false, -7, v.pan); made.push(v.name); });
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function') restartPlayback();
+  return { ok:!!made.length, voices:made, src:(s.t.name||'vocal') };
+}
+window.studioHarmonize = studioHarmonize;
+// Choir — many detuned + time-offset voices spread in stereo (ACE "Choir Mode", on your own take). One stereo track.
+function studioChoir(){
+  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' };
+  ensureCtx();
+  const src=s.buf, sr=src.sampleRate;
+  const voices=[ {cents:-12,d:0,pan:-0.6,oct:0}, {cents:9,d:11,pan:-0.3,oct:0}, {cents:-7,d:7,pan:0.35,oct:0},
+                 {cents:13,d:15,pan:0.6,oct:0}, {cents:-5,d:5,pan:0,oct:-12}, {cents:6,d:9,pan:0,oct:12} ];
+  const maxD=Math.ceil(0.02*sr), N=src.length+maxD;
+  const out=ctx.createBuffer(2,N,sr), L=out.getChannelData(0), R=out.getChannelData(1);
+  const vg=0.6/Math.sqrt(voices.length);
+  voices.forEach(v=>{ const semis=(v.oct||0)+(v.cents/100); let b=src; if(semis){ try{ b=fxPitchBuf(src,semis); }catch(e){ b=src; } }
+    const m=b.getChannelData(0), d=Math.floor((v.d/1000)*sr), th=(v.pan+1)*Math.PI/4, lg=Math.cos(th)*vg, rg=Math.sin(th)*vg;
+    for(let i=0;i<m.length&&(i+d)<N;i++){ const x=m[i]; L[i+d]+=x*lg; R[i+d]+=x*rg; } });
+  _newBufTrack('Choir', out, s.start, true, -2, 0);
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function') restartPlayback();
+  return { ok:true, voices:voices.length, src:(s.t.name||'vocal') };
+}
+window.studioChoir = studioChoir;
+// Vocal → instrument — a classic 12-band vocoder (carrier = sawtooth, modulator = your voice). Offline render → new track.
+async function studioVocoder(opts){
+  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' };
+  ensureCtx(); opts=opts||{};
+  const src=s.buf, sr=src.sampleRate, len=src.length;
+  if(!len) return { ok:false, msg:'That clip is empty.' };
+  const oc=new OfflineAudioContext(1, len, sr);
+  const mod=oc.createBufferSource(); mod.buffer=src;
+  const car=oc.createOscillator(); car.type=opts.carrier||'sawtooth'; car.frequency.value=opts.carrierHz||110;
+  const out=oc.createGain(); out.gain.value=1; out.connect(oc.destination);
+  const bands=[150,250,400,600,900,1300,1900,2700,3800,5200,7000,9000];
+  bands.forEach(f=>{
+    const mBP=oc.createBiquadFilter(); mBP.type='bandpass'; mBP.frequency.value=f; mBP.Q.value=5;
+    const cBP=oc.createBiquadFilter(); cBP.type='bandpass'; cBP.frequency.value=f; cBP.Q.value=5;
+    const rect=oc.createWaveShaper(); rect.curve=_absCurve();
+    const lp=oc.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=22;
+    const env=oc.createGain(); env.gain.value=10;          // scale the band envelope up
+    const vca=oc.createGain(); vca.gain.value=0;            // a-rate modulated by env
+    mod.connect(mBP); mBP.connect(rect); rect.connect(lp); lp.connect(env); env.connect(vca.gain);
+    car.connect(cBP); cBP.connect(vca); vca.connect(out);
+  });
+  mod.start(0); car.start(0);
+  let rendered; try{ rendered=await oc.startRendering(); }catch(e){ return { ok:false, msg:'Vocoder render failed.' }; }
+  _peakNorm(rendered, 0.7);
+  _newBufTrack('Vocal Synth', rendered, s.start, false, 0, 0);
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function') restartPlayback();
+  return { ok:true, src:(s.t.name||'vocal'), bands:bands.length };
+}
+window.studioVocoder = studioVocoder;
+
+// ════════════════════════════════════════════════════════════════════════
+//  MIXING-TRICK MOVES — agent-callable pro moves on the session.
+// ════════════════════════════════════════════════════════════════════════
+function _ssSelTrack(){ return (typeof selTrackId!=='undefined'&&selTrackId) ? tracks.find(t=>t.id===selTrackId&&t.type!=='aux'&&t.type!=='master') : null; }
+// Pultec punch on the master — simultaneous low-shelf boost + upper-bass scoop.
+function studioPultec(opts){
+  ensureCtx(); opts=opts||{};
+  if(!masterTrack.present){ masterTrack.present=true; try{ if(typeof ensureMasterLane==='function')ensureMasterLane(); }catch(e){} }
+  masterTrack.inserts = masterTrack.inserts||[];
+  let ins = masterTrack.inserts.find(i=>i.name==='Pultec Punch');
+  if(!ins){ ins={ name:'Pultec Punch', params:{} }; masterTrack.inserts.unshift(ins); }   // first in the master chain
+  ins.params = { boost:(opts.boost!=null?opts.boost:4), scoop:(opts.scoop!=null?opts.scoop:3), freq:(opts.freq||60) };
+  try{ if(typeof renderInserts==='function')renderInserts(masterTrack); }catch(e){}
+  try{ if(master&&master.sum&&typeof buildMasterChain==='function')buildMasterChain(ctx,false); }catch(e){}
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, boost:ins.params.boost, scoop:ins.params.scoop, freq:ins.params.freq };
+}
+window.studioPultec = studioPultec;
+// Parallel saturation — a driven aux bus (HPF → drive) blended under the source via a pre-fader send.
+function studioParallel(flavor){
+  ensureCtx(); flavor=flavor||'vocal';
+  let targets=[]; const sel=_ssSelTrack();
+  if(sel) targets=[sel];
+  else { const role=(flavor==='drum')?'drums':'vocal'; targets=_ssAudioTracks().filter(t=>_ssRole(t)===role); }
+  if(!targets.length) return { ok:false, msg:'Select a track (or have a vocal/drum track) to parallel-process.' };
+  const aux=addAux(); aux.name=(flavor==='drum'?'Drum Smash':'P-Sat')+' Bus';
+  aux.inserts=[ {name:'EQ-6', params:{hpf:150}}, {name:'DeMartin Drive', params:{}} ];
+  try{ if(typeof renderInserts==='function')renderInserts(aux); }catch(e){}
+  const busId=aux.inputBus;
+  targets.forEach(t=>{ t.sends=t.sends||[]; const used=new Set(t.sends.map(s=>s.slot)); let L='A'; for(const ch of 'ABCDEFGHIJ'){ if(!used.has(ch)){ L=ch; break; } }
+    t.sends.push({ slot:L, bus:busId, level:0.28, pan:0, prefader:true, on:true });
+    try{ if(typeof renderSends==='function')renderSends(t); }catch(e){} });
+  try{ if(typeof refreshSendMenus==='function')refreshSendMenus(); }catch(e){}
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, bus:aux.name, targets:targets.map(t=>t.name) };
+}
+window.studioParallel = studioParallel;
+// Sidechain "pump" — bake a tempo-synced gain duck onto the bass (clears space on each beat, like a sidechain to the kick).
+function studioPump(opts){
+  ensureCtx(); opts=opts||{};
+  let t=_ssSelTrack(); if(!t) t=_ssAudioTracks().find(x=>_ssRole(x)==='bass');
+  if(!t) return { ok:false, msg:'Select the bass track (or name one bass/808) to pump.' };
+  const cs=_ssTrackClips(t); if(!cs.length||!cs.some(c=>c.buffer)) return { ok:false, msg:'No audio on that track.' };
+  const beat=60/curTempo(), depth=(opts.depth!=null?opts.depth:0.6);
+  try{ if(typeof pushUndoClips==='function')pushUndoClips(t); }catch(e){}
+  cs.forEach(cl=>{ if(!cl.buffer) return; const src=cl.buffer, sr=src.sampleRate;
+    const atk=Math.max(1,Math.floor(0.004*sr)), rel=Math.max(1,Math.floor(beat*0.6*sr));
+    const out=ctx.createBuffer(src.numberOfChannels, src.length, sr);
+    const off=((cl.start||0)%beat);
+    for(let ch=0;ch<src.numberOfChannels;ch++){ const s=src.getChannelData(ch), d=out.getChannelData(ch);
+      for(let i=0;i<s.length;i++){ const ps=(((i/sr)+off)%beat)*sr; let g;
+        if(ps<atk) g=1-depth*(ps/atk); else if(ps<atk+rel) g=1-depth*(1-(ps-atk)/rel); else g=1;
+        d[i]=s[i]*g; } }
+    cl.buffer=out; });
+  syncPrimary(t); try{ if(typeof drawLane==='function')drawLane(t); }catch(e){}
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, track:t.name, bpm:curTempo() };
+}
+window.studioPump = studioPump;
+
+// ════════════════════════════════════════════════════════════════════════
+//  CREATIVE FX — stutter / beat-repeat + build-to-a-drop. Operate on the selected clip.
+// ════════════════════════════════════════════════════════════════════════
+// Beat-Repeat / stutter — capture a slice and re-stamp it with shrink + pitch-rise + decay.
+function studioStutter(opts){
+  ensureCtx(); opts=opts||{};
+  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a clip to stutter.' };
+  const buf=s.buf, sr=buf.sampleRate, ch=buf.numberOfChannels;
+  const beats=opts.beats||0.25, reps=opts.reps||8, shrink=(opts.shrink!=null?opts.shrink:0.4), pitch=opts.pitch||0, decay=(opts.decay!=null?opts.decay:0.18);
+  const sliceLen=Math.max(64,Math.floor(divSec(beats)*sr)), grab=Math.floor((buf.length-sliceLen)*((opts.pos||0)/100));
+  let lens=[],total=0; for(let r=0;r<reps;r++){ const f=shrink?Math.pow(1-shrink*0.5,r):1; const L=Math.max(48,Math.floor(sliceLen*f)); lens.push(L); total+=L; }
+  if(total<1) return { ok:false, msg:'Clip too short to stutter.' };
+  const out=ctx.createBuffer(ch,total,sr);
+  for(let k=0;k<ch;k++){ const src=buf.getChannelData(Math.min(k,ch-1)), d=out.getChannelData(k); let w=0;
+    for(let r=0;r<reps;r++){ const L=lens[r], rate=Math.pow(2,(pitch/12)*r/Math.max(1,reps-1)), amp=Math.pow(1-decay,r), e=Math.floor(sr*0.002);
+      for(let i=0;i<L;i++){ const sp=Math.max(0,grab)+i*rate, i0=sp|0, fr=sp-i0, a=src[Math.min(src.length-1,i0)]||0, b=src[Math.min(src.length-1,i0+1)]||0;
+        let v=(a+(b-a)*fr)*amp; if(e>0&&(i<e||i>L-e))v*=Math.min(i,L-i)/e; d[w+i]=v; } w+=L; } }
+  try{ if(typeof pushUndoClips==='function')pushUndoClips(s.t); }catch(e){}
+  s.cl.buffer=out; syncPrimary(s.t); try{ if(typeof drawLane==='function')drawLane(s.t); }catch(e){}
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, clip:(s.cl.name||s.t.name||'clip'), reps };
+}
+window.studioStutter = studioStutter;
+// Build to a drop — LP-sweep + duck the source, overlay a rising noise riser, end on a breath of silence.
+async function studioDrop(opts){
+  ensureCtx(); opts=opts||{};
+  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a clip to build into a drop.' };
+  const src=s.buf, sr=src.sampleRate, ch=Math.max(1,src.numberOfChannels), len=src.length, durS=len/sr;
+  if(durS<0.2) return { ok:false, msg:'Clip too short to build a drop.' };
+  const oc=new OfflineAudioContext(ch, len, sr);
+  const bs=oc.createBufferSource(); bs.buffer=src;
+  const lp=oc.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(18000,0); lp.frequency.exponentialRampToValueAtTime(300,durS);
+  const g=oc.createGain(); g.gain.setValueAtTime(1,0); g.gain.linearRampToValueAtTime(0.18,durS);
+  bs.connect(lp); lp.connect(g); g.connect(oc.destination); bs.start(0);
+  const nb=oc.createBuffer(1,len,sr), nd=nb.getChannelData(0); for(let i=0;i<len;i++)nd[i]=Math.random()*2-1;
+  const ns=oc.createBufferSource(); ns.buffer=nb;
+  const hp=oc.createBiquadFilter(); hp.type='highpass'; hp.frequency.setValueAtTime(400,0); hp.frequency.exponentialRampToValueAtTime(6000,durS);
+  const ng=oc.createGain(); ng.gain.setValueAtTime(0.001,0); ng.gain.exponentialRampToValueAtTime(0.4,durS*0.96); ng.gain.linearRampToValueAtTime(0,durS);
+  ns.connect(hp); hp.connect(ng); ng.connect(oc.destination); ns.start(0);
+  let built; try{ built=await oc.startRendering(); }catch(e){ return { ok:false, msg:'Drop render failed.' }; }
+  const breath=Math.floor(divSec(0.125)*sr), fade=Math.min(breath,Math.floor(0.003*sr));
+  for(let k=0;k<built.numberOfChannels;k++){ const d=built.getChannelData(k), n=d.length;
+    for(let i=0;i<breath;i++){ const idx=n-breath+i; if(idx<0)continue; d[idx]*=(i<fade?(1-i/fade):0); } }
+  try{ if(typeof pushUndoClips==='function')pushUndoClips(s.t); }catch(e){}
+  s.cl.buffer=built; syncPrimary(s.t); try{ if(typeof drawLane==='function')drawLane(s.t); }catch(e){}
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, clip:(s.cl.name||s.t.name||'clip') };
+}
+window.studioDrop = studioDrop;
+
+// ════════════════════════════════════════════════════════════════════════
+//  AI SOUND-FX — generate a sound (ElevenLabs, BYO-key, proxied) → drop on the timeline.
+// ════════════════════════════════════════════════════════════════════════
+async function studioGenSfx(prompt){
+  ensureCtx(); prompt=(prompt||'').trim();
+  if(!prompt) return { ok:false, msg:'Tell me what sound to make — e.g. "cinematic braam", "riser", "vinyl crackle".' };
+  let res; try{ res=await fetch('/api/sfx',{ method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ text:prompt }) }).then(r=>r.json()); }
+  catch(e){ return { ok:false, msg:'Couldn’t reach the SFX service.' }; }
+  if(!res || res.error) return { ok:false, msg:(res&&res.error)||'SFX failed.' };
+  let buf; try{ const raw=res.audio.split(',')[1], bin=atob(raw), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i); buf=await ctx.decodeAudioData(u8.buffer); }
+  catch(e){ return { ok:false, msg:'Could not decode the generated audio.' }; }
+  const at=(typeof pos==='number'?pos:0)||0;
+  _newBufTrack('SFX: '+prompt.slice(0,22), buf, at, buf.numberOfChannels>1, 0, 0);
+  if(typeof playing!=='undefined'&&playing&&typeof restartPlayback==='function')restartPlayback();
+  return { ok:true, prompt, dur:+buf.duration.toFixed(1) };
+}
+window.studioGenSfx = studioGenSfx;
+
 function vdPlan(f){
   const hpf = Math.round(_clamp(f.bandPct.sub > 0.10 ? 100 : (f.bandPct.sub < 0.04 ? 80 : 90), 70, 120));
   const mudVsBody = f.bandPct.mud / (f.bandPct.body + 1e-9);
@@ -8757,7 +9104,7 @@ function laneUiTake(t, placeAt) {
   // setInterval(() => checkForUpdates(false), CHECK_EVERY);
 })();
 </script>
-<script src="/static/agent-dock.js?v=10"></script>
+<script src="/static/agent-dock.js?v=16"></script>
 <script src="/static/pinkroom-nav.js?v=5"></script>
 
 <!-- ─────────────────────────────────────────────────────────────────────────

@@ -321,9 +321,103 @@
     return lines.join("\n");
   }
 
+  // ── SESSION-WIDE commands (the agent works the WHOLE mix, like Mixstein — but on our own DAW + honest) ──
+  function _ssHeadroom(s) {
+    var map = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12 };
+    var m = s.replace(/negative\s+([a-z]+)/g, function(_,w){ return " -"+(map[w]!=null?map[w]:w)+" "; })
+             .replace(/minus\s+([a-z0-9]+)/g, function(_,w){ return " -"+(map[w]!=null?map[w]:w)+" "; });
+    var nums=[], re=/-?\d+(?:\.\d+)?/g, x; while((x=re.exec(m))){ var n=parseFloat(x[0]); if(n<=0 && n>=-30) nums.push(n); }
+    if (nums.length>=2) return { hi:Math.min(nums[0],nums[1]), lo:Math.max(nums[0],nums[1]) };
+    if (nums.length===1) return { hi:nums[0]-1.5, lo:nums[0]+1.5 };
+    return { hi:-6, lo:-3 };
+  }
+  function _ssGainReply(r) {
+    if (!r || !r.ok) return (r&&r.msg) || "Couldn't gain-stage that.";
+    var lines = ["**Gain-staged "+r.count+" of "+r.total+" track"+(r.total>1?"s":"")+"** — trimmed the input on each (faders stay at unity, like a Utility first)."];
+    if (r.masterPeak!=null) lines.push("  ↳ _master now peaks at "+r.masterPeak+" dB"+(r.corrected?" (after one corrective pass)":"")+" — you asked for "+r.floor+" to "+r.ceil+" dB of headroom._");
+    if (r.skipped&&r.skipped.length) lines.push("Couldn't read: "+r.skipped.join(", ")+".");
+    lines.push("\nClean headroom to mix into now. 🎚️");
+    return lines.join("\n");
+  }
+  function _ssRecipeReply(r) {
+    if (!r || !r.ok) return (r&&r.msg) || "Couldn't apply that recipe.";
+    var lines = ["**"+r.recipe+"** — "+(r.note||"")+"."];
+    var byRole = {};
+    (r.applied||[]).forEach(function(a){ if(a.moves&&a.moves.length){ (byRole[a.role]=byRole[a.role]||[]).push(a.name+" ("+a.moves.join(" + ")+")"); } });
+    Object.keys(byRole).forEach(function(role){ lines.push("• **"+role+"** → "+byRole[role].join(", ")); });
+    if (r.skipped&&r.skipped.length) { var sk=r.skipped.map(function(s){ return s.name+(s.why?" ("+s.why+")":""); }); lines.push("_Left alone: "+sk.join(", ")+"._"); }
+    lines.push("\nDressed "+r.count+" track"+(r.count!==1?"s":"")+" — some on the track, reverb routed to the bus. AB it; too subtle? tell me to push it. 🎛️");
+    return lines.join("\n");
+  }
+  function _ssVocalReply(kind, r){
+    if(!r || !r.ok) return (r&&r.msg) || "Couldn't do that — select a vocal clip first.";
+    if(kind==='harmony') return "**Harmonies up** — added "+(r.voices||[]).join(" + ")+" off “"+r.src+"”, panned out and tucked under the lead on their own tracks. Mute any you don't want. 🎶";
+    if(kind==='choir')   return "**Choir stacked** — "+r.voices+" detuned voices spread across the stereo field (+ octaves for body) into one Choir track, from “"+r.src+"”. 🎼";
+    if(kind==='vocoder') return "**Vocal → instrument** — ran “"+r.src+"” through a "+r.bands+"-band vocoder onto a new “Vocal Synth” track. Your voice plays the synth now. 🤖🎹";
+    return "Done.";
+  }
+  function _ssTrickReply(kind, r){
+    if(!r || !r.ok) return (r&&r.msg) || "Couldn't do that.";
+    if(kind==='pultec')   return "**Pultec punch on the master** — +"+r.boost+" dB shelf at "+r.freq+" Hz with a -"+r.scoop+" dB scoop just above. Fat low end, no mud. 🔊";
+    if(kind==='parallel') return "**Parallel saturation** — spun up a “"+r.bus+"” (HPF → drive) and sent "+(r.targets||[]).join(", ")+" into it pre-fader. Blend it under the dry with the aux fader. 🔥";
+    if(kind==='pump')     return "**Sidechain pump** — ducked **"+r.track+"** with the beat ("+r.bpm+" BPM) so it breathes around the kick, clearing the low end. 🫷";
+    return "Done.";
+  }
+  function _ssCreativeReply(kind, r){
+    if(!r || !r.ok) return (r&&r.msg) || "Couldn't do that — select a clip first.";
+    if(kind==='stutter') return "**Stutter** — beat-repeated “"+r.clip+"” ("+r.reps+"× accelerating) into the downbeat. 🔫";
+    if(kind==='drop')    return "**Build to a drop** — swept “"+r.clip+"” down with a rising riser and a breath of silence right before the 1. Drop your beat after it. 💥";
+    return "Done.";
+  }
+  function _ssSfxReply(r){
+    if(!r || !r.ok) return (r&&r.msg) || "SFX failed.";
+    return "**Sound dropped** — generated “"+r.prompt+"” ("+r.dur+"s) onto a new track at the playhead. 🔊";
+  }
+
   // the entry point kit-helper's ask() calls. Returns {handled, reply}. handled:false → let the brain answer.
   window.DMV_DOCK_FIX = async function (text, agentId) {
     try {
+      var t2 = (text || "").toLowerCase();
+      // Session-wide passes first — these work the WHOLE mix, even with nothing parented (studio only).
+      if (typeof window.studioGainStage === "function" && /(gain[ -]?stage|gainstage|stage (the|this|my|it|everything|all|session)|set (the )?levels?\b|headroom|level (everything|it all|the session))/.test(t2)) {
+        return { handled: true, reply: _ssGainReply(await window.studioGainStage(_ssHeadroom(t2))) };
+      }
+      if (typeof window.studioRecipe === "function" && /(recipe|dimension|nineties|90's|\b90s\b|boom[ -]?bap|\bglue\b|\bvibe\b|dress (the|it|this)|fill (the|in)\b|make (it|the mix|this) (wider|bigger|spacious|lush|huge|wide))/.test(t2)) {
+        return { handled: true, reply: _ssRecipeReply(await window.studioRecipe(text)) };
+      }
+      // AI-vocal (selected clip) — harmony / choir / vocal→instrument
+      if (typeof window.studioVocoder === "function" && /(vocod|talk ?box|robot voice|turn (my |the )?(voice|vocal) into|(voice|vocal) (in)?to (an? )?(instrument|synth)|synth(esize|esise)? (my |the )?(voice|vocal))/.test(t2)) {
+        return { handled: true, reply: _ssVocalReply('vocoder', await window.studioVocoder()) };
+      }
+      if (typeof window.studioChoir === "function" && /(choir|gang vocal|ensemble of|stack (a )?choir|\bvocal stack\b)/.test(t2)) {
+        return { handled: true, reply: _ssVocalReply('choir', window.studioChoir()) };
+      }
+      if (typeof window.studioHarmonize === "function" && /(harmoni|harmony|backing vocal|stack (a |some )?harmon|third and fifth)/.test(t2)) {
+        var hset = /thick|big|wall|stack/.test(t2)?'thick' : /octave|8va/.test(t2)?'octave' : /minor/.test(t2)?'minor' : /major|triad|third|3rd/.test(t2)?'triad' : 'safe';
+        return { handled: true, reply: _ssVocalReply('harmony', window.studioHarmonize(hset)) };
+      }
+      // Mixing-trick moves
+      if (typeof window.studioPultec === "function" && /(pultec|low.?end punch|thicken (the )?(low|bottom|master)|fatten (the )?(low|bottom|master)|punch (the )?(master|low|bottom))/.test(t2)) {
+        return { handled: true, reply: _ssTrickReply('pultec', window.studioPultec()) };
+      }
+      if (typeof window.studioParallel === "function" && /(parallel[ -]?sat|parallel satur|p-sat|smash (the )?(room|drum|drums)|crush (the )?(room|drum|drums)|distort (the )?(room|drum))/.test(t2)) {
+        return { handled: true, reply: _ssTrickReply('parallel', window.studioParallel(/drum|room/.test(t2)?'drum':'vocal')) };
+      }
+      if (typeof window.studioPump === "function" && /(side ?chain|duck (the )?bass|pump (the )?bass|bass under the kick|duck it (to|under) the kick)/.test(t2)) {
+        return { handled: true, reply: _ssTrickReply('pump', window.studioPump()) };
+      }
+      // Creative FX (selected clip)
+      if (typeof window.studioDrop === "function" && /(build (a |to a |it to a |into the )?(drop|up)|build[ -]?up|drop build|riser into|build into (a|the) (drop|chorus))/.test(t2)) {
+        return { handled: true, reply: _ssCreativeReply('drop', await window.studioDrop()) };
+      }
+      if (typeof window.studioStutter === "function" && /(stutter|beat ?repeat|glitch (it|this|the)|machine ?gun|chop .* (drop|into))/.test(t2)) {
+        return { handled: true, reply: _ssCreativeReply('stutter', window.studioStutter()) };
+      }
+      // AI sound-FX (ElevenLabs, BYO-key) — generate a sound and drop it on the timeline
+      if (typeof window.studioGenSfx === "function" && /(\bsfx\b|sound ?effect|drop (a |an |some )?(whoosh|riser|braam|boom|impact|sub ?drop|downlifter|foley|crackle|swoosh|stab|laser|zap|sweep)|generate (a |an |some )?(sound|whoosh|riser|braam|impact|foley)|make (a |an |me a )?(whoosh|riser|braam|boom|impact|sound ?effect))/.test(t2)) {
+        var sfxP = (text||"").replace(/^.*?\b(sfx|sound ?effects?|drop|generate|make|create|add|give me|i want)\b[:\s]*(a |an |some |me a |me an )?/i, "").trim() || (text||"");
+        return { handled: true, reply: _ssSfxReply(await window.studioGenSfx(sfxP)) };
+      }
       var ids = parented(); if (!ids.length) return { handled: false };
       var parsed = parseIntent(text || "");
       if (!parsed.moves.length && !parsed.fullFix) return { handled: false };   // not a fix command → brain answers

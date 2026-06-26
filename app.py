@@ -3342,6 +3342,37 @@ async def transcribe_audio(req: Request):
         return {"text": "", "error": str(e)[:160]}
 
 
+@app.post("/api/sfx")
+async def gen_sfx(req: Request):
+    """Generate a sound effect via ElevenLabs on the USER'S OWN key (BYO-key, proxied so
+    the key never ships client-side). For dropping whooshes / risers / braams / impacts /
+    foley onto the timeline. Returns base64 mp3. Commercial use needs a paid ElevenLabs
+    plan — you own the output, just don't resell the raw sounds as a sample pack."""
+    body = await req.json()
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"error": "no prompt — say what to make (e.g. 'cinematic braam', 'riser', 'vinyl crackle')"}
+    key = (_gen_keys_load().get("elevenlabs") or "").strip()
+    if not key:
+        return {"error": "no ElevenLabs key — add one in the keys hub (paid plan: you own the output)"}
+    dur, infl = body.get("duration_seconds"), body.get("prompt_influence")
+    try:
+        import httpx
+        payload = {"text": text[:400]}
+        if isinstance(dur, (int, float)) and dur:  payload["duration_seconds"] = max(0.5, min(30.0, float(dur)))
+        if isinstance(infl, (int, float)):          payload["prompt_influence"] = max(0.0, min(1.0, float(infl)))
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(
+                "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128",
+                headers={"xi-api-key": key, "accept": "audio/*", "content-type": "application/json"},
+                json=payload)
+        if r.status_code != 200:
+            return {"error": f"ElevenLabs {r.status_code}: {r.text[:160]}"}
+        return {"audio": "data:audio/mpeg;base64," + base64.b64encode(r.content).decode("ascii")}
+    except Exception as e:
+        return {"error": str(e)[:160]}
+
+
 # ════════════════════════════════════════════════════════════════════════════
 #  THE EDITOR — the flagship wing. A pro NLE + compositor (static/editor.html).
 #  Render engine = native ffmpeg + NVENC (already on PATH). Preview = 540p
