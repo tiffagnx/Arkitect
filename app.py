@@ -3373,6 +3373,38 @@ async def gen_sfx(req: Request):
         return {"error": str(e)[:160]}
 
 
+@app.post("/api/tts")
+async def gen_tts(req: Request):
+    """Speak an agent's reply via Fish Audio TTS on the USER'S OWN key (BYO-key, proxied so the
+    key never ships client-side). The voice = a Fish voice/clone model id, passed as `reference_id`.
+    The `model: s2.1-pro` HEADER (NOT a body field) is what makes the inline [expression] tags fire —
+    S1 would ignore square brackets. Returns base64 mp3. No key / no voice id → the browser falls
+    back to its built-in voice client-side, so an agent always talks."""
+    body = await req.json()
+    text = (body.get("text") or "").strip()
+    model_id = (body.get("model_id") or "").strip()      # the agent's Fish voice/clone id (reference_id)
+    if not text:
+        return {"error": "no text to speak"}
+    if not model_id:
+        return {"error": "no voice set for this agent — add a voice model id in the keys hub (Voices)"}
+    key = (_gen_keys_load().get("fish_audio") or "").strip()
+    if not key:
+        return {"error": "no Fish Audio key — add one in the keys hub (Voices)"}
+    try:
+        import httpx
+        payload = {"text": text[:2000], "reference_id": model_id, "format": "mp3", "mp3_bitrate": 128}
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(
+                "https://api.fish.audio/v1/tts",
+                headers={"Authorization": f"Bearer {key}", "content-type": "application/json", "model": "s2.1-pro"},
+                json=payload)
+        if r.status_code != 200:
+            return {"error": f"Fish Audio {r.status_code}: {r.text[:160]}"}
+        return {"audio": "data:audio/mpeg;base64," + base64.b64encode(r.content).decode("ascii")}
+    except Exception as e:
+        return {"error": str(e)[:160]}
+
+
 # ════════════════════════════════════════════════════════════════════════════
 #  THE EDITOR — the flagship wing. A pro NLE + compositor (static/editor.html).
 #  Render engine = native ffmpeg + NVENC (already on PATH). Preview = 540p
@@ -4791,6 +4823,8 @@ async def index():
 # logic lives in swarm_routes.py, which reuses this module's helpers lazily — no circular import).
 from swarm_routes import router as swarm_router  # noqa: E402
 app.include_router(swarm_router)
+from room_relay import router as room_relay_router  # noqa: E402  (Layer 2: MCP live-room command relay)
+app.include_router(room_relay_router)
 
 # ── KIT — the in-room build-bot helper. His OWN brain (free cloud keys if the user
 #    set any, else the local model), room-aware: he knows the room you're in and

@@ -423,7 +423,17 @@
       if (!parsed.moves.length && !parsed.fullFix) return { handled: false };   // not a fix command → brain answers
       var style = STYLE[agentId] || null;
       var results = [];
-      for (var i = 0; i < ids.length; i++) { var t = trackById(ids[i]); if (t) results.push(await applyMovesToTrack(t, parsed, style)); }
+      for (var i = 0; i < ids.length; i++) {
+        var t = trackById(ids[i]); if (!t) continue;
+        var _agName = (typeof active !== "undefined" && active && active.name) ? active.name : agentId;   // pretty name if we have it
+        if (window.roomGlow) try { window.roomGlow("#lane-" + t.id, { agent: _agName, label: "working on " + t.name, state: "working" }); } catch (e) {}   // light the stem she's on
+        var _r = await applyMovesToTrack(t, parsed, style); results.push(_r);
+        if (window.roomGlow) try {
+          var _ok = _r && _r.done && _r.done.length;
+          window.roomGlow("#lane-" + t.id, { agent: _agName, state: _ok ? "done" : "error",
+            label: _ok ? ("✓ " + _r.done.join(", ")) : (_r && _r.blank ? "nothing on this track" : "couldn’t read it") });
+        } catch (e) {}
+      }
       return { handled: true, reply: buildReply(results, style && style.flair) };
     } catch (e) { return { handled: false }; }
   };

@@ -40,7 +40,8 @@
     const sb = document.createElement("button");
     sb.textContent = "Summon agent"; sb.setAttribute("data-summon", "1");
     sb.style.cssText = "background:rgba(255,255,255,.05);border:1px solid rgba(120,182,205,.4);color:#9FCFDD;" +
-      "font:600 11px Oxanium,system-ui,sans-serif;letter-spacing:.04em;padding:6px 12px;border-radius:9px;cursor:pointer;margin-left:8px;";
+      "font:600 11.5px Oxanium,system-ui,sans-serif;letter-spacing:.04em;height:34px;padding:0 12px;border-radius:10px;cursor:pointer;" +
+      "margin-left:6px;display:inline-flex;align-items:center;box-sizing:border-box;";   // match the Feedback / help button size exactly
     sb.onmouseover = () => { sb.style.borderColor = "rgba(120,182,205,.8)"; sb.style.color = "#CFE6EE"; };
     sb.onmouseout = () => { sb.style.borderColor = "rgba(120,182,205,.4)"; sb.style.color = "#9FCFDD"; };
     sb.onclick = () => {
@@ -69,6 +70,8 @@
   // STREAM PUBLISH — window.publishToStream + window.streamPublishDialog so any lab can drop a
   // finished track (→ Notifi) or video (→ Cratel) straight into The Stream.
   if (!document.querySelector('script[data-strpub]')) { const sp = document.createElement("script"); sp.src = "/static/stream-publish.js"; sp.setAttribute("data-strpub", "1"); document.body.appendChild(sp); }
+  // HELP — the quiet in-room "?" guide (per-room how-to; never auto-opens, never nags)
+  if (!document.querySelector('script[data-help]')) { const hp = document.createElement("script"); hp.src = "/static/help.js"; hp.setAttribute("data-help", "1"); document.body.appendChild(hp); }
   // NO version badge in the rooms — owner's call: the version lives ONLY on the front page (the chat,
   // next to brain/engine). The corner badge here was cluttering the rooms, so it's intentionally gone.
 })();

@@ -59,7 +59,10 @@
     border-radius:9px;cursor:pointer;font:600 12px Inter;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;flex:none;transition:all .12s}
   .tb:hover{border-color:rgba(62,156,184,.5)}
   .tb.solid{background:linear-gradient(120deg,var(--acc),var(--mag));color:#0A1518;border-color:transparent;font-weight:700;box-shadow:0 3px 14px rgba(62,156,184,.4)}
-  .kit-mount{display:flex;align-items:center;flex:none}
+  /* pin the agent cluster (Summon agent / Feedback / help) to the RIGHT of the scrolling toolbar so it
+     never scrolls off the edge / "drops out"; the left fade masks any tab buttons scrolling under it */
+  .kit-mount{display:flex;align-items:center;flex:none;position:sticky;right:0;z-index:3;padding-left:16px;
+    background:linear-gradient(90deg,rgba(20,21,25,0),rgba(20,21,25,.97) 16px,rgba(20,21,25,.97))}
   /* master meter */
   .mtr{width:78px;height:11px;border-radius:4px;background:rgba(0,0,0,.5);border:1px solid var(--hair2);overflow:hidden;position:relative;flex:none}
   .mtr i{position:absolute;left:0;top:0;bottom:0;width:0%;background:linear-gradient(90deg,var(--go),var(--hot) 72%,var(--red));transition:width .05s}

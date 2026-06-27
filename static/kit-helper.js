@@ -154,6 +154,11 @@
   .kit-mic:disabled { opacity:.45; cursor:default; }
   .kit-mic.rec { border-color:#E0245E; background:rgba(224,36,94,.22); color:#fff; animation:kitmic 1.1s ease-in-out infinite; }
   @keyframes kitmic { 0%,100%{ box-shadow:0 0 0 0 rgba(224,36,94,.5);} 50%{ box-shadow:0 0 0 7px rgba(224,36,94,0);} }
+  .kit-speak { flex:none; width:36px; height:31px; border:1px solid rgba(120,182,205,.4); border-radius:9px; cursor:pointer; background:rgba(255,255,255,.05); color:#CFE6EE; font-size:14px; }
+  .kit-speak:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); }
+  .kit-speak.on { border-color:rgba(127,211,176,.85); background:rgba(127,211,176,.18); color:#BFF0DA; box-shadow:0 0 9px rgba(127,211,176,.4); }
+  .kit-speak.playing { animation:kitspeak 1s ease-in-out infinite; }
+  @keyframes kitspeak { 0%,100%{ box-shadow:0 0 0 0 rgba(127,211,176,.5);} 50%{ box-shadow:0 0 0 7px rgba(127,211,176,0);} }
   .kit-tier { display:flex; align-items:center; gap:5px; padding:5px 10px; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(0,0,0,.12); }
   .kit-tier .kt-l { font:700 8.5px 'Space Mono'; letter-spacing:.14em; text-transform:uppercase; color:rgba(170,180,190,.5); margin-right:3px; }
   .kt-pill { font:700 9.5px Oxanium; letter-spacing:.04em; padding:3px 9px; border-radius:20px; cursor:pointer; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03); color:#C6CBD3; }
@@ -279,7 +284,7 @@
      <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-crew kt-pill" id="ktCrew" type="button" title="Back this agent with a crew of other brains — they weigh in, this agent gives you the answer">+ crew</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
+     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-speak" title="Voice off — tap so this agent talks out loud">🔇</button><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -665,6 +670,61 @@
     }
   }
 
+  // ── VOICE OUT — the agent SPEAKS its reply via Fish Audio (/api/tts), in that agent's cloned
+  //    voice (a Fish "reference_id"/model id). Per-agent on/off + model id, mirroring the brain picker:
+  //    built-ins (kit/tiff) carry a default voice id; user (mine) agents store one on their entry.
+  //    No Fish key / no model id → fall back to the browser's built-in voice so it ALWAYS talks. ──
+  const VOICE_DEFAULTS = { kit: "5312c04032034388bb6bac44c94c804d", tiff: "8526ee26387448b2a86c1d1052148a4b" };
+  function getVoiceModelId(ch){
+    if (!ch) return "";
+    try { const m = JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); if (m && m[ch.id]) return m[ch.id]; } catch (_) {}
+    if (ch.mine) return ch.voiceModelId || "";
+    return VOICE_DEFAULTS[ch.id] || "";
+  }
+  function getVoiceOn(ch){ if (!ch) return false; try { return localStorage.getItem("dmv_voice_on_" + ch.id) === "1"; } catch (_) { return false; } }
+  function setVoiceOn(ch, on){ if (!ch) return; try { localStorage.setItem("dmv_voice_on_" + ch.id, on ? "1" : "0"); } catch (_) {} }
+  // strip chat-only cruft so the spoken line is clean. KEEP [expression] tags (Fish S2 fires them);
+  // the browser fallback strips them since it can't perform them.
+  function cleanForSpeech(t){
+    return String(t || "")
+      .replace(/```[\s\S]*?```/g, " ")          // code/action fences — don't read them aloud
+      .replace(/\*\([\s\S]*?\)\*/g, " ")         // *(preview / +learned)* asides
+      .replace(/[*_`#>]/g, "")                    // markdown chars
+      .replace(/\s+/g, " ").trim();
+  }
+  let _audioEl = null;
+  const speakBtn = win.querySelector(".kit-speak");
+  function paintSpeak(){
+    if (!speakBtn) return;
+    const on = getVoiceOn(active), nm = (active && active.name) || "the agent";
+    speakBtn.classList.toggle("on", on);
+    speakBtn.textContent = on ? "🔊" : "🔇";
+    speakBtn.title = on ? ("Voice ON — " + nm + " speaks replies. Tap to mute.") : ("Voice off — tap so " + nm + " talks out loud");
+  }
+  function speakBrowser(text){
+    try { const u = new SpeechSynthesisUtterance(String(text).replace(/\[[^\]]*\]/g, "")); u.rate = 1.04; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (_) {}
+  }
+  async function playTTS(text, modelId){
+    const clean = cleanForSpeech(text); if (!clean) return;
+    if (!modelId) { speakBrowser(clean); return; }            // no voice id → free browser voice
+    if (speakBtn) speakBtn.classList.add("playing");
+    try {
+      const r = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: clean, model_id: modelId }) });
+      const j = await r.json();
+      if (j && j.audio) {
+        if (_audioEl) { try { _audioEl.pause(); } catch (_) {} }
+        _audioEl = new Audio(j.audio);
+        _audioEl.onended = _audioEl.onerror = () => { if (speakBtn) speakBtn.classList.remove("playing"); };
+        _audioEl.play().catch(() => { if (speakBtn) speakBtn.classList.remove("playing"); });
+      } else { if (speakBtn) speakBtn.classList.remove("playing"); speakBrowser(clean); }   // key/credit/error → still talk
+    } catch (_) { if (speakBtn) speakBtn.classList.remove("playing"); speakBrowser(clean); }
+  }
+  if (speakBtn) speakBtn.onclick = () => {
+    if (!active) return;
+    const on = !getVoiceOn(active); setVoiceOn(active, on); paintSpeak();
+    if (!on) { if (_audioEl) { try { _audioEl.pause(); } catch (_) {} } try { speechSynthesis.cancel(); } catch (_) {} speakBtn.classList.remove("playing"); }
+  };
+
   // top-tier Claude/Opus cloud model selected → keep the God-Particle gold/pink window glow.
   function isTopClaude(v){
     if (!v || v.indexOf("cloud:") !== 0) return false;
@@ -706,6 +766,7 @@
     modelSel.value = has ? want : "auto";
     applyGlow();
     try { paintCrew(); } catch (_) {}
+    try { paintSpeak(); } catch (_) {}
   }
 
   if (modelSel) modelSel.onchange = () => {
@@ -906,6 +967,8 @@
       let reply = j.reply || "Hm, I blanked — ask me again?";
       if (active.preview && !active.mine) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
       addMsg("kit", reply);
+      // ── VOICE: speak the reply when 🔊 is on for this agent (Fish Audio in its voice; browser voice if no key) ──
+      if (getVoiceOn(active)) { try { playTTS(reply, getVoiceModelId(active)); } catch (_) {} }
       // ── LEARNS AS YOU WORK — fire-and-forget: distill this real exchange into the agent's pack.
       //    Only for user (mine) agents with a real question (built-in Kit/Tiff NEVER write a user pack);
       //    repaints ONLY when the model found genuine, durable rules (res.added > 0) — never on empties. ──

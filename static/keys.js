@@ -17,6 +17,15 @@
   const loadMedia = () => { try { return JSON.parse(localStorage.getItem(MEDIA_STORE)) || {}; } catch (e) { return {}; } };
   function saveMedia(id, key) { const m = loadMedia(); if (key) m[id] = key; else delete m[id]; try { localStorage.setItem(MEDIA_STORE, JSON.stringify(m)); } catch (e) {} }
 
+  // ── VOICES — agents talk back (Fish Audio TTS). The KEY saves SERVER-SIDE (via /api/cloud/key, like
+  //    the SFX key) so /api/tts can read it; the per-agent voice MODEL IDs (the cloned-voice
+  //    "reference_id") save locally per-agent. Built-in cast (Kit/Tiff) carry default voice ids; any
+  //    user overrides them with their own clone. ──
+  const VOICE_MODELS_STORE = "dmv_voice_models";
+  const loadVoiceModels = () => { try { return JSON.parse(localStorage.getItem(VOICE_MODELS_STORE)) || {}; } catch (e) { return {}; } };
+  function saveVoiceModel(agentId, modelId) { const m = loadVoiceModels(); if (modelId) m[agentId] = modelId; else delete m[agentId]; try { localStorage.setItem(VOICE_MODELS_STORE, JSON.stringify(m)); } catch (e) {} }
+  const VOICE_DEFAULTS = { kit: "5312c04032034388bb6bac44c94c804d", tiff: "8526ee26387448b2a86c1d1052148a4b" };
+
   const css = `
   .kw-ov { position:fixed; inset:0; z-index:100001; display:none; align-items:center; justify-content:center;
     background:rgba(6,7,10,.66); backdrop-filter:blur(4px); }
@@ -163,6 +172,33 @@
       '<details><summary>Never done this? Here\'s the whole thing ↓</summary><div style="margin-top:6px">1. Hit <b>Get key ↗</b> — it opens the provider.<br>2. Make a free account (most hand you <b>free credits</b> to try it).<br>3. When the credits run low, drop a few dollars on — pay-as-you-go, you only pay for what you actually make.<br>4. Copy your key, paste it here, hit Save. That\'s it.</div></details></div>');
     const media = loadMedia();
     MEDIA.forEach(p => body.appendChild(card(p, { saved: !!media[p.id], save: (k) => { saveMedia(p.id, k); return Promise.resolve(); } })));
+
+    // ── VOICES — agents speak their replies (Fish Audio). Key saves server-side; per-agent voice ids local. ──
+    const vh = document.createElement("div"); vh.className = "kw-cat"; vh.textContent = "Voices — make your agents talk"; body.appendChild(vh);
+    body.insertAdjacentHTML("beforeend", '<div class="kw-explain"><b>🔊 Give your agents a voice.</b> Add a <b>Fish Audio</b> key, then paste a <b>voice model id</b> for each agent (clone a voice at fish.audio → copy its id). Agents then speak their replies in that voice — flip <b>🔊</b> on in the agent window. No key? They still talk with the browser\'s built-in voice (free).</div>');
+    let fishSaved = false;
+    try { fishSaved = !!((await fetch("/api/cloud/key?provider=fish_audio").then(r => r.json())).has_key); } catch (e) {}
+    body.appendChild(card(
+      { name: "Fish Audio", note: "Cloned, expressive voices — your agents talk back", url: "https://fish.audio/go-api/api-keys/" },
+      { saved: fishSaved,
+        save: (k) => fetch("/api/cloud/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: "fish_audio", api_key: k }) }).then(r => r.json()).then(r => { if (!r.ok) throw new Error("failed"); }),
+        verify: () => fetch("/api/cloud/key?provider=fish_audio").then(r => r.json()).then(j => ({ ok: !!j.has_key })).catch(() => ({ ok: false })) }
+    ));
+    // per-agent voice model ids (the cloned-voice "reference_id"). Built-in cast shown; user agents set theirs in the agent window.
+    const vm = loadVoiceModels();
+    const vmWrap = document.createElement("div"); vmWrap.className = "kw-card";
+    vmWrap.innerHTML = '<div class="kw-crow"><span class="kw-nm">Voice model IDs</span></div><div class="kw-note">Each agent\'s Fish voice id (the cloned-voice reference_id). Leave blank to use the browser voice.</div>';
+    [{ id: "kit", name: "Kit" }, { id: "tiff", name: "Tiff" }].forEach(a => {
+      const lab = document.createElement("div"); lab.style.cssText = "font:700 10px Oxanium;color:#9FCFDD;letter-spacing:.04em;margin:9px 2px 2px"; lab.textContent = a.name; vmWrap.appendChild(lab);
+      const row = document.createElement("div"); row.className = "kw-paste";
+      row.innerHTML = '<input type="text" placeholder="' + a.name + ' voice model id" autocomplete="off" /><button>Save</button>';
+      const inp = row.querySelector("input"), btn = row.querySelector("button");
+      inp.value = vm[a.id] || VOICE_DEFAULTS[a.id] || "";
+      btn.onclick = () => { saveVoiceModel(a.id, inp.value.trim()); btn.textContent = "✓ saved"; setTimeout(() => { btn.textContent = "Save"; }, 1300); };
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") btn.click(); });
+      vmWrap.appendChild(row);
+    });
+    body.appendChild(vmWrap);
 
     const f = document.createElement("div"); f.className = "kw-foot";
     f.textContent = "Keys are saved on this machine only — never shared, never shipped.";
