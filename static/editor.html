@@ -3125,7 +3125,9 @@ function attachClipDrag(el,track,c){
     e.preventDefault();el.setPointerCapture(e.pointerId);
     const sx=e.clientX,start0=c.start,dur0=c.dur,in0=c.in||0;
     const ck=clipKind(c),hasSrc=(ck!=='text'&&ck!=='solid'&&!c.solid); // text/solid have no source media
-    const m=MEDIA[c.mediaId];const maxSrc=(hasSrc&&m&&ck!=='image')?Math.round((m.dur||0)*FPS()):Infinity;
+    // A video/audio clip can't be trimmed past its OWN footage; stills (image/text/solid) stretch freely.
+    // Only finite when the source duration is actually known (>0) — otherwise leave it unclamped, never lock to 0/1.
+    const m=MEDIA[c.mediaId];const maxSrc=(hasSrc&&m&&ck!=='image'&&m.dur>0)?Math.round(m.dur*FPS()):Infinity;
     const multi=(!handle&&selSet.size>1)?selectedClips().map(s=>({c:s.clip,s0:s.clip.start})):null; // multi-drag: move all selected together
     const move=ev=>{
       let df=Math.round((ev.clientX-sx)/ppf);
@@ -3134,7 +3136,9 @@ function attachClipDrag(el,track,c){
         if(hasSrc){let ni=in0+delta;if(ni<0){ni=0;delta=-in0;ns=start0+delta;}c.in=ni;}
         c.start=ns;c.dur=dur0-delta;
       }else if(handle==='r'){
-        let nd=clamp(dur0+df,1,hasSrc?((maxSrc-(c.in||0))||99999):99999);c.dur=nd;
+        // Right edge stops at the last source frame (in-point + footage left). No falsy-0 fallback that let it run into black.
+        const cap=(maxSrc===Infinity)?Infinity:Math.max(1,maxSrc-(c.in||0));
+        c.dur=clamp(dur0+df,1,cap);
       }else if(multi){
         for(const mm of multi){mm.c.start=Math.max(0,mm.s0+df);const mel=document.querySelector('.clip[data-cid="'+mm.c.id+'"]');if(mel)mel.style.left=(mm.c.start*ppf)+'px';}
       }else{
