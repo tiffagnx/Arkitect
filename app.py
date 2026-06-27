@@ -4113,6 +4113,44 @@ async def editor_import(req: Request):
     return {"media": out}
 
 
+@app.post("/api/editor/upload")
+async def editor_upload(req: Request):
+    """Save a file the WebView2 file-picker / drag-drop handed us, then return its
+    on-disk path so the normal /import step can probe + cache it. Bytes stream straight
+    to disk (no full-file buffering in RAM) so a multi-GB clip imports fine. This is the
+    reliable desktop import path — the native Tk 'pick' dialog can't run from a frozen
+    .exe (sys.executable is the app itself), but a WebView2 <input type=file> opens the
+    real Windows Open dialog directly."""
+    from urllib.parse import unquote
+    raw_name = unquote((req.headers.get("x-filename") or "upload").strip())
+    name = os.path.basename(raw_name) or "upload"
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in (_VIDEO_EXT | _AUDIO_EXT | _IMAGE_EXT):
+        return JSONResponse({"error": f"unsupported file type: {ext or 'no extension'}"}, status_code=400)
+    updir = EDITOR_DIR / "uploads"
+    updir.mkdir(exist_ok=True)
+    dest = updir / name
+    if dest.exists():                                  # never clobber a file already in a project
+        stem = os.path.splitext(name)[0]
+        i = 1
+        while dest.exists():
+            dest = updir / f"{stem} ({i}){ext}"
+            i += 1
+    try:
+        with open(dest, "wb") as f:
+            async for chunk in req.stream():
+                f.write(chunk)
+    except Exception as e:
+        try: dest.unlink(missing_ok=True)
+        except Exception: pass
+        return JSONResponse({"error": f"upload failed: {e}"}, status_code=500)
+    if dest.stat().st_size == 0:
+        try: dest.unlink(missing_ok=True)
+        except Exception: pass
+        return JSONResponse({"error": "empty file"}, status_code=400)
+    return {"path": str(dest)}
+
+
 @app.get("/api/editor/media")
 async def editor_media_list():
     items = sorted(EDIT_MEDIA.values(), key=lambda m: m.get("ts", 0), reverse=True)

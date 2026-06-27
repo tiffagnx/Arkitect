@@ -515,8 +515,9 @@ body.mode-simple .director-only{display:none!important}
       <div class="bin-body" id="binBody">
         <div class="import-zone" id="importZone">
           <div class="big">⤓</div><div>Import media</div>
-          <div class="sub">video · audio · images — opens your files</div>
+          <div class="sub">click to choose, or drop files here</div>
         </div>
+        <input id="fileInput" type="file" multiple accept="video/*,audio/*,image/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.mpg,.mpeg,.wmv,.mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tif,.tiff" style="display:none">
       </div>
     </div>
 
@@ -733,14 +734,28 @@ function tc(frames){const f=Math.max(0,Math.round(frames)),fps=FPS();
   const p=n=>String(n).padStart(2,'0');return `${p(h)}:${p(m)}:${p(s)}:${p(ff)}`;}
 
 // ── MEDIA / IMPORT ─────────────────────────────────────────────────────
-async function doImport(){
-  let paths=[];
-  try{const r=await fetch('/api/editor/pick',{method:'POST'}).then(r=>r.json());paths=r.paths||[];}
-  catch{toast('Couldn’t open the file dialog',1);return;}
+function doImport(){ $('#fileInput').click(); }   // WebView2 opens the real Windows Open dialog
+
+// Stream each File's bytes to disk, then register the saved paths through the normal import.
+async function importFiles(files){
+  files=[...(files||[])].filter(f=>f&&f.size>0);
+  if(!files.length)return;
+  toast(`Importing ${files.length} file${files.length>1?'s':''}…`);
+  const paths=[];
+  for(const f of files){
+    try{
+      const r=await fetch('/api/editor/upload',{method:'POST',
+        headers:{'x-filename':encodeURIComponent(f.name)},body:f}).then(r=>r.json());
+      if(r&&r.path)paths.push(r.path);
+      else toast((r&&r.error)||`Couldn’t import ${f.name}`,1);
+    }catch{toast(`Couldn’t import ${f.name}`,1);}
+  }
   if(!paths.length)return;
-  toast(`Importing ${paths.length} file${paths.length>1?'s':''}…`);
-  const r=await fetch('/api/editor/import',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({paths})}).then(r=>r.json());
+  let r;
+  try{r=await fetch('/api/editor/import',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({paths})}).then(r=>r.json());}
+  catch{toast('Import failed',1);return;}
+  if(r&&r.error){toast(r.error,1);return;}
   for(const m of (r.media||[])){MEDIA[m.id]=m;if(!m.ready)pollMedia(m.id);}
   renderBin();
 }
@@ -3944,6 +3959,19 @@ lanesWrap.addEventListener('scroll',()=>{ruler.parentElement.scrollLeft=lanesWra
 
 // ── TOOLBAR / TOP BAR WIRING ───────────────────────────────────────────
 $('#binImport').onclick=doImport;$('#importZone').onclick=doImport;
+$('#fileInput').onchange=function(){importFiles(this.files);this.value='';};   // reset so re-picking the same file fires again
+// Drop files straight from Explorer onto the Media bin.
+(function(){const bin=$('#binBody');if(!bin)return;
+  const show=on=>{const z=$('#importZone');if(z)z.classList.toggle('drop-ok',on);};
+  const hasFiles=e=>{const t=e.dataTransfer;return t&&[...(t.types||[])].includes('Files');};
+  bin.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';show(true);});
+  bin.addEventListener('dragleave',e=>{if(e.target===bin||!bin.contains(e.relatedTarget))show(false);});
+  bin.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();show(false);
+    if(e.dataTransfer.files&&e.dataTransfer.files.length)importFiles(e.dataTransfer.files);});
+  // Without this, a file dropped anywhere OFF the bin makes WebView2 navigate away and open it.
+  window.addEventListener('dragover',e=>{if(hasFiles(e))e.preventDefault();});
+  window.addEventListener('drop',e=>{if(hasFiles(e))e.preventDefault();});
+})();
 $('#toolSelect').onclick=()=>setTool('select');$('#toolRazor').onclick=()=>setTool('razor');
 function setTool(t){if(t!=='pen'&&penDraft)cancelPenDraft();tool=t;$('#toolSelect').classList.toggle('on',t==='select');
   $('#toolRazor').classList.toggle('on',t==='razor');lanes.style.cursor=t==='razor'?'crosshair':'';
