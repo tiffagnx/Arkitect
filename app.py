@@ -3522,19 +3522,38 @@ def _gen_poster(src, dst, kind, dur):
 
 
 def _gen_proxy(src, dst, has_audio):
-    """540p H.264 proxy. NVENC first; fall back to CPU x264 if the card balks."""
+    """540p/30fps H.264 proxy with a dense, B-frame-free GOP so scrubbing seeks land fast and
+    uniformly (every ~0.5s is a keyframe, no B-frames to decode through). NVENC first; fall back
+    to CPU x264 if the card balks. The result is VALIDATED (size + probe) — a truncated/failed
+    encode is deleted so the player keeps serving the (no-store) original, never a broken proxy."""
     base = [FFMPEG, "-y", "-v", "error", "-i", src,
-            "-vf", "scale=-2:540", "-g", "30", "-pix_fmt", "yuv420p"]
+            "-vf", "scale=-2:540,fps=30", "-g", "15", "-keyint_min", "15",
+            "-sc_threshold", "0", "-bf", "0", "-pix_fmt", "yuv420p"]
     audio = (["-c:a", "aac", "-b:a", "128k"] if has_audio else ["-an"])
     tail = ["-movflags", "+faststart", str(dst)]
+    def _ok():
+        try:
+            if not (dst.exists() and dst.stat().st_size > 10240):
+                return False                                  # missing/truncated → definitely bad
+            p = _probe(str(dst))
+            return (p is None) or bool(p.get("has_video"))    # probe UNAVAILABLE (ffprobe timeout/race) ≠ bad encode — keep it
+        except Exception:
+            return True                                       # never discard a returncode-0 encode we can't disprove
     try:
-        r = _run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "30"] + audio + tail, 900)
-        if r.returncode == 0 and dst.exists():
+        r = _run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "30", "-no-scenecut", "1"] + audio + tail, 900)
+        if r.returncode == 0 and _ok():
             return
     except Exception:
         pass
     try:
-        _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"] + audio + tail, 1800)
+        r = _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"] + audio + tail, 1800)
+        if r.returncode == 0 and _ok():
+            return
+    except Exception:
+        pass
+    try:
+        if dst.exists() and not _ok():
+            dst.unlink()
     except Exception:
         pass
 
@@ -4179,14 +4198,19 @@ async def editor_media_src(mid: str):
 
 @app.get("/api/editor/media/{mid}/proxy")
 async def editor_media_proxy(mid: str):
-    m = _media_or_404(mid)
+    clean = re.sub(r"[^a-f0-9]", "", mid)        # every sibling cleans the id; this one didn't → wrong folder → permanent fallback to the heavy original (= choppy)
+    m = _media_or_404(clean)
     if not m:
         return JSONResponse({"error": "not found"}, status_code=404)
-    px = EDIT_CACHE / mid / "proxy.mp4"
+    px = EDIT_CACHE / clean / "proxy.mp4"
     if px.exists():
-        return FileResponse(px)
+        # the finished proxy is content-stable per media id → let the browser cache it hard
+        return FileResponse(px, media_type="video/mp4",
+                            headers={"Cache-Control": "public, max-age=31536000, immutable"})
     if os.path.isfile(m["src"]):
-        return FileResponse(m["src"])
+        # transient: served only while the proxy builds. NEVER let the browser cache the heavy
+        # original under the stable /proxy URL, or it never upgrades to the real proxy.
+        return FileResponse(m["src"], headers={"Cache-Control": "no-store"})
     return JSONResponse({"error": "not found"}, status_code=404)
 
 

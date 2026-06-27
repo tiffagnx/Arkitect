@@ -525,6 +525,7 @@ body.mode-simple .director-only{display:none!important}
     <div class="col mon">
       <div class="phead" style="border-bottom:1px solid var(--line2)">Program
         <span class="ttype" id="resLbl" style="margin-left:auto;font:600 9px var(--mono);color:var(--dim2)"></span>
+        <button class="icbtn" id="snapPng" title="Save current frame as PNG" style="margin-left:8px;width:24px;height:22px">📷</button>
         <button class="icbtn" id="gridBtn" title="Grid & guide options" style="margin-left:8px;width:24px;height:22px">▦</button></div>
       <div class="gridmenu" id="gridMenu"></div>
       <div class="stage">
@@ -545,7 +546,7 @@ body.mode-simple .director-only{display:none!important}
           <button id="tNext" title="Frame fwd">ᴵ▶</button>
           <button id="tEnd" title="End">⏭</button>
         </div>
-        <div class="tc"><span id="tcCur">00:00:00:00</span><span class="sep">/</span><span class="tot" id="tcTot">00:00:00:00</span></div>
+        <div class="tc"><span id="tcCur">00:00:00:00</span><span class="sep">/</span><span class="tot" id="tcTot" title="Composition length — click to change" style="cursor:pointer">00:00:00:00</span></div>
       </div>
     </div>
 
@@ -739,7 +740,7 @@ function doImport(){ $('#fileInput').click(); }   // WebView2 opens the real Win
 // Stream each File's bytes to disk, then register the saved paths through the normal import.
 async function importFiles(files){
   files=[...(files||[])].filter(f=>f&&f.size>0);
-  if(!files.length)return;
+  if(!files.length)return [];
   toast(`Importing ${files.length} file${files.length>1?'s':''}…`);
   const paths=[];
   for(const f of files){
@@ -750,14 +751,16 @@ async function importFiles(files){
       else toast((r&&r.error)||`Couldn’t import ${f.name}`,1);
     }catch{toast(`Couldn’t import ${f.name}`,1);}
   }
-  if(!paths.length)return;
+  if(!paths.length)return [];
   let r;
   try{r=await fetch('/api/editor/import',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({paths})}).then(r=>r.json());}
-  catch{toast('Import failed',1);return;}
-  if(r&&r.error){toast(r.error,1);return;}
-  for(const m of (r.media||[])){MEDIA[m.id]=m;if(!m.ready)pollMedia(m.id);}
+  catch{toast('Import failed',1);return [];}
+  if(r&&r.error){toast(r.error,1);return [];}
+  const media=r.media||[];
+  for(const m of media){MEDIA[m.id]=m;if(!m.ready)pollMedia(m.id);}
   renderBin();
+  return media;   // callers (timeline drop) place these at the drop point
 }
 async function pollMedia(id){
   for(let i=0;i<120;i++){
@@ -1210,7 +1213,7 @@ function clipEl(track,c){
   }else if(t==='v'){
     if(m&&m.cache&&m.cache.strip)el.style.backgroundImage=`url(/api/editor/media/${c.mediaId}/strip)`,el.style.backgroundSize='100% 100%';
     else if(m&&m.cache&&m.cache.poster)el.style.backgroundImage=`url(/api/editor/media/${c.mediaId}/poster)`,el.style.backgroundSize='cover';
-    el.innerHTML=`<div class="cl-lbl">${esc(c.name||(m?m.name:'clip'))}${c.reversed?' ↺':''}${c.freeze!=null?' ❄':''}</div>`;
+    el.innerHTML=`<div class="cl-lbl">${esc(c.name||(m?m.name:'clip'))}${c.reversed?' ↺':''}${c.freeze!=null?' ❄':''}${(c.speed||1)!==1?' ⏱'+Math.round((c.speed||1)*100)+'%':''}</div>`;
     if(c.transIn&&!isKeyed(c,'opacity'))el.innerHTML+=`<div class="fade" style="width:${c.transIn*ppf}px"></div>`;
     if(c.transOut&&!isKeyed(c,'opacity'))el.innerHTML+=`<div class="fade r" style="width:${c.transOut*ppf}px"></div>`;
   }else if(t==='t'){
@@ -2390,6 +2393,7 @@ function _infoFromEvent(e){const rc=screen.getBoundingClientRect();
   screen.addEventListener('pointermove',_infoFromEvent);
   screen.addEventListener('pointerleave',()=>{_infoXY=null;updateInfo();});})();
 const vels={};
+const _lastGoodFrame={};   // per-clip-id offscreen canvas of the last successfully decoded frame (anti-flash hold)
 function videoFor(c){
   if(vels[c.id])return vels[c.id];
   const v=document.createElement('video');v.src=`/api/editor/media/${c.mediaId}/proxy`;
@@ -2400,8 +2404,9 @@ function videoFor(c){
 function clipSrcFrame(c,f){
   const local=f-c.start;
   if(c.freeze!=null)return (c.in||0)+c.freeze;
+  const sp=c.speed||1;                       // time-stretch: <1 slow-mo, >1 speed-up
   const l=c.reversed?((c.dur-1)-local):local;
-  return (c.in||0)+l;
+  return Math.round((c.in||0)+l*sp);
 }
 function activeVideoClips(f){
   const out=[];
@@ -2556,8 +2561,27 @@ function drawOneClip(ctx,entry,f,W,H,srcOverride){
   let src,sw,sh;
   if(img){const im=imageFor(c);if(!(im.complete&&im.naturalWidth))return false;src=im;sw=im.naturalWidth;sh=im.naturalHeight;}
   else{const v=(srcOverride&&srcOverride[c.id])||videoFor(c);
-    if(!srcOverride&&!playing){const want=clipSrcFrame(c,f)/FPS();if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}}
-    if(!(v.readyState>=2&&v.videoWidth))return false;src=v;sw=v.videoWidth;sh=v.videoHeight;}
+    if(srcOverride){if(!(v.readyState>=2&&v.videoWidth))return false;src=v;sw=v.videoWidth;sh=v.videoHeight;}
+    else{
+      if(!playing){const want=clipSrcFrame(c,f)/FPS();
+        if(isFinite(want)&&Math.abs(v.currentTime-want)>0.04){
+          // A <video> seek is ASYNC — drawing right now paints the OLD (often end-of-clip) frame, which is
+          // exactly why a split looked like it "showed the end / repeated". Repaint once the seek lands.
+          if(!v._lpSeekHooked){v._lpSeekHooked=true;v.addEventListener('seeked',()=>{if(!playing)drawFrame();});}
+          try{v.currentTime=want;}catch{}}}
+      if(!(v.readyState>=2&&v.videoWidth)){
+        const cc=_lastGoodFrame[c.id];                       // transient decode stall: hold the last good frame, don't flash to bg
+        if(playing&&cc&&cc.width){src=cc;sw=cc.width;sh=cc.height;}
+        else{if(!v._lpLoadHooked){v._lpLoadHooked=true;v.addEventListener('loadeddata',()=>{v._lpLoadHooked=false;if(!playing)drawFrame();},{once:true});}return false;}
+      }else{
+        src=v;sw=v.videoWidth;sh=v.videoHeight;
+        if(playing){                                         // only snapshot during playback — the cache is ONLY read on a play-time stall
+          let cc=_lastGoodFrame[c.id]||(_lastGoodFrame[c.id]=document.createElement('canvas'));
+          if(cc.width!==sw||cc.height!==sh){cc.width=sw;cc.height=sh;}
+          const cx=cc._ctx||(cc._ctx=cc.getContext('2d'));try{cx.drawImage(v,0,0);}catch{}
+        }
+      }
+    }}
   drawClip(ctx,effClip(c),f,src,sw,sh,W,H);return true;
 }
 // Track matte — the layer ABOVE (matteEntry) becomes the matted layer's (bEntry) alpha/luma matte.
@@ -3084,7 +3108,10 @@ function syncPlay(start){
     if(c.reversed||c.freeze!=null){ // can't real-time play these — seek per frame instead
       if(Math.abs(v.currentTime-want)>0.04){try{v.currentTime=want;}catch{}}try{v.pause();}catch{}
     }else{
-      if(start||Math.abs(v.currentTime-want)>0.25){try{v.currentTime=want;}catch{}}
+      // Only re-seek a PLAYING video on a real desync. The old 0.25s tripped on normal decode
+      // jitter, forcing a keyframe-snap several times a second — that was the choppy "skip-jump" flashing.
+      v.playbackRate=clamp(c.speed||1,0.25,4);
+      if(start||Math.abs(v.currentTime-want)>0.6){try{v.currentTime=want;}catch{}}
       v.play().catch(()=>{});}}
   for(const id in vels)if(!wantIds.has(id)){try{vels[id].pause();}catch{}}
   const wantA=new Set();
@@ -3133,11 +3160,12 @@ function attachClipDrag(el,track,c){
       let df=Math.round((ev.clientX-sx)/ppf);
       if(handle==='l'){
         let ns=clamp(start0+df,0,start0+dur0-1);let delta=ns-start0;
-        if(hasSrc){let ni=in0+delta;if(ni<0){ni=0;delta=-in0;ns=start0+delta;}c.in=ni;}
+        // in-point advances in SOURCE frames = timeline delta × speed (mirrors clipSrcFrame + the right-edge clamp)
+        if(hasSrc){const sp=c.speed||1;let ni=in0+Math.round(delta*sp);if(ni<0){ni=0;delta=-Math.round(in0/sp);ns=start0+delta;}c.in=ni;}
         c.start=ns;c.dur=dur0-delta;
       }else if(handle==='r'){
-        // Right edge stops at the last source frame (in-point + footage left). No falsy-0 fallback that let it run into black.
-        const cap=(maxSrc===Infinity)?Infinity:Math.max(1,maxSrc-(c.in||0));
+        // Right edge stops at the last source frame (in-point + footage left, divided by speed). No falsy-0 fallback that let it run into black.
+        const cap=(maxSrc===Infinity)?Infinity:Math.max(1,Math.floor((maxSrc-(c.in||0))/(c.speed||1)));
         c.dur=clamp(dur0+df,1,cap);
       }else if(multi){
         for(const mm of multi){mm.c.start=Math.max(0,mm.s0+df);const mel=document.querySelector('.clip[data-cid="'+mm.c.id+'"]');if(mel)mel.style.left=(mm.c.start*ppf)+'px';}
@@ -3929,7 +3957,7 @@ function updateLiveFields(){const sc=selClip();if(!sc||!sc.clip)return;
 }
 function deleteSel(){const ids=selSet.size?[...selSet]:(sel?[sel.clipId]:[]);if(!ids.length)return;
   for(const t of project.tracks)t.clips=t.clips.filter(c=>!ids.includes(c.id));
-  for(const id of ids){if(vels[id]){vels[id].remove();delete vels[id];}if(audioEls[id]){try{audioEls[id].pause();}catch(e){}delete audioEls[id];}}
+  for(const id of ids){if(vels[id]){vels[id].remove();delete vels[id];}delete _lastGoodFrame[id];if(audioEls[id]){try{audioEls[id].pause();}catch(e){}delete audioEls[id];}}
   for(const t of project.tracks)for(const c of t.clips)if(c.parentId&&ids.includes(c.parentId))c.parentId=null; // clear orphaned parent links
   deselect();renderTimeline();drawFrame();save(true);if(ids.length>1)toast(ids.length+' layers deleted');}
 // Ripple delete: remove the clip AND slide later clips on the same track left to close the gap.
@@ -3937,7 +3965,7 @@ function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
   const {track,clip}=sc, end=clip.start+clip.dur, gap=clip.dur;
   track.clips=track.clips.filter(c=>c.id!==clip.id);
   for(const c of track.clips)if(c.start>=end)c.start-=gap;   // close the gap behind it
-  if(vels[clip.id]){vels[clip.id].remove();delete vels[clip.id];}
+  if(vels[clip.id]){vels[clip.id].remove();delete vels[clip.id];}delete _lastGoodFrame[clip.id];
   for(const t of project.tracks)for(const c of t.clips)if(c.parentId===clip.id)c.parentId=null; // clear orphaned parent links
   deselect();renderTimeline();drawFrame();save(true);toast('Ripple deleted — gap closed');}
 
@@ -3945,12 +3973,20 @@ function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
 lanes.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';
   const lane=e.target.closest('.lane');$$('.lane').forEach(l=>l.classList.toggle('drop-ok',l===lane));});
 lanes.addEventListener('dragleave',()=>$$('.lane').forEach(l=>l.classList.remove('drop-ok')));
-lanes.addEventListener('drop',e=>{e.preventDefault();$$('.lane').forEach(l=>l.classList.remove('drop-ok'));
-  const mid=e.dataTransfer.getData('mid');if(!mid)return;
+lanes.addEventListener('drop',async e=>{e.preventDefault();$$('.lane').forEach(l=>l.classList.remove('drop-ok'));
   const lane=e.target.closest('.lane');
   let tid=lane&&lane.dataset.tid;
   if(!tid){const tr={id:uid(),name:'Track '+(project.tracks.length+1),clips:[]};insertTrack(tr);tid=tr.id;} // dropped on empty area → make a track
   let f=frameAtEvent(e);if(snap)f=snapFrame(f);
+  if(e.dataTransfer.files&&e.dataTransfer.files.length){          // OS file dropped straight onto the timeline → import + place here
+    const media=await importFiles(e.dataTransfer.files)||[];
+    let last=null;
+    for(const m of media){const added=addClipFromMedia(m.id,tid,f);
+      if(added){last=added;const tr=project.tracks.find(t=>t.id===tid),cl=tr&&tr.clips.find(c=>c.id===added.clipId);f+=cl?cl.dur:0;}}
+    if(last)select(last.trackId,last.clipId);
+    return;
+  }
+  const mid=e.dataTransfer.getData('mid');if(!mid)return;
   const added=addClipFromMedia(mid,tid,f);if(added)select(added.trackId,added.clipId);});
 
 // ── RULER / PLAYHEAD SCRUB ─────────────────────────────────────────────
@@ -4070,6 +4106,7 @@ function purgeAllCache(){
   let n=0;for(const k in imgCache){delete imgCache[k];n++;}                 // decoded images
   _mkL=_mkM=_mkS=null;_grainTile=null;_scanTile=null;                        // offscreen compositor buffers
   for(const id in vels){try{vels[id].pause();vels[id].removeAttribute('src');vels[id].load();}catch(e){}delete vels[id];} // video elements
+  Object.keys(_lastGoodFrame).forEach(k=>delete _lastGoodFrame[k]);
   drawFrame();toast('Purged caches — '+n+' images + buffers freed');
 }
 function purgeUndoCache(){histInit();toast('Undo history cleared');}
@@ -4110,6 +4147,7 @@ $('#projName').onchange=()=>save(true);
 $('#btnNew').onclick=()=>{if(!confirm('Start a new project? Unsaved changes are kept in the last save.'))return;
   stop();for(const id in vels){vels[id].remove();}Object.keys(vels).forEach(k=>delete vels[k]);
   for(const id in audioEls){try{audioEls[id].pause();}catch{}}Object.keys(audioEls).forEach(k=>delete audioEls[k]);
+  Object.keys(_lastGoodFrame).forEach(k=>delete _lastGoodFrame[k]);
   project=newProject();$('#projName').value=project.title;playhead=0;deselect();fitScreen();renderTimeline();histInit();save();};
 $('#btnOpen').onclick=openPicker;
 async function openPicker(){
@@ -4123,6 +4161,7 @@ async function openPicker(){
 }
 function loadProject(p){stop();for(const id in vels)vels[id].remove();Object.keys(vels).forEach(k=>delete vels[k]);
   for(const id in audioEls){try{audioEls[id].pause();}catch{}}Object.keys(audioEls).forEach(k=>delete audioEls[k]);
+  Object.keys(_lastGoodFrame).forEach(k=>delete _lastGoodFrame[k]);
   project=p;$('#projName').value=p.title||'Untitled';playhead=0;deselect();fitScreen();renderTimeline();
   loadExistingMedia();histInit();}
 
@@ -4154,7 +4193,7 @@ function projectNeedsFrameServer(p){
     if(c.nullObject)return true; // null objects (invisible) — frame-server skips them
     if(c.motionBlur)return true; // motion blur is sub-frame-accumulated client-side
     if(c.masks&&c.masks.some(m=>m&&!m.hidden))return true; // masks are canvas-composited
-    if(c.reversed||c.freeze!=null)return true; // time-reverse / freeze-frame — native path can't do these
+    if(c.reversed||c.freeze!=null||(c.speed||1)!==1)return true; // time-reverse / freeze / time-stretch — native path can't do these
     // any working effect → render client-side per frame (the native ffmpeg path can't do these)
     if(clipFilter(c,0,1)!=='none'||hasOverlayFX(c,0)||hasLayerBufferFX(c,0))return true;
     if(c.blend&&c.blend!=='source-over')return true;
@@ -4577,6 +4616,15 @@ window.addEventListener('resize',fitScreen);
   function timeReverseSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)!=='video'||s.clip.solid)return toast('Time-Reverse needs a video layer',1);
     s.clip.reversed=!s.clip.reversed;renderTimeline();drawFrame();save();toast('Time-Reverse '+(s.clip.reversed?'ON':'off'));}
+  function timeStretchSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
+    const c=s.clip;if(clipKind(c)!=='video'||c.solid)return toast('Time-Stretch needs a video layer',1);
+    const v=prompt('Playback speed %  —  50 = half-speed slow-mo, 200 = 2× faster  (25–400):',Math.round((c.speed||1)*100));
+    if(v==null)return;
+    let sp=parseFloat(v)/100;if(!isFinite(sp)||sp<=0)return toast('Enter a positive number',1);
+    sp=clamp(sp,0.25,4);   // matches the preview playbackRate range so playback stays smooth at any allowed speed
+    const consumed=(c.dur||1)*(c.speed||1);   // source frames this clip covers — keep constant, just respan it
+    c.speed=sp;c.dur=Math.max(1,Math.round(consumed/sp));
+    renderTimeline();drawFrame();save();toast('Time-Stretch '+Math.round(sp*100)+'%');}
   function freezeFrameSel(){const s=sc();if(!s||!s.clip)return toast('Select a layer first',1);
     if(clipKind(s.clip)!=='video'||s.clip.solid)return toast('Freeze Frame needs a video layer',1);
     if(s.clip.freeze!=null){s.clip.freeze=null;toast('Freeze off');}
@@ -4929,6 +4977,7 @@ window.addEventListener('resize',fitScreen);
       if(/Backward$/i.test(L))return ()=>arrangeSel('bwd');
       if(/to Back$/i.test(L))return ()=>arrangeSel('back');
       if(/^Time-Reverse Layer$/i.test(L))return timeReverseSel;
+      if(/^Time Stretch/i.test(L))return timeStretchSel;
       if(/^Freeze Frame$/i.test(L))return freezeFrameSel;
       if(/^Flip Horizontal$/i.test(L))return flipH;
       if(/^Flip Vertical$/i.test(L))return flipV;
@@ -5159,6 +5208,8 @@ window.addEventListener('resize',fitScreen);
       if(open)gm.classList.remove('open');else{buildGridMenu();gm.classList.add('open');}};
     document.addEventListener('mousedown',e=>{if(!e.target.closest('#gridMenu')&&!e.target.closest('#gridBtn')){const gm=$('#gridMenu');if(gm)gm.classList.remove('open');}});
   }
+  if($('#snapPng'))$('#snapPng').onclick=saveFrameAs;                 // visible "save frame as PNG"
+  if($('#tcTot'))$('#tcTot').onclick=openCompSettings;               // click the comp length → Composition Settings (duration)
 
   // ---- right-click context menus (reuse the dropdown renderer) ----
   function openContext(x,y,menuObj){
