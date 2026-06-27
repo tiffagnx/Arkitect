@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory — the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory — her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "2.7.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "2.8.0"   # ← canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) — but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -4825,6 +4825,8 @@ from swarm_routes import router as swarm_router  # noqa: E402
 app.include_router(swarm_router)
 from room_relay import router as room_relay_router  # noqa: E402  (Layer 2: MCP live-room command relay)
 app.include_router(room_relay_router)
+from mcp_routes import router as mcp_router  # noqa: E402  (in-app "Connect to Claude Desktop" setup/status)
+app.include_router(mcp_router)
 
 # ── KIT — the in-room build-bot helper. His OWN brain (free cloud keys if the user
 #    set any, else the local model), room-aware: he knows the room you're in and
