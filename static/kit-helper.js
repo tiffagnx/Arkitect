@@ -723,7 +723,7 @@
   //    voice (a Fish "reference_id"/model id). Per-agent on/off + model id, mirroring the brain picker:
   //    built-ins (kit/tiff) carry a default voice id; user (mine) agents store one on their entry.
   //    No Fish key / no model id → fall back to the browser's built-in voice so it ALWAYS talks. ──
-  const VOICE_DEFAULTS = { kit: "5312c04032034388bb6bac44c94c804d", tiff: "8526ee26387448b2a86c1d1052148a4b" };
+  const VOICE_DEFAULTS = { kit: "5312c04032034388bb6bac44c94c804d", tiff: "1811b3df4182496dbf94eb3a46bdc1e2" };
   function getVoiceModelId(ch){
     if (!ch) return "";
     try { const m = JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); if (m && m[ch.id]) return m[ch.id]; } catch (_) {}

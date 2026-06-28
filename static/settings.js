@@ -186,7 +186,7 @@
   // ── Voices section: Fish Audio key (server-side, the SAME key /api/tts reads) + per-agent voice ids
   //    (local). ONE keys hub — every key the app uses gets its own labeled section here. As we add
   //    features that need a key, add a section; never a second window. (Owner's law: one place for keys.) ──
-  const VOICE_DEFAULTS = { tiff: "8526ee26387448b2a86c1d1052148a4b", kit: "5312c04032034388bb6bac44c94c804d" };
+  const VOICE_DEFAULTS = { tiff: "1811b3df4182496dbf94eb3a46bdc1e2", kit: "5312c04032034388bb6bac44c94c804d" };
   const VOICE_AGENTS = [{ id: "tiff", name: "Tiffany" }, { id: "kit", name: "Kit" }];
   function loadVoiceModels(){ try { return JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); } catch(_){ return {}; } }
   function saveVoiceModel(id, mid){ const m = loadVoiceModels(); if (mid) m[id] = mid; else delete m[id]; try { localStorage.setItem("dmv_voice_models", JSON.stringify(m)); } catch(_){} }
