@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code — DeMartinville</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#0C0D10; --bg1:#15161A; --panel:#15161A; --panel-2:#1b1d23;
+    --hairline:rgba(255,255,255,.07); --line:rgba(255,255,255,.07);
+    --text:#E9EAED; --text-2:#C2C8D1; --text-3:rgba(198,201,208,.62); --text-4:rgba(198,201,208,.40);
+    --dim:rgba(198,201,208,.52); --faint:rgba(198,201,208,.45);
+    --steel:#3E9CB8; --steel-2:#5FB4CE; --teal:#2BB6A8; --gold:#E6C16A; --amber:#D9A441;
+    --good:#2BB6A8; --warn:#D9A441; --bad:#E0796A;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+    --ui:Inter,system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:var(--ui);color:var(--text);overflow:hidden;
+    background:radial-gradient(1100px 600px at 50% -18%,#1C1E24 0%,var(--bg1) 55%,var(--bg0) 100%)}
+  button{font-family:inherit;cursor:pointer}
+  .wrap{display:flex;flex-direction:column;height:100vh}
+
+  /* top bar */
+  .top{display:flex;align-items:center;gap:9px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--hairline);flex:0 0 auto}
+  .ccswitch{display:flex;background:var(--panel-2);border:1px solid var(--hairline);border-radius:9px;padding:2px;gap:2px}
+  .cc{font:600 12px Inter;color:var(--text-3);text-decoration:none;padding:5px 12px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+  .cc:hover{color:var(--text)}
+  .cc.on{background:var(--steel);color:#06161b}
+  .sep{width:1px;height:20px;background:var(--hairline);margin:0 1px}
+  .tb{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:8px;padding:6px 11px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px}
+  .tb:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .tb.primary{background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none;font-weight:700}
+  .tb.primary:hover{filter:brightness(1.07)}
+  select.tb{appearance:none;padding-right:24px;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 13px) 14px,calc(100% - 8px) 14px;background-size:5px 5px;background-repeat:no-repeat}
+  .grow{flex:1}
+  .status{font-size:12px;color:var(--text-3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .status.ok{color:var(--teal)} .status.err{color:var(--bad)}
+
+  /* body: files | chat (center, main) | editor */
+  .body{flex:1;display:flex;min-height:0}
+  .gutter{flex:0 0 6px;cursor:col-resize;position:relative;z-index:5;background:transparent}
+  .gutter::after{content:"";position:absolute;left:2px;top:50%;transform:translateY(-50%);width:2px;height:28px;border-radius:2px;background:var(--hairline);transition:background .12s}
+  .gutter:hover{background:rgba(62,156,184,.18)} .gutter:hover::after{background:var(--steel-2);height:42px}
+  .gutter.drag{background:rgba(62,156,184,.32)} .gutter.drag::after{background:var(--steel-2);height:60px}
+
+  /* LEFT — files */
+  .tree{flex:0 0 220px;background:var(--panel);border-right:1px solid var(--hairline);display:flex;flex-direction:column;min-height:0}
+  .tree .head{display:flex;align-items:center;gap:6px;padding:9px 11px;border-bottom:1px solid var(--hairline);font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3)}
+  .tree .head .grow{flex:1}
+  .icon-btn{background:none;border:none;color:var(--text-3);font-size:13px;padding:3px 5px;border-radius:6px}
+  .icon-btn:hover{color:var(--text);background:var(--panel-2)}
+  .filelist{flex:1;overflow:auto;padding:6px 4px 16px}
+  .node{font-size:12.5px;color:var(--text-2);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;display:flex;align-items:center;gap:5px}
+  .node:hover{background:var(--panel-2);color:var(--text)}
+  .node.sel{background:rgba(62,156,184,.16);color:var(--steel-2)}
+  .node .tw{width:12px;flex:0 0 auto;color:var(--text-4);font-size:10px}
+  .node .ic{flex:0 0 auto;opacity:.85}
+  .node.bin{color:var(--text-4);cursor:default} .node.bin:hover{background:none}
+
+  /* CENTER — the conversation (main) */
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0;background:transparent}
+  .chat .head{padding:10px 14px;border-bottom:1px solid var(--hairline);font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);display:flex;align-items:center;gap:7px}
+  .chat .head .glow{width:7px;height:7px;border-radius:50%;background:var(--steel);box-shadow:0 0 9px var(--steel)}
+  .chat.claude .head .glow{background:var(--gold);box-shadow:0 0 11px var(--gold)}
+  .log{flex:1;overflow:auto;padding:18px 18% 14px;display:flex;flex-direction:column;gap:13px}
+  @media(max-width:1100px){.log{padding:16px 8% 14px}}
+  .msg{font-size:13.5px;line-height:1.55;max-width:100%}
+  .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);padding:9px 13px;border-radius:13px 13px 4px 13px;max-width:85%;white-space:pre-wrap;word-break:break-word}
+  .msg.ai{color:var(--text-2);white-space:pre-wrap;word-break:break-word}
+  .msg.ai pre{background:var(--bg0);border:1px solid var(--hairline);border-radius:8px;padding:9px 11px;overflow:auto;margin:7px 0;font-family:var(--mono);font-size:11.5px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font-size:11.5px;font-family:var(--mono);background:rgba(43,182,168,.13);border:1px solid rgba(43,182,168,.32);color:var(--teal);border-radius:7px;padding:4px 9px;cursor:pointer}
+  .chip:hover{filter:brightness(1.12)}
+  .chip.err{background:rgba(224,121,106,.12);border-color:rgba(224,121,106,.3);color:var(--bad);cursor:default}
+  .hint{color:var(--text-4);font-size:13px;text-align:center;margin:auto;padding:24px;line-height:1.6;max-width:440px}
+  .scope{font-size:11px;color:var(--text-4);padding:0 18px 6px;text-align:center}
+
+  /* composer — input bubble, then controls UNDER it */
+  .composer{padding:12px 16px 14px;display:flex;flex-direction:column;max-width:760px;width:100%;margin:0 auto}
+  .thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px} .thumbs:empty{display:none}
+  .thumb{position:relative;width:46px;height:46px;border-radius:8px;overflow:hidden;border:1px solid var(--hairline)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb b{position:absolute;top:0;right:0;background:rgba(0,0,0,.6);color:#fff;font-size:11px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-bottom-left-radius:6px}
+  #ask{width:100%;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);border-radius:12px;padding:12px 84px 12px 13px;font-family:inherit;font-size:13.5px;resize:none;outline:none;max-height:200px;line-height:1.5}
+  #ask:focus{border-color:rgba(95,180,206,.55)}
+  .toolbar{display:flex;align-items:center;gap:7px;margin-top:9px}
+  .toolbtn{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:34px;min-width:34px;padding:0 10px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+  .toolbtn:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .toolbtn.mic.on{color:var(--steel-2);border-color:var(--steel);animation:micpulse 1.3s ease-in-out infinite}
+  @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(62,156,184,.5)}50%{box-shadow:0 0 0 6px rgba(62,156,184,0)}}
+  .effortbtn{font:700 11px Oxanium;letter-spacing:.02em;color:var(--teal)}
+  .inputbox{position:relative}
+  .inbtns{position:absolute;right:8px;bottom:8px;display:flex;gap:6px;align-items:center}
+  .inbtn{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;border:1px solid var(--hairline);background:var(--panel);color:var(--text-2)}
+  .inbtn:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .inbtn.mic.on{color:var(--steel-2);border-color:var(--steel);animation:micpulse 1.3s ease-in-out infinite}
+  .inbtn.send{background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none;font-weight:700}
+  .inbtn.send:disabled{opacity:.4;cursor:default}
+  .inbtn.send.stop{background:linear-gradient(180deg,var(--bad),#cf6452);color:#1a0c08}
+
+  /* model picker (in the toolbar; opens UP) */
+  .modelwrap,.effortwrap{position:relative}
+  .modelpick{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:34px;padding:0 11px;font-size:12px;display:inline-flex;align-items:center;gap:7px;max-width:200px}
+  .modelpick:hover{color:var(--text)}
+  .modelpick .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex:0 0 auto}
+  .modelpick #modelName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .menu{position:absolute;bottom:42px;right:0;width:280px;max-height:320px;overflow:auto;background:var(--panel-2);border:1px solid var(--hairline);border-radius:10px;padding:5px;display:none;z-index:60;box-shadow:0 -10px 40px rgba(0,0,0,.55)}
+  .menu.on{display:block}
+  .mrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12.5px;color:var(--text-2)}
+  .mrow:hover{background:var(--panel)} .mrow .mname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mrow .mtag{font-size:10px;color:var(--text-4);text-transform:uppercase;letter-spacing:.4px}
+  .mrow .chk{opacity:0;color:var(--steel-2)} .mrow.sel .chk{opacity:1} .mrow.sel{color:var(--text)}
+  .advisor{padding:9px 10px;margin:-5px -5px 6px;border-bottom:1px solid var(--hairline);background:rgba(62,156,184,.06)}
+  .adv-machine{font:700 11px Oxanium;color:var(--steel-2);margin-bottom:3px}
+  .adv-note{font-size:11px;color:var(--text-3);line-height:1.45}
+
+  /* effort popup (opens when you press the effort button) */
+  .effortpop{position:absolute;bottom:42px;right:0;width:268px;background:var(--panel-2);border:1px solid var(--hairline);border-radius:12px;padding:13px;display:none;z-index:60;box-shadow:0 -10px 40px rgba(0,0,0,.55)}
+  .effortpop.on{display:block}
+  .ep-title{font:700 10px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .ep-title .gd{color:var(--gold);font-size:8px;opacity:0} .effortpop.claude .ep-title .gd{opacity:1}
+  .ep-keys{margin-top:12px;width:100%;background:var(--panel);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;padding:9px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:7px;justify-content:center}
+  .ep-keys:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+
+  /* EFFORT LEVER */
+  .elever{display:flex;align-items:center;gap:8px;position:relative;flex:1}
+  .el-end{font:700 8.5px 'Space Mono',monospace;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
+  .el-track{position:relative;flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.09);cursor:pointer}
+  .el-fill{position:absolute;left:0;top:0;bottom:0;width:8px;border-radius:99px;
+    background:linear-gradient(90deg,#2E8FAE,#7BB6CD 35%,#E6C16A 60%,#7BB6CD 85%,#2E8FAE);
+    background-size:280% 100%;animation:elflow 3.4s linear infinite;box-shadow:0 0 8px rgba(120,182,205,.45);transition:width .18s cubic-bezier(.4,0,.2,1)}
+  @keyframes elflow{to{background-position:-280% 0}}
+  .el-thumb{position:absolute;top:50%;left:0;width:15px;height:15px;border-radius:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#fff,#CFE6EE 58%,#7BB6CD);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 10px rgba(120,182,205,.6);cursor:grab;transition:left .18s cubic-bezier(.4,0,.2,1)}
+  .el-name{font:700 10.5px Oxanium;letter-spacing:.03em;color:var(--teal);min-width:84px;text-align:right}
+  .elever.e2 .el-fill{animation-duration:2.1s;box-shadow:0 0 12px rgba(120,182,205,.6)}
+  .elever.e3 .el-fill{animation-duration:1.05s;box-shadow:0 0 17px rgba(230,193,106,.72),0 0 7px rgba(123,182,205,.6)}
+  .elever.e3 .el-thumb{box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 17px rgba(230,193,106,.85);animation:elpulse 1.05s ease-in-out infinite}
+  .elever.e3 .el-name{color:var(--gold)}
+  .elever.e4 .el-fill{animation-duration:.62s;background:linear-gradient(90deg,#3E9CB8,#7BB6CD 22%,#E6C16A 48%,#E94B9C 68%,#7BB6CD 86%,#3E9CB8);background-size:320% 100%;box-shadow:0 0 22px rgba(230,193,106,.85),0 0 11px rgba(233,75,156,.6)}
+  .elever.e4 .el-thumb{box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 22px rgba(230,193,106,.95);animation:elpulse .62s ease-in-out infinite}
+  .elever.e4 .el-name{color:#FFE6A3;text-shadow:0 0 10px rgba(230,193,106,.7)}
+  @keyframes elpulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.45)}}
+  @media (prefers-reduced-motion:reduce){.el-fill,.el-thumb{animation:none !important}}
+
+  /* RIGHT — code editor */
+  .editor{flex:0 0 40%;display:flex;flex-direction:column;min-width:0;background:rgba(0,0,0,.18);border-left:1px solid var(--hairline)}
+  .ed-head{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--hairline);font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3)}
+  .ed-head .path{color:var(--text-2);font-family:var(--mono);font-size:12px;text-transform:none;letter-spacing:0}
+  .ed-head .grow{flex:1}
+  .edtabs{display:flex;background:var(--panel-2);border:1px solid var(--hairline);border-radius:8px;padding:2px;gap:2px}
+  .edtab{font:600 11px Inter;color:var(--text-3);border:none;background:none;padding:4px 11px;border-radius:6px;cursor:pointer;text-transform:none;letter-spacing:0}
+  .edtab:hover{color:var(--text)} .edtab.on{background:var(--steel);color:#06161b}
+  #preview{flex:1;width:100%;border:none;background:#fff}
+  .ed-head .dirty{width:7px;height:7px;border-radius:50%;background:var(--amber);display:none}
+  .ed-head .dirty.on{display:inline-block}
+  #ed{flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.55;padding:14px 16px;tab-size:2;white-space:pre;overflow:auto}
+  .empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-4);font-size:13px;text-align:center;padding:30px}
+  .empty .big{font-size:30px;opacity:.4}
+
+  /* in-app modal (replaces the ugly native localhost prompt) */
+  .modal-ov{position:fixed;inset:0;background:rgba(6,7,10,.62);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:200}
+  .modal{background:var(--panel);border:1px solid var(--hairline);border-radius:14px;padding:18px;width:390px;max-width:90vw;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .m-title{font:600 14px Inter;color:var(--text);margin-bottom:12px}
+  .m-in{width:100%;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);border-radius:9px;padding:10px 12px;font:inherit;font-size:13.5px;outline:none}
+  .m-in:focus{border-color:rgba(95,180,206,.55)}
+  .m-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+  .m-btns button{border-radius:9px;padding:8px 14px;font:600 12.5px Inter;cursor:pointer;border:1px solid var(--hairline);background:var(--panel-2);color:var(--text-2)}
+  .m-cancel:hover{color:var(--text)}
+  .m-ok{background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none}
+  /* agent reply markdown */
+  .msg.ai a{color:var(--steel-2)} .msg.ai a:hover{text-decoration:underline}
+  .msg.ai code{background:rgba(255,255,255,.06);border:1px solid var(--hairline);border-radius:4px;padding:1px 4px;font-family:var(--mono);font-size:11.5px}
+  .msg.ai pre code{background:none;border:none;padding:0}
+</style>
+</head>
+<body>
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+<div class="wrap">
+  <div class="top">
+    <div class="ccswitch">
+      <a class="cc" href="/" title="Go to Chat">💬 Chat</a>
+      <span class="cc on">⌨ Code</span>
+    </div>
+    <span class="sep"></span>
+    <select class="tb" id="wsSel" title="Workspace"></select>
+    <button class="tb" id="newWs" title="New workspace">＋ ws</button>
+    <span class="sep"></span>
+    <button class="tb" id="newFile">＋ New file</button>
+    <button class="tb primary" id="saveBtn">Save</button>
+    <span class="status grow" id="status">Pick or create a file to start.</span>
+  </div>
+
+  <div class="body">
+    <!-- LEFT: files -->
+    <div class="tree">
+      <div class="head"><span class="grow" id="wsLabel">files</span><button class="icon-btn" id="refreshTree" title="Refresh">⟳</button></div>
+      <div class="filelist" id="filelist"></div>
+    </div>
+
+    <div class="gutter" id="gutterL" title="Drag to resize"></div>
+
+    <!-- CENTER: the conversation -->
+    <div class="chat">
+      <div class="head"><span class="glow"></span>Coding agent</div>
+      <div class="log" id="log">
+        <div class="hint">Tell me what to build or change.<br>I can see your file tree and the open file, and I'll write the files directly into this workspace.</div>
+      </div>
+      <div class="scope" id="scopeNote"></div>
+      <div class="composer">
+        <div class="thumbs" id="thumbs"></div>
+        <div class="inputbox">
+          <textarea id="ask" rows="1" placeholder="Tell me what to build or change…"></textarea>
+          <div class="inbtns">
+            <button class="inbtn mic" id="micBtn" title="Talk to type — keeps going across pauses">🎤</button>
+            <button class="inbtn send" id="sendBtn" title="Send">➤</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button class="toolbtn" id="addBtn" title="Attach images / screenshots">＋</button>
+          <span class="grow"></span>
+          <div class="modelwrap">
+            <button class="modelpick" id="modelPick"><span class="dot"></span><span id="modelName">model</span></button>
+            <div class="menu" id="modelMenu"></div>
+          </div>
+          <div class="effortwrap">
+            <button class="toolbtn effortbtn" id="effortBtn" title="Reasoning effort">⚡ Quick</button>
+            <div class="effortpop" id="effortPop">
+              <div class="ep-title">Effort <span class="gd">⚡ CLAUDE GOD MODE</span></div>
+              <div class="elever e1" id="elever" title="Drag toward Smarter for deeper reasoning">
+                <span class="el-end">Faster</span>
+                <span class="el-track" id="elTrack"><span class="el-fill" id="elFill"></span><span class="el-thumb" id="elThumb"></span></span>
+                <span class="el-end">Smarter</span>
+                <span class="el-name" id="elName">⚡ Quick</span>
+              </div>
+              <input type="hidden" id="think" value="low">
+              <button class="ep-keys" id="keysBtn">🔑 Your API keys</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gutter" id="gutterR" title="Drag to resize"></div>
+
+    <!-- RIGHT: code -->
+    <div class="editor">
+      <div class="ed-head"><span class="dirty" id="dirty"></span><span class="path" id="edPath">no file open</span><span class="grow"></span><div class="edtabs"><button class="edtab on" id="tabCode">Code</button><button class="edtab" id="tabPreview">Preview</button></div></div>
+      <textarea id="ed" spellcheck="false" style="display:none"></textarea>
+      <iframe id="preview" sandbox="allow-scripts allow-forms allow-modals allow-popups" style="display:none"></iframe>
+      <div class="empty" id="edEmpty"><div class="big">⌨</div><div>The code shows here — open a file on the left, or ask the agent to build something.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let WS="default", ADMIN=false, MODELS=[], curModel="", curFile=null, dirty=false;
+let history=[], ATT=[], CAP=null;
+
+function setStatus(t, kind=""){ const s=$("status"); s.textContent=t; s.className="status grow"+(kind?(" "+kind):""); }
+
+/* Chat/Code tabs — wire Chat → main chat explicitly (a global link handler strips bare hrefs) */
+{ const _ct=document.querySelector('.ccswitch a.cc'); if(_ct) _ct.addEventListener('click', e=>{ e.preventDefault(); window.location.href='/'; }); }
+
+/* ── model picker — local LM Studio models + ALL your cloud-key models ── */
+function isCoder(s){ return /coder|deepseek|codestral|qwen.*code/i.test(s||""); }
+function isCloud(id){ return /^cloud:/.test(id||""); }
+function modelLabel(id){ const e=MODELS.find(x=>x.id===id); return e?e.label:id; }
+function isClaudeish(id){ return /claude|anthropic|opus|sonnet|haiku/i.test(modelLabel(id)+" "+id); }
+(async()=>{
+  const [r,cap] = await Promise.all([
+    fetch("/api/models?include_hidden=1").then(r=>r.json()).catch(()=>({models:[],cloud:[]})),
+    fetch("/api/capability").then(r=>r.json()).catch(()=>null)
+  ]);
+  CAP=cap;
+  const cloud=(r.cloud||[]).map(c=>({id:c.id, label:c.label||c.id, cloud:true}));        // ☁ your API-key models come first
+  const seen=new Set();
+  const local=(r.models||[]).map(m=>String(m).replace(/:\d+$/,"")).filter(b=>{ if(seen.has(b))return false; seen.add(b); return true; }).map(b=>({id:b,label:b,cloud:false}));
+  MODELS=[...cloud, ...local];
+  renderMenu();
+  const saved=localStorage.getItem("dmv-code-model");
+  const has=id=>MODELS.some(x=>x.id===id);
+  let pick = (saved && has(saved) && saved) || (MODELS.find(x=>!x.cloud && isCoder(x.label))||{}).id || (MODELS.find(x=>!x.cloud)||{}).id || (MODELS[0]||{}).id || "";
+  if(pick) selectModel(pick,false);
+  await loadWorkspaces();
+})();
+function selectModel(id,save=true){
+  curModel=id; $("modelName").textContent=modelLabel(id);
+  if(save) localStorage.setItem("dmv-code-model",id);
+  renderMenu();
+  const cloud=isCloud(id), claude=isClaudeish(id);
+  if(window.__codeLeverGod) window.__codeLeverGod(cloud);
+  $("effortPop").classList.toggle("claude",claude);
+  const ch=document.querySelector(".chat"); if(ch) ch.classList.toggle("claude",claude);
+}
+function advisorHtml(){
+  if(!CAP||CAP.error) return "";
+  const vram=Math.round((CAP.vram_mb||0)/1024), gpu=CAP.gpu||CAP.platform||"your machine";
+  let local;
+  if(CAP.apple_silicon) local="Apple Silicon · "+(CAP.ram_gb||"?")+"GB — a 7–14B coder runs (e.g. Qwen2.5-Coder)";
+  else if(vram>=16) local="fits a ~14B coder (e.g. Qwen2.5-Coder-14B) — solid for everyday code";
+  else if(vram>=8) local="fits a ~7B coder (e.g. Qwen2.5-Coder-7B) — better at code than Gemma; a 32B won't fit";
+  else local="tight VRAM ("+vram+"GB) — stick to a tiny local model or use cloud";
+  let cloud;
+  if(CAP.has_cloud_key){
+    const labels=MODELS.filter(m=>m.cloud).map(m=>m.label.toLowerCase());
+    const picks=[];
+    if(labels.some(l=>/groq/.test(l)))            picks.push("grind/quick → ☁ Groq (free, fast)");
+    if(labels.some(l=>/gemini/.test(l)))          picks.push("cheap balance → ☁ Gemini Flash");
+    if(labels.some(l=>/claude|anthropic/.test(l)))picks.push("hard problems → ☁ Claude");
+    cloud = picks.length ? ("Cloud picks — "+picks.join(" · ")+".") : "For hard code, use a ☁ cloud model below.";
+  } else cloud="Add a cloud key (Settings → Keys) for coding stronger than this machine runs.";
+  return '<div class="advisor"><div class="adv-machine">💻 '+gpu+' · '+vram+'GB VRAM</div><div class="adv-note">'+local+'.</div><div class="adv-note" style="margin-top:4px">'+cloud+'</div></div>';
+}
+function renderMenu(){
+  const el=$("modelMenu"); if(!el) return;
+  const rows = MODELS.map(m=>{
+    const tag = m.cloud?"cloud":isCoder(m.label)?"coder":"local";
+    return `<div class="mrow ${m.id===curModel?'sel':''}" data-m="${m.id}"><span class="mname">${m.label}</span><span class="mtag">${tag}</span><span class="chk">✓</span></div>`;
+  }).join("") || `<div class="mrow"><span class="mname" style="color:var(--text-4)">no models — load one in LM Studio or add a key in Settings → Keys</span></div>`;
+  el.innerHTML = advisorHtml() + rows;
+  el.querySelectorAll(".mrow[data-m]").forEach(r=>r.onclick=()=>{ selectModel(r.dataset.m); $("modelMenu").classList.remove("on"); });
+}
+$("modelPick").onclick=e=>{ e.stopPropagation(); $("effortPop").classList.remove("on"); $("modelMenu").classList.toggle("on"); };
+$("effortBtn").onclick=e=>{ e.stopPropagation(); $("modelMenu").classList.remove("on"); $("effortPop").classList.toggle("on"); };
+$("effortPop").addEventListener("click",e=>e.stopPropagation());
+document.addEventListener("click",()=>{ $("modelMenu").classList.remove("on"); $("effortPop").classList.remove("on"); });
+
+/* ── workspaces ── */
+async function loadWorkspaces(){
+  const r = await fetch("/api/code/workspaces").then(r=>r.json()).catch(()=>({workspaces:["default"],admin:false}));
+  ADMIN = !!r.admin;
+  const sel = $("wsSel"); sel.innerHTML="";
+  (r.workspaces||["default"]).forEach(w=>{ const o=document.createElement("option"); o.value=w; o.textContent=w; sel.appendChild(o); });
+  if(ADMIN){ const o=document.createElement("option"); o.value="__repo__"; o.textContent="⚠ This project (repo)"; sel.appendChild(o); }
+  sel.value = WS; updateScope(); await loadTree();
+}
+$("wsSel").onchange = async e => { WS=e.target.value; curFile=null; closeEditor(); updateScope(); await loadTree(); };
+$("newWs").onclick = async () => {
+  const name=((await dmvPrompt("New workspace","letters, numbers, - and _"))||"").trim(); if(!name) return;
+  const safe=name.replace(/[^a-zA-Z0-9_-]/g,""); if(!safe) return;
+  await fetch("/api/code/write",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ws:safe,path:"README.md",content:"# "+safe+"\n\nNew DeMartinville workspace.\n"})});
+  WS=safe; await loadWorkspaces(); $("wsSel").value=safe;
+};
+function updateScope(){
+  $("wsLabel").textContent = WS==="__repo__" ? "the project" : WS;
+  $("scopeNote").textContent = WS==="__repo__" ? "⚠ Admin: edits the REAL DeMartinville project files."
+    : "Sandboxed to data/code/"+WS+" — can't touch anything outside it.";
+}
+
+/* ── file tree ── */
+async function loadTree(){
+  const r = await fetch("/api/code/tree?ws="+encodeURIComponent(WS)).then(r=>r.json()).catch(()=>({tree:[]}));
+  renderTree(r.tree||[]);
+}
+$("refreshTree").onclick = loadTree;
+function renderTree(tree){
+  const el=$("filelist"); el.innerHTML="";
+  if(!tree.length){ el.innerHTML=`<div class="hint" style="font-size:11.5px;padding:18px">empty workspace —<br>create a file or ask the agent</div>`; return; }
+  function walkInto(nodes, depth, frag){
+    nodes.forEach(n=>{
+      const d=document.createElement("div");
+      d.className="node"+(n.type==="file"&&n.bin?" bin":"")+(n.path===curFile?" sel":"");
+      d.style.paddingLeft=(8+depth*13)+"px";
+      if(n.type==="dir"){
+        d.innerHTML=`<span class="tw">▸</span><span class="ic">📁</span><span>${n.name}</span>`;
+        let open=false; const kids=[];
+        d.onclick=()=>{ open=!open; d.querySelector(".tw").textContent=open?"▾":"▸";
+          if(open){ const f2=document.createElement("div"); walkInto(n.children||[],depth+1,f2); d.after(f2); kids.push(f2);} else {kids.forEach(k=>k.remove()); kids.length=0;} };
+      } else {
+        d.innerHTML=`<span class="tw"></span><span class="ic">${n.bin?"▪":"📄"}</span><span>${n.name}</span>`;
+        if(!n.bin) d.onclick=()=>openFile(n.path);
+      }
+      frag.appendChild(d);
+    });
+  }
+  const root=document.createElement("div"); walkInto(tree,0,root); el.appendChild(root);
+}
+
+/* ── editor ── */
+async function openFile(path){
+  if(dirty && !(await dmvConfirm("Discard unsaved changes to "+curFile+"?"))) return;
+  const r = await fetch(`/api/code/read?ws=${encodeURIComponent(WS)}&path=${encodeURIComponent(path)}`).then(r=>r.json()).catch(()=>({error:"failed"}));
+  if(r.error){ setStatus("Can't open: "+r.error, "err"); return; }
+  curFile=path; setDirty(false);
+  $("ed").value=r.content; $("edPath").textContent=path;
+  setEdView(edView);   // show Code or Preview for the freshly opened file
+  setStatus("opened "+path,"ok"); loadTree();
+}
+function closeEditor(){ $("ed").style.display="none"; $("preview").style.display="none"; $("edEmpty").style.display="flex"; $("edPath").textContent="no file open"; setDirty(false); }
+function setDirty(v){ dirty=v; $("dirty").classList.toggle("on",v); }
+$("ed").addEventListener("input", ()=>setDirty(true));
+$("ed").addEventListener("keydown", e=>{
+  if(e.key==="Tab"){ e.preventDefault(); const s=e.target.selectionStart,en=e.target.selectionEnd;
+    e.target.value=e.target.value.slice(0,s)+"  "+e.target.value.slice(en); e.target.selectionStart=e.target.selectionEnd=s+2; setDirty(true); }
+  if((e.ctrlKey||e.metaKey)&&e.key==="s"){ e.preventDefault(); saveFile(); }
+});
+/* ── Code / Preview toggle for the right panel (live-renders HTML) ── */
+let edView='code';
+function isHtmlFile(p){ return /\.html?$/i.test(p||''); }
+function renderPreview(){
+  const pv=$("preview");
+  if(isHtmlFile(curFile)) pv.srcdoc=$("ed").value;   // live — previews unsaved edits too
+  else pv.srcdoc='<body style="font:14px system-ui;color:#9aa0ac;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#15161a;text-align:center;padding:24px">Live preview is for .html files. Switch to <b style="color:#5FB4CE">&nbsp;Code&nbsp;</b> to edit “'+(curFile||'')+'”.</body>';
+}
+function setEdView(v){
+  edView=v;
+  $("tabCode").classList.toggle('on', v==='code');
+  $("tabPreview").classList.toggle('on', v==='preview');
+  if(!curFile){ $("ed").style.display='none'; $("preview").style.display='none'; $("edEmpty").style.display='flex'; return; }
+  $("edEmpty").style.display='none';
+  if(v==='preview'){ renderPreview(); $("ed").style.display='none'; $("preview").style.display='block'; }
+  else { $("preview").style.display='none'; $("ed").style.display='block'; }
+}
+$("tabCode").onclick=()=>setEdView('code');
+$("tabPreview").onclick=()=>setEdView('preview');
+$("ed").addEventListener('input', ()=>{ if(edView==='preview') renderPreview(); });
+
+async function saveFile(){
+  if(!curFile){ setStatus("no file open to save"); return; }
+  const r = await fetch("/api/code/write",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ws:WS,path:curFile,content:$("ed").value})}).then(r=>r.json()).catch(()=>({error:"failed"}));
+  if(r.error){ setStatus("save failed: "+r.error,"err"); return; }
+  setDirty(false); setStatus("saved "+curFile,"ok");
+}
+$("saveBtn").onclick = saveFile;
+$("newFile").onclick = async () => {
+  const path=((await dmvPrompt("New file","e.g. src/hello.py"))||"").trim(); if(!path) return;
+  const r = await fetch("/api/code/write",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ws:WS,path,content:""})}).then(r=>r.json()).catch(()=>({error:"failed"}));
+  if(r.error){ setStatus("couldn't create: "+r.error,"err"); return; }
+  await loadTree(); openFile(path);
+};
+
+/* ── EFFORT LEVER (in the popup) ── */
+(function(){
+  var ev=$("elever"),track=$("elTrack"),fill=$("elFill"),thumb=$("elThumb"),name=$("elName"),hidden=$("think"),btn=$("effortBtn");
+  if(!ev||!track||!fill||!thumb||!hidden) return;
+  var BASE=[{v:"low",t:"⚡ Quick",cls:"e1"},{v:"medium",t:"🧠 Balanced",cls:"e2"},{v:"high",t:"🔥 Deep",cls:"e3"}];
+  var GOD={v:"max",t:"🔱 God",cls:"e4"};
+  var STOPS=BASE.slice(), idx=0;
+  function apply(i){ var n=STOPS.length; idx=Math.max(0,Math.min(n-1,i)); var s=STOPS[idx],frac=n>1?idx/(n-1):0,w=track.clientWidth||120;
+    hidden.value=s.v; name.textContent=s.t; if(btn) btn.textContent=s.t; ev.classList.remove("e1","e2","e3","e4"); ev.classList.add(s.cls);
+    fill.style.width=Math.max(8,frac*w)+"px"; thumb.style.left=(frac*w)+"px"; try{localStorage.setItem("dmv-effort",s.v);}catch(e){} }
+  function fromX(x){ var r=track.getBoundingClientRect(); var frac=r.width?(x-r.left)/r.width:0; frac=Math.max(0,Math.min(1,frac)); apply(Math.round(frac*(STOPS.length-1))); }
+  track.addEventListener("mousedown",function(e){ e.preventDefault(); fromX(e.clientX);
+    var mv=function(e2){fromX(e2.clientX);}; var up=function(){document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);};
+    document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up); });
+  track.addEventListener("touchstart",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
+  track.addEventListener("touchmove",function(e){ if(e.touches[0]) fromX(e.touches[0].clientX); },{passive:true});
+  window.__codeLeverGod=function(on){ var cur=STOPS[idx]&&STOPS[idx].v; STOPS=on?BASE.concat([GOD]):BASE.slice();
+    var ni=STOPS.findIndex(function(s){return s.v===cur;}); apply(ni>=0?ni:Math.min(idx,STOPS.length-1)); };
+  var saved=null; try{saved=localStorage.getItem("dmv-effort");}catch(e){}
+  var si=STOPS.findIndex(function(s){return s.v===saved;}); apply(si>=0?si:0);
+  requestAnimationFrame(function(){ apply(idx); }); window.addEventListener("resize",function(){ apply(idx); });
+  $("effortBtn").addEventListener("click",function(){ requestAnimationFrame(function(){ apply(idx); }); });  // lay out the fill when the popup opens
+})();
+function getEffort(){ var t=$("think"); return (t&&t.value)||"low"; }
+
+/* ── keys hub ── */
+$("keysBtn").onclick = () => { if(window.openKeys) window.openKeys("brain"); else setStatus("keys window still loading — one sec",""); };
+
+/* ── image attach (the ＋ button under the input) ── */
+function readDataURL(f){ return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(f); }); }
+$("addBtn").onclick = () => $("fileInput").click();
+$("fileInput").onchange = async e => {
+  for(const f of e.target.files){ if(!f.type.startsWith("image/")) continue; const u=await readDataURL(f); if(u) ATT.push(u); }
+  e.target.value=""; renderThumbs();
+};
+function renderThumbs(){
+  const t=$("thumbs");
+  t.innerHTML = ATT.map((u,i)=>`<span class="thumb"><img src="${u}"><b data-i="${i}">×</b></span>`).join("");
+  t.querySelectorAll("b[data-i]").forEach(b=>b.onclick=()=>{ ATT.splice(+b.dataset.i,1); renderThumbs(); });
+}
+
+/* ── talk-to-type ── */
+let rec=null, recOn=false;
+$("micBtn").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ setStatus("voice input isn't supported in this browser","err"); return; }
+  if(recOn){ recOn=false; try{rec&&rec.stop();}catch(_){}  $("micBtn").classList.remove("on"); setStatus("🎤 off",""); return; }
+  rec = new SR(); rec.continuous=true; rec.interimResults=true; rec.lang="en-US";
+  let base=$("ask").value;
+  rec.onresult = e => {
+    let interim="", finalTxt="";
+    for(let i=e.resultIndex;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal) finalTxt+=t; else interim+=t; }
+    if(finalTxt){ base=(base?base.replace(/\s+$/,"")+" ":"")+finalTxt.trim(); }
+    const a=$("ask"); a.value=base+(interim?(" "+interim):""); a.style.height="auto"; a.style.height=Math.min(200,a.scrollHeight)+"px";
+  };
+  rec.onend = () => { if(recOn){ try{rec.start();}catch(_){} } };
+  rec.onerror = ev => { if(ev.error==="not-allowed"){ recOn=false; $("micBtn").classList.remove("on"); setStatus("mic blocked — allow microphone access","err"); } };
+  try{ rec.start(); recOn=true; $("micBtn").classList.add("on"); setStatus("🎤 listening — talk freely, hit ➤ when ready","ok"); }
+  catch(_){ setStatus("couldn't start the mic","err"); }
+};
+
+/* ── in-app modals (no ugly native "localhost says" prompts) ── */
+function dmvModal(opts){
+  return new Promise(res=>{
+    const ov=document.createElement('div'); ov.className='modal-ov';
+    const m=document.createElement('div'); m.className='modal';
+    m.innerHTML='<div class="m-title"></div>'+(opts.input?'<input class="m-in" type="text">':'')+'<div class="m-btns"><button class="m-cancel">Cancel</button><button class="m-ok"></button></div>';
+    m.querySelector('.m-title').textContent=opts.title||'';
+    m.querySelector('.m-ok').textContent=opts.confirmText||'OK';
+    ov.appendChild(m); document.body.appendChild(ov);
+    const inp=m.querySelector('.m-in'); if(inp){ inp.placeholder=opts.placeholder||''; inp.value=opts.value||''; setTimeout(()=>{inp.focus();inp.select();},20); }
+    function done(v){ ov.remove(); document.removeEventListener('keydown',onkey); res(v); }
+    function onkey(e){ if(e.key==='Escape') done(null); else if(e.key==='Enter'&&inp){ e.preventDefault(); done(inp.value.trim()); } }
+    document.addEventListener('keydown',onkey);
+    m.querySelector('.m-ok').onclick=()=>done(inp?inp.value.trim():true);
+    m.querySelector('.m-cancel').onclick=()=>done(null);
+    ov.onclick=e=>{ if(e.target===ov) done(null); };
+  });
+}
+function dmvPrompt(title,placeholder,value){ return dmvModal({title,placeholder,value,input:true}); }
+async function dmvConfirm(title){ return (await dmvModal({title,input:false,confirmText:'Discard'}))!==null; }
+
+/* ── tiny markdown → html for the agent's replies (clickable links, JSON/code blocks) ── */
+function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function mdToHtml(t){
+  t=t.replace(/```write\s+path="([^"]+)"[\s\S]*?```/g,(m,p)=>'\n〈✍ wrote '+p+'〉\n');
+  const codes=[]; t=t.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{ codes.push(c); return ' '+(codes.length-1)+' '; });
+  t=_esc(t);
+  t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+  t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t=t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  t=t.replace(/\n/g,'<br>');
+  t=t.replace(/ (\d+) /g,(m,i)=>'<pre><code>'+_esc(codes[+i])+'</code></pre>');
+  return t;
+}
+
+/* ── paste / drop a screenshot straight into the composer ── */
+(function(){
+  const comp=document.querySelector('.composer');
+  $("ask").addEventListener('paste', async e=>{
+    const items=(e.clipboardData&&e.clipboardData.items)||[];
+    for(const it of items){ if(it.type&&it.type.indexOf('image/')===0){ const f=it.getAsFile(); if(f){ const u=await readDataURL(f); if(u){ATT.push(u);renderThumbs();setStatus("📎 screenshot attached","ok");} } } }
+  });
+  if(comp){ comp.addEventListener('dragover',e=>e.preventDefault());
+    comp.addEventListener('drop',async e=>{ e.preventDefault(); for(const f of (e.dataTransfer.files||[])){ if(f.type.indexOf('image/')===0){ const u=await readDataURL(f); if(u){ATT.push(u);renderThumbs();} } } }); }
+})();
+
+/* ── coding agent ── */
+let busy=false, controller=null;
+const ask=$("ask");
+ask.addEventListener("input", ()=>{ ask.style.height="auto"; ask.style.height=Math.min(200,ask.scrollHeight)+"px"; });
+ask.addEventListener("keydown", e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); if(!busy) sendAgent(); } });
+$("sendBtn").onclick = () => { if(busy){ if(controller) controller.abort(); } else sendAgent(); };
+
+function addMsg(cls, text){ const d=document.createElement("div"); d.className="msg "+cls; d.textContent=text||""; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; return d; }
+
+async function sendAgent(){
+  if(busy) return;
+  const q=ask.value.trim(); if(!q && !ATT.length) return;
+  if(!curModel){ setStatus("pick a model first","err"); return; }
+  const hint=$("log").querySelector(".hint"); if(hint) hint.remove();
+  const imgs=ATT.slice(); ATT.length=0; renderThumbs();
+  ask.value=""; ask.style.height="auto";
+  addMsg("user", q + (imgs.length?("  📎×"+imgs.length):""));
+  const aiEl=addMsg("ai",""); aiEl.textContent="…";
+  busy=true; controller=new AbortController();
+  const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
+
+  const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs };
+  let acc="";
+  try{
+    const res=await fetch("/api/code/agent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf="";
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split("\n"); buf=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith("data: ")) continue;
+        let ev; try{ ev=JSON.parse(line.slice(6)); }catch{ continue; }
+        if(ev.type==="delta"){ acc+=ev.text; aiEl.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; }
+        else if(ev.type==="status"){ aiEl.textContent=acc+"\n("+ev.text+")"; }
+        else if(ev.type==="error"){ aiEl.textContent=(acc||"")+"\n⚠ "+ev.text; setStatus(ev.text,"err"); }
+        else if(ev.type==="applied"){ renderApplied(aiEl, ev); }
+      }
+    }
+  }catch(err){
+    if(err&&err.name==="AbortError"){ aiEl.textContent=(acc||"")+"\n■ stopped — kept what we have"; setStatus("stopped — your text & any written files are kept",""); }
+    else{ aiEl.textContent=(acc||"")+"\n⚠ connection dropped"; }
+  }
+  finally{
+    busy=false; controller=null;
+    const sb2=$("sendBtn"); sb2.classList.remove("stop"); sb2.textContent="➤"; sb2.title=""; sb2.disabled=false;
+    history.push({role:"user",content:q}); history.push({role:"assistant",content:acc.slice(0,4000)});
+  }
+}
+function renderApplied(aiEl, ev){
+  if((ev.changed&&ev.changed.length) || (ev.errors&&ev.errors.length)){
+    const wrap=document.createElement("div"); wrap.className="chips";
+    (ev.changed||[]).forEach(f=>{ const c=document.createElement("span"); c.className="chip"; c.textContent="✓ "+f; c.onclick=()=>openFile(f); wrap.appendChild(c); });
+    (ev.errors||[]).forEach(e=>{ const c=document.createElement("span"); c.className="chip err"; c.textContent="✗ "+e; wrap.appendChild(c); });
+    aiEl.appendChild(wrap); loadTree();
+    if(ev.changed&&ev.changed.includes(curFile)) openFile(curFile);
+    setStatus((ev.changed||[]).length+" file(s) written","ok");
+  }
+}
+
+/* ── resizable panels (drag the gutters; persists) ── */
+(function(){
+  var tree=document.querySelector('.tree'), editor=document.querySelector('.editor');
+  try{
+    var tw=localStorage.getItem('dmv-code-tree'); if(tw&&tree){ tree.style.flex='0 0 '+tw; tree.style.width=tw; }
+    var ew=localStorage.getItem('dmv-code-editor'); if(ew&&editor){ editor.style.flex='0 0 '+ew; editor.style.width=ew; }
+  }catch(_){}
+  function wire(gutter, panel, sign, key, min, max){
+    if(!gutter||!panel) return;
+    gutter.addEventListener('mousedown', function(e){
+      e.preventDefault(); var startX=e.clientX, startW=panel.getBoundingClientRect().width;
+      gutter.classList.add('drag'); document.body.style.userSelect='none'; document.body.style.cursor='col-resize';
+      function mv(e2){ var w=startW+sign*(e2.clientX-startX); w=Math.max(min,Math.min(max,w)); panel.style.flex='0 0 '+w+'px'; panel.style.width=w+'px'; }
+      function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); gutter.classList.remove('drag'); document.body.style.userSelect=''; document.body.style.cursor=''; try{localStorage.setItem(key,panel.style.width);}catch(_){} }
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+    gutter.addEventListener('dblclick', function(){ panel.style.flex=''; panel.style.width=''; try{localStorage.removeItem(key);}catch(_){} });
+  }
+  wire(document.getElementById('gutterL'), tree, 1, 'dmv-code-tree', 140, 520);       // drag right → files wider
+  wire(document.getElementById('gutterR'), editor, -1, 'dmv-code-editor', 260, 1100); // drag left → code wider
+})();
+</script>
+
+<!-- This room has its own coding agent + scope note; suppress the generic injected "Summon agent" + "?" guide -->
+<span data-summon hidden></span>
+<script data-help>/* help.js intentionally suppressed in the Code room */</script>
+<script>(function(){function strip(){document.querySelectorAll('[data-summon]:not([hidden]),[aria-label*="guide" i],[title*="quick guide" i]').forEach(function(e){e.remove();});}[150,600,1400].forEach(function(t){setTimeout(strip,t);});})();</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

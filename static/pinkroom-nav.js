@@ -58,6 +58,26 @@
       }, 50);
     };
     (document.querySelector(".kit-mount") || document.querySelector(".top") || document.querySelector(".menubar") || document.body).appendChild(sb);
+    // ── FIRST-RUN NUDGE — point a newcomer at "Summon agent" (once, ever; dismisses on summon/click) ──
+    try {
+      if (!localStorage.getItem("dmv_summon_hint_seen")) {
+        setTimeout(function () {
+          var btn = document.querySelector('[data-summon]:not([hidden])'); if (!btn) return;
+          var r = btn.getBoundingClientRect();
+          var tip = document.createElement("div");
+          tip.innerHTML = '<span style="color:#7BB6CD;font-weight:700">↑</span> <b style="color:#9FCFDD">New here?</b> Summon an agent — they’ll show you around.<span class="sh-x" style="margin-left:auto;cursor:pointer;color:#9AA0AC;font-size:15px;line-height:1">×</span>';
+          tip.style.cssText = "position:fixed;z-index:99998;left:" + Math.max(10, r.left - 30) + "px;top:" + (r.bottom + 10) + "px;" +
+            "background:linear-gradient(180deg,#1b1c22,#141519);border:1px solid rgba(120,182,205,.5);border-radius:12px;padding:10px 13px;" +
+            "color:#E7E9EE;font:500 12.5px/1.45 Inter,system-ui,sans-serif;max-width:270px;box-shadow:0 12px 36px rgba(0,0,0,.5);" +
+            "display:flex;gap:8px;align-items:flex-start;transition:opacity .4s";
+          document.body.appendChild(tip);
+          function dismiss() { try { localStorage.setItem("dmv_summon_hint_seen", "1"); } catch (e) {} tip.remove(); }
+          tip.querySelector(".sh-x").onclick = dismiss;
+          btn.addEventListener("click", dismiss, { once: true });
+          setTimeout(function () { if (tip.parentNode) { tip.style.opacity = "0"; setTimeout(function(){ tip.remove(); }, 500); } }, 14000);
+        }, 900);
+      }
+    } catch (e) {}
   }
   // the in-room FEEDBACK BUDDY (separate from Kit) — "you're early = you're a builder", collects bugs/ideas
   if (!document.querySelector('script[data-fbk]')) { const fs = document.createElement("script"); fs.src = "/static/feedback-buddy.js"; fs.setAttribute("data-fbk", "1"); document.body.appendChild(fs); }

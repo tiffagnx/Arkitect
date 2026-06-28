@@ -79,22 +79,26 @@
     background: var(--panel); backdrop-filter: blur(28px) saturate(1.2);
     border-right: 1px solid var(--hairline);
   }
-  .brand { padding: 20px 18px 14px; text-align: center; }
+  .brand { padding: 13px 18px 6px; text-align: center; }
   .dmv{display:inline-flex;align-items:center;justify-content:center;gap:.42em;line-height:1}
   .dmv .r{height:1px;width:1.05em;background:#5b6470;flex:none}
   .dmv .w{white-space:nowrap;line-height:1}
   .dmv .b{font-family:Oswald,sans-serif;font-weight:700;font-size:1em;letter-spacing:.005em}
   .dmv .s{font-family:Allura,cursive;font-size:1.35em;margin-left:-.02em}
   .dmv .b,.dmv .s{background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
-  .brand-dmv{display:flex;justify-content:center;font-size:25px;margin:2px 0 9px}
+  .brand-dmv{display:flex;justify-content:center;font-size:23px;margin:2px 0 2px}
   .arkhero .hero-dmv{font-size:clamp(30px,4.6vw,44px);margin-bottom:18px;filter:drop-shadow(0 4px 16px rgba(62,156,184,.28))}
   .brand .brandlogo { display: block; width: 200px; max-width: 100%; height: auto; margin: 2px auto 8px;
     filter: drop-shadow(0 0 16px rgba(62,156,184,.30)); user-select: none; }
   .brand small { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
-  .newchat { margin: 4px 14px 10px; padding: 10px; border: none; border-radius: 12px; cursor: pointer;
-    font: 600 13px Inter; color: #14040E; background: linear-gradient(120deg, var(--accent2), var(--pink));
-    box-shadow: 0 4px 18px rgba(62,156,184,.35); transition: transform .12s, box-shadow .12s; }
-  .newchat:hover { transform: translateY(-1px); box-shadow: 0 7px 24px rgba(62,156,184,.5); }
+  .newchat { margin: 3px 12px 5px; padding: 7px 10px; border: none; border-radius: 9px; cursor: pointer;
+    font: 600 12px Inter; color: #14040E; background: linear-gradient(120deg, var(--accent2), var(--pink));
+    box-shadow: 0 3px 14px rgba(62,156,184,.3); transition: transform .12s, box-shadow .12s; }
+  .newchat:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(62,156,184,.45); }
+  .chat-code-sw { display:flex; margin:4px 12px 6px; background:rgba(255,255,255,.04); border-radius:8px; padding:3px; border:1px solid var(--hairline); gap:2px; }
+  .chat-code-sw a, .chat-code-sw .csw-on { flex:1; text-align:center; padding:5px 6px; border-radius:6px; font:600 11px Inter; letter-spacing:.03em; text-decoration:none; cursor:pointer; transition:background .12s,color .12s; color:var(--dim); }
+  .chat-code-sw .csw-on { background:rgba(62,156,184,.22); color:var(--text); border:1px solid rgba(62,156,184,.38); }
+  .chat-code-sw a:hover { background:rgba(255,255,255,.06); color:var(--text); }
   .sesslist { flex: 1; overflow-y: auto; padding: 2px 10px; }
   .sess { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 10px; cursor: pointer;
     font-size: 12.5px; color: var(--dim); transition: background .12s, color .12s; }
@@ -107,11 +111,11 @@
     background: rgba(255,255,255,.035); border: 1px solid var(--hairline); transition: all .12s; }
   .ghostbtn:hover { color: var(--text); border-color: rgba(62,156,184,.45); }
   .ghostbtn.on { color: #B9FFF8; border-color: rgba(0,209,196,.5); background: rgba(0,209,196,.08); }
-  .raillabel { font: 700 9px 'Space Mono', monospace; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); opacity: .55; padding: 8px 16px 5px; }
-  .roomrail { padding: 0 12px 8px; display: flex; flex-direction: column; gap: 3px; }
-  .roomlink { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 10px; text-decoration: none; color: var(--dim); font: 600 12.5px Inter; letter-spacing: .01em; border: 1px solid transparent; transition: background .14s, color .14s, border-color .14s, transform .1s; }
+  .raillabel { font: 700 9px 'Space Mono', monospace; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); opacity: .55; padding: 5px 14px 3px; }
+  .roomrail { padding: 0 10px 4px; display: flex; flex-direction: column; gap: 1px; }
+  .roomlink { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; text-decoration: none; color: var(--dim); font: 600 11.5px Inter; letter-spacing: .01em; border: 1px solid transparent; transition: background .14s, color .14s, border-color .14s, transform .1s; }
   .roomlink:hover { background: rgba(255,255,255,.045); color: var(--text); border-color: var(--hairline); transform: translateX(2px); }
-  .roomlink .ri { width: 26px; height: 26px; min-width: 26px; display: grid; place-items: center; font-size: 13.5px; border-radius: 8px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); transition: background .14s, border-color .14s; }
+  .roomlink .ri { width: 22px; height: 22px; min-width: 22px; display: grid; place-items: center; font-size: 12px; border-radius: 6px; background: rgba(255,255,255,.04); border: 1px solid var(--hairline); transition: background .14s, border-color .14s; }
   .roomlink:hover .ri { background: rgba(62,156,184,.16); border-color: rgba(62,156,184,.45); }
   /* The Stream — pinned, featured above the creation wings (it's the scene, not a tool) */
   .roomlink.streampin { background: linear-gradient(100deg, rgba(62,156,184,.18), rgba(62,156,184,.04)); border-color: rgba(62,156,184,.4); color: var(--text); }
@@ -404,10 +408,10 @@
 
 <div class="app">
   <aside class="side">
-    <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><small>local · private · yours</small><span class="wallegg" role="button" aria-label="Sign the wall" onclick="location.href='/static/wall.html'"></span></div>
+    <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><span class="wallegg" role="button" aria-label="Sign the wall" onclick="location.href='/static/wall.html'"></span></div>
+    <div class="chat-code-sw"><span class="csw-on">Chat</span><a href="/static/code.html">Code</a></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
-    <div class="roomsearch"><span class="rs-ic">⌕</span><input id="roomSearch" type="search" placeholder="Search rooms…" autocomplete="off" aria-label="Search rooms" /></div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
@@ -416,7 +420,7 @@
     <div class="raillabel">More</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
-      <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Berner Builder</span></a>
+      <a class="roomlink" href="/static/code.html"><span class="ri">⌨</span><span>Code</span></a>
       <a class="roomlink" id="connectClaude" style="cursor:pointer" onclick="if(window.arkOpenSettings){window.arkOpenSettings('mcp')}"><span class="ri">🔌</span><span>Connect to Claude</span></a>
       <a class="roomlink" href="/for-creators"><span class="ri">🎭</span><span>For Creators</span></a>
       <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>

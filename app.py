@@ -1468,6 +1468,255 @@ async def research(req: Request):
 
 BUILDS_DIR = DATA / "builds"
 BUILDS_DIR.mkdir(exist_ok=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CODE ROOM — an in-app agentic coding workspace (the "control center").
+#   Thin slice: file tree / read / write, ALL jailed to a per-workspace sandbox,
+#   plus an agent loop that drives ANY brain (local LM Studio OR a cloud:<slot>)
+#   to edit files via fenced ```write blocks. `_code_path()` is the whole security
+#   story — every file op resolves through it, so nothing can escape its workspace.
+#   Admin (DMV_CODE_ADMIN=1) can point a workspace at the real repo; OFF by default
+#   so a plain user can never reach outside data/code/. Marketplace / auto-install /
+#   run-command come LATER (see memory: coding-room-inside-demartinville).
+# ══════════════════════════════════════════════════════════════════════════════
+CODE_ROOT = DATA / "code"
+CODE_ROOT.mkdir(exist_ok=True)
+CODE_ADMIN = os.environ.get("DMV_CODE_ADMIN") == "1"
+_CODE_SKIP = {".git", "venv", ".venv", "node_modules", "__pycache__", "data",
+              ".idea", ".vscode", "dist", "build", ".pytest_cache", ".mypy_cache"}
+_CODE_TEXT_MAX = 400_000          # don't shove a 5MB file into the editor/model
+_CODE_BIN_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg",
+                 ".mp4", ".mov", ".webm", ".mp3", ".wav", ".ogg", ".flac",
+                 ".zip", ".gz", ".pdf", ".woff", ".woff2", ".ttf", ".otf",
+                 ".exe", ".dll", ".pyd", ".so", ".dylib", ".bin", ".onnx"}
+
+
+def _ws_root(ws: str) -> Path:
+    """Resolve a workspace id → its root dir. '__repo__' = the real project (admin only)."""
+    if ws == "__repo__" and CODE_ADMIN:
+        return ROOT
+    safe = re.sub(r"[^a-zA-Z0-9_-]", "", ws or "default") or "default"
+    p = CODE_ROOT / safe
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _code_path(ws: str, rel: str) -> Path:
+    """JAIL: resolve `rel` inside the workspace root and PROVE it can't escape.
+    .resolve() collapses ../ and symlinks; we then require the result to BE the
+    root or live under it. Anything else raises — the one wall that matters."""
+    root = _ws_root(ws).resolve()
+    target = (root / (rel or "").lstrip("/\\")).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("path escapes workspace")
+    return target
+
+
+def _code_tree(root: Path, base: Path, depth: int = 0) -> list:
+    """Best-effort nested tree, capped, skipping junk dirs + flagging binaries."""
+    out = []
+    if depth > 12:
+        return out
+    try:
+        entries = sorted(root.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+    except Exception:
+        return out
+    for p in entries[:800]:
+        if p.name in _CODE_SKIP:
+            continue
+        if p.is_dir() and p.name.startswith("."):
+            continue
+        rel = str(p.relative_to(base)).replace("\\", "/")
+        if p.is_dir():
+            out.append({"type": "dir", "name": p.name, "path": rel,
+                        "children": _code_tree(p, base, depth + 1)})
+        else:
+            out.append({"type": "file", "name": p.name, "path": rel,
+                        "bin": p.suffix.lower() in _CODE_BIN_EXT})
+    return out
+
+
+def _flatten_tree(nodes: list, prefix: str = "") -> list:
+    lines = []
+    for n in nodes:
+        if n["type"] == "dir":
+            lines.append(prefix + n["name"] + "/")
+            lines += _flatten_tree(n.get("children") or [], prefix + "  ")
+        else:
+            lines.append(prefix + n["name"])
+    return lines
+
+
+CODE_AGENT_SYSTEM = (
+    "You are the coding agent inside DeMartinville's Code room — a real, contained coding "
+    "workspace. You edit files in the user's workspace directly, like a pair-programmer who "
+    "has the keyboard.\n\n"
+    "You can SEE the workspace file tree and the file that's currently open (both given below). "
+    "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
+    "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
+    "Hard rules:\n"
+    "- Always write the COMPLETE file content — never a diff, never '...', never 'rest unchanged'.\n"
+    "- Forward-slash relative paths INSIDE the workspace only. Never absolute paths, never '..'.\n"
+    "- You may write multiple files (multiple blocks back to back).\n"
+    "- Before the block(s), say in ONE or two short lines what you're doing — no long lectures.\n"
+    "- If the user only asked a question, just answer in plain text — no write block needed.\n"
+    "- If you need to see a file that isn't shown, say which one and ask them to open it."
+)
+
+
+@app.get("/api/code/workspaces")
+async def code_workspaces():
+    try:
+        wss = sorted([p.name for p in CODE_ROOT.iterdir() if p.is_dir()])
+    except Exception:
+        wss = []
+    if "default" not in wss:
+        wss = ["default"] + wss
+    return {"workspaces": wss, "admin": CODE_ADMIN}
+
+
+@app.get("/api/code/tree")
+async def code_tree(ws: str = "default"):
+    try:
+        root = _ws_root(ws)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ws": ws, "repo": (ws == "__repo__" and CODE_ADMIN), "tree": _code_tree(root, root)}
+
+
+@app.get("/api/code/read")
+async def code_read(ws: str = "default", path: str = ""):
+    try:
+        f = _code_path(ws, path)
+    except Exception:
+        return JSONResponse({"error": "path escapes workspace"}, status_code=400)
+    if not f.exists() or not f.is_file():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if f.suffix.lower() in _CODE_BIN_EXT or f.stat().st_size > _CODE_TEXT_MAX:
+        return JSONResponse({"error": "binary or too large to edit here", "bin": True}, status_code=415)
+    try:
+        return {"path": path, "content": f.read_text(encoding="utf-8", errors="replace")}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/code/write")
+async def code_write(req: Request):
+    body = await req.json()
+    ws = body.get("ws") or "default"
+    path = (body.get("path") or "").strip()
+    if not path:
+        return JSONResponse({"error": "no path"}, status_code=400)
+    try:
+        f = _code_path(ws, path)
+    except Exception:
+        return JSONResponse({"error": "path escapes workspace"}, status_code=400)
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(body.get("content") or "", encoding="utf-8")
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"ok": True, "path": path}
+
+
+@app.post("/api/code/agent")
+async def code_agent(req: Request):
+    """Agentic loop: the picked brain plans + emits ```write blocks; we apply them
+    to the jailed workspace and report which files changed. One round (budget-lean);
+    multi-round tool-loop is a later slice."""
+    body = await req.json()
+    ws = body.get("ws") or "default"
+    model = body.get("model") or ""
+    instruction = (body.get("instruction") or "").strip()
+    open_path = (body.get("open_path") or "").strip()
+    history = _hist_msgs(body.get("history") or [])
+    effort = str(body.get("effort") or "low").lower()
+
+    try:
+        root = _ws_root(ws)
+        tree_txt = "\n".join(_flatten_tree(_code_tree(root, root))) or "(empty workspace)"
+    except Exception:
+        tree_txt = "(empty workspace)"
+    open_txt = ""
+    if open_path:
+        try:
+            of = _code_path(ws, open_path)
+            if of.is_file() and of.suffix.lower() not in _CODE_BIN_EXT and of.stat().st_size <= _CODE_TEXT_MAX:
+                open_txt = of.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            open_txt = ""
+
+    ctx = f"WORKSPACE FILE TREE:\n{tree_txt[:6000]}\n\n"
+    if open_path and open_txt:
+        ctx += f"CURRENTLY OPEN FILE — {open_path}:\n```\n{open_txt[:14000]}\n```\n\n"
+    ctx += f"TASK: {instruction}"
+
+    # attached images (data-URIs) → vision content parts (gemma-vision + Claude see them)
+    images = body.get("images") or []
+    img_parts = [{"type": "image_url", "image_url": {"url": u}} for u in images if isinstance(u, str) and u.startswith("data:")][:4]
+    user_content = ([{"type": "text", "text": ctx}] + img_parts) if img_parts else ctx
+
+    msgs = [{"role": "system", "content": CODE_AGENT_SYSTEM}] + history + [{"role": "user", "content": user_content}]
+    payload = {"model": model, "messages": msgs, "temperature": 0.2, "stream": True}
+
+    async def gen():
+        acc = []
+        if model.startswith("cloud:"):
+            from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
+            slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
+            if not slot:
+                yield f"data: {json.dumps({'type':'error','text':'That cloud model isn’t set up anymore — pick another (Settings ⚙).'})}\n\n"
+                yield f"data: {json.dumps({'type':'done'})}\n\n"
+                return
+            cpay = dict(payload)
+            cpay["model"] = slot["model"]
+            cpay.pop("reasoning_effort", None)
+            src = anthropic_native_stream(slot, cpay, effort) if _is_claude_slot(slot) else provider_stream(slot, cpay, effort)
+            async for ev in src:
+                yield ev
+                if ev.startswith("data: "):
+                    try:
+                        d = json.loads(ev[6:])
+                        if d.get("type") == "delta":
+                            acc.append(d.get("text", ""))
+                    except Exception:
+                        pass
+        else:
+            if not await brain_up():
+                if not await ensure_brain():
+                    yield f"data: {json.dumps({'type':'error','text':'Local brain (LM Studio) won’t start — open it once, or pick a cloud model in the picker.'})}\n\n"
+                    yield f"data: {json.dumps({'type':'done'})}\n\n"
+                    return
+            if await _ctx_too_small(model):
+                yield f"data: {json.dumps({'type':'status','text':'giving the brain more room…'})}\n\n"
+                await _reload_ctx(model)
+            async for ev in lm_stream(payload):
+                yield ev
+                if ev.startswith("data: "):
+                    try:
+                        d = json.loads(ev[6:])
+                        if d.get("type") == "delta":
+                            acc.append(d.get("text", ""))
+                    except Exception:
+                        pass
+
+        # ── apply every ```write block the agent emitted (jailed) ──
+        full = "".join(acc)
+        changed, errors = [], []
+        for m in re.finditer(r'```write\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', full, re.S):
+            rel = m.group(1).strip()
+            content = m.group(2)
+            try:
+                wf = _code_path(ws, rel)
+                wf.parent.mkdir(parents=True, exist_ok=True)
+                wf.write_text(content, encoding="utf-8")
+                changed.append(rel)
+            except Exception as e:
+                errors.append(f"{rel}: {e}")
+        yield f"data: {json.dumps({'type':'applied','changed':changed,'errors':errors})}\n\n"
+        yield f"data: {json.dumps({'type':'done'})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 IMG_META = DATA / "img_meta"          # per-image sidecars: prompt/seed/mode → remix & re-roll
 IMG_META.mkdir(exist_ok=True)
 STUDIO_DIR = DATA / "studio_projects"  # saved Studio mixes
@@ -4983,6 +5232,14 @@ async def export_frames(ws: WebSocket):
 async def editor_page():
     return FileResponse(
         ROOT / "static" / "editor.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
+
+
+@app.get("/code")
+async def code_page():
+    return FileResponse(
+        ROOT / "static" / "code.html",
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 

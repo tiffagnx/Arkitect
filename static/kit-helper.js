@@ -27,12 +27,13 @@
   // ── a character is only in a room if you DRAGGED them in from the front page:
   //    ?brain=kit|tiff for the two built-ins, or ?char=ID for a user-built one. No param →
   //    nothing mounts here at all; rooms have NO helper until you bring someone in. ──
-  let broughtId = null;
+  let broughtId = null, explicit = false;   // explicit = the user actively brought someone in THIS time (drag / summon)
   try {
     const sp = new URLSearchParams(location.search);
+    if (sp.get("summon") === "1") explicit = true;                          // the "Summon agent" button re-injects with ?summon=1
     const brain = (sp.get("brain") || "").toLowerCase();
-    if (brain === "kit" || brain === "tiff") broughtId = brain;
-    else { const cid = sp.get("char"); if (cid) broughtId = cid; }
+    if (brain === "kit" || brain === "tiff") { broughtId = brain; explicit = true; }
+    else { const cid = sp.get("char"); if (cid) { broughtId = cid; explicit = true; } }   // dragged in from the front page
   } catch (_) {}
   // remembered from a previous room/page (so a dragged-in agent rides the local→cloud switch + room hops).
   // The Agent Forge stays CLEAN until you hit "Start here" — so don't auto-restore an agent there.
@@ -1046,8 +1047,11 @@
   }
   // bring in ONLY the character dragged here from the front page (kit/tiff, or a user-built one)
   const bring = CHARACTERS.find(c => c.id === broughtId) || CHARACTERS[0];
-  win.classList.add("open");
-  setActive(bring, true);
+  // DON'T auto-pop the agent window on a plain room visit (a merely-REMEMBERED agent stays ready but CLOSED,
+  // out of the way). It opens only when explicitly brought — dragged in, summoned (?summon=1), or in Agent
+  // Forge. "Summon agent" calls __kitOpen(); a front-page drag carries ?brain/?char. A warm handoff self-opens.
+  if (explicit || room === "character") win.classList.add("open");
+  setActive(bring, explicit || room === "character");
 
   // live refresh when a character is saved/edited/deleted (same tab via CustomEvent,
   // other tabs via storage). Best-effort — never disrupts an in-progress chat.
