@@ -727,6 +727,7 @@
   function getVoiceModelId(ch){
     if (!ch) return "";
     try { const m = JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); if (m && m[ch.id]) return m[ch.id]; } catch (_) {}
+    if (ch.fishVoiceId) return ch.fishVoiceId;
     if (ch.mine) return ch.voiceModelId || "";
     return VOICE_DEFAULTS[ch.id] || "";
   }
