@@ -208,7 +208,7 @@
   window.openKeys = function (cat) {
     ov.classList.add("open");
     render().then(() => {
-      if (cat) { const el = [...body.querySelectorAll(".kw-cat")].find(e => (cat === "media" ? /image/i : /brain/i).test(e.textContent)); if (el) el.scrollIntoView({ block: "start" }); }
+      if (cat) { const rx = cat === "media" ? /image/i : cat === "voices" ? /voice/i : /brain/i; const el = [...body.querySelectorAll(".kw-cat")].find(e => rx.test(e.textContent)); if (el) el.scrollIntoView({ block: "start" }); }
     });
   };
 })();

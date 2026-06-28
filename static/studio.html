@@ -681,6 +681,18 @@
   .kit-mount { display:flex; align-items:center; }
   .menubar .kit-fab.in-bar, .menubar .fbk-fab.in-bar { height:24px; padding:0 10px 0 5px; border-radius:8px; margin-left:4px; font-size:10.5px; letter-spacing:.05em; }
   .menubar .kit-fab.in-bar canvas { width:19px; height:19px; }   /* match the Visual Lab — keep Kit's face small + aligned in the bar (studio was missing this → Kit too big) */
+  /* ── Top-bar tidy (owner 2026-06-28): the injected buttons read like the MENU, not a pill cluster.
+     ? + Summon agent sit right after Window as menu-text (no circle; Summon stays blue); Feedback keeps
+     its pill right next to them; the "● Name" presence chip is pushed to the far right, up by the window. ── */
+  .menubar #dmvHelpBtn.in-bar { order:1; background:none; border:none; box-shadow:none; border-radius:0;
+    height:auto; padding:0 11px; opacity:1; color:#AEB6C2; font:500 12.5px Inter; }
+  .menubar #dmvHelpBtn.in-bar:hover { color:var(--text); transform:none; border-color:transparent; }
+  .menubar [data-summon] { order:2; background:none !important; border:none !important; box-shadow:none !important;
+    border-radius:0 !important; height:auto !important; padding:0 11px !important; margin-left:0 !important;
+    color:#9FCFDD !important; font:500 12.5px Inter !important; letter-spacing:.02em !important; }
+  .menubar [data-summon]:hover { color:#CDEBF5 !important; }
+  .menubar .fbk-fab.in-bar { order:3; }
+  .menubar .kit-fab.in-bar { align-self:center; }   /* relocated to the bar's far right by placeAgentChip() */
   /* blank-slate hero: Kit's face instead of the abstract diamond (frame 0 of the 9-frame sprite sheet, gently floating) */
   .drop-spark.kit { width:92px; height:92px; margin:0 auto 12px; background:url(/static/kit-hero.png) center/contain no-repeat;   /* the WHOLE transparent Kit "little guy" (no tile/icon bg) — ships in static/ */
     filter:drop-shadow(0 6px 18px rgba(62,156,184,.5)); animation:kitFloat 3.6s ease-in-out infinite; }
@@ -908,6 +920,7 @@
       <div class="drop-h2">Drop your stems anywhere here — vocals, beat, anything (MP3 / WAV). Each file becomes a lane.</div>
       <div class="drop-actions">
         <button class="drop-btn" id="qsAdd">＋ Add stems</button>
+        <button class="drop-btn" id="qsBeat" onclick="if(window.openBeatLab)openBeatLab()">🥁 Make a beat</button>
         <button class="drop-btn" id="qsTrack">＋ New track</button>
         <button class="drop-btn rec" id="qsRec">● Record a take</button>
         <button class="drop-btn ghost" id="qsOpen">📂 Open a session</button>
@@ -6370,6 +6383,20 @@ function _ssSelClipBuf(){
   if(!cl||!cl.buffer) return null;
   return { t, cl, buf:cl.buffer, start:(cl.start!=null?cl.start:0) };
 }
+// Region scope — if a time-selection (SEL, the highlight) is active over this clip, narrow to just
+// that slice so "add harmonies HERE" lands under the highlighted section, not the whole take.
+// Generative moves (harmony/choir/vocoder) call this; in-place FX (stutter/drop) stay whole-clip for now.
+function _ssRegionOf(s){
+  if(!s || !s.buf) return s;
+  if(!(typeof SEL!=='undefined' && SEL && SEL.a!=null && SEL.b!=null && SEL.b>SEL.a)) return s;
+  if(SEL.trackId!=null && s.t && SEL.trackId!==s.t.id) return s;          // highlight is on another track → ignore
+  const sr=s.buf.sampleRate, cs=(s.start!=null?s.start:0), ce=cs + s.buf.length/sr;
+  const ra=Math.max(SEL.a,cs), rb=Math.min(SEL.b,ce);
+  if(rb-ra < 0.03) return s;                                              // no real overlap → whole clip
+  const sa=Math.max(0,Math.round((ra-cs)*sr)), sb=Math.min(s.buf.length,Math.round((rb-cs)*sr));
+  if(sa<=0 && sb>=s.buf.length) return s;                                 // highlight ≈ the whole clip
+  return { t:s.t, cl:s.cl, buf:_sliceBuffer(s.buf, sa, sb), start:ra, region:true };
+}
 function _absCurve(){ const n=257,c=new Float32Array(n); for(let i=0;i<n;i++){ const x=(i/(n-1))*2-1; c[i]=Math.abs(x); } return c; }
 function _peakNorm(buf, target){ let pk=0; for(let ch=0;ch<buf.numberOfChannels;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk)pk=a; } } if(pk<1e-5) return buf; const g=(target||0.7)/pk; if(g>=0.999&&g<=1.001) return buf; for(let ch=0;ch<buf.numberOfChannels;ch++){ const d=buf.getChannelData(ch); for(let i=0;i<d.length;i++) d[i]*=g; } return buf; }
 function _newBufTrack(name, buffer, start, stereo, gainDb, pan){
@@ -6381,7 +6408,7 @@ function _newBufTrack(name, buffer, start, stereo, gainDb, pan){
 }
 // Harmony — pitched copies of the selected vocal on new tracks (key-agnostic safe intervals by default).
 function studioHarmonize(set){
-  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first (click it in the timeline).' };
+  let s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first (click it in the timeline).' }; s=_ssRegionOf(s);
   ensureCtx();
   const sets={
     safe:   [ {semis:7,pan:-0.4,name:'5th'}, {semis:12,pan:0.4,name:'8va'} ],
@@ -6399,7 +6426,7 @@ function studioHarmonize(set){
 window.studioHarmonize = studioHarmonize;
 // Choir — many detuned + time-offset voices spread in stereo (ACE "Choir Mode", on your own take). One stereo track.
 function studioChoir(){
-  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' };
+  let s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' }; s=_ssRegionOf(s);
   ensureCtx();
   const src=s.buf, sr=src.sampleRate;
   const voices=[ {cents:-12,d:0,pan:-0.6,oct:0}, {cents:9,d:11,pan:-0.3,oct:0}, {cents:-7,d:7,pan:0.35,oct:0},
@@ -6417,7 +6444,7 @@ function studioChoir(){
 window.studioChoir = studioChoir;
 // Vocal → instrument — a classic 12-band vocoder (carrier = sawtooth, modulator = your voice). Offline render → new track.
 async function studioVocoder(opts){
-  const s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' };
+  let s=_ssSelClipBuf(); if(!s) return { ok:false, msg:'Select a vocal clip first.' }; s=_ssRegionOf(s);
   ensureCtx(); opts=opts||{};
   const src=s.buf, sr=src.sampleRate, len=src.length;
   if(!len) return { ok:false, msg:'That clip is empty.' };
@@ -7553,19 +7580,15 @@ function openSongGuide(){
 }
 function closeSongGuide(){ const p=document.getElementById('songGuide'); if(p) p.remove(); if(_guideTimer){ clearInterval(_guideTimer); _guideTimer=null; } _ensureGuideFab(); }
 function _ensureGuideFab(){
-  let done=false; try{ done=localStorage.getItem('ark_guide_done')==='1'; }catch(e){}
-  let fab=document.getElementById('guideFab');
-  if(done){ if(fab) fab.remove(); return; }                    // experienced user → no FAB, no clutter
-  if(!fab){ fab=document.createElement('button'); fab.id='guideFab'; fab.title='First-song guide';
-    fab.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99997;border:1px solid rgba(120,182,205,.4);border-radius:11px;padding:8px 12px;cursor:pointer;font:700 11.5px Inter,sans-serif;color:#cfe6ee;background:linear-gradient(180deg,#1b2430,#121822);box-shadow:0 8px 24px rgba(0,0,0,.5)";
-    fab.textContent='🎤 Guide'; fab.onclick=()=>openSongGuide(); document.body.appendChild(fab); }
-  fab.style.display = document.getElementById('songGuide') ? 'none' : '';   // hide the FAB while the panel is open
+  // Owner: NO floating Guide button over the canvas — it got in the way + showed every time
+  // (same peeve as the killed walk-in intro). The first-song guide still lives in openSongGuide(),
+  // reachable on demand; we'll give it a quiet, non-floating home (top-bar ? / a menu) later.
+  const fab=document.getElementById('guideFab'); if(fab) fab.remove();
 }
 function maybeShowGuide(){
-  let done=false; try{ done=localStorage.getItem('ark_guide_done')==='1'; }catch(e){}
-  if(done) return;                                              // skipped/finished before → never again
-  _ensureGuideFab();
-  if(!tracks.length && !document.getElementById('recoverBar')) openSongGuide();   // first-timer on an empty board; recover banner wins if present
+  // Owner: don't auto-pop the guide on load and don't float a FAB. The first-song guide stays
+  // available on demand via openSongGuide(); a quiet entry point for first-timers comes later.
+  _ensureGuideFab();   // removes any stray FAB; never creates one
 }
 setTimeout(maybeShowGuide, 1400);                              // after the 900ms recover check, so recover wins if both apply
 
@@ -8919,6 +8942,19 @@ function laneUiTake(t, placeAt) {
   });
   if (typeof paintUpdatesBadge === "function") paintUpdatesBadge();   // reflect any update found before the bar built
   const _kitMount = document.createElement("span"); _kitMount.className = "kit-mount"; bar.appendChild(_kitMount);   // Kit's slot, right after Help (kit-helper.js mounts here, matching Visual Labs)
+  // ── Owner 2026-06-28: pull the "● agent" presence chip OUT of the center cluster to the FAR RIGHT of the
+  //    bar (up by the agent window), so it's never in the way. kit-helper mounts it async → poll briefly. ──
+  (function placeAgentChip(){
+    function place(){
+      var chip = document.querySelector(".kit-fab.in-bar"); if (!chip) return false;
+      var mbar = document.querySelector(".menubar"); if (!mbar) return false;
+      var exp = document.getElementById("btnExport");                                   // editor has one; studio doesn't
+      if (exp && exp.parentNode === mbar) { chip.style.marginLeft = ""; mbar.insertBefore(chip, exp); }
+      else { chip.style.marginLeft = "auto"; mbar.appendChild(chip); }                  // float to the bar's right edge
+      return true;
+    }
+    if (!place()) { var n = 0, t = setInterval(function(){ if (place() || ++n > 80) clearInterval(t); }, 50); }
+  })();
   document.addEventListener("mousedown", (e) => { const t = e.target; if (t.closest && !t.closest("#menubar") && !t.closest(".mb-panel")) closeAll(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && openIdx !== null) closeAll(); });
 

@@ -123,6 +123,14 @@ body.ws-no-tl #gTL{display:none}
 /* Kit shrunk to ride the slim menu bar, next to Help */
 .menubar .kit-fab.in-bar,.menubar .fbk-fab.in-bar{height:24px;padding:0 10px 0 5px;border-radius:8px;margin-left:4px;font-size:10.5px;letter-spacing:.05em}
 .menubar .kit-fab.in-bar canvas{width:19px;height:19px}
+/* ── Top-bar tidy (owner 2026-06-28): ? + Summon read like the menu (no circle; Summon stays blue),
+   Feedback keeps its pill next to them, the "● Name" presence chip floats right by the window. ── */
+.menubar #dmvHelpBtn.in-bar{order:1;background:none;border:none;box-shadow:none;border-radius:0;height:auto;padding:0 9px;opacity:1;color:#AEB6C2;font:500 12.5px var(--ui)}
+.menubar #dmvHelpBtn.in-bar:hover{color:var(--txt);transform:none;border-color:transparent}
+.menubar [data-summon]{order:2;background:none !important;border:none !important;box-shadow:none !important;border-radius:0 !important;height:auto !important;padding:0 9px !important;margin-left:0 !important;color:#9FCFDD !important;font:500 12.5px var(--ui) !important}
+.menubar [data-summon]:hover{color:#CDEBF5 !important}
+.menubar .fbk-fab.in-bar{order:3}
+.menubar .kit-fab.in-bar{align-self:center}
 .kit-win.from-bar{top:78px;bottom:auto}
 
 /* ── AE TOOLS RAIL ───────────────────────────────────────────────────── */
@@ -5539,5 +5547,20 @@ window.addEventListener('resize',fitScreen);
 })();
 </script>
 <script src="/static/pinkroom-nav.js"></script>
+<script>
+  // ── Owner 2026-06-28: pull the "● agent" presence chip to the far right of the bar (by the Export
+  //    button / agent window), out of the center. kit-helper mounts it async → poll briefly. ──
+  (function placeAgentChip(){
+    function place(){
+      var chip = document.querySelector(".kit-fab.in-bar"); if (!chip) return false;
+      var mbar = document.querySelector(".menubar"); if (!mbar) return false;
+      var exp = document.getElementById("btnExport");
+      if (exp && exp.parentNode === mbar) { chip.style.marginLeft = ""; mbar.insertBefore(chip, exp); }
+      else { chip.style.marginLeft = "auto"; mbar.appendChild(chip); }
+      return true;
+    }
+    if (!place()) { var n = 0, t = setInterval(function(){ if (place() || ++n > 80) clearInterval(t); }, 50); }
+  })();
+</script>
 </body>
 </html>

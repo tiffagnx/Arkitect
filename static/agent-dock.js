@@ -392,6 +392,9 @@
       if (typeof window.studioChoir === "function" && /(choir|gang vocal|ensemble of|stack (a )?choir|\bvocal stack\b)/.test(t2)) {
         return { handled: true, reply: _ssVocalReply('choir', window.studioChoir()) };
       }
+      if (typeof window.studioHarmonize === "function" && /(\blayer (it|this|the vocal|them|that)\b|\bdouble (it|this|the vocal|up|the take|that)\b|thicken (the |this |my )?(vocal|lead|take|voice)|stack (it|this) (up|thick|wide)\b|fatten (the |this |my )?(vocal|lead|voice))/.test(t2)) {
+        return { handled: true, reply: _ssVocalReply('harmony', window.studioHarmonize('thick')) };   // "layer it / double it" → the thick 3-voice stack (region-scoped if a part is highlighted)
+      }
       if (typeof window.studioHarmonize === "function" && /(harmoni|harmony|backing vocal|stack (a |some )?harmon|third and fifth)/.test(t2)) {
         var hset = /thick|big|wall|stack/.test(t2)?'thick' : /octave|8va/.test(t2)?'octave' : /minor/.test(t2)?'minor' : /major|triad|third|3rd/.test(t2)?'triad' : 'safe';
         return { handled: true, reply: _ssVocalReply('harmony', window.studioHarmonize(hset)) };
@@ -425,7 +428,7 @@
       var results = [];
       for (var i = 0; i < ids.length; i++) {
         var t = trackById(ids[i]); if (!t) continue;
-        var _agName = (typeof active !== "undefined" && active && active.name) ? active.name : agentId;   // pretty name if we have it
+        var _agName = window.__dmvActiveName || (agentId ? (agentId.charAt(0).toUpperCase() + agentId.slice(1)) : "Agent");   // `active` isn't in this IIFE's scope — title-case the id (kit→Kit)
         if (window.roomGlow) try { window.roomGlow("#lane-" + t.id, { agent: _agName, label: "working on " + t.name, state: "working" }); } catch (e) {}   // light the stem she's on
         var _r = await applyMovesToTrack(t, parsed, style); results.push(_r);
         if (window.roomGlow) try {

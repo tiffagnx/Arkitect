@@ -46,10 +46,10 @@
   const CHARACTERS_BUILTIN = [
     { id: "kit",  name: "Kit",  tag: "the technical one · build", color: "#7BB6CD", sprite: true,
       intro: r => `Kit online. I run the technical side of ${r} — the levels, the settings, the exact moves. Tell me the target and I'll dial it in precise.` },
-    { id: "tiff", name: "Tiff", tag: "one of the crew · artist",  color: "#E58FB5",
+    { id: "tiff", name: "Tiffany", tag: "one of the crew · artist",  color: "#E58FB5",
       intro: r => r === "Agent Forge"
         ? `Yo, welcome — first time building an agent? Cool part: I'm one, so this is me showing you live. Tell me what you do and I'll handle the whole thing — you talk, I build. (Or fill it in yourself below.) Wanna run it together?`
-        : `What's good — it's Tiff. I'm right here in ${r} making stuff with you — I write, I make beats, I do a little of everything. So whatchu working on? Let's get it.` },
+        : `What's good — it's Tiffany. I'm right here in ${r} making stuff with you — I write, I make beats, I do a little of everything. So whatchu working on? Let's get it.` },
   ];
   let CHARACTERS = CHARACTERS_BUILTIN.slice();   // merged cast (built-in + user-made); rebuilt on load/refresh
   let active = CHARACTERS[0];
@@ -99,7 +99,7 @@
   @keyframes fabpulse { 0%,100%{ box-shadow:0 0 5px rgba(57,217,138,.55);} 50%{ box-shadow:0 0 9px rgba(57,217,138,.95);} }
   .fab-lbl { line-height:1; }
   .kit-win.from-bar { bottom:auto; top:62px; }
-  .kit-win { position:fixed; right:18px; bottom:70px; z-index:9997; width:344px; max-width:92vw; display:none; flex-direction:column;
+  .kit-win { position:fixed; right:18px; bottom:70px; z-index:9997; width:362px; max-width:92vw; display:none; flex-direction:column;
     max-height:min(600px,82vh); border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1);
     background:linear-gradient(160deg,#21232B,#15161B 60%,#101116); box-shadow:0 22px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-win.open { display:flex; animation:kitrise .16s ease-out; }
@@ -192,6 +192,10 @@
   /* God-Particle window glow — kept, now keyed to a top-tier Claude/Opus cloud model being selected. */
   .kit-win.tier-max { border-color:rgba(240,90,120,.6); box-shadow:0 22px 60px rgba(0,0,0,.7), 0 0 0 1px rgba(240,90,120,.32), 0 0 36px rgba(240,90,120,.2), inset 0 1px 0 rgba(255,255,255,.06); }
   .kit-foot { display:flex; flex-direction:column; gap:7px; padding:9px 11px 11px; border-top:1px solid rgba(255,255,255,.07); }
+  /* 🎙🔊 voice meter — dances pink to HER voice, blue to YOURS (gender-reveal convention). */
+  .kit-vm { display:none; align-items:flex-end; justify-content:center; gap:2px; height:0; overflow:hidden; transition:height .14s ease; }
+  .kit-vm.on { display:flex; height:20px; }
+  .kit-vm .vmb { width:3px; height:3px; border-radius:2px; background:var(--kvm,#56C2DE); box-shadow:0 0 5px var(--kvm,#56C2DE); transition:height .06s linear; }
   .kit-in { width:100%; box-sizing:border-box; resize:none; background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.1); border-radius:10px;
     color:#E9EAED; font:500 12.5px Inter; padding:9px 11px; outline:none; max-height:90px; }
   .kit-in:focus { border-color:rgba(62,156,184,.55); }
@@ -222,6 +226,24 @@
   .agent-dock { width:100%; }
   .agent-dock:empty { display:none; }
   @media (max-width:680px){ .kit-win { right:8px; left:8px; width:auto; } }
+  /* ── Owner 2026-06-28: clean bottom bar — send INSIDE the bubble, tools folded into two labeled menus ── */
+  .kit-inwrap { position:relative; display:block; }
+  .kit-inwrap .kit-in { padding-right:86px; }                 /* room for the in-bubble mic + send */
+  .kit-inwrap .kit-mic { position:absolute; right:45px; bottom:7px; width:32px; height:32px; border-radius:9px; }   /* mic sits right next to send, in the bubble */
+  .kit-inwrap .kit-go { position:absolute; right:7px; bottom:7px; width:32px; height:32px; border-radius:9px; font-size:14px; }
+  .kt-hidden { display:none !important; }                      /* old icon buttons kept as action sinks for the menus */
+  .kit-plus { flex:none; width:38px; height:31px; border:1px solid rgba(120,182,205,.4); border-radius:9px; cursor:pointer; background:rgba(255,255,255,.05); color:#9FCFDD; font-size:18px; line-height:1; }
+  .kit-plus:hover { border-color:rgba(120,182,205,.8); background:rgba(62,156,184,.16); color:#fff; }
+  .kit-voice { flex:none; width:36px; height:31px; border:1px solid rgba(120,182,205,.4); border-radius:9px; cursor:pointer; background:rgba(255,255,255,.05); color:#9FCFDD; display:inline-flex; align-items:center; justify-content:center; transition:all .12s; }
+  .kit-voice:hover { border-color:rgba(120,182,205,.85); background:rgba(62,156,184,.18); color:#fff; transform:translateY(-1px); }
+  .kit-voice.on { color:#BFF0DA; border-color:rgba(127,211,176,.7); box-shadow:0 0 9px rgba(127,211,176,.35); }
+  .kit-voice svg { display:block; }
+  .kit-more-item { display:flex; align-items:center; gap:10px; }
+  .kit-more-item.dis { opacity:.4; cursor:default; }
+  .kmi-ic { width:18px; text-align:center; flex:none; font-size:13px; }
+  .kmi-lbl { flex:1; }
+  .kmi-ck { color:#7FD3B0; font-size:12px; flex:none; }
+  .kit-menu-sep { height:1px; margin:4px 7px; background:rgba(255,255,255,.09); }
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -284,7 +306,9 @@
      <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-crew kt-pill" id="ktCrew" type="button" title="Back this agent with a crew of other brains — they weigh in, this agent gives you the answer">+ crew</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
-     <div class="kit-foot"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><div class="kit-tools"><button class="kit-up" title="Show the agent an image">📎</button><button class="kit-look" title="Let the agent look at your screen">👁</button><button class="kit-watch" title="Watch me work — narrate what you're doing + I read your live session, and learn from it">⏺</button><button class="kit-teach" title="Teach this — bank the move you just made as a rule">📌</button><button class="kit-more" title="More tools">+</button><span class="kit-tools-sp"></span><button class="kit-speak" title="Voice off — tap so this agent talks out loud">🔇</button><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div></div>`;
+     <div class="kit-foot"><div class="kit-vm" aria-hidden="true"></div>
+       <div class="kit-inwrap"><textarea class="kit-in" rows="1" placeholder="Ask, or hit 🎙 to talk…"></textarea><button class="kit-mic" title="Talk to type — press, speak, it types for you">🎙</button><button class="kit-go" title="Send">➤</button></div>
+       <div class="kit-tools"><button class="kit-plus" title="Tools — image, screen, teach, and more">＋</button><button class="kit-up kt-hidden" title="Show the agent an image">📎</button><button class="kit-look kt-hidden" title="Let the agent look at your screen">👁</button><button class="kit-watch kt-hidden" title="Watch me work">⏺</button><button class="kit-teach kt-hidden" title="Teach this">📌</button><button class="kit-speak kt-hidden" title="Voice toggle">🔇</button><span class="kit-tools-sp"></span><button class="kit-voice" title="Voice options"></button></div></div>`;
   document.body.appendChild(win);
   const hostSlot = win.querySelector(".kit-host"), titleEl = win.querySelector(".kit-t"),
         subEl = win.querySelector(".kit-s"), roster = win.querySelector(".kit-roster"),
@@ -396,31 +420,55 @@
   if (teachBtn) teachBtn.onclick = captureMove;
   if (watchBtn) watchBtn.onclick = watchMe;
 
-  // ── "+" MORE TOOLS — the dropdown for extra/future tools. Add an entry to MORE_TOOLS and it shows up;
-  //    that's the room the slim tool row was built to leave. Agent-agnostic. ──
-  const moreBtn = win.querySelector(".kit-more");
-  const MORE_TOOLS = [
-    { label: "📋  Copy last reply", run: () => {
-        const msgs = body.querySelectorAll(".kit-msg.kit"); const last = msgs[msgs.length - 1];
-        const txt = last ? (last.innerText || last.textContent || "").trim() : "";
-        if (txt) { try { navigator.clipboard.writeText(txt); } catch (_) {} }
-      } },
-    { label: "🗑  Clear chat", run: () => { if (body) body.innerHTML = ""; } },
-    // (📌 Capture that move is promoted to the toolbar as the 📌 Teach button — next to 👁.)
-  ];
-  let moreMenu = null;
-  function closeMore() { if (moreMenu) { moreMenu.remove(); moreMenu = null; document.removeEventListener("mousedown", onMoreDown, true); } }
-  function onMoreDown(e) { if (moreMenu && !moreMenu.contains(e.target) && e.target !== moreBtn) closeMore(); }
-  if (moreBtn) moreBtn.onclick = () => {
-    if (moreMenu) { closeMore(); return; }
-    moreMenu = document.createElement("div"); moreMenu.className = "kit-more-menu";
-    MORE_TOOLS.forEach(it => { const d = document.createElement("div"); d.className = "kit-more-item"; d.textContent = it.label;
-      d.onclick = () => { closeMore(); try { it.run(); } catch (_) {} }; moreMenu.appendChild(d); });
-    document.body.appendChild(moreMenu);
-    const r = moreBtn.getBoundingClientRect();
-    moreMenu.style.left = Math.max(6, r.left) + "px";
-    moreMenu.style.top = (r.top - moreMenu.offsetHeight - 6) + "px";   // pop ABOVE the tool row
-    setTimeout(() => document.addEventListener("mousedown", onMoreDown, true), 0);
+  // ── TWO LABELED MENUS (owner 2026-06-28) — the old gaudy icon row is folded into a left "＋" tools menu
+  //    and a right "🎙 ▾" voice menu, each item named in PLAIN TEXT (no hover-to-learn). The original
+  //    buttons stay in the DOM (hidden) as action sinks, so every handler keeps working untouched; the
+  //    menu items just .click() them. ONE build → every agent window (Tiff, Kit, anything you build).
+  //    Add an item to either list and it shows up — built to grow, like a real menu bar. ──
+  let kMenu = null;
+  function kCloseMenu() { if (kMenu) { kMenu.remove(); kMenu = null; document.removeEventListener("mousedown", kOnDown, true); } }
+  function kOnDown(e) { if (kMenu && !kMenu.contains(e.target) && e.target !== kMenu._for && !(kMenu._for && kMenu._for.contains(e.target))) kCloseMenu(); }
+  function kOpenMenu(trigger, items) {
+    const same = kMenu && kMenu._for === trigger; kCloseMenu(); if (same) return;   // tap the same trigger again = close
+    kMenu = document.createElement("div"); kMenu.className = "kit-more-menu"; kMenu._for = trigger;
+    items.forEach(it => {
+      if (it.sep) { const s = document.createElement("div"); s.className = "kit-menu-sep"; kMenu.appendChild(s); return; }
+      const d = document.createElement("div"); d.className = "kit-more-item" + (it.disabled ? " dis" : "");
+      d.innerHTML = '<span class="kmi-ic">' + (it.ic || "") + '</span><span class="kmi-lbl">' + it.label + '</span>' + (it.check ? '<span class="kmi-ck">✓</span>' : '');
+      if (!it.disabled) d.onclick = () => { kCloseMenu(); try { it.run(); } catch (_) {} };
+      kMenu.appendChild(d);
+    });
+    document.body.appendChild(kMenu);
+    const r = trigger.getBoundingClientRect();
+    kMenu.style.left = Math.max(6, Math.min(r.left, window.innerWidth - kMenu.offsetWidth - 6)) + "px";
+    kMenu.style.top = (r.top - kMenu.offsetHeight - 6) + "px";   // pop ABOVE the bar
+    setTimeout(() => document.addEventListener("mousedown", kOnDown, true), 0);
+  }
+  function clickEl(sel) { const b = win.querySelector(sel); if (b) b.click(); }
+  const plusBtn = win.querySelector(".kit-plus");
+  if (plusBtn) plusBtn.onclick = () => {
+    const mine = !!(active && active.mine);
+    kOpenMenu(plusBtn, [
+      { ic: "📎", label: "Show me an image or file", run: () => clickEl(".kit-up") },
+      { ic: "👁", label: "Look at my screen", run: () => clickEl(".kit-look") },
+      { ic: "⏺", label: "Watch me work" + (mine ? " (learn from it)" : " — for agents you build"), disabled: !mine, run: () => clickEl(".kit-watch") },
+      { ic: "📌", label: "Teach a rule" + (mine ? "" : " — for agents you build"), disabled: !mine, run: () => clickEl(".kit-teach") },
+      { sep: true },
+      { ic: "📋", label: "Copy last reply", run: () => { const m = body.querySelectorAll(".kit-msg.kit"); const last = m[m.length - 1]; const t = last ? (last.innerText || last.textContent || "").trim() : ""; if (t) { try { navigator.clipboard.writeText(t); } catch (_) {} } } },
+      { ic: "🗑", label: "Clear chat", run: () => { if (body) body.innerHTML = ""; } },
+    ]);
+  };
+  const voiceMenuBtn = win.querySelector(".kit-voice");
+  // a chunky, rounded down-arrow (graffiti-ish) instead of the thin cut-off caret
+  if (voiceMenuBtn) voiceMenuBtn.innerHTML = '<svg width="15" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M6 11l6 6 6-6"/></svg>';
+  if (voiceMenuBtn) voiceMenuBtn.onclick = () => {
+    const on = getVoiceOn(active), nm = (active && active.name) || "the agent";
+    kOpenMenu(voiceMenuBtn, [
+      { ic: "🔊", label: nm + " reads replies aloud", check: on, run: () => clickEl(".kit-speak") },
+      { ic: "🎙", label: "Talk to type", run: () => clickEl(".kit-mic") },
+      { sep: true },
+      { ic: "👂", label: "Wake word — “Hey Tiffany” / “Hey Kit”", check: wakeOn, disabled: !SRdock, run: () => setWakeOn(!wakeOn) },
+    ]);
   };
 
   // ── 👁 ANNOTATOR — mark up the captured shot (arrows / freehand, pick a color) to point at exactly
@@ -685,14 +733,85 @@
   function setVoiceOn(ch, on){ if (!ch) return; try { localStorage.setItem("dmv_voice_on_" + ch.id, on ? "1" : "0"); } catch (_) {} }
   // strip chat-only cruft so the spoken line is clean. KEEP [expression] tags (Fish S2 fires them);
   // the browser fallback strips them since it can't perform them.
+  // valid Fish S2 expression tags — anything else in brackets is stripped, so Fish never tries to
+  // vocalize a bad tag and run off into noise / another language. (docs.fish.audio — S2 uses [tags])
+  const FISH_TAGS = new Set(["whispering","soft tone","sad","excited","joyful","delighted","embarrassed","proud","grateful","confident","curious","serious","empathetic","comforting","sincere","relaxed","amused","chuckling","laughing","surprised","worried","nervous","frustrated","confused","moved","interested","satisfied","sarcastic","scared","astonished"]);
   function cleanForSpeech(t){
     return String(t || "")
       .replace(/```[\s\S]*?```/g, " ")          // code/action fences — don't read them aloud
       .replace(/\*\([\s\S]*?\)\*/g, " ")         // *(preview / +learned)* asides
-      .replace(/[*_`#>]/g, "")                    // markdown chars
-      .replace(/\s+/g, " ").trim();
+      .replace(/\[([^\]]+)\]\((https?:[^)]*)\)/g, "$1")   // markdown links → just the text
+      .replace(/\[([^\]]{1,22})\]/g, (m,g) => FISH_TAGS.has(g.trim().toLowerCase()) ? "[" + g.trim().toLowerCase() + "]" : " ")   // keep ONLY real Fish tags; drop the rest
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}]/gu, " ")   // strip emoji/symbols
+      .replace(/[*_`#>~]/g, "")                    // markdown chars
+      .replace(/\s*(?:…|\.{2,})\s*/g, ". ")        // ellipses / trailing-off → a clean stop (kills the run-on)
+      .replace(/([!?])\1+/g, "$1")                 // !!! → !
+      .replace(/\s+([,.!?;:])/g, "$1")
+      .replace(/\s+/g, " ").trim()
+      .replace(/([^.!?])$/, "$1.");                // always end on a terminator so Fish stops cleanly
   }
   let _audioEl = null;
+  // ── 🎙 RICH VOICE state (shared by the mic + ask()): the live tone read of the last take, the
+  //    recording (for Whisper uncensor), and the open ear handle. Mirrors the main chat. ──
+  let lastVoiceTone = null, lastVoiceBlob = null, voiceListen = null;
+  // ── voice meter — pink to HER voice, blue to YOURS (matches the main chat) ──
+  const vmEl = win.querySelector(".kit-vm"); const _vmBars = [];
+  if (vmEl) { for (let i = 0; i < 11; i++) { const b = document.createElement("div"); b.className = "vmb"; vmEl.appendChild(b); _vmBars.push(b); } }
+  function vmShow(who){ if (!vmEl) return; vmEl.style.setProperty("--kvm", who === "her" ? "#E94B9C" : "#56C2DE"); vmEl.classList.add("on"); }
+  function vmHide(){ if (!vmEl) return; vmEl.classList.remove("on"); _vmBars.forEach(b => { b.style.height = "3px"; }); }
+  function vmLevel(v){ v = Math.max(0, Math.min(1, v || 0)); const n = _vmBars.length;
+    for (let i = 0; i < n; i++){ const c = 1 - Math.abs(i - (n - 1) / 2) / ((n - 1) / 2); const h = 3 + v * 17 * (0.5 + 0.5 * c) * (0.65 + 0.7 * Math.random()); _vmBars[i].style.height = Math.min(20, h).toFixed(1) + "px"; } }
+  function vmFromAudio(audioEl){ try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ac = new AC(); if (ac.state === "suspended") { try { ac.resume(); } catch(e){} }
+    const src = ac.createMediaElementSource(audioEl), an = ac.createAnalyser(); an.fftSize = 256; src.connect(an); an.connect(ac.destination);
+    const buf = new Uint8Array(an.fftSize);
+    const tick = () => { if (audioEl.paused || audioEl.ended) { vmHide(); try { ac.close(); } catch(e){} return; }
+      an.getByteTimeDomainData(buf); let peak = 0; for (let i = 0; i < buf.length; i++){ const d = Math.abs(buf[i] - 128) / 128; if (d > peak) peak = d; }
+      vmLevel(Math.min(1, peak * 1.7)); requestAnimationFrame(tick); };
+    audioEl.addEventListener("play", () => { vmShow("her"); requestAnimationFrame(tick); });
+    audioEl.addEventListener("ended", vmHide);
+  } catch(e){} }
+
+  // ── 👂 WAKE WORD — say "Hey Tiffany" / "Hey Kit" and the agent wakes up, opens, and listens
+  //    hands-free for your command (then sleeps, like a smart speaker). Opt-in (always-on mic),
+  //    persisted per machine. Uses ONE recognizer at a time: the wake listener detects the phrase,
+  //    hands off to the command mic, then resumes when that mic ends. setupMic publishes the
+  //    dockMicStart/dockMicStop hooks below. ──
+  const SRdock = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let wakeOn = false; try { wakeOn = localStorage.getItem("dmv_wake_on") === "1"; } catch(_){}
+  let wakeRec = null;
+  let dockMicStart = null, dockMicStop = null, micIsListening = function(){ return false; };   // wired by setupMic
+  function agentForWake(said){
+    if (/tiffan|tiff|jeff/.test(said)) return "tiff";   // tolerate the common mishears of "Tiffany"
+    if (/\bkit+\b|kitt/.test(said)) return "kit";
+    return null;
+  }
+  function onWakeResult(e){
+    let txt = ""; for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+    const m = txt.toLowerCase().match(/\bhey,?\s+(tiffan\w*|tiff|jeff|kit+t?)\b/);
+    if (!m) return;
+    const id = agentForWake(m[1]); if (!id) return;
+    pauseWake();                                                           // free the mic for the command recognizer
+    const ch = CHARACTERS.find(c => c.id === id);
+    if (ch && (!active || active.id !== ch.id)) { try { setActive(ch, false); } catch(_){} }   // switch without wiping the chat
+    win.classList.add("open");
+    try { addMsg("kit", "👂 _listening…_"); } catch(_){}
+    setTimeout(() => { if (dockMicStart) dockMicStart({ viaWake: true }); }, 220);   // hands-free: capture the command, auto-send on a pause
+  }
+  function startWake(){
+    if (!SRdock || !wakeOn || wakeRec || (micIsListening && micIsListening())) return;
+    try {
+      wakeRec = new SRdock(); wakeRec.lang = "en-US"; wakeRec.interimResults = true; wakeRec.continuous = true;
+      wakeRec.onresult = onWakeResult;
+      wakeRec.onerror = function(){};                                       // transient — onend revives it
+      wakeRec.onend = function(){ wakeRec = null; if (wakeOn && !(micIsListening && micIsListening())) setTimeout(startWake, 500); };
+      wakeRec.start();
+    } catch(_){ wakeRec = null; }
+  }
+  function pauseWake(){ if (wakeRec) { try { wakeRec.onend = null; wakeRec.abort(); } catch(_){} wakeRec = null; } }
+  function setWakeOn(on){ wakeOn = on; try { localStorage.setItem("dmv_wake_on", on ? "1" : "0"); } catch(_){} if (on) startWake(); else pauseWake(); }
+
   const speakBtn = win.querySelector(".kit-speak");
   function paintSpeak(){
     if (!speakBtn) return;
@@ -700,13 +819,23 @@
     speakBtn.classList.toggle("on", on);
     speakBtn.textContent = on ? "🔊" : "🔇";
     speakBtn.title = on ? ("Voice ON — " + nm + " speaks replies. Tap to mute.") : ("Voice off — tap so " + nm + " talks out loud");
+    const vb = win.querySelector(".kit-voice"); if (vb) { vb.classList.toggle("on", on); vb.title = on ? (nm + " reads replies aloud — voice options") : "Voice options"; }   // the caret glows when voice is on
   }
+  // hide spoken-only [expression] tags from the BUBBLE (Fish still reads them). Lowercase emotion tags
+  // only — never [Verse]/[Hook] (capitalized) or markdown links. Mirrors the main chat's stripTags.
+  function stripVoiceTags(s){ return String(s).replace(/\[[a-z][a-z ,'\-]{0,24}\](?!\()/g, "").replace(/[ \t]{2,}/g, " "); }
+  function _pickBrowserVoice(){ try { const vs = speechSynthesis.getVoices() || [];
+    return vs.find(v => /en/i.test(v.lang) && /(female|woman|zira|aria|jenny|samantha|google us english|hazel|susan|eva|fiona)/i.test(v.name))
+        || vs.find(v => /en/i.test(v.lang) && !/(david|mark|george|guy|\bmale\b|paul|fred|alex)/i.test(v.name))
+        || vs.find(v => /en/i.test(v.lang)) || vs[0] || null; } catch(_){ return null; } }
   function speakBrowser(text){
-    try { const u = new SpeechSynthesisUtterance(String(text).replace(/\[[^\]]*\]/g, "")); u.rate = 1.04; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (_) {}
+    try { const u = new SpeechSynthesisUtterance(String(text).replace(/\[[^\]]*\]/g, "")); u.rate = 1.04;
+      const _v = _pickBrowserVoice(); if (_v) { u.voice = _v; u.lang = _v.lang; }   // dodge the default robot-dude voice
+      speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (_) {}
   }
   async function playTTS(text, modelId){
     const clean = cleanForSpeech(text); if (!clean) return;
-    if (!modelId) { speakBrowser(clean); return; }            // no voice id → free browser voice
+    if (!modelId) { speakBrowser(clean); return; }            // no voice id at all → free browser voice
     if (speakBtn) speakBtn.classList.add("playing");
     try {
       const r = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: clean, model_id: modelId }) });
@@ -714,10 +843,18 @@
       if (j && j.audio) {
         if (_audioEl) { try { _audioEl.pause(); } catch (_) {} }
         _audioEl = new Audio(j.audio);
-        _audioEl.onended = _audioEl.onerror = () => { if (speakBtn) speakBtn.classList.remove("playing"); };
-        _audioEl.play().catch(() => { if (speakBtn) speakBtn.classList.remove("playing"); });
-      } else { if (speakBtn) speakBtn.classList.remove("playing"); speakBrowser(clean); }   // key/credit/error → still talk
-    } catch (_) { if (speakBtn) speakBtn.classList.remove("playing"); speakBrowser(clean); }
+        _audioEl.onended = _audioEl.onerror = () => { if (speakBtn) speakBtn.classList.remove("playing"); vmHide(); };
+        vmFromAudio(_audioEl);                                 // 🔊 meter dances pink to her voice
+        _audioEl.play().catch(() => { if (speakBtn) speakBtn.classList.remove("playing"); vmHide(); });
+      } else {
+        if (speakBtn) speakBtn.classList.remove("playing");
+        const err = (j && j.error) || "";
+        // NO ROBOT mid-convo (owner's hard rule): browser voice ONLY when there's no Fish key (free user).
+        // A real Fish failure (bad/"reference not found" voice id, 4xx, credit) → STAY TEXT + say why.
+        if (/key/i.test(err)) speakBrowser(clean);
+        else addMsg("kit", "*(🔊 voice off — Fish: " + (String(err).slice(0, 70) || "unavailable") + " · fix this agent's voice id in Settings → Voices)*");
+      }
+    } catch (_) { if (speakBtn) speakBtn.classList.remove("playing"); vmHide(); addMsg("kit", "*(🔊 couldn't reach Fish — staying text)*"); }
   }
   if (speakBtn) speakBtn.onclick = () => {
     if (!active) return;
@@ -744,7 +881,10 @@
     const locals = (j && Array.isArray(j.models)) ? j.models : [];
     const clouds = (j && Array.isArray(j.cloud)) ? j.cloud : [];
     let html = '<option value="auto">Auto (local)</option>';
-    locals.forEach(id => { html += '<option value="' + id + '">🖥 ' + id + '</option>'; });
+    const _seen = new Set();
+    locals.forEach(id => { const base = String(id).replace(/:\d+$/, "");   // collapse duplicate LM Studio instances (gemma, gemma:2, gemma:3 → ONE)
+      if (_seen.has(base)) return; _seen.add(base);
+      html += '<option value="' + base + '">🖥 ' + base + '</option>'; });
     clouds.forEach(c => { if (c && c.id) html += '<option value="' + c.id + '">' + (c.label || c.id) + '</option>'; });
     if (!clouds.length) html += '<option value="__addkey">➕ Add a cloud model…</option>';
     modelSel.innerHTML = html;
@@ -918,6 +1058,7 @@
   // ── ask the active character (carries `character`; backend may route per-character later) ──
   let busy = false;
   async function ask() {
+    if (dockMicStop) dockMicStop();   // pressing send (or auto-send) stops the mic recording — restart it to talk again
     // ── DOCKED-AGENT FIX (Studio). If she's parented to stem(s) and you give a fix command
     //    ("brighter", "less harsh", "fix it"…), she DOES it — clamped-safe, in-house, free —
     //    instead of just talking. Guarded so it's a pure no-op in every other room / when
@@ -930,15 +1071,25 @@
           if (res && res.handled) {
             addMsg("you", dq); input.value = ""; input.style.height = "auto";
             addMsg("kit", res.reply); winSpr && winSpr.setSpeed && winSpr.setSpeed(2);
+            if (getVoiceOn(active)) { try { playTTS(res.reply, getVoiceModelId(active)); } catch (_) {} }   // 🔊 she says what she just did, too
+            lastVoiceTone = null; lastVoiceBlob = null;
             return;
           }
         } catch (_) {}
       }
     }
-    const q = input.value.trim(); if ((!q && !pendingImage && !pendingAudio) || busy) return;   // allow an image- OR audio-only ask
+    let q = input.value.trim(); if ((!q && !pendingImage && !pendingAudio) || busy) return;   // allow an image- OR audio-only ask
     busy = true; go.disabled = true;
     const sentImage = pendingImage;
     const sentAudio = pendingAudio;
+    // 🔊→📝 UNCENSOR: if the browser bleeped a cuss (***) and we recorded the mic take, re-transcribe via Whisper
+    if (lastVoiceBlob && /\*/.test(q)) {
+      try {
+        const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(lastVoiceBlob); });
+        const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: dataUrl, audio_name: "voice.webm" }) }).then(r => r.json());
+        if (tr && tr.text && tr.text.trim() && !/\*/.test(tr.text)) q = tr.text.trim();
+      } catch (_) {}
+    }
     addMsg("you", q || (sentAudio ? "🎵 " + (sentAudio.name || "audio") : "(image)"));
     if (sentImage) { const im = document.createElement("img"); im.src = sentImage;
       im.style.cssText = "max-width:130px;border-radius:9px;margin-top:5px;display:block;border:1px solid rgba(120,182,205,.4);";
@@ -948,7 +1099,24 @@
     try {
       // base body is unchanged for Kit + the preview cast. User-made (mine) characters ALSO
       // carry persona/knowledge/charName/charCraft so the backend answers genuinely as them.
-      const payload = { room, message: q || (sentImage && !sentAudio ? "Look at this image and write a great prompt I can generate from it." : ""), character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      // 🎙 RICH VOICE + 🔊 VOICE MODE — fold the live tone read + the spoken-delivery directive into the prompt (mirrors the main chat)
+      let voiceFold = "";
+      if (lastVoiceTone && lastVoiceTone.ok) {
+        if (lastVoiceTone.kind === "sung") {
+          const shaky = lastVoiceTone.confidence < 0.5 ? " (the read was shaky — fine to tell me to run it back)" : "";
+          voiceFold += "\n\n[🎙 Rich Voice — performed live, dry vocal, measured: " + lastVoiceTone.line + "." + shaky
+            + " Be the engineer in the room: my style is never 'wrong,' but call the pitch/timing straight and we fix it in post. Only claim what you can actually hear.]";
+        } else { voiceFold += "\n\n[🎙 voice (how I said it): " + lastVoiceTone.line + "]"; }
+      }
+      if (getVoiceOn(active)) {
+        voiceFold += "\n\n[VOICE MODE — your reply is read aloud in your REAL voice (Fish Audio S2). Talk like a person, not a song:\n"
+          + "• MIRROR MY EMOTION. Read how I sound from the [🎙 Rich Voice] note + my words, and match it: I'm down/sad -> [sad] or [whispering] or [comforting]; I'm hyped/happy -> [excited] or [joyful]; I praise you / say good job -> [grateful] or [joyful] or [proud]; I say you messed up -> [embarrassed] then [sincere]; things going wrong / I'm stressed -> [worried] or [nervous]; I'm chill -> [relaxed]; I impress you -> [surprised] or [amused].\n"
+          + "• Put ONE tag right before the words it colors — about one every 2-3 sentences, never every line. Use ONLY these EXACT tags: [whispering] [soft tone] [sad] [excited] [joyful] [delighted] [embarrassed] [proud] [grateful] [confident] [curious] [serious] [empathetic] [comforting] [sincere] [relaxed] [amused] [chuckling] [laughing] [surprised] [worried] [nervous] [frustrated] [confused]. NO other bracket words. Tags are hidden from the reader.\n"
+          + "• Natural flowing phrases. Do NOT trail off with \"…\" and do NOT use ellipses — finish every sentence and END on a period. No markdown, no emoji, no stage directions.\n"
+          + "• If I sang or held a note, SAY you heard it — call the vibe or the pitch.]";
+      }
+      const payload = { room, message: (q || (sentImage && !sentAudio ? "Look at this image and write a great prompt I can generate from it." : "")) + voiceFold, character: active.id, tier, model: getAgentModel(active), effort: kitEffort };
+      lastVoiceTone = null; lastVoiceBlob = null;   // the take is consumed — fresh read next mic press
       { const _crew = getAgentCrew(active); if (_crew && _crew.length) payload.crew = _crew; }   // CREW: the user-picked backing brains for THIS agent
       if (handoff && handoff.brief) { payload.handoff = handoff.brief; handoff = null; }   // seed the room ONCE with the chat brief, then run on the room's own thread
       if (sentImage) payload.image = sentImage;
@@ -966,9 +1134,9 @@
       const j = await r.json(); think.remove();
       let reply = j.reply || "Hm, I blanked — ask me again?";
       if (active.preview && !active.mine) reply = "*(" + active.name + " is a preview character — answering through the room brain for now)*\n\n" + reply;
-      addMsg("kit", reply);
+      addMsg("kit", getVoiceOn(active) ? stripVoiceTags(reply) : reply);   // hide spoken-only [tags] from the bubble when voice is on
       // ── VOICE: speak the reply when 🔊 is on for this agent (Fish Audio in its voice; browser voice if no key) ──
-      if (getVoiceOn(active)) { try { playTTS(reply, getVoiceModelId(active)); } catch (_) {} }
+      if (getVoiceOn(active)) { try { playTTS(reply, getVoiceModelId(active)); } catch (_) {} }   // playTTS gets the FULL reply so Fish performs the [tags]
       // ── LEARNS AS YOU WORK — fire-and-forget: distill this real exchange into the agent's pack.
       //    Only for user (mine) agents with a real question (built-in Kit/Tiff NEVER write a user pack);
       //    repaints ONLY when the model found genuine, durable rules (res.added > 0) — never on empties. ──
@@ -1016,7 +1184,17 @@
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { micBtn.disabled = true; micBtn.title = "Talk-to-type isn't available in this build"; return; }
     let rec = null, listening = false, manualStop = false, committed = "", lastFinal = "", got = false;
-    const reset = () => { listening = false; micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; };
+    let viaWake = false, silenceT = null;                  // a WAKE-WORD capture auto-sends after a short pause (hands-free)
+    micIsListening = function(){ return listening; };
+    function clearSilence(){ if (silenceT) { clearTimeout(silenceT); silenceT = null; } }
+    function finishEar(){                                  // 🎙 close the ear, keep the tone read for the next send
+      if (!voiceListen) return;
+      const h = voiceListen; voiceListen = null;
+      let sum = null; try { sum = h.stop(); } catch(_){}
+      vmHide();
+      if (sum && sum.ok) lastVoiceTone = sum;
+    }
+    const reset = () => { listening = false; clearSilence(); micBtn.classList.remove("rec"); micBtn.textContent = "🎙"; micBtn.title = "Talk to type — press, speak, it types for you"; finishEar(); viaWake = false; if (wakeOn) startWake(); };
     const errText = c => ({
       "not-allowed": "mic is blocked — allow the microphone for the app, then try again",
       "service-not-allowed": "Windows is blocking the mic — check Settings ▸ Privacy ▸ Microphone",
@@ -1033,6 +1211,7 @@
         const full = committed + fin + interim;
         if (full.trim()) got = true;
         input.value = full; input.dispatchEvent(new Event("input"));
+        if (viaWake && full.trim()) { clearSilence(); silenceT = setTimeout(() => { if (dockMicStop) dockMicStop(); ask(); }, 2300); }   // wake capture: ~2.3s pause → send it hands-free
       };
       rec.onerror = ev => { const err = ev && ev.error;
         if (err === "no-speech" || err === "aborted") return;   // transient (a pause) — let onend auto-restart
@@ -1042,18 +1221,29 @@
         if (committed && !/\s$/.test(committed)) committed += " ";
         if (!manualStop && listening) { try { startRec(); return; } catch (_) {} }   // keep listening through pauses
         reset();
-        if (!got) addMsg("kit", "🎙 didn't catch anything — press the mic and talk; your words land in the box as you go.");
+        if (!got && !viaWake) addMsg("kit", "🎙 didn't catch anything — press the mic and talk; your words land in the box as you go.");
       };
       try { rec.start(); } catch (err) { reset(); addMsg("kit", "🎙 couldn't start the mic — " + ((err && err.message) || err)); }
     }
-    micBtn.onclick = () => {
-      if (listening) { manualStop = true; rec && rec.stop(); return; }   // press again = stop (it never sends; you read it + hit ➤)
-      manualStop = false; got = false;
+    function startMicCapture(opts){
+      if (listening) return;
+      pauseWake();                                          // only one recognizer at a time (wake listener stands down)
+      manualStop = false; got = false; viaWake = !!(opts && opts.viaWake);
       committed = input.value ? input.value.replace(/\s*$/, "") + " " : "";   // start from whatever's already typed
+      lastVoiceTone = null; lastVoiceBlob = null;                              // fresh take — drop any prior read
+      if (active && !getVoiceOn(active)) { setVoiceOn(active, true); paintSpeak(); }   // 🔊 talk = she answers in voice (auto-on)
+      try { if (window.DMV_EAR && DMV_EAR.startListen) { vmShow("you"); voiceListen = DMV_EAR.startListen(function(lv){ vmLevel(lv); }, function(blob){ lastVoiceBlob = blob; }); } } catch(_){}   // 🎙 ear + live meter + recording
       listening = true; micBtn.classList.add("rec"); micBtn.textContent = "■"; micBtn.title = "Listening… press to stop"; input.focus();
       startRec();
+    }
+    micBtn.onclick = () => {
+      if (listening) { manualStop = true; clearSilence(); rec && rec.stop(); return; }   // press again = stop (you read it + hit ➤)
+      startMicCapture();
     };
+    dockMicStart = startMicCapture;                         // the wake word hands its command capture to this
+    dockMicStop = function(){ if (listening) { manualStop = true; clearSilence(); try { rec && rec.stop(); } catch(_){} } finishEar(); };   // SEND auto-stops the mic
   })();
+  if (wakeOn) startWake();                                  // resume the always-on wake listener if it was left enabled
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
   input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(90, input.scrollHeight) + "px"; });
 

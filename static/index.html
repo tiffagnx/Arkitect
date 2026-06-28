@@ -407,24 +407,24 @@
     <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><small>local · private · yours</small><span class="wallegg" role="button" aria-label="Sign the wall" onclick="location.href='/static/wall.html'"></span></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
-    <div class="raillabel">Memory</div>
-    <div class="roomrail">
-      <button type="button" class="roomlink memlink" data-scope="local"><span class="ri">⚡</span><span>Local memory</span></button>
-      <button type="button" class="roomlink memlink" data-scope="cloud"><span class="ri">☁</span><span>Cloud memory</span></button>
-    </div>
     <div class="roomsearch"><span class="rs-ic">⌕</span><input id="roomSearch" type="search" placeholder="Search rooms…" autocomplete="off" aria-label="Search rooms" /></div>
     <div class="raillabel">Rooms</div>
     <div class="roomrail">
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
-      <a class="roomlink" href="/static/beats.html"><span class="ri">🥁</span><span>Leon Production Labs</span></a>
     </div>
     <div class="raillabel">More</div>
     <div class="roomrail">
-      <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>
       <a class="roomlink" href="/static/images.html"><span class="ri">🎨</span><span>Imagination Station</span></a>
       <a class="roomlink" href="/static/build.html"><span class="ri">🛠</span><span>Berner Builder</span></a>
+      <a class="roomlink" id="connectClaude" style="cursor:pointer" onclick="if(window.arkOpenSettings){window.arkOpenSettings('mcp')}"><span class="ri">🔌</span><span>Connect to Claude</span></a>
       <a class="roomlink" href="/for-creators"><span class="ri">🎭</span><span>For Creators</span></a>
+      <a class="roomlink streampin" href="/static/stream.html"><span class="ri">📡</span><span>The Stream</span><span class="pinhint">Notifi · Cratel</span></a>
+    </div>
+    <div class="raillabel">Memory</div>
+    <div class="roomrail">
+      <button type="button" class="roomlink memlink" data-scope="local"><span class="ri">⚡</span><span>Local memory</span></button>
+      <button type="button" class="roomlink memlink" data-scope="cloud"><span class="ri">☁</span><span>Cloud memory</span></button>
     </div>
     <div class="sidefoot">
       <div id="prStatus" style="display:flex; gap:16px; justify-content:center; padding:2px 0 8px; font:600 10px Inter; letter-spacing:.06em; color:var(--dim);">
@@ -440,7 +440,7 @@
       <div class="avatar" id="avatar"></div>
       <div class="who">TIFF<small id="status">ready</small></div>
       <div class="charsw" id="charsw" style="display:none">
-        <button class="csf tiff on" data-brain="tiff" title="Talk to Tiff" type="button"></button>
+        <button class="csf tiff on" data-brain="tiff" title="Talk to Tiffany" type="button"></button>
         <button class="csf kit" data-brain="kit" title="Talk to Kit" type="button"></button>
       </div>
       <select class="model" id="model"></select>
@@ -473,7 +473,7 @@
         <button class="mode chat on" id="modeChat">💬 Chat</button>
         <button class="mode" id="modeWrite">✍️ Write</button>
         <button class="mode" id="modeResearch">🔬 Research</button>
-        <div class="elever e1" id="elever" title="How hard Tiff thinks — drag toward Smarter for deeper reasoning">
+        <div class="elever e1" id="elever" title="How hard Tiffany thinks — drag toward Smarter for deeper reasoning">
           <span class="el-end">Faster</span>
           <span class="el-track" id="elTrack"><span class="el-fill" id="elFill"></span><span class="el-thumb" id="elThumb"></span></span>
           <span class="el-end">Smarter</span>
@@ -485,9 +485,11 @@
       <div class="chips" id="chips"></div>
       <div class="inputrow" id="inputrow">
         <button class="attach" id="attach" title="Attach images, PDFs, Word docs, text or code — images get seen, the rest gets read">＋</button>
-        <textarea id="input" rows="1" placeholder="Talk to Tiff…"></textarea>
+        <textarea id="input" rows="1" placeholder="Talk to Tiffany…"></textarea>
         <button class="send" id="mic" title="Tap to talk · pause all you want · tap again when you're done · then press ➤"
           style="background:rgba(255,255,255,.07); color:#D8CCE4; box-shadow:none; border:1px solid var(--hairline); font-size:15px;">🎙</button>
+        <button class="send" id="speak" title="Voice off — tap so she talks back in her voice"
+          style="background:rgba(255,255,255,.07); color:#D8CCE4; box-shadow:none; border:1px solid var(--hairline); font-size:15px;">🔇</button>
         <button class="send" id="send">➤</button>
       </div>
       <input type="file" id="fileInput" multiple
@@ -531,7 +533,10 @@ async function arkRebuildModels(){
   const r = await fetch("/api/models").then(r => r.json()).catch(() => ({models:[]}));
   const prev = sel.value || localStorage.getItem("pinkroom-model");
   sel.innerHTML = "";
-  (r.models || []).forEach(m => { const o = document.createElement("option"); o.value = o.textContent = m; sel.appendChild(o); });
+  const _seenM = new Set();
+  (r.models || []).forEach(m => { const base = String(m).replace(/:\d+$/, "");   // collapse duplicate LM Studio instances (gemma, gemma:2, gemma:3 → ONE)
+    if (_seenM.has(base)) return; _seenM.add(base);
+    const o = document.createElement("option"); o.value = o.textContent = base; sel.appendChild(o); });
   (r.cloud || []).forEach(c => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); });  // ☁ cloud models (your own keys)
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
   return r;
@@ -790,6 +795,7 @@ function setChatBrain(id){
   document.querySelectorAll('.csf[data-brain]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-brain')===id); });
   if(av) av.style.boxShadow = (id==='kit' ? '0 0 0 2px rgba(62,156,184,.75)' : '0 0 0 2px rgba(233,75,156,.75)');
   try { window.activeBrain = id; if (window.setMascotChar) window.setMascotChar(id); } catch(_){}   // switch the bottom animation to match
+  try { paintSpeakBtn(); } catch(_){}   // 🔊 reflect this agent's own voice on/off state
   try { var _ip = $('input'); if (_ip && typeof chatPlaceholder === 'function') _ip.placeholder = chatPlaceholder(); } catch(_){}   // the box names whoever's active
   // theme the whole UI to the active character — Tiff pink, Kit blue
   var _rs = document.documentElement.style;
@@ -802,7 +808,7 @@ document.addEventListener('click', function(e){ var c = e.target.closest ? e.tar
 function renderShelf(){
   var row = $("cshelfRow"); if(!row) return;
   row.innerHTML =
-    '<div class="cstile tiff" data-brain="tiff" draggable="true" title="Tiff — your general-purpose creative partner (vibe, words, ideas). Click to chat, or drag her into a room to bring her in."><img src="/static/tiff.png" alt=""><span><span class="ct-n">Tiff</span><span class="ct-r">general</span></span></div>' +
+    '<div class="cstile tiff" data-brain="tiff" draggable="true" title="Tiffany — your general-purpose creative partner (vibe, words, ideas). Click to chat, or drag her into a room to bring her in."><img src="/static/tiff.png" alt=""><span><span class="ct-n">Tiffany</span><span class="ct-r">general</span></span></div>' +
     '<div class="cstile kit" data-brain="kit" draggable="true" title="Kit — the specialist for deeper, hands-on, technical work. Click to chat, or drag him into a room to bring him in."><img src="/static/tec.png" alt=""><span><span class="ct-n">Kit</span><span class="ct-r">specialist</span></span></div>' +
     '<div class="cstile build" onclick="location.href=\'/static/character.html\'" title="Build your own agent"><span class="ct-plus">＋</span><span class="ct-n">Build your own</span></div>';
 }
@@ -813,9 +819,23 @@ async function send() {
   if (sessionLoading) { setStatus("loading that chat — one sec…"); return; }
   if (pendingAtt.some(a => a.loading)) { setStatus("still reading that file — one sec…"); return; }
   const ta = $("input");
-  const typed = ta.value.trim();
+  let typed = ta.value.trim();
   const atts = pendingAtt.filter(a => !a.error);
   if (!typed && !atts.length) return;
+
+  // 🔊→📝 UNCENSOR: if Chrome's speech engine bleeped a cuss (***) and we recorded the take,
+  //    re-transcribe with Whisper (uncensored + more accurate). Only fires WHEN censored, so a
+  //    normal send stays instant — you only eat the ~1s when there's actually a bleep to fix.
+  if (lastVoiceBlob && /\*/.test(typed)) {
+    setStatus("cleaning up the transcript…");
+    try {
+      const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(lastVoiceBlob); });
+      const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: dataUrl, audio_name: "voice.webm" }) }).then(r => r.json());
+      if (tr && tr.text && tr.text.trim() && !/\*/.test(tr.text)) { typed = tr.text.trim(); ta.value = typed; setStatus("ready"); }
+      else if (tr && tr.error) { setStatus("(kept your words — Whisper off: " + String(tr.error).slice(0, 55) + ")", true); }
+    } catch (_) {}
+  }
+  lastVoiceBlob = null;
 
   // Build what the MODEL sees: typed text + any file text folded in; images as
   // vision parts. Build what the BUBBLE shows: just what B typed + previews.
@@ -837,6 +857,26 @@ async function send() {
     const noLyric = /key/i.test(terr) ? " (no transcription key — break down the sound from the measured numbers, and tell me I can add a free Groq key for the lyrics)" : " (no transcript — read it from the measured sound)";
     modelText = head + "\n\n[🎵 " + (audAtt.name || "audio") + (mline ? " — measured: " + mline : "") + (lyrics ? "\nlyrics/transcript:\n" + lyrics.slice(0, 1800) : noLyric) + "]";
   }
+  // 🎙 RICH VOICE — how it was SAID/SUNG (measured live off the mic), folded in like the song numbers above
+  if (lastVoiceTone && lastVoiceTone.ok) {
+    if (lastVoiceTone.kind === "sung") {
+      const shaky = lastVoiceTone.confidence < 0.5 ? " (the read was shaky — fine to tell me to run it back)" : "";
+      modelText = (modelText.trim() ? modelText : "(no text typed — react to how I just sang it)")
+        + "\n\n[🎙 Rich Voice — performed live, dry vocal, measured: " + lastVoiceTone.line + "." + shaky
+        + " Be the engineer in the room: my style is never 'wrong,' but call the pitch/timing straight and we fix it in post. Only claim what you can actually hear.]";
+    } else {
+      modelText += "\n\n[🎙 voice (how I said it): " + lastVoiceTone.line + "]";
+    }
+  }
+  // 🔊 when her reply will be SPOKEN, teach her the delivery: structured lines + punctuation pacing +
+  //    hidden inline Fish tags (research-backed). Conversational — NEVER song format.
+  if (voiceReplyOn()) {
+    modelText += "\n\n[VOICE MODE — your reply is read aloud in your REAL voice (Fish Audio S2). Talk like a person, not a song:\n"
+      + "• MIRROR MY EMOTION. Read how I sound from the [🎙 Rich Voice] note + my words, and match it: I'm down/sad -> [sad] or [whispering] or [comforting]; I'm hyped/happy -> [excited] or [joyful]; I praise you / say good job -> [grateful] or [joyful] or [proud]; I say you messed up -> [embarrassed] then [sincere]; things going wrong / I'm stressed -> [worried] or [nervous]; I'm chill -> [relaxed]; I impress you -> [surprised] or [amused].\n"
+      + "• Put ONE tag right before the words it colors — about one every 2-3 sentences, never every line. Use ONLY these EXACT tags: [whispering] [soft tone] [sad] [excited] [joyful] [delighted] [embarrassed] [proud] [grateful] [confident] [curious] [serious] [empathetic] [comforting] [sincere] [relaxed] [amused] [chuckling] [laughing] [surprised] [worried] [nervous] [frustrated] [confused]. NO other bracket words. Tags are hidden from the reader.\n"
+      + "• Natural flowing phrases. Do NOT trail off with \"…\" and do NOT use ellipses — finish every sentence and END on a period. No markdown, no emoji, no stage directions.\n"
+      + "• If I sang or held a note, SAY you heard it — call the vibe or the pitch. That's the whole point: you can HEAR me.]";
+  }
   const content = imgAtts.length
     ? [{ type: "text", text: modelText || "(image attached — take a look)" },
        ...imgAtts.map(a => ({ type: "image_url", image_url: { url: a.url } }))]
@@ -845,7 +885,7 @@ async function send() {
   const userMsg = { role: "user", content, _typed: typed, _files: fileAtts.map(f => ({ name: f.name })) };
 
   ta.value = ""; ta.style.height = "auto"; growInput();
-  clearAtts();
+  clearAtts(); clearVoiceTone(); lastVoiceTone = null;
   addMsg("user", typed || (audAtt ? "🎵 " + audAtt.name : ""), dispAtts);
   messages.push(userMsg);
 
@@ -921,8 +961,11 @@ async function send() {
 
   // strip her private reasoning from what we keep — only the answer goes into history
   const finalAnswer = splitThink(acc).answer || acc;
-  if (!finalAnswer.trim() && !thinkEl) bubble.textContent = "…nothing came back. Is LM Studio's server on?";
-  messages.push({ role: "assistant", content: finalAnswer });
+  const shownAnswer = stripTags(finalAnswer);                          // hide spoken-only [expression] tags from the bubble
+  if (shownAnswer.trim()) { const _t = ansEl || bubble; _t.innerHTML = md(shownAnswer); }
+  else if (!thinkEl) bubble.textContent = "…nothing came back. Is LM Studio's server on?";
+  messages.push({ role: "assistant", content: shownAnswer });
+  if (voiceReplyOn() && finalAnswer.trim()) { try { speakReply(finalAnswer); } catch(_){} }   // 🔊 read it back, with emotion
   streaming = false;
   $("send").classList.remove("stop"); $("send").textContent = "➤";
   $("avatar").classList.remove("live");
@@ -1067,7 +1110,7 @@ $("memAdd").onclick = async () => {
 
 /* ── modes + input ── */
 function chatPlaceholder() {
-  var name = (activeBrain === "kit") ? "Kit" : "Tiff";
+  var name = (activeBrain === "kit") ? "Kit" : "Tiffany";
   return mode === "research" ? "What should I dig into?"
     : mode === "write" ? "Drop your bars — I'll go off what YOU wrote…"
     : "Talk to " + name + "…";
@@ -1086,13 +1129,29 @@ $("modeResearch").onclick = () => setMode("research");
 /* ── mic: tap to talk, PAUSE freely, tap again when done — YOU press send (never auto-sends) ── */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false, wantStop = false, finalText = "", pendingInterim = "";
+let voiceListen = null, lastVoiceTone = null, lastVoiceBlob = null;   // 🎙 rich-voice: live pitch/tone read + recording of the current take
 function micActive(on){
   $("mic").style.background = on ? "linear-gradient(135deg,var(--accent2),var(--pink))" : "rgba(255,255,255,.07)";
   $("mic").style.color = on ? "#14040E" : "#D8CCE4";
 }
 function growInput(){ const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px";
   try { document.querySelector(".tec-mascot")?.classList.toggle("busy", t.value.trim().length > 0); } catch(_){} }
-function stopMic(){ if (listening) { wantStop = true; try { rec?.stop(); } catch(_){} } }
+function stopMic(){ if (listening) { wantStop = true; try { rec?.stop(); } catch(_){} } finishVoiceListen(); }
+function finishVoiceListen(){                                            // 🎙 close the ear, keep the read for send()
+  if (!voiceListen) return;
+  const h = voiceListen; voiceListen = null;
+  let sum = null; try { sum = h.stop(); } catch(_){}
+  try { $("mic").classList.remove("voice-live"); voiceFXHide(); } catch(_){}
+  if (sum && sum.ok) { lastVoiceTone = sum; showVoiceTone(sum); }
+}
+function showVoiceTone(sum){                                             // a chip so you SEE what she heard
+  let el = document.getElementById("voiceTone");
+  if (!el){ el = document.createElement("div"); el.id = "voiceTone"; el.className = "chips";
+            const cs = $("chips"); cs.parentNode.insertBefore(el, cs.nextSibling); }
+  el.innerHTML = `<div class="chip"><span class="ico">🎙</span><span class="nm">heard you<small>${escapeHtml(sum.chip || sum.line || "")}</small></span><button class="x" title="dismiss">✕</button>`;
+  el.querySelector(".x").onclick = () => { lastVoiceTone = null; el.innerHTML = ""; };
+}
+function clearVoiceTone(){ const el = document.getElementById("voiceTone"); if (el) el.innerHTML = ""; }
 $("mic").onclick = () => {
   if (!SR) { setStatus("this browser has no speech engine — Chrome does", true); return; }
   if (listening) { stopMic(); return; }                                 // tap again = stop; your text stays in the box
@@ -1100,23 +1159,30 @@ $("mic").onclick = () => {
   wantStop = false;
   finalText = $("input").value ? $("input").value.replace(/\s+$/,"") + " " : "";   // keep anything already typed
   pendingInterim = "";
+  lastVoiceTone = null; lastVoiceBlob = null; clearVoiceTone();          // fresh take — drop any prior tone read + recording
+  if (!voiceReplyOn()) { setVoiceReplyOn(true); paintSpeakBtn(); }       // 🔊 auto-on the moment you talk → it's just talk + send, she answers in voice
+  try { if (window.DMV_EAR && DMV_EAR.startListen) { $("mic").classList.add("voice-live"); voiceFXShow("you"); voiceListen = DMV_EAR.startListen(function(lv){ voiceFXLevel(lv); }, function(blob){ lastVoiceBlob = blob; }); } } catch(_){}  // 🎙 ear + live meter + recording (for Whisper uncensor)
   rec = new SR();
-  rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;  // keep listening through pauses
+  rec.lang = "en-US"; rec.interimResults = true; rec.continuous = true;  // keep listening through pauses (Whisper handles cusses on send — no maxAlternatives churn that ate words)
   rec.onstart = () => { listening = true; micActive(true); setStatus("listening… take your time — tap 🎙 again when you're done"); };
   rec.onresult = (e) => {
     let interim = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {             // only NEW results (no double-counting)
       const r = e.results[i];
       if (r.isFinal) {
-        // Chrome's speech engine bleeps profanity (***) in FINAL results, but the live
-        // interim is usually uncensored — if the final got masked, keep the clean interim.
+        // Chrome's speech engine bleeps cusses (***) in FINAL results. Interims are usually clean,
+        // and sometimes an alternative is too — prefer ANY uncensored version we can find.
         let t = r[0].transcript;
-        if (/\*/.test(t) && pendingInterim && !/\*/.test(pendingInterim)) t = pendingInterim;
+        if (/\*/.test(t)) {
+          for (let a = 1; a < r.length; a++) { if (r[a] && !/\*/.test(r[a].transcript)) { t = r[a].transcript; break; } }
+          if (/\*/.test(t) && pendingInterim && !/\*/.test(pendingInterim)) t = pendingInterim;   // fall back to the clean interim
+        }
         finalText += t + " ";
         pendingInterim = "";
       } else {
         interim += r[0].transcript;
-        pendingInterim = r[0].transcript;
+        const cand = r[0].transcript;
+        if (!/\*/.test(cand) || !pendingInterim) pendingInterim = cand;   // remember the CLEANEST interim for this segment
       }
     }
     $("input").value = (finalText + interim).replace(/\s{2,}/g, " ").replace(/^\s+/, "");
@@ -1133,6 +1199,107 @@ const ta = $("input");
 ta.addEventListener("input", growInput);
 ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); stopMic(); send(); } });
 $("send").onclick = () => { stopMic(); send(); };
+
+/* ── 🔊 VOICE OUT — she reads her replies back in her voice (Fish Audio), with emotion ──
+   Same on/off + voice-id storage as the side helper, so the toggle agrees everywhere.
+   No Fish key / no voice id → free browser voice, so she ALWAYS talks back. */
+const VOICE_DEFAULTS = { kit: "5312c04032034388bb6bac44c94c804d", tiff: "8526ee26387448b2a86c1d1052148a4b" };
+function voiceModelId(id){ try { const m = JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); if (m && m[id]) return m[id]; } catch(_){} return VOICE_DEFAULTS[id] || ""; }
+function voiceReplyOn(){ try { return localStorage.getItem("dmv_voice_on_" + activeBrain) === "1"; } catch(_){ return false; } }
+function setVoiceReplyOn(on){ try { localStorage.setItem("dmv_voice_on_" + activeBrain, on ? "1" : "0"); } catch(_){} }
+// strip the spoken-only [expression] tags from what's SHOWN (Fish still reads them aloud). Only when
+// voice is on, and only lowercase emotion-style tags — never [Verse]/[Hook] (capitalized) or links.
+function stripTags(s){ return voiceReplyOn() ? String(s).replace(/\[[a-z][a-z ,'\-]{0,24}\](?!\()/g, "").replace(/[ \t]{2,}/g, " ") : s; }
+// valid Fish S2 expression tags (square-bracket). ANYTHING else in brackets is stripped, so Fish
+// never tries to vocalize a bad tag and run off into noise / another language. (docs.fish.audio)
+const FISH_TAGS = new Set(["whispering","soft tone","sad","excited","joyful","delighted","embarrassed","proud","grateful","confident","curious","serious","empathetic","comforting","sincere","relaxed","amused","chuckling","laughing","surprised","worried","nervous","frustrated","confused","moved","interested","satisfied","sarcastic","scared","astonished"]);
+function cleanForSpeech(t){
+  return String(t || "")
+    .replace(/```[\s\S]*?```/g, " ")                                  // code/action fences
+    .replace(/\[([^\]]+)\]\((https?:[^)]*)\)/g, "$1")                 // markdown links → just the text
+    .replace(/\[([^\]]{1,22})\]/g, (m,g) => FISH_TAGS.has(g.trim().toLowerCase()) ? "[" + g.trim().toLowerCase() + "]" : " ")   // keep ONLY real Fish tags; drop the rest
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}]/gu, " ")   // strip emoji/symbols (Fish stumbles on them)
+    .replace(/[*_`#>~]/g, "")                                         // markdown chars
+    .replace(/\s*(?:…|\.{2,})\s*/g, ". ")                             // ellipses / trailing-off → a clean stop (kills the run-on)
+    .replace(/([!?])\1+/g, "$1")                                      // !!! → !
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .replace(/\s+/g, " ").trim()
+    .replace(/([^.!?])$/, "$1.");                                     // always end on a terminator so Fish stops cleanly
+}
+function _pickBrowserVoice(){ try { const vs = speechSynthesis.getVoices() || [];
+  return vs.find(v => /en/i.test(v.lang) && /(female|woman|zira|aria|jenny|samantha|google us english|hazel|susan|eva|fiona)/i.test(v.name))
+      || vs.find(v => /en/i.test(v.lang) && !/(david|mark|george|guy|\bmale\b|paul|fred|alex)/i.test(v.name))
+      || vs.find(v => /en/i.test(v.lang)) || vs[0] || null; } catch(_){ return null; } }
+function speakBrowser(text){ try { const u = new SpeechSynthesisUtterance(String(text).replace(/\[[^\]]*\]/g, "")); u.rate = 1.04; const _v = _pickBrowserVoice(); if (_v) { u.voice = _v; u.lang = _v.lang; }   // dodge the default robot-dude voice — pick a female English one
+  voiceFXShow("her"); const _iv = setInterval(() => voiceFXLevel(0.3 + 0.5 * Math.random()), 90); u.onend = u.onerror = () => { clearInterval(_iv); voiceFXHide(); }; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch(_){ voiceFXHide(); } }
+let _replyAudio = null;
+async function speakReply(text){
+  const clean = cleanForSpeech(text); if (!clean) return;
+  const mid = voiceModelId(activeBrain);
+  if (!mid) { speakBrowser(clean); return; }                 // no voice id → free browser voice
+  try {
+    const r = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: clean, model_id: mid }) });
+    const j = await r.json();
+    if (j && j.audio) { if (_replyAudio) { try { _replyAudio.pause(); } catch(_){} } _replyAudio = new Audio(j.audio); voiceFXFromAudio(_replyAudio); _replyAudio.play().catch(()=>{}); }
+    else { const err = (j && j.error) ? String(j.error) : "";
+      if (/key/i.test(err)) { speakBrowser(clean); }                     // no Fish key set up yet → free browser voice (the intended free path)
+      else { setStatus("🔊 voice off — Fish: " + (err.slice(0, 70) || "unavailable") + " · fix the voice id in Settings → Voices", true); }   // real failure (bad voice id, etc.) → STAY TEXT, no robot
+    }
+  } catch(_){ setStatus("🔊 voice error — couldn't reach Fish · staying text", true); }
+}
+function paintSpeakBtn(){
+  const b = $("speak"); if (!b) return;
+  const on = voiceReplyOn(), nm = (activeBrain === "kit") ? "Kit" : "Tiffany";
+  b.textContent = on ? "🔊" : "🔇";
+  b.style.background = on ? "linear-gradient(135deg,var(--accent2),var(--pink))" : "rgba(255,255,255,.07)";
+  b.style.color = on ? "#14040E" : "#D8CCE4";
+  b.style.setProperty("--vglow", on ? "rgba(62,156,184,.8)" : "transparent");
+  b.classList.toggle("voice-live", on);   // breathe when on, so you can SEE it's live
+  b.title = on ? (nm + " reads her replies out loud — tap to mute") : ("Voice off — tap so " + nm + " talks back in her voice");
+}
+if ($("speak")) $("speak").onclick = () => {
+  const on = !voiceReplyOn(); setVoiceReplyOn(on); paintSpeakBtn();
+  if (!on) { try { if (_replyAudio) _replyAudio.pause(); } catch(_){} try { speechSynthesis.cancel(); } catch(_){} return; }
+  // turning ON — browser voice works right now; if no Fish key saved, pop the Voices panel for her REAL voice
+  fetch("/api/cloud/key?provider=fish_audio").then(r => r.json()).then(j => {
+    if (!(j && j.has_key)) { setStatus("🔊 on (browser voice) — add your Fish Audio key in Settings → Voices for her real voice"); if (window.arkOpenSettings) window.arkOpenSettings("voices"); else if (window.openKeys) window.openKeys("voices"); }
+    else setStatus("🔊 on — " + (activeBrain === "kit" ? "Kit" : "Tiffany") + " talks back");
+  }).catch(()=>{});
+};
+paintSpeakBtn();
+
+// ── VOICE FX — the "alive" meter + glow: bars dance to YOUR voice while you talk, to HERS while she speaks ──
+(function(){ const s = document.createElement("style"); s.textContent =
+    "@keyframes vbreathe{0%,100%{box-shadow:0 0 9px 1px var(--vglow,rgba(233,75,156,.5))}50%{box-shadow:0 0 20px 6px var(--vglow,rgba(233,75,156,.9))}}"
+  + ".voice-live{animation:vbreathe 1.5s ease-in-out infinite}"
+  + "#voiceMeter{display:none;align-items:flex-end;justify-content:center;gap:3px;height:24px;margin:2px 0 8px;padding:0 4px}"
+  + "#voiceMeter.on{display:flex}"
+  + "#voiceMeter .vm-bar{width:3px;height:3px;border-radius:2px;background:var(--vbar,#E94B9C);transition:height .07s linear}";
+  document.head.appendChild(s);
+})();
+let _vmBars = [];
+(function(){ const m = document.createElement("div"); m.id = "voiceMeter";
+  for (let i=0;i<11;i++){ const b=document.createElement("div"); b.className="vm-bar"; m.appendChild(b); _vmBars.push(b); }
+  const ir = document.getElementById("inputrow"); if (ir && ir.parentNode) ir.parentNode.insertBefore(m, ir);
+})();
+function voiceFXShow(who){ const m=document.getElementById("voiceMeter"); if(!m) return;
+  m.style.setProperty("--vbar", who==="her"?"#E94B9C":"#56C2DE");
+  document.documentElement.style.setProperty("--vglow", who==="her"?"rgba(233,75,156,.7)":"rgba(62,156,184,.7)");
+  m.classList.add("on"); }
+function voiceFXHide(){ const m=document.getElementById("voiceMeter"); if(m){ m.classList.remove("on"); _vmBars.forEach(b=>{ b.style.height="3px"; }); } }
+function voiceFXLevel(v){ v=Math.max(0,Math.min(1,v||0)); const n=_vmBars.length;
+  for(let i=0;i<n;i++){ const c=1-Math.abs(i-(n-1)/2)/((n-1)/2); const h=3+v*21*(0.5+0.5*c)*(0.65+0.7*Math.random()); _vmBars[i].style.height=Math.min(24,h).toFixed(1)+"px"; } }
+function voiceFXFromAudio(audioEl){ try {
+  const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+  const ac=new AC(); if(ac.state==="suspended"){ try{ac.resume();}catch(e){} }
+  const src=ac.createMediaElementSource(audioEl), an=ac.createAnalyser(); an.fftSize=256; src.connect(an); an.connect(ac.destination);
+  const buf=new Uint8Array(an.fftSize);
+  const tick=()=>{ if(audioEl.paused||audioEl.ended){ voiceFXHide(); try{ac.close();}catch(e){} return; }
+    an.getByteTimeDomainData(buf); let peak=0; for(let i=0;i<buf.length;i++){ const d=Math.abs(buf[i]-128)/128; if(d>peak)peak=d; }
+    voiceFXLevel(Math.min(1,peak*1.7)); requestAnimationFrame(tick); };
+  audioEl.addEventListener("play", ()=>{ voiceFXShow("her"); requestAnimationFrame(tick); });
+  audioEl.addEventListener("ended", voiceFXHide);
+} catch(e){} }
 
 /* ── attachments: she SEES images, READS files (pdf/word/text/code) ── */
 function escapeHtml(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -1241,10 +1408,10 @@ const ARK_INTRO = "Your private creative studio — running on your own machine.
 // who you're talking to RIGHT NOW — leads the rotation, swaps when you switch agent
 const AGENT_TIPS = {
   tiff: [
-    { who: "Tiff", t: "Tiff is your all-rounder — vibe, words, and ideas. Use the ⚡ Quick / 🧠 Balanced / 🔥 Deep dial to set how hard she thinks before she answers." },
-    { who: "Tiff", t: "Flip Tiff to 🔬 Research and she searches the live web for free, reads the pages, then writes back a synthesized answer — every step visible." },
-    { who: "Tiff", t: "Switch to ✍️ Write and Tiff stretches into long-form — lyrics, bios, treatments — in her full voice instead of quick replies." },
-    { who: "Tiff", t: "Drag Tiff onto a room on the left and she comes in to work inside it — not just talk to you from out here." },
+    { who: "Tiffany", t: "Tiffany is your all-rounder — vibe, words, and ideas. Use the ⚡ Quick / 🧠 Balanced / 🔥 Deep dial to set how hard she thinks before she answers." },
+    { who: "Tiffany", t: "Flip Tiffany to 🔬 Research and she searches the live web for free, reads the pages, then writes back a synthesized answer — every step visible." },
+    { who: "Tiffany", t: "Switch to ✍️ Write and Tiffany stretches into long-form — lyrics, bios, treatments — in her full voice instead of quick replies." },
+    { who: "Tiffany", t: "Drag Tiffany onto a room on the left and she comes in to work inside it — not just talk to you from out here." },
   ],
   kit: [
     { who: "Kit", t: "Kit is the specialist — deeper, hands-on, technical work. Reach for him when you want the precise move, not the vibe." },
@@ -1433,6 +1600,7 @@ startArkTips();
 <script src="/static/cloud-ai.js?v=4"></script>
 <script src="/static/cloud-bridge.js?v=4"></script>
 <script src="/static/audio-ear.js"></script>
+<script src="/static/onboard.js"></script>
 <script src="/static/settings.js"></script>
 <script src="/static/tec-mascot.js"></script>
 <script src="/static/copy-anywhere.js"></script>

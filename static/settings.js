@@ -81,6 +81,22 @@
   .as-listbtn{flex:none;white-space:nowrap;font:600 10.5px Inter;padding:0 11px;border-radius:10px;cursor:pointer;color:#9CD3E4;background:rgba(62,156,184,.10);border:1px solid rgba(95,180,206,.35);}
   .as-listbtn:hover{color:#E9EAED;border-color:rgba(95,180,206,.6);background:rgba(62,156,184,.18);}
   .as-listbtn:disabled{opacity:.6;cursor:default;}
+  /* Connect to Claude Desktop (MCP) */
+  .as-mcpdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#6b7178;vertical-align:middle;margin-left:7px;}
+  .as-mcpdot.amber{background:#D9A441;box-shadow:0 0 7px rgba(217,164,65,.7);}
+  .as-mcpdot.green{background:#46d6a8;box-shadow:0 0 7px rgba(70,214,168,.7);}
+  .as-mcprecheck{float:right;background:none;border:none;cursor:pointer;color:rgba(198,201,208,.55);font:500 10px Inter;padding:2px 0;}
+  .as-mcprecheck:hover{color:#9CD3E4;}
+  .as-mcpconsent{font:400 11px Inter;color:rgba(198,201,208,.6);margin-top:8px;line-height:1.5;}
+  .as-mcpconsent b{color:#9CD3E4;}
+  .as-mcpcode{font:400 11px 'Space Mono',monospace;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:10px 12px;white-space:pre-wrap;word-break:break-all;color:#bfe6f2;margin-top:8px;max-height:170px;overflow:auto;line-height:1.55;}
+  .as-mcpok{font:400 12.5px Inter;color:rgba(206,210,218,.85);line-height:1.6;background:rgba(70,214,168,.07);border:1px solid rgba(70,214,168,.25);border-radius:12px;padding:11px 13px;}
+  .as-mcpok b{color:#7fe8c0;}
+  .as-mcperr{font:400 11.5px Inter;color:#F0D49A;background:rgba(230,193,106,.08);border:1px solid rgba(230,193,106,.28);border-radius:10px;padding:9px 12px;margin-top:8px;line-height:1.5;}
+  .as-mcperr b{color:#fbe7b6;}
+  .as-mcprow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  .as-mcprow button{font:600 11.5px Inter;padding:7px 13px;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);color:#E9EAED;}
+  .as-mcprow button:hover{border-color:rgba(95,180,206,.5);}
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
@@ -104,6 +120,11 @@
       <div class="as-head"><h2>SETTINGS</h2><button class="as-x" id="asClose">✕</button></div>
       <div class="as-body">
         <div class="as-sec" id="asUpdSec" style="display:none"><div class="as-upd" id="asUpd"></div></div>
+        <div class="as-sec" id="asMcpSec">
+          <h3>Connect to Claude Desktop<span id="asMcpDot" class="as-mcpdot"></span><button type="button" class="as-mcprecheck" id="asMcpRecheck">Re-check</button></h3>
+          <div class="as-sub">Let Claude — or Claude Code — drive DeMartinville from outside. Talk to your agents, make a beat, cut a video, generate art, run any room, just by asking Claude.</div>
+          <div id="asMcpBody"><div class="as-empty">checking…</div></div>
+        </div>
         <div class="as-sec">
           <h3>Cloud models &amp; API keys — make DeMartinville smarter</h3>
           <div class="as-sub">Add a provider with <b>your own API key</b> and its model shows up in your <b>chat model picker</b> (☁) and powers <b>Swarm</b> research. Keys stay on this machine — nothing is shared. On a light PC, this is how you run a frontier brain — flat-monthly picks like <b>Featherless</b> &amp; <b>Z.ai GLM</b>, or free <b>Groq</b>.</div>
@@ -135,16 +156,110 @@
             </div>
           </div>
         </div>
+        <div class="as-sec" id="asVoiceSec">
+          <h3>Voices — make your agents talk back 🔊</h3>
+          <div class="as-sub">Add your <b>Fish Audio</b> key and your agents <b>speak their replies in a real voice</b>, with emotion. No key? They still talk with the free built-in browser voice. The <b>voice model id</b> is a voice/clone from fish.audio — leave the default for the stock voice, or paste your own clone's id.</div>
+          <div class="as-field"><label>Fish Audio API key</label>
+            <div class="as-modelrow"><input id="asFishKey" type="password" placeholder="paste your Fish Audio key here" autocomplete="off" /><button type="button" class="as-listbtn" id="asFishSave">Save</button></div>
+            <div class="h"><a href="https://fish.audio/go-api/api-keys/" target="_blank" rel="noopener">get a Fish Audio key ↗</a></div>
+          </div>
+          <div class="as-field"><label>Voice model id per agent</label>
+            <div id="asVoiceRows" style="margin-top:4px"></div>
+          </div>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(ov);
 
-  const open = () => { ov.classList.add("open"); load(); checkAppUpdate(); };
+  const open = (anchor) => {
+    ov.classList.add("open"); load(); checkAppUpdate(); loadMcp(); loadVoices();
+    const _rc = $("asMcpRecheck"); if (_rc) _rc.onclick = loadMcp;
+    if (anchor === "mcp") { const s = $("asMcpSec"); if (s) setTimeout(() => s.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }
+    if (anchor === "voices") { const s = $("asVoiceSec"); if (s) setTimeout(() => s.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }
+  };
   const close = () => ov.classList.remove("open");
   window.arkOpenSettings = open;   // let the "Make ARKITECT smarter" CTA (and anything else) open Settings
   gear.onclick = open;
   $("asClose").onclick = close;
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+
+  // ── Voices section: Fish Audio key (server-side, the SAME key /api/tts reads) + per-agent voice ids
+  //    (local). ONE keys hub — every key the app uses gets its own labeled section here. As we add
+  //    features that need a key, add a section; never a second window. (Owner's law: one place for keys.) ──
+  const VOICE_DEFAULTS = { tiff: "8526ee26387448b2a86c1d1052148a4b", kit: "5312c04032034388bb6bac44c94c804d" };
+  const VOICE_AGENTS = [{ id: "tiff", name: "Tiffany" }, { id: "kit", name: "Kit" }];
+  function loadVoiceModels(){ try { return JSON.parse(localStorage.getItem("dmv_voice_models") || "{}"); } catch(_){ return {}; } }
+  function saveVoiceModel(id, mid){ const m = loadVoiceModels(); if (mid) m[id] = mid; else delete m[id]; try { localStorage.setItem("dmv_voice_models", JSON.stringify(m)); } catch(_){} }
+  // one labeled voice-id row: [name] [id input] [Save]. Saves to dmv_voice_models[id] (what /api/tts reads).
+  function _voiceRow(wrap, id, name, defVal, sub){
+    const vm = loadVoiceModels();
+    const row = document.createElement("div"); row.className = "as-modelrow"; row.style.cssText = "margin:0 0 7px;align-items:center";
+    const lab = document.createElement("span");
+    lab.style.cssText = "min-width:78px;font:700 11.5px Inter,sans-serif;color:#CFE6EE;display:flex;flex-direction:column;line-height:1.15";
+    lab.innerHTML = name + (sub ? '<span style="font:600 9px Inter,sans-serif;color:#8AA2AE">' + sub + '</span>' : '');
+    const inp = document.createElement("input"); inp.type = "text"; inp.autocomplete = "off"; inp.placeholder = name + " voice id";
+    inp.value = vm[id] || defVal || "";
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "as-listbtn"; btn.textContent = "Save";
+    btn.onclick = () => { saveVoiceModel(id, inp.value.trim()); btn.textContent = "✓ saved"; setTimeout(() => { btn.textContent = "Save"; }, 1200); };
+    row.appendChild(lab); row.appendChild(inp); row.appendChild(btn); wrap.appendChild(row);
+  }
+  async function loadVoices(){
+    let saved = false; try { saved = !!((await fetch("/api/cloud/key?provider=fish_audio").then(r => r.json())).has_key); } catch(_){}
+    const k = $("asFishKey"); if (k) k.placeholder = saved ? "✓ Fish Audio key saved — paste to replace" : "paste your Fish Audio key here";
+    const wrap = $("asVoiceRows"); if (!wrap) return; wrap.innerHTML = "";
+    // built-ins — always here, labeled
+    _voiceRow(wrap, "tiff", "Tiffany", VOICE_DEFAULTS.tiff, "built-in");
+    _voiceRow(wrap, "kit", "Kit", VOICE_DEFAULTS.kit, "built-in");
+    // YOUR agents — auto-grows as you build more (10, 100, however many), each gets its own slot
+    let mine = [];
+    try { const arr = JSON.parse(localStorage.getItem("dmv_characters") || "[]"); if (Array.isArray(arr)) mine = arr.filter(c => c && c.id && c.mine && c.name && c.name.trim()); } catch(_){}
+    if (mine.length){
+      const hd = document.createElement("div"); hd.style.cssText = "margin:12px 0 5px;font:700 10px 'Space Mono',monospace;letter-spacing:.06em;color:#9FCFDD"; hd.textContent = "YOUR AGENTS";
+      wrap.appendChild(hd);
+      mine.forEach(c => _voiceRow(wrap, c.id, c.name, c.voiceModelId || ""));
+    }
+    // ＋ build more — agents are created in the builder, then show up here automatically with their own voice slot
+    const add = document.createElement("button"); add.type = "button"; add.className = "as-listbtn"; add.style.cssText = "margin-top:10px";
+    add.textContent = mine.length ? "＋ Build another agent" : "＋ Build your own agent (it gets its own voice here)";
+    add.onclick = () => { location.href = "/static/character.html"; };
+    wrap.appendChild(add);
+
+    // 🎵 Pitch check — tap a known note, HEAR it, and confirm the detector reads it right.
+    //    For someone who "just sings" and doesn't know notes: the tone is the answer key.
+    const pt = document.createElement("div"); pt.style.cssText = "margin-top:15px;padding-top:13px;border-top:1px solid rgba(255,255,255,.08)";
+    pt.innerHTML = '<div style="font:700 11.5px Inter,sans-serif;color:#CFE6EE;margin-bottom:3px">🎵 Test pitch detection</div>' +
+      '<div class="as-sub" style="margin:0 0 9px">Tap a note — you\'ll HEAR it, and it confirms the detector reads it right. Then sing that same note into the 🎙 mic in chat and watch the "heard you" chip match. (You don\'t need to know notes — the tone is the answer key.)</div>' +
+      '<div id="asPitchBtns" style="display:flex;flex-wrap:wrap;gap:6px"></div>' +
+      '<div id="asPitchOut" style="margin-top:9px;font:600 12.5px Inter,sans-serif;color:#9FCFDD;min-height:17px"></div>';
+    wrap.appendChild(pt);
+    const btnWrap = pt.querySelector("#asPitchBtns"), out = pt.querySelector("#asPitchOut");
+    ["C3", "E3", "G3", "A3", "C4", "E4", "A4"].forEach(nm => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "as-listbtn"; b.textContent = nm;
+      b.onclick = () => {
+        try {
+          if (window.DMV_EAR && window.DMV_EAR.playNote) window.DMV_EAR.playNote(nm);
+          const t = (window.DMV_EAR && window.DMV_EAR.testNote) ? window.DMV_EAR.testNote(nm) : null;
+          if (t && t.ok) out.innerHTML = "♪ played <b>" + nm + "</b> → detector reads <b>" + t.detected + "</b> " +
+            (t.detected === nm ? '<span style="color:#7FD3B0">✓ spot on</span>' : '(' + (t.cents >= 0 ? "+" : "") + t.cents + "¢)");
+          else out.textContent = "♪ played " + nm + " — listen + sing it back in chat";
+        } catch (e) { out.textContent = "couldn't play that one"; }
+      };
+      btnWrap.appendChild(b);
+    });
+  }
+  (function wireVoices(){
+    const sb = $("asFishSave"), kb = $("asFishKey"); if (!sb || !kb) return;
+    sb.onclick = async () => {
+      const v = kb.value.trim(); if (!v) { setStatus("paste a Fish Audio key first", "bad"); return; }
+      sb.textContent = "saving…";
+      try {
+        const r = await fetch("/api/cloud/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: "fish_audio", api_key: v }) }).then(r => r.json());
+        if (r && r.ok) { sb.textContent = "✓ saved"; kb.value = ""; loadVoices(); }
+        else setStatus("couldn't save key", "bad");
+      } catch(_){ setStatus("couldn't save key", "bad"); }
+      setTimeout(() => { if (sb.textContent !== "Save") sb.textContent = "Save"; }, 1500);
+    };
+  })();
 
   function setStatus(t, cls) { const s = $("asStatus"); s.textContent = t; s.className = "as-status " + (cls || ""); }
 
@@ -363,4 +478,50 @@
     if (ok) { pendingModels = []; renderChips(); ["asModel", "asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ added " + ok + " model" + (ok > 1 ? "s" : "") + " on your key", "ok"); }
     else setStatus(lastErr, "bad");
   };
+
+  // ── Connect to Claude Desktop (MCP) — discover + one-click setup + honest status ──
+  const _E = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function _mcpJson(d) { return JSON.stringify({ mcpServers: { demartinville: { command: d.python || "python", args: [d.server || ""] } } }, null, 2); }
+  function _mcpManual(d, lead) {
+    return (lead ? '<div class="as-mcperr">' + _E(lead) + '</div>' : '') +
+      '<div class="as-sub" style="margin:8px 0 4px">Paste this into your Claude config (<code>' + _E(d.config_path || "your Claude Desktop config file") + '</code>), then fully restart Claude Desktop:</div>' +
+      '<div class="as-mcpcode">' + _E(_mcpJson(d)) + '</div>' +
+      '<div class="as-mcprow"><button type="button" id="asMcpCopy">Copy</button></div>';
+  }
+  function _wireCopy(text) { const b = $("asMcpCopy"); if (!b) return; b.onclick = () => { try { navigator.clipboard.writeText(text); b.textContent = "Copied ✓"; setTimeout(() => { b.textContent = "Copy"; }, 1400); } catch (e) {} }; }
+  function _mcpDot(state) { const dot = $("asMcpDot"); if (!dot) return; dot.className = "as-mcpdot" + (state === "configured" ? " green" : state === "stale" ? " amber" : ""); dot.title = state === "configured" ? "In your Claude config" : state === "stale" ? "Present, needs updating" : "Not set up yet"; }
+  function _wireManualToggle(d) { const t = $("asMcpManualT"); if (!t) return; t.onclick = () => { const w = $("asMcpManualWrap"); if (!w) return; if (w.innerHTML) { w.innerHTML = ""; } else { w.innerHTML = _mcpManual(d, ""); _wireCopy(_mcpJson(d)); } }; }
+  async function loadMcp() {
+    const body = $("asMcpBody"); if (!body) return;
+    _mcpDot("none");
+    let d; try { d = await fetch("/api/mcp/status").then(r => r.json()); } catch (e) { body.innerHTML = '<div class="as-empty">couldn’t check status</div>'; return; }
+    _mcpDot(d.state);
+    if (d.state === "configured") {
+      body.innerHTML = '<div class="as-mcpok"><b>✓ Set up.</b> DeMartinville is in your Claude Desktop config. If you just did this, fully <b>quit Claude Desktop and reopen it</b> (closing the window isn’t enough), then in Claude hit <b>＋ → Connectors</b> (or find the 🔨 tools icon) — “demartinville” should be listed.</div><button type="button" class="as-advtoggle" id="asMcpManualT" style="margin-top:8px">Show the config entry ▾</button><div id="asMcpManualWrap"></div>';
+      _wireManualToggle(d); return;
+    }
+    body.innerHTML = '<div class="as-mcpconsent">You’ll need <b>Claude Desktop</b> installed. DeMartinville’s already running — that’s this. ✓</div><div class="as-mcprow"><button type="button" class="as-addbtn" id="asMcpSetup" style="width:auto;flex:1">' + (d.state === "stale" ? "Update the connection" : "Set it up for me") + '</button></div><div class="as-mcpconsent">We add one entry to your Claude Desktop config and <b>back it up first</b> — nothing of yours gets overwritten.</div><button type="button" class="as-advtoggle" id="asMcpManualT" style="margin-top:6px">Rather do it by hand? ▾</button><div id="asMcpManualWrap"></div>';
+    $("asMcpSetup").onclick = () => setupMcp();
+    _wireManualToggle(d);
+  }
+  async function setupMcp() {
+    const body = $("asMcpBody"); if (!body) return;
+    body.innerHTML = '<div class="as-mcpconsent">Writing the connection… (backing up your Claude config first, then adding ours)</div>';
+    let r; try { r = await fetch("/api/mcp/setup", { method: "POST" }).then(x => x.json()); } catch (e) { r = { ok: false, reason: "write_failed", error: "couldn’t reach the app" }; }
+    if (r.ok) {
+      _mcpDot("configured");
+      body.innerHTML = '<div class="as-mcpok">' + (r.already_set ? '<b>✓ Already connected.</b> DeMartinville is in your Claude Desktop config.' : '<b>✓ Done.</b> Added DeMartinville to Claude Desktop' + (r.backup ? ' (your old config is backed up)' : '') + '.') + ' One last step only you can do: <b>fully quit Claude Desktop and open it again</b> — closing the window isn’t enough. Then check <b>＋ → Connectors</b> in Claude.</div><div class="as-mcprow"><button type="button" id="asMcpRecheck2">Re-check</button></div>';
+      const rc = $("asMcpRecheck2"); if (rc) rc.onclick = loadMcp;
+      try { window.dispatchEvent(new Event("dmv:mcp-changed")); } catch (e) {}
+      return;
+    }
+    if (r.reason === "mcp_package_missing") {
+      body.innerHTML = '<div class="as-mcperr">One quick install first — Claude needs a small piece (the <b>mcp</b> package). Run this in your DeMartinville Python, then hit “Set it up” again:</div><div class="as-mcpcode">' + _E(r.pip || "pip install mcp") + '</div><div class="as-mcprow"><button type="button" id="asMcpRetry">Try again</button></div>';
+      const rt = $("asMcpRetry"); if (rt) rt.onclick = loadMcp; return;
+    }
+    const lead = r.reason === "needs_manual" ? "Couldn’t auto-find your DeMartinville Python from here — here’s the quick manual way (just a copy-paste, your paths are filled in)." : r.reason === "path_too_long" ? "Your install path is too long for auto-setup — here’s the manual way:" : "Couldn’t write it automatically (" + (r.error || r.reason || "unknown") + "). Here’s the manual way:";
+    body.innerHTML = _mcpManual(r, lead) + '<div class="as-mcprow"><button type="button" id="asMcpRetry">Try again</button></div>';
+    _wireCopy(_mcpJson(r));
+    const rt = $("asMcpRetry"); if (rt) rt.onclick = loadMcp;
+  }
 })();
