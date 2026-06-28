@@ -142,7 +142,7 @@
   input[type=range].bar:hover::-webkit-slider-thumb { box-shadow:0 0 0 5px rgba(62,156,184,.25); }
   .nb-right { width:248px; display:flex; align-items:center; justify-content:flex-end; gap:9px; }
   .nb-right .vico { color:var(--dim); font-size:14px; }
-  .nb-right input[type=range].bar { max-width:110px; flex:none; width:110px; }
+  .nb-right input[type=range].bar { flex:1 1 70px; min-width:56px; max-width:110px; }   /* shrink so a Support pill never clips the cluster */
 
   /* ── WATCH: grid ── */
   .vgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(252px,1fr)); gap:18px 16px; }

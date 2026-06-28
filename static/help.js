@@ -143,7 +143,10 @@
     // Mount the "?" into the shared top bar (the SAME mount the Feedback button uses) so it lives
     // UP TOP, out of the canvas / timeline — never floating over your work. Pages with no bar fall
     // back to a small top-corner button (never bottom, never over content).
-    var bar = document.querySelector(".kit-mount, .top");
+    // Prefer the dedicated mount (.kit-mount / .top); fall back to any room's .topbar so rooms
+    // with only a .topbar (e.g. Berner Builder) still dock the "?" in-bar instead of floating it
+    // over the work area. Fixes the shared injector ONCE for every .topbar room.
+    var bar = document.querySelector(".kit-mount, .top") || document.querySelector(".topbar");
     if (bar) { btn.classList.add("in-bar"); bar.appendChild(btn); }
     else { document.body.appendChild(btn); }
     document.body.appendChild(panel);

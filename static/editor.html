@@ -178,8 +178,17 @@ body.ws-no-bin.ws-no-insp .mid{grid-template-columns:0 minmax(0,1fr) 0}
 .import-zone .big{font-size:22px;margin-bottom:5px;opacity:.7}
 .import-zone .sub{font-size:10.5px;color:var(--dim2);margin-top:3px}
 .media{display:flex;gap:9px;padding:7px;border-radius:9px;background:var(--surf);border:1px solid var(--line);
-  cursor:grab;transition:.1s;align-items:center}
+  cursor:grab;transition:.1s;align-items:center;position:relative}
 .media:hover{background:var(--surf2);border-color:var(--cy-line)}
+.media .binDel{position:absolute;top:4px;right:4px;width:18px;height:18px;padding:0;border:none;border-radius:5px;
+  background:rgba(8,8,12,.72);color:#fff;font:700 13px/1 system-ui;cursor:pointer;opacity:0;transition:opacity .1s;
+  display:grid;place-items:center;z-index:2}
+.media:hover .binDel{opacity:.85}
+.media .binDel:hover{opacity:1;background:#c0392b}
+.media .pxbadge{display:inline-flex;align-items:center;gap:3px;margin-top:3px;font:700 9px var(--mono);
+  letter-spacing:.04em;color:var(--dim2)}
+.media .pxbadge.on{color:#46d39a}
+.media .pxbadge.work{color:#e6b450}
 .media.sel{border-color:var(--cy);box-shadow:0 0 0 1px var(--cy-line)}
 .media:active{cursor:grabbing}
 .media .thumb{width:62px;height:38px;border-radius:5px;background:#0a0a0d center/cover no-repeat;flex:none;
@@ -328,8 +337,18 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .zoom{display:flex;align-items:center;gap:7px;margin-left:auto}
 .zoom input{width:120px}
 
-.tl-grid{flex:1;display:grid;grid-template-columns:var(--heads-w,236px) 1fr;grid-template-rows:24px 1fr;min-height:0}
+.tl-grid{flex:1;display:grid;grid-template-columns:var(--heads-w,236px) 1fr;grid-template-rows:16px 24px 1fr;min-height:0}
 .tl-corner{background:var(--bg2);border-right:1px solid var(--line);border-bottom:1px solid var(--line);z-index:5}
+/* ── Time Navigator (AE-style): drag the brackets to zoom the timeline into a range ── */
+.tl-nav-corner{background:var(--bg2);border-right:1px solid var(--line);border-bottom:1px solid var(--line);z-index:5}
+.tl-nav{position:relative;background:var(--bg1);border-bottom:1px solid var(--line);overflow:hidden;user-select:none;touch-action:none}
+.tl-nav .navview{position:absolute;top:2px;bottom:2px;background:var(--cy-soft);border:1px solid var(--cy-line);border-radius:4px;cursor:grab;min-width:8px;box-sizing:border-box}
+.tl-nav .navview:active{cursor:grabbing}
+.tl-nav .navh{position:absolute;top:-2px;bottom:-2px;width:10px;cursor:ew-resize;z-index:2}
+.tl-nav .navh::after{content:"";position:absolute;top:3px;bottom:3px;left:50%;width:2px;margin-left:-1px;background:var(--cy);border-radius:1px}
+.tl-nav .navh.l{left:-5px}
+.tl-nav .navh.r{right:-5px}
+.tl-nav .navph{position:absolute;top:0;bottom:0;width:1.5px;background:var(--red);pointer-events:none;z-index:3}
 .ruler-wrap{overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--line);position:relative}
 #ruler{height:24px;position:relative}
 .heads-wrap{overflow:hidden;background:#101116;border-right:1px solid var(--line)}
@@ -370,6 +389,7 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .lanes-wrap{overflow:auto;position:relative;background:
   repeating-linear-gradient(90deg,transparent,transparent 39px,var(--line2) 39px,var(--line2) 40px)}
 #lanes{position:relative}
+#lanesWrap.drop-ok{box-shadow:inset 0 0 0 2px var(--cy)}
 .lane{height:var(--lane-h,58px);border-bottom:1px solid var(--line2);position:relative}
 .clip .twirl{position:absolute;left:3px;top:1px;font-size:9px;line-height:1;color:rgba(255,255,255,.75);cursor:pointer;z-index:5;padding:2px}
 .clip.t .twirl,.clip.a .twirl{color:rgba(255,255,255,.85)}
@@ -410,7 +430,7 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 .scrim{position:fixed;inset:0;background:rgba(6,7,10,.72);backdrop-filter:blur(6px);z-index:200;display:none;
   place-items:center}
 .scrim.open{display:grid}
-.modal{width:460px;max-width:92vw;background:var(--panel);backdrop-filter:blur(24px);border:1px solid var(--line);
+.modal{width:460px;max-width:92vw;max-height:90vh;overflow:auto;background:var(--panel);backdrop-filter:blur(24px);border:1px solid var(--line);
   border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
 .modal h2{font-size:16px;font-weight:800;margin-bottom:3px;display:flex;align-items:center;gap:9px}
 .modal h2 .ic{width:26px;height:26px;border-radius:8px;background:linear-gradient(140deg,#2c5e6b,#3E9CB8);
@@ -444,6 +464,16 @@ textarea.fld{resize:vertical;min-height:56px;font-family:var(--ui);font-weight:5
 #expVideo{width:100%;border-radius:10px;margin:6px 0 14px;background:#000;max-height:240px}
 .err{background:rgba(229,86,91,.1);border:1px solid rgba(229,86,91,.3);border-radius:8px;padding:10px;
   font:500 11px var(--mono);color:#f0a0a3;white-space:pre-wrap;max-height:160px;overflow:auto;margin-bottom:12px}
+/* Quick / Advanced export modes (AE Render Queue feel) */
+.expModes{display:flex;gap:6px;background:var(--surf3);border-radius:10px;padding:4px;margin-bottom:16px}
+.expMode{flex:1;border:0;background:transparent;color:var(--dim);cursor:pointer;border-radius:7px;padding:8px 6px;
+  font:800 12px var(--ui);display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.expMode.on{background:linear-gradient(140deg,#2c5e6b,#3E9CB8);color:#fff;box-shadow:0 4px 14px rgba(62,156,184,.3)}
+.expSect{font:800 9.5px var(--mono);letter-spacing:.16em;color:var(--cy);text-transform:uppercase;
+  margin:4px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.expSect:not(:first-child){margin-top:18px}
+.frow.dim{opacity:.4;pointer-events:none}
+.expHint{font-size:12px;color:var(--dim);line-height:1.5;padding:2px 0 6px}
 
 /* ── COMPOSITION SETTINGS DIALOG ─────────────────────────────────────── */
 .csTabs{display:flex;gap:2px;margin:2px 0 16px;border-bottom:1px solid var(--line)}
@@ -573,9 +603,14 @@ body.mode-simple .director-only{display:none!important}
       <button class="tool" id="snapBtn" title="Snap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v8a6 6 0 0012 0V3"/><path d="M3 21h18"/></svg></button>
       <button class="tool" id="delBtn" title="Delete (Del)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
       <span class="lbl" id="modeHint" style="margin-left:10px"></span>
-      <div class="zoom"><span class="lbl">Zoom</span><input type="range" id="zoom" min="1" max="120" step="0.5" value="12"/><span class="lbl" id="zoomLbl" style="min-width:54px">12 px/f</span></div>
+      <div class="zoom"><span class="lbl">Zoom</span><input type="range" id="zoom" min="0.02" max="120" step="0.01" value="12"/><span class="lbl" id="zoomLbl" style="min-width:54px">12 px/f</span></div>
     </div>
     <div class="tl-grid">
+      <div class="tl-nav-corner"></div>
+      <div class="tl-nav" id="tlNav" title="Drag the brackets to zoom into part of the timeline; drag the middle to pan">
+        <div class="navview" id="navView"><div class="navh l" id="navHL"></div><div class="navh r" id="navHR"></div></div>
+        <div class="navph" id="navPh"></div>
+      </div>
       <div class="tl-corner"></div>
       <div class="ruler-wrap"><div id="ruler"><div class="ph-ruler" id="phRuler"></div></div></div>
       <div class="heads-wrap"><div id="heads"></div></div>
@@ -589,23 +624,67 @@ body.mode-simple .director-only{display:none!important}
 <div class="scrim" id="expScrim">
   <div class="modal" id="expModal">
     <h2><span class="ic">▶</span> Export</h2>
-    <div class="sub" id="expSub">Render your timeline to a finished video file.</div>
+    <div class="sub" id="expSub">Render your timeline to a finished file.</div>
     <div id="expForm">
-      <div class="frow"><span>Format</span>
-        <select class="fld" id="expRes">
-          <option value="1920x1080">1080p — Landscape (1920×1080)</option>
-          <option value="1080x1920">Vertical — Reels/TikTok (1080×1920)</option>
-          <option value="1280x720">720p — Landscape (1280×720)</option>
-          <option value="1080x1080">Square (1080×1080)</option>
-        </select></div>
-      <div class="frow"><span>Quality</span>
-        <select class="fld" id="expQual">
-          <option value="nvenc-bal">Fast — GPU / NVENC (balanced)</option>
-          <option value="nvenc-high">High — GPU / NVENC (best)</option>
-          <option value="x264">Archive — CPU / x264 (max detail, slow)</option>
-        </select></div>
-      <div class="frow"><span>Frame rate</span>
-        <select class="fld" id="expFps"><option>30</option><option>24</option><option>60</option></select></div>
+      <div class="expModes">
+        <button class="expMode on" id="modeQuick" data-mode="quick">⚡ Quick</button>
+        <button class="expMode" id="modeAdv" data-mode="adv">🎛 Advanced</button>
+      </div>
+
+      <!-- QUICK — one tap, best-quality MP4 -->
+      <div class="expPane" id="paneQuick">
+        <div class="frow"><span>Size</span>
+          <select class="fld" id="qRes">
+            <option value="full">Full — your project size</option>
+            <option value="half">Half — smaller file</option>
+          </select></div>
+        <div class="expHint">Best-quality <b>MP4</b> (H.264), audio baked in. Just hit Render.</div>
+      </div>
+
+      <!-- ADVANCED — After Effects Render-Queue style -->
+      <div class="expPane" id="paneAdv" style="display:none">
+        <div class="expSect">Render Settings</div>
+        <div class="frow"><span>Resolution</span>
+          <select class="fld" id="aRes">
+            <option value="full">Full</option>
+            <option value="half">Half</option>
+            <option value="third">Third</option>
+            <option value="quarter">Quarter</option>
+          </select></div>
+        <div class="frow"><span>Quality</span>
+          <select class="fld" id="aQual">
+            <option value="best">Best — GPU / NVENC</option>
+            <option value="high">High — GPU / NVENC (max)</option>
+            <option value="draft">Draft — CPU x264 (fast)</option>
+            <option value="archive">Archive — CPU x264 (max detail)</option>
+          </select></div>
+        <div class="frow"><span>Frame rate</span>
+          <select class="fld" id="aFps">
+            <option value="">Use project rate</option>
+            <option value="24">24</option><option value="30">30</option><option value="60">60</option>
+          </select></div>
+
+        <div class="expSect">Output Module</div>
+        <div class="frow"><span>Format</span>
+          <select class="fld" id="aFormat">
+            <option value="h264">H.264 · MP4 (best all-rounder)</option>
+            <option value="mov">QuickTime · MOV</option>
+            <option value="mp3">MP3 · audio only</option>
+            <option value="wav">WAV · audio only</option>
+            <option value="pngseq">PNG Sequence · zip</option>
+            <option value="jpgseq">JPEG Sequence · zip</option>
+          </select></div>
+        <div class="frow" id="rowChannels"><span>Channels</span>
+          <select class="fld" id="aChannels">
+            <option value="rgb">RGB</option>
+            <option value="rgba">RGB + Alpha (transparent background)</option>
+          </select></div>
+        <div class="expHint" id="aFmtHint"></div>
+
+        <div class="expSect">Output To</div>
+        <div class="frow"><span>File name</span><input class="fld" id="aName" spellcheck="false" placeholder="render"></div>
+      </div>
+
       <div class="actions">
         <button class="tbtn" id="expCancel">Cancel</button>
         <button class="tbtn cta" id="expGo">Render</button>
@@ -792,17 +871,43 @@ function renderBin(){
     const kind=m.kind==='audio'?'AUD':m.kind==='image'?'IMG':'VID';
     const dur=m.kind==='image'?'still':tc(Math.round((m.dur||0)*FPS()));
     const loaded=m.ready||(m.cache&&m.cache.poster);
+    // Proxy status — dummy-proof: shows the user their footage is being optimised for smooth editing.
+    let px='';
+    if(m.kind==='video'){
+      px=(m.cache&&m.cache.proxy)
+        ? `<div class="pxbadge on" title="A lightweight stand-in copy was made so editing scrubs smoothly. Full quality is used automatically when you export.">⚡ PROXY READY</div>`
+        : `<div class="pxbadge work" title="Making a lightweight stand-in copy so this scrubs smoothly without freezing. Keep working — it finishes on its own.">⏳ OPTIMIZING…</div>`;
+    }
     el.innerHTML=`<div class="thumb ${loaded?'':'loading'}" ${loaded?`style="background-image:url(/api/editor/media/${m.id}/poster)"`:''}>
         ${m.kind==='audio'?'🎵':''}<span class="kbadge">${kind}</span></div>
-      <div class="meta"><div class="nm">${esc(m.name)}</div><div class="dt">${dur}${m.w?` · ${m.w}×${m.h}`:''}</div></div>`;
+      <div class="meta"><div class="nm">${esc(m.name)}</div><div class="dt">${dur}${m.w?` · ${m.w}×${m.h}`:''}</div>${px}</div>
+      <button class="binDel" title="Remove from bin (Delete) — never deletes your original file">×</button>`;
     el.onclick=()=>{$$('.media').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');};
     el.ondblclick=()=>addClipToBestTrack(m.id);
     el.title='Drag to the timeline — or double-click to add at the playhead';
     el.ondragstart=e=>{e.dataTransfer.setData('mid',m.id);e.dataTransfer.effectAllowed='copy';};
+    el.querySelector('.binDel').onclick=e=>{e.stopPropagation();removeMedia(m.id);};
     body.appendChild(el);
   }
 }
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Remove a clip from the media bin. Pulls any copies already on the timeline, forgets the
+// registry entry on disk — but NEVER deletes the user's original source file.
+async function removeMedia(mid){
+  const m=MEDIA[mid];if(!m)return;
+  let used=0;
+  for(const t of project.tracks){const before=t.clips.length;
+    t.clips=t.clips.filter(c=>{const hit=(c.mediaId===mid);
+      if(hit){if(vels[c.id]){try{vels[c.id].pause();vels[c.id].remove();}catch(e){}delete vels[c.id];}
+        if(audioEls[c.id]){try{audioEls[c.id].pause();}catch(e){}delete audioEls[c.id];}delete _lastGoodFrame[c.id];}
+      return !hit;});
+    used+=before-t.clips.length;}
+  if(sel&&!findClipTrack(sel.clipId))deselect();
+  delete MEDIA[mid];
+  renderBin();renderTimeline();drawFrame();save(true);
+  fetch('/api/editor/media/'+encodeURIComponent(mid),{method:'DELETE'}).catch(()=>{});
+  toast(`Removed “${m.name}”${used?` and ${used} clip${used>1?'s':''} from the timeline`:''}`);
+}
 
 // ── ADD CLIP FROM MEDIA ────────────────────────────────────────────────
 function addClipFromMedia(mid,trackId,startFrame){
@@ -1198,6 +1303,7 @@ function renderTimeline(){
   $('#resLbl').textContent=`${project.width}×${project.height} · ${FPS()}fps`;
   $('#tcTot').textContent=tc(timelineFrames());
   $('#monEmpty').style.display=timelineFrames()?'none':'grid';
+  if(window.syncNavigator)syncNavigator();   // keep the Time Navigator bracket in sync with zoom/length
 }
 function clipEl(track,c){
   const el=document.createElement('div');
@@ -1311,6 +1417,8 @@ function updatePlayhead(){
   const x=playhead*ppf;
   $('#playhead').style.left=x+'px';$('#phRuler').style.left=(x-lanesWrap.scrollLeft)+'px';
   $('#tcCur').textContent=tc(playhead);
+  const nav=$('#tlNav'),navph=$('#navPh');   // mirror the playhead onto the Time Navigator
+  if(nav&&navph){const totalF=Math.max(1,tlWidthFrames());navph.style.left=(playhead/totalF*nav.clientWidth)+'px';}
   if(typeof updateInfo==='function')updateInfo();   // keep the Info strip's frame/timecode live
 }
 function setPlayhead(f,scrollInto){
@@ -2760,8 +2868,9 @@ function render2DEntry(ctx,vis,i,consumed,f,W,H,srcOverride){
   else window.__lp2ndCanvas=null;
   drawOneClipMB(ctx,entry,f,W,H,srcOverride);
 }
-function drawFrameInto(ctx,W,H,f,srcOverride){
-  ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);
+function drawFrameInto(ctx,W,H,f,srcOverride,transparent){
+  if(transparent)ctx.clearRect(0,0,W,H);              // alpha export → keep the canvas transparent
+  else{ctx.fillStyle=project.bg||'#000';ctx.fillRect(0,0,W,H);}
   ctx.filter='none';ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   const vis=activeVideoClips(f),consumed=new Set();
   const any3D=lp3dOK()&&vis.some(e=>e.c.threeD);
@@ -2974,13 +3083,23 @@ function activeMask(c){return c&&clipMasks(c).find(m=>m.id===selMaskId)||null;}
 function writeProp(c,field,v){if(isKeyed(c,field))upsertKey(c,field,v);else c[field]=v;}
 // view zoom (preview-only CSS transform — never touches the backing store or export)
 let viewZoom=1;
-function applyViewZoom(){screen.style.transform=`translate(-50%,-50%) scale(${viewZoom})`;}
+let viewPanX=0,viewPanY=0;   // Hand-tool monitor pan (preview-only CSS offset; never touches the export)
+function applyViewZoom(){screen.style.transform=`translate(calc(-50% + ${viewPanX}px),calc(-50% + ${viewPanY}px)) scale(${viewZoom})`;}
+function startViewPan(e){try{screen.setPointerCapture(e.pointerId);}catch{}screen.style.cursor='grabbing';
+  const sx=e.clientX,sy=e.clientY,px0=viewPanX,py0=viewPanY;
+  const mv=ev=>{viewPanX=px0+(ev.clientX-sx);viewPanY=py0+(ev.clientY-sy);applyViewZoom();};
+  const up=ev=>{try{screen.releasePointerCapture(ev.pointerId);}catch{}screen.style.cursor=(tool==='hand'?'grab':'');
+    screen.removeEventListener('pointermove',mv);screen.removeEventListener('pointerup',up);};
+  screen.addEventListener('pointermove',mv);screen.addEventListener('pointerup',up);}
 let _zbT=0;
 function showZoomBadge(t){let z=$('#zoomBadge');if(!z){z=document.createElement('div');z.id='zoomBadge';z.className='zoom-badge';document.querySelector('.stage').appendChild(z);}
   z.textContent=t;z.classList.add('show');clearTimeout(_zbT);_zbT=setTimeout(()=>z.classList.remove('show'),900);}
 let vdrag=null;
 screen.addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
+  if(tool==='hand'){startViewPan(e);return;}                                   // Hand → drag to pan the monitor
+  if(tool==='zoom'){const f=e.altKey?1/1.25:1.25;viewZoom=Math.min(8,Math.max(0.1,viewZoom*f));   // Zoom → click in, Alt-click out
+    applyViewZoom();showZoomBadge(Math.round(viewZoom*100)+'%');return;}
   const W=screen.width,H=screen.height,{x,y}=evToCanvas(e),sc=selClip();
   if(tool==='pen'){penClick(x,y,W,H);return;}
   if(tool==='rotate'){ // Rotation tool (W): drag a layer in the monitor to spin it about its anchor
@@ -3061,7 +3180,7 @@ screen.addEventListener('pointerup',e=>{if(!vdrag)return;try{screen.releasePoint
   if(vdrag.mode==='vertexdrag'&&isPenMask(vdrag.m)&&!pathKeyed(vdrag.c,vdrag.m))vdrag.m.box=penBBox(vdrag.m.points); // keyed → the box rides on the upserted keyframe, don't recompute from stale static points
   const wasMask=/^(mask|vertex)/.test(vdrag.mode);vdrag=null;if(wasMask)renderTimeline();refreshInspector();save(true);});
 screen.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:1/1.1;viewZoom=Math.min(8,Math.max(0.1,viewZoom*f));applyViewZoom();showZoomBadge(Math.round(viewZoom*100)+'%');},{passive:false});
-screen.addEventListener('dblclick',()=>{viewZoom=1;applyViewZoom();showZoomBadge('Fit');});
+screen.addEventListener('dblclick',()=>{viewZoom=1;viewPanX=viewPanY=0;applyViewZoom();showZoomBadge('Fit');});
 screen.addEventListener('dragover',e=>e.preventDefault());
 screen.addEventListener('drop',e=>{e.preventDefault();const mid=e.dataTransfer.getData('mid')||e.dataTransfer.getData('text/plain');if(!mid)return;
   const added=addClipToBestTrack(mid);if(added)select(added.trackId,added.clipId);});
@@ -3970,10 +4089,15 @@ function rippleDeleteSel(){const sc=selClip();if(!sc||!sc.clip)return;
   deselect();renderTimeline();drawFrame();save(true);toast('Ripple deleted — gap closed');}
 
 // ── DROP MEDIA ONTO TIMELINE ───────────────────────────────────────────
-lanes.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';
-  const lane=e.target.closest('.lane');$$('.lane').forEach(l=>l.classList.toggle('drop-ok',l===lane));});
-lanes.addEventListener('dragleave',()=>$$('.lane').forEach(l=>l.classList.remove('drop-ok')));
-lanes.addEventListener('drop',async e=>{e.preventDefault();$$('.lane').forEach(l=>l.classList.remove('drop-ok'));
+// Bind drag/drop to lanesWrap (the always-full-height scroll area), NOT #lanes — an EMPTY
+// timeline gives #lanes zero height, so dropping the FIRST clip onto it was impossible.
+// lanesWrap fills the visible timeline, so the first clip can always land + auto-make a track.
+lanesWrap.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';
+  const lane=e.target.closest('.lane');$$('.lane').forEach(l=>l.classList.toggle('drop-ok',l===lane));
+  lanesWrap.classList.toggle('drop-ok',!lane);});           // highlight the whole area when hovering empty space
+lanesWrap.addEventListener('dragleave',e=>{if(lanesWrap.contains(e.relatedTarget))return;
+  $$('.lane').forEach(l=>l.classList.remove('drop-ok'));lanesWrap.classList.remove('drop-ok');});
+lanesWrap.addEventListener('drop',async e=>{e.preventDefault();$$('.lane').forEach(l=>l.classList.remove('drop-ok'));lanesWrap.classList.remove('drop-ok');
   const lane=e.target.closest('.lane');
   let tid=lane&&lane.dataset.tid;
   if(!tid){const tr={id:uid(),name:'Track '+(project.tracks.length+1),clips:[]};insertTrack(tr);tid=tr.id;} // dropped on empty area → make a track
@@ -3995,7 +4119,7 @@ ruler.addEventListener('pointerdown',e=>{ruler.setPointerCapture(e.pointerId);
   mv(e);const up=()=>{ruler.releasePointerCapture(e.pointerId);ruler.removeEventListener('pointermove',mv);ruler.removeEventListener('pointerup',up);};
   ruler.addEventListener('pointermove',mv);ruler.addEventListener('pointerup',up);});
 lanesWrap.addEventListener('scroll',()=>{ruler.parentElement.scrollLeft=lanesWrap.scrollLeft;
-  heads.parentElement.scrollTop=lanesWrap.scrollTop;updatePlayhead();});
+  heads.parentElement.scrollTop=lanesWrap.scrollTop;updatePlayhead();if(window.syncNavigator)syncNavigator();});
 
 // ── TOOLBAR / TOP BAR WIRING ───────────────────────────────────────────
 $('#binImport').onclick=doImport;$('#importZone').onclick=doImport;
@@ -4015,7 +4139,7 @@ $('#fileInput').onchange=function(){importFiles(this.files);this.value='';};   /
 $('#toolSelect').onclick=()=>setTool('select');$('#toolRazor').onclick=()=>setTool('razor');
 function setTool(t){if(t!=='pen'&&penDraft)cancelPenDraft();tool=t;$('#toolSelect').classList.toggle('on',t==='select');
   $('#toolRazor').classList.toggle('on',t==='razor');lanes.style.cursor=t==='razor'?'crosshair':'';
-  screen.style.cursor=t==='pen'?'crosshair':(t==='rotate'?'grab':'');
+  screen.style.cursor=t==='pen'?'crosshair':(t==='rotate'?'grab':(t==='hand'?'grab':(t==='zoom'?'zoom-in':'')));
   if(window.aeSetActiveTool){const key={select:'selection',pen:'pen',rotate:'rotation'}[t];   // keep the AE rail highlight in sync
     const btn=key&&[...document.querySelectorAll('#aeTools .aetool')].find(b=>(b.dataset.tool||'').toLowerCase().includes(key));
     window.aeSetActiveTool(btn?btn.dataset.tool:'');}
@@ -4039,21 +4163,76 @@ function insertTrack(tr){
   renderTimeline();save(true);
   return tr;
 }
+// Lowest zoom that still fits the WHOLE timeline in the viewport, so you can always zoom out to
+// see every clip (and drag the navigator bracket all the way to the end) no matter how long it gets.
+// Capped at 1 so short timelines keep the normal 1px/frame floor.
+function minPpf(){const vw=lanesWrap.clientWidth||1,tf=Math.max(1,tlWidthFrames());return Math.max(0.02,Math.min(1,vw/tf));}
 function applyPpf(centerFrame){
-  ppf=clamp(ppf,1,120);
-  const z=$('#zoom');if(z)z.value=ppf;
+  ppf=clamp(ppf,minPpf(),120);
+  const z=$('#zoom');if(z){z.min=minPpf();z.value=ppf;}
   const zl=$('#zoomLbl');if(zl)zl.textContent=(Math.round(ppf*10)/10)+' px/f';
   renderTimeline();
   if(centerFrame!=null)lanesWrap.scrollLeft=Math.max(0,centerFrame*ppf-lanesWrap.clientWidth/2);
 }
 $('#zoom').oninput=e=>{ppf=+e.target.value;applyPpf(playhead);};
+// ── TIME NAVIGATOR — AE-style zoom brackets spanning the whole timeline (drag edges to
+//    zoom into a range, drag the middle to pan). Two-way synced with ppf + scroll. ──
+(function(){
+  const nav=$('#tlNav'),view=$('#navView'),hl=$('#navHL'),hr=$('#navHR'),navph=$('#navPh');
+  if(!nav)return;
+  const navW=()=>Math.max(1,nav.clientWidth);
+  const minWinF=()=>Math.max(1,lanesWrap.clientWidth/120);       // tightest window the ppf cap allows
+  window.syncNavigator=function(){                               // reflect current view onto the bracket
+    const totalF=Math.max(1,tlWidthFrames()),w=navW();
+    const startF=lanesWrap.scrollLeft/ppf;
+    const winF=Math.min(totalF,lanesWrap.clientWidth/ppf);
+    view.style.left=(startF/totalF*w)+'px';
+    view.style.width=Math.max(8,winF/totalF*w)+'px';
+    navph.style.left=(playhead/totalF*w)+'px';
+  };
+  function applyWindow(startF,winF){                             // drive ppf+scroll from a desired window
+    const totalF=Math.max(1,tlWidthFrames());
+    winF=clamp(winF,minWinF(),totalF);
+    startF=clamp(startF,0,Math.max(0,totalF-winF));
+    ppf=clamp(lanesWrap.clientWidth/winF,minPpf(),120);
+    applyPpf(null);                                              // re-render + update slider/label
+    lanesWrap.scrollLeft=startF*ppf;                            // fires scroll → syncNavigator
+    syncNavigator();
+  }
+  function drag(e,mode){
+    e.preventDefault();e.stopPropagation();
+    const totalF=Math.max(1,tlWidthFrames()),w=navW(),sx=e.clientX;
+    const l0=view.offsetLeft,w0=view.offsetWidth;
+    const startF0=l0/w*totalF,endF0=(l0+w0)/w*totalF;
+    try{nav.setPointerCapture(e.pointerId);}catch(_){}
+    const mv=ev=>{
+      const dF=(ev.clientX-sx)/w*totalF;
+      if(mode==='pan')    applyWindow(startF0+dF,endF0-startF0);
+      else if(mode==='l') applyWindow(startF0+dF,endF0-(startF0+dF));
+      else                applyWindow(startF0,(endF0+dF)-startF0);
+    };
+    const up=()=>{try{nav.releasePointerCapture(e.pointerId);}catch(_){}
+      nav.removeEventListener('pointermove',mv);nav.removeEventListener('pointerup',up);};
+    nav.addEventListener('pointermove',mv);nav.addEventListener('pointerup',up);
+  }
+  view.addEventListener('pointerdown',e=>{if(e.target===hl||e.target===hr)return;drag(e,'pan');});
+  hl.addEventListener('pointerdown',e=>drag(e,'l'));
+  hr.addEventListener('pointerdown',e=>drag(e,'r'));
+  nav.addEventListener('pointerdown',e=>{                        // click empty track → center the window there
+    if(e.target!==nav)return;
+    const totalF=Math.max(1,tlWidthFrames()),w=navW();
+    const clickF=(e.clientX-nav.getBoundingClientRect().left)/w*totalF;
+    applyWindow(clickF-(lanesWrap.clientWidth/ppf)/2,lanesWrap.clientWidth/ppf);
+  });
+  window.addEventListener('resize',()=>{if(window.syncNavigator)syncNavigator();});
+})();
 // Ctrl/Alt/⌘ + wheel over the timeline = zoom centered on the cursor (frame under the cursor stays put)
 function tlWheelZoom(e){
   if(!(e.ctrlKey||e.altKey||e.metaKey))return;        // plain wheel still scrolls
   e.preventDefault();
   const rect=lanesWrap.getBoundingClientRect(),localX=e.clientX-rect.left;
   const frameAtCursor=(localX+lanesWrap.scrollLeft)/ppf;
-  ppf=clamp(ppf*(e.deltaY<0?1.25:1/1.25),1,120);
+  ppf=clamp(ppf*(e.deltaY<0?1.25:1/1.25),minPpf(),120);
   applyPpf(null);
   lanesWrap.scrollLeft=Math.max(0,frameAtCursor*ppf-localX);
 }
@@ -4085,15 +4264,19 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight'){stop();setPlayhead(playhead+(e.shiftKey?FPS():1));}
   else if(e.key==='Home'){stop();setPlayhead(0,true);}
   else if(e.key==='End'){stop();setPlayhead(timelineFrames(),true);}
-  else if(e.key==='Delete'||e.key==='Backspace'){e.shiftKey?rippleDeleteSel():deleteSel();}
+  else if((e.key==='x'||e.key==='X')&&(e.ctrlKey||e.metaKey)){const b=$('#binBody .media.sel');if(b){e.preventDefault();removeMedia(b.dataset.id);}}
+  else if(e.key==='Delete'||e.key==='Backspace'){
+    const b=$('#binBody .media.sel');
+    if(b&&!sel&&!selSet.size){removeMedia(b.dataset.id);}   // a bin clip is picked and nothing on the timeline is → remove it from the bin
+    else{e.shiftKey?rippleDeleteSel():deleteSel();}}
   else if((e.key==='s'||e.key==='S')&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();toast('Saved');}
   else if((e.key==='z'||e.key==='Z')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey){e.preventDefault();undoEdit();}
   else if(((e.key==='z'||e.key==='Z')&&(e.ctrlKey||e.metaKey)&&e.shiftKey)||((e.key==='y'||e.key==='Y')&&(e.ctrlKey||e.metaKey))){e.preventDefault();redoEdit();}
   else if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)){e.preventDefault();openCompSettings();}
   else if(e.key==="'"&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleOv('grid');toast('Grid '+(OV.grid?'on':'off'));}
   else if(e.key===';'&&(e.ctrlKey||e.metaKey)){e.preventDefault();toggleOv('guides');toast('Guides '+(OV.guides?'on':'off'));}
-  else if((e.key==='='||e.key==='+')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf*1.3,1,120);applyPpf(playhead);}
-  else if((e.key==='-'||e.key==='_')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf/1.3,1,120);applyPpf(playhead);}
+  else if((e.key==='='||e.key==='+')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf*1.3,minPpf(),120);applyPpf(playhead);}
+  else if((e.key==='-'||e.key==='_')&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ppf=clamp(ppf/1.3,minPpf(),120);applyPpf(playhead);}
   else if((e.key==='u'||e.key==='U')&&!mod){e.preventDefault(); // U = reveal animated; UU (double-tap) = reveal all modified
     const now=performance.now();
     if(now-_revealLastU<450){applyReveal('modified');_revealLastU=0;}
@@ -4168,7 +4351,7 @@ function loadProject(p){stop();for(const id in vels)vels[id].remove();Object.key
 // ── EXPORT ─────────────────────────────────────────────────────────────
 let expJob=null,expPoll=0;
 $('#btnExport').onclick=()=>{if(!timelineFrames()){toast('Add some clips first',1);return;}
-  const fo=$('#expFps');if(fo)fo.value=String(project.fps);
+  const nm=$('#aName');if(nm&&!nm.value)nm.value=project.title||'render';
   showExp('form');$('#expScrim').classList.add('open');};
 $('#expCancel').onclick=()=>$('#expScrim').classList.remove('open');
 $('#expClose').onclick=()=>$('#expScrim').classList.remove('open');
@@ -4225,8 +4408,9 @@ function seekActiveVideos(f,fps,srcMap){
 }
 async function exportViaFrameServer(tl){
   const W=tl.width,H=tl.height,fps=tl.fps,total=tl.duration||timelineFrames();
+  const alpha=!!(tl._settings&&tl._settings.alpha);
   let wake=null;try{wake=await navigator.wakeLock.request('screen');}catch{}
-  const off=new OffscreenCanvas(W,H),octx=off.getContext('2d',{alpha:false});
+  const off=new OffscreenCanvas(W,H),octx=off.getContext('2d',{alpha});
   let srcMap=null,ws=null;
   let done=null,err=null,ready=false;
   try{
@@ -4241,8 +4425,8 @@ async function exportViaFrameServer(tl){
     for(let f=0;f<total;f++){
       if(window.__expCancel){try{ws.send(JSON.stringify({type:'cancel'}));}catch{}ws.close();return null;}
       await seekActiveVideos(f,fps,srcMap);
-      drawFrameInto(octx,W,H,f,srcMap);
-      const blob=await off.convertToBlob({type:'image/jpeg',quality:0.95});
+      drawFrameInto(octx,W,H,f,srcMap,alpha);
+      const blob=await off.convertToBlob(alpha?{type:'image/png'}:{type:'image/jpeg',quality:0.95});
       const buf=await blob.arrayBuffer();
       while(ws.bufferedAmount>6*1024*1024)await sleep(8);
       ws.send(buf);
@@ -4260,40 +4444,100 @@ async function exportViaFrameServer(tl){
   if(!done)throw new Error('render timed out');
   return done;
 }
+// ── Export modal: Quick / Advanced toggle ──
+let expMode='quick';
+function setExpMode(m){expMode=m;
+  $('#modeQuick').classList.toggle('on',m==='quick');
+  $('#modeAdv').classList.toggle('on',m==='adv');
+  $('#paneQuick').style.display=m==='quick'?'':'none';
+  $('#paneAdv').style.display=m==='adv'?'':'none';}
+if($('#modeQuick'))$('#modeQuick').onclick=()=>setExpMode('quick');
+if($('#modeAdv'))$('#modeAdv').onclick=()=>setExpMode('adv');
+// Format-aware Output Module: Channels (alpha) only lights up where it's real.
+function expFmtSync(){
+  const f=$('#aFormat').value, alphaOK=(f==='mov'||f==='pngseq');
+  $('#rowChannels').classList.toggle('dim',!alphaOK);
+  if(!alphaOK)$('#aChannels').value='rgb';
+  const hints={h264:'Universal MP4 — plays everywhere, small files.',
+    mov:'QuickTime. Choose RGB + Alpha for a transparent background (ProRes 4444).',
+    mp3:'Audio only — the whole timeline mix as an MP3.',
+    wav:'Audio only — uncompressed WAV master.',
+    pngseq:'Every frame as a PNG, delivered zipped. RGB + Alpha keeps transparency.',
+    jpgseq:'Every frame as a JPEG, delivered zipped. No transparency.'};
+  $('#aFmtHint').textContent=hints[f]||'';}
+if($('#aFormat')){$('#aFormat').onchange=expFmtSync;expFmtSync();}
+// resolution fraction → even pixel size off the comp
+function expFrac(frac){const d={full:1,half:2,third:3,quarter:4}[frac]||1;
+  let w=Math.round(project.width/d)&~1,h=Math.round(project.height/d)&~1;return [Math.max(2,w),Math.max(2,h)];}
+function finishExp(jid,fmt){
+  expJob=jid;const url='/api/editor/export/'+jid+'/file';$('#expDownload').href=url;
+  const v=$('#expVideo');
+  if(fmt==='h264'||fmt==='mov'){v.style.display='';v.src=url;}
+  else{v.style.display='none';v.removeAttribute('src');}   // audio / sequence: download only
+  showExp('done');$('#expSub').textContent='';toast('Render complete ✓');}
+// Download — in the desktop app (WebView2) the HTML `download` link is silently dropped,
+// so try a native Save-As dialog first; fall back to a plain browser download on the web.
+if($('#expDownload'))$('#expDownload').addEventListener('click',async e=>{
+  if(!expJob)return;
+  e.preventDefault();
+  const btn=e.currentTarget,was=btn.textContent;btn.textContent='Saving…';
+  try{
+    const r=await fetch('/api/editor/export/'+expJob+'/save',{method:'POST'}).then(r=>r.json());
+    if(r&&r.saved){toast('Saved ✓ '+r.saved.split(/[\\/]/).pop());}
+    else if(r&&r.cancelled){/* user closed the dialog — do nothing */}
+    else throw new Error((r&&r.error)||'no dialog');
+  }catch(_){
+    // Web/browser fallback: let the anchor's own download happen.
+    const a=document.createElement('a');a.href='/api/editor/export/'+expJob+'/file';
+    a.download='';document.body.appendChild(a);a.click();a.remove();
+  }finally{btn.textContent=was;}
+});
+
 $('#expGo').onclick=async()=>{
-  let [w,h]=$('#expRes').value.split('x').map(Number);w-=w%2;h-=h%2;
-  const q=$('#expQual').value;const fps=project.fps;
-  const settings=q==='x264'?{encoder:'x264',crf:18}:{encoder:'nvenc',cq:q==='nvenc-high'?19:23};
-  const tl=JSON.parse(JSON.stringify(project));tl.width=w;tl.height=h;tl.fps=fps;tl.duration=timelineFrames();tl._settings=settings;
+  let fmt='h264',alpha=false,frac='full',fps=project.fps,settings,fname=project.title||'render';
+  if(expMode==='adv'){
+    fmt=$('#aFormat').value;
+    alpha=$('#aChannels').value==='rgba'&&(fmt==='mov'||fmt==='pngseq');
+    frac=$('#aRes').value;
+    const fv=$('#aFps').value;if(fv)fps=Number(fv)||project.fps;
+    const q=$('#aQual').value;
+    settings=(q==='draft')?{encoder:'x264',crf:23}:(q==='archive')?{encoder:'x264',crf:18}
+      :{encoder:'nvenc',cq:(q==='high'?19:21)};
+    fname=($('#aName').value||'').trim()||project.title||'render';
+  }else{
+    frac=$('#qRes').value; settings={encoder:'nvenc',cq:21};
+  }
+  settings.format=fmt;settings.alpha=alpha;
+  const audioOnly=(fmt==='mp3'||fmt==='wav');
+  let [w,h]=expFrac(frac);
+  const tl=JSON.parse(JSON.stringify(project));tl.width=w;tl.height=h;tl.fps=fps;
+  tl.duration=timelineFrames();tl._settings=settings;tl.title=fname;
   window.__expCancel=false;
   showExp('running');$('#expBar').style.width='0%';$('#expPct').textContent='Starting render…';
-  if(projectNeedsFrameServer(project)){
+  // Audio-only skips the frame compositor; anything visual with motion/effects needs it.
+  if(!audioOnly&&projectNeedsFrameServer(project)){
     $('#expPct').textContent='Frame-exact render (motion/effects)…';
     try{const jid=await exportViaFrameServer(tl);
-      if(jid){expJob=jid;const url='/api/editor/export/'+jid+'/file';$('#expVideo').src=url;$('#expDownload').href=url;
-        showExp('done');$('#expSub').textContent='';toast('Render complete ✓');}
-      else showExp('form');
+      if(jid)finishExp(jid,fmt);else showExp('form');
     }catch(e){showExp('err');$('#expErrTxt').textContent='Frame render failed: '+String(e&&e.message||e);}
     return;
   }
   let r;try{r=await fetch('/api/editor/export',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({timeline:tl,settings,name:project.title})}).then(r=>r.json());}
+    body:JSON.stringify({timeline:tl,settings,name:fname})}).then(r=>r.json());}
   catch{showExp('err');$('#expErrTxt').textContent='Could not reach the render engine.';return;}
   if(r.error){showExp('err');$('#expErrTxt').textContent=r.error;return;}
-  expJob=r.id;pollExport();
+  expJob=r.id;pollExport(fmt);
 };
-async function pollExport(){
+async function pollExport(fmt){
   let j;try{j=await fetch('/api/editor/export/'+expJob).then(r=>r.json());}catch{j=null;}
   if(j){
     const pct=Math.round((j.progress||0)*100);$('#expBar').style.width=pct+'%';
     $('#expPct').textContent=j.status==='rendering'?`Rendering… ${pct}%`:j.status;
-    if(j.status==='done'){const url='/api/editor/export/'+expJob+'/file';
-      $('#expVideo').src=url;$('#expDownload').href=url;showExp('done');
-      $('#expSub').textContent='';toast('Render complete ✓');return;}
+    if(j.status==='done'){finishExp(expJob,fmt||'h264');return;}
     if(j.status==='error'){showExp('err');$('#expErrTxt').textContent=j.error||'Render failed.';return;}
     if(j.status==='cancelled'){showExp('form');return;}
   }
-  expPoll=setTimeout(pollExport,900);
+  expPoll=setTimeout(()=>pollExport(fmt),900);
 }
 $('#expAbort').onclick=async()=>{window.__expCancel=true;clearTimeout(expPoll);if(expJob)
   await fetch('/api/editor/export/'+expJob+'/cancel',{method:'POST'}).catch(()=>{});showExp('form');};
@@ -4661,7 +4905,7 @@ window.addEventListener('resize',fitScreen);
     refreshInspector();drawFrame();save();toast(label+' · '+n+' keyframe'+(n>1?'s':''));}
   function gotoTimePrompt(){const v=prompt('Go to time (seconds):','');if(v==null)return;
     const f=Math.round(parseFloat(v)*FPS());if(isFinite(f)){stop();setPlayhead(clamp(f,0,timelineFrames()),true);}}
-  function zoomTimeline(d){ppf=clamp(ppf*(d>0?1.3:1/1.3),1,120);applyPpf(playhead);}
+  function zoomTimeline(d){ppf=clamp(ppf*(d>0?1.3:1/1.3),minPpf(),120);applyPpf(playhead);}
   function togglePanel(cls){document.body.classList.toggle(cls);fitScreen();renderTimeline();}
   function showShortcuts(){toast('V select · C razor · Space play · ←/→ frame · ⌫ delete · Shift+⌫ ripple delete · Ctrl+Z undo · Ctrl+K comp settings');}
   function saveFrameAs(){
@@ -4739,9 +4983,10 @@ window.addEventListener('resize',fitScreen);
       setTool('pen');setActiveTool(t.name);toast('Pen — click to drop points, click the first point to close (Esc cancels)');};
     if(/type/.test(n))return ()=>{$('#addText').click();};
     if(/rotation/.test(n))return ()=>{setTool('rotate');setActiveTool(t.name);toast('Rotation — drag a layer in the monitor to rotate (Shift = 45° steps)');};
-    if(/hand|pan behind|anchor/.test(n))return ()=>toast(t.name+' — panning the monitor is coming soon');
-    if(/zoom/.test(n))return ()=>toast('Use the timeline Zoom slider for now');
-    return ()=>toast(t.name+' — not in this build yet');
+    if(/^hand/.test(n))return ()=>{setTool('hand');setActiveTool(t.name);toast('Hand — drag the monitor to pan; double-click resets the view');};
+    if(/zoom/.test(n))return ()=>{setTool('zoom');setActiveTool(t.name);toast('Zoom — click the monitor to zoom in, Alt-click to zoom out; double-click fits');};
+    if(/shape/.test(n))return ()=>{newShape('roundrect');setTool('select');setActiveTool('Selection');};
+    return ()=>toast(t.name+' — not in this build yet',1);   // genuinely unbuilt (Camera/Anchor/Brush/Clone/Eraser/Roto/Puppet) — honest, not faked
   }
   // monochrome line icons (currentColor) — one color, follows the scheme
   const SVG=(inner,filled)=>`<svg viewBox="0 0 24 24" fill="${filled?'currentColor':'none'}" stroke="${filled?'none':'currentColor'}" stroke-width="1.6">${inner}</svg>`;
@@ -4765,7 +5010,7 @@ window.addEventListener('resize',fitScreen);
     const host=$('#aeTools');if(!host||!window.AE_TOOLS)return;host.innerHTML='';
     AE_TOOLS.forEach(t=>{const b=document.createElement('button');b.className='aetool';b.dataset.tool=t.name;
       b.innerHTML=TOOL_ICONS[t.name]||SVG('<circle cx="12" cy="12" r="3"/>',true);
-      const wired=/selection|type|pen|rotation/i.test(t.name); // Pen + Rotation are live — stop dimming them
+      const wired=/selection|type|pen|rotation|hand|zoom|shape/i.test(t.name); // live tools — not dimmed
       if(!wired)b.classList.add('soon');
       if(t.flyout&&t.flyout.length)b.classList.add('has-fly');
       b.title=scrub(t.name+(t.shortcut?'  ('+t.shortcut+')':'')+(t.behavior?'\n'+t.behavior:''));
@@ -4966,7 +5211,9 @@ window.addEventListener('resize',fitScreen);
     if(menuId==='layer'&&/^Create 3D Layer Instance/i.test(L))return ()=>toggle3D();
     if(menuId==='layer'&&/^Create Masks from/i.test(L))return ()=>createFromTrace('masks');
     if(menuId==='layer'&&/^Create Shapes from/i.test(L))return ()=>createFromTrace('shape');
-    if(menuId==='layer'&&/^Convert to Editable Text/i.test(L))return ()=>toast('Text layers here are already editable — select one and edit it in the Inspector',0);
+    if(menuId==='layer'&&/^Convert to Editable Text/i.test(L))return ()=>{const s=selClip&&selClip();
+      if(s&&s.clip&&clipKind(s.clip)==='text'){focusInspector();toast('This text is already editable — edit it in the Inspector',0);}
+      else toast('Select a text layer first, then edit it in the Inspector',1);};
     if(menuId==='layer'&&BLENDS.some(b=>b[0]===L))return ()=>setBlendSel(L);
     if(menuId==='layer'){
       if(/^Rename$/i.test(L))return renameSel;

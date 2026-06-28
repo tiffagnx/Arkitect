@@ -3396,7 +3396,7 @@ async def gen_tts(req: Request):
         async with httpx.AsyncClient(timeout=90) as cx:
             r = await cx.post(
                 "https://api.fish.audio/v1/tts",
-                headers={"Authorization": f"Bearer {key}", "content-type": "application/json", "model": "s2.1-pro"},
+                headers={"Authorization": f"Bearer {key}", "content-type": "application/json", "model": "s2.1-pro-free"},   # same model as s2.1-pro, $0 (no latency/DPA guarantee) — flip to "s2.1-pro" for production
                 json=payload)
         if r.status_code != 200:
             return {"error": f"Fish Audio {r.status_code}: {r.text[:160]}"}
@@ -3553,7 +3553,7 @@ def _gen_poster(src, dst, kind, dur):
         pass
 
 
-def _gen_proxy(src, dst, has_audio):
+def _gen_proxy(src, dst, has_audio, dur=0):
     """540p/30fps H.264 proxy with a dense, B-frame-free GOP so scrubbing seeks land fast and
     uniformly (every ~0.5s is a keyframe, no B-frames to decode through). NVENC first; fall back
     to CPU x264 if the card balks. The result is VALIDATED (size + probe) — a truncated/failed
@@ -3571,14 +3571,19 @@ def _gen_proxy(src, dst, has_audio):
             return (p is None) or bool(p.get("has_video"))    # probe UNAVAILABLE (ffprobe timeout/race) ≠ bad encode — keep it
         except Exception:
             return True                                       # never discard a returncode-0 encode we can't disprove
+    # Scale the timeout ceiling to clip length — a 2-hour film's proxy must not be killed
+    # mid-encode (a half-built proxy is discarded, and the player would fall back to the heavy
+    # original = the freeze). These are generous upper bounds; NVENC finishes far sooner.
+    nv_to = max(900, int((dur or 0) * 1.5) + 300)
+    cpu_to = max(1800, int((dur or 0) * 3) + 300)
     try:
-        r = _run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "30", "-no-scenecut", "1"] + audio + tail, 900)
+        r = _run(base + ["-c:v", "h264_nvenc", "-preset", "p5", "-cq", "30", "-no-scenecut", "1"] + audio + tail, nv_to)
         if r.returncode == 0 and _ok():
             return
     except Exception:
         pass
     try:
-        r = _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"] + audio + tail, 1800)
+        r = _run(base + ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28"] + audio + tail, cpu_to)
         if r.returncode == 0 and _ok():
             return
     except Exception:
@@ -3634,7 +3639,7 @@ async def _build_cache(mid: str):
         await asyncio.to_thread(_gen_poster, src, cdir / "poster.jpg", kind, dur)
         cache["poster"] = (cdir / "poster.jpg").exists()
         if kind == "video":
-            await asyncio.to_thread(_gen_proxy, src, cdir / "proxy.mp4", m.get("has_audio"))
+            await asyncio.to_thread(_gen_proxy, src, cdir / "proxy.mp4", m.get("has_audio"), dur)
             cache["proxy"] = (cdir / "proxy.mp4").exists()
             strip_n = await asyncio.to_thread(_gen_filmstrip, src, cdir / "strip.jpg", dur)
             if strip_n:
@@ -4220,6 +4225,26 @@ def _media_or_404(mid: str):
     return EDIT_MEDIA.get(re.sub(r"[^a-f0-9]", "", mid))
 
 
+@app.delete("/api/editor/media/{mid}")
+async def editor_media_delete(mid: str):
+    """Forget a clip from the editor bin: drop its registry entry + its cached proxy/thumbs/peaks.
+    The ORIGINAL source file on disk is never touched — this only removes it from the editor."""
+    key = re.sub(r"[^a-f0-9]", "", mid)
+    async with _media_lock:
+        m = EDIT_MEDIA.pop(key, None)
+        if m is not None:
+            _save_media_reg()
+    if m is None:
+        return JSONResponse({"error": "unknown media"}, status_code=404)
+    try:
+        cdir = EDIT_CACHE / key
+        if cdir.is_dir():
+            _shutil.rmtree(cdir, ignore_errors=True)
+    except Exception:
+        pass
+    return {"ok": True, "id": key}
+
+
 @app.get("/api/editor/media/{mid}/src")
 async def editor_media_src(mid: str):
     m = _media_or_404(mid)
@@ -4240,6 +4265,17 @@ async def editor_media_proxy(mid: str):
         return FileResponse(px, media_type="video/mp4",
                             headers={"Cache-Control": "public, max-age=31536000, immutable"})
     if os.path.isfile(m["src"]):
+        # While the proxy builds we normally serve the original so preview is instant — fine for
+        # small clips. But for a BIG/long source that's the freeze trap: the browser would load the
+        # whole multi-GB file into a <video> and lock up the machine. Cap it — hold the original
+        # back and tell the client to wait for the proxy (it shows the poster meanwhile, no crash).
+        try:
+            big = os.path.getsize(m["src"]) > 350 * 1024 * 1024 or (m.get("dur", 0) or 0) > 720
+        except OSError:
+            big = False
+        if big:
+            return JSONResponse({"status": "building", "proxy": False},
+                                status_code=202, headers={"Cache-Control": "no-store"})
         # transient: served only while the proxy builds. NEVER let the browser cache the heavy
         # original under the stable /proxy URL, or it never upgrades to the real proxy.
         return FileResponse(m["src"], headers={"Cache-Control": "no-store"})
@@ -4391,10 +4427,48 @@ def _clip_kind(c: dict, track_kind=None) -> str:
     return "video"
 
 
+# ── Output formats for the editor's Advanced (AE-style) export ───────────────
+#  ONE place maps the UI "Output Module" choice → container ext + codec, so the
+#  native path AND the frame-server path stay in lockstep. Alpha (a transparent
+#  background) rides only on QuickTime/ProRes 4444 and the PNG sequence — H.264
+#  and JPEG can't carry it, exactly like After Effects greys it out for those.
+_EXPORT_FORMATS = {"h264", "mov", "mp3", "wav", "pngseq", "jpgseq"}
+
+def _fmt_norm(settings: dict) -> tuple:
+    """(fmt, alpha) — sanitised. Unknown format → h264; alpha only where it's real."""
+    fmt = (settings.get("format") or "h264").lower()
+    if fmt not in _EXPORT_FORMATS:
+        fmt = "h264"
+    alpha = bool(settings.get("alpha")) and fmt in ("mov", "pngseq")
+    return fmt, alpha
+
+def _fmt_ext(fmt: str) -> str:
+    return {"h264": ".mp4", "mov": ".mov", "mp3": ".mp3", "wav": ".wav",
+            "pngseq": ".zip", "jpgseq": ".zip"}.get(fmt, ".mp4")
+
+def _video_codec_args(fmt: str, alpha: bool, settings: dict) -> list:
+    """Encoder flags for the finished (already-composited) video stream."""
+    if fmt == "pngseq":
+        return ["-c:v", "png", "-pix_fmt", ("rgba" if alpha else "rgb24")]
+    if fmt == "jpgseq":
+        return ["-c:v", "mjpeg", "-q:v", "2", "-pix_fmt", "yuvj420p"]
+    if fmt == "mov" and alpha:
+        # ProRes 4444 carries a real alpha channel — the AE-style transparent .mov.
+        return ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]
+    enc = settings.get("encoder", "nvenc")
+    if enc == "nvenc" and _has_nvenc():
+        return ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
+                "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
+    return ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
+
+
 def _build_export_cmd(tl: dict, out_path: str, settings: dict):
     W = int(tl.get("width", 1920)); H = int(tl.get("height", 1080))
     FPS = float(tl.get("fps", 30)) or 30.0
     tracks = tl.get("tracks", [])
+    fmt, alpha = _fmt_norm(settings)
+    audio_only = fmt in ("mp3", "wav")
+    is_seq = fmt in ("pngseq", "jpgseq")
 
     vclips, aclips, texts = [], [], []
     for ti, tr in enumerate(tracks):
@@ -4429,7 +4503,49 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
             cmd.extend(["-i", m["src"]])
         return idx
 
-    fc = [f"color=c=black:s={W}x{H}:r={FPS}:d={total_sec:.3f},format=yuva420p[base]"]
+    # Audio submix is identical across every format that carries sound — build it once.
+    def build_audio():
+        amaps, fc_a = [], []
+        for j, c in enumerate(aclips):
+            m = EDIT_MEDIA.get(c.get("mediaId"))
+            if not m or not os.path.isfile(m["src"]) or not m.get("has_audio"):
+                continue
+            ii = add_input(m, False)
+            d = max(0.04, c.get("dur", 0) / FPS)
+            pos_ms = int(c.get("start", 0) / FPS * 1000)
+            vol = float(c.get("volume", 1.0))
+            lbl = f"a{j}"
+            ch = (f"[{ii}:a]atrim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},"
+                  f"asetpts=PTS-STARTPTS,volume={vol:.3f}")
+            afi = (c.get("audioFadeIn") or 0) / FPS
+            afo = (c.get("audioFadeOut") or 0) / FPS
+            if afi > 0: ch += f",afade=t=in:st=0:d={afi:.3f}"
+            if afo > 0: ch += f",afade=t=out:st={max(0,d-afo):.3f}:d={afo:.3f}"
+            if pos_ms > 0: ch += f",adelay={pos_ms}|{pos_ms}"
+            ch += f"[{lbl}]"
+            fc_a.append(ch); amaps.append(f"[{lbl}]")
+        if amaps:
+            fc_a.append(f"{''.join(amaps)}amix=inputs={len(amaps)}:normalize=0:"
+                        f"dropout_transition=0,alimiter=limit=0.97[aout]")
+        return amaps, fc_a
+
+    # ── Audio-only formats (MP3 / WAV) — no video composite at all ──
+    if audio_only:
+        amaps, fc_a = build_audio()
+        if not amaps:
+            raise ValueError("nothing with audio on the timeline to export")
+        cmd += ["-filter_complex", ";".join(fc_a), "-map", "[aout]", "-vn"]
+        if fmt == "mp3":
+            cmd += ["-c:a", "libmp3lame", "-q:a", "0"]   # ~245 kbps VBR, transparent
+        else:
+            cmd += ["-c:a", "pcm_s16le"]
+        cmd += ["-t", f"{total_sec:.3f}", "-progress", "pipe:1", "-nostats", out_path]
+        return cmd, total_sec
+
+    # ── Video composite (shared by mp4 / mov / png-seq / jpg-seq) ──
+    pad_col = ":color=black@0.0" if alpha else ""   # transparent letterbox bars for alpha exports
+    base_col = "black@0.0" if alpha else "black"
+    fc = [f"color=c={base_col}:s={W}x{H}:r={FPS}:d={total_sec:.3f},format=yuva420p[base]"]
     last = "base"; n = 0
     for c in vclips:
         m = EDIT_MEDIA.get(c.get("mediaId"))
@@ -4448,7 +4564,7 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
         else:
             chain += f"trim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},setpts=PTS-STARTPTS,"
         chain += (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
-                  f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuva420p")
+                  f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2{pad_col},setsar=1,format=yuva420p")
         if tin > 0:
             chain += f",fade=t=in:st=0:d={tin:.3f}:alpha=1"
         if tout > 0:
@@ -4475,47 +4591,29 @@ def _build_export_cmd(tl: dict, out_path: str, settings: dict):
                   f"enable='between(t,{pos:.3f},{pos+d:.3f})'[{nl}]")
         last = nl; n += 1
 
-    fc.append(f"[{last}]format=yuv420p[vout]")
+    # Keep the alpha plane for transparent exports; flatten to yuv420p otherwise.
+    fc.append(f"[{last}]format={'yuva420p' if alpha else 'yuv420p'}[vout]")
 
-    amaps = []
-    for j, c in enumerate(aclips):
-        m = EDIT_MEDIA.get(c.get("mediaId"))
-        if not m or not os.path.isfile(m["src"]) or not m.get("has_audio"):
-            continue
-        ii = add_input(m, False)
-        d = max(0.04, c.get("dur", 0) / FPS)
-        pos_ms = int(c.get("start", 0) / FPS * 1000)
-        vol = float(c.get("volume", 1.0))
-        lbl = f"a{j}"
-        ch = (f"[{ii}:a]atrim=start={c.get('in',0)/FPS:.3f}:duration={d:.3f},"
-              f"asetpts=PTS-STARTPTS,volume={vol:.3f}")
-        afi = (c.get("audioFadeIn") or 0) / FPS
-        afo = (c.get("audioFadeOut") or 0) / FPS
-        if afi > 0: ch += f",afade=t=in:st=0:d={afi:.3f}"
-        if afo > 0: ch += f",afade=t=out:st={max(0,d-afo):.3f}:d={afo:.3f}"
-        if pos_ms > 0: ch += f",adelay={pos_ms}|{pos_ms}"
-        ch += f"[{lbl}]"
-        fc.append(ch); amaps.append(f"[{lbl}]")
-
+    amaps, fc_a = ([], []) if is_seq else build_audio()   # image sequences drop audio
+    fc += fc_a
     has_audio = bool(amaps)
-    if has_audio:
-        fc.append(f"{''.join(amaps)}amix=inputs={len(amaps)}:normalize=0:"
-                  f"dropout_transition=0,alimiter=limit=0.97[aout]")
 
     cmd += ["-filter_complex", ";".join(fc), "-map", "[vout]"]
     if has_audio:
         cmd += ["-map", "[aout]"]
 
-    enc = settings.get("encoder", "nvenc")
-    if enc == "nvenc" and _has_nvenc():
-        cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
-                "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
-    else:  # no NVIDIA encoder (normal laptop) → CPU encode so export still works
-        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
+    cmd += _video_codec_args(fmt, alpha, settings)
     if has_audio:
         cmd += ["-c:a", "aac", "-b:a", "256k"]
-    cmd += ["-r", f"{FPS}", "-t", f"{total_sec:.3f}", "-movflags", "+faststart",
-            "-progress", "pipe:1", "-nostats", out_path]
+
+    if is_seq:
+        # out_path is a numbered pattern (…_%05d.png/.jpg); the caller zips the folder.
+        cmd += ["-r", f"{FPS}", "-t", f"{total_sec:.3f}", "-progress", "pipe:1", "-nostats", out_path]
+    else:
+        cmd += ["-r", f"{FPS}", "-t", f"{total_sec:.3f}"]
+        if fmt in ("h264", "mov") and not alpha:
+            cmd += ["-movflags", "+faststart"]
+        cmd += ["-progress", "pipe:1", "-nostats", out_path]
     return cmd, total_sec
 
 
@@ -4557,6 +4655,16 @@ async def _run_export(jid: str, cmd: list, total_sec: float):
         except Exception:
             pass
         err = "".join(err_chunks)
+        # Image-sequence formats: ffmpeg wrote a folder of frames → zip it into out_path.
+        zip_from = job.get("zip_from")
+        if proc.returncode == 0 and zip_from and os.path.isdir(zip_from):
+            try:
+                base = job["out_path"][:-4] if job["out_path"].endswith(".zip") else job["out_path"]
+                await asyncio.to_thread(_shutil.make_archive, base, "zip", zip_from)
+                _shutil.rmtree(zip_from, ignore_errors=True)
+            except Exception as e:
+                job["status"] = "error"; job["error"] = f"couldn't zip the frame sequence: {e}"
+                return
         if proc.returncode == 0 and os.path.isfile(job["out_path"]):
             job["status"] = "done"; job["progress"] = 1.0
             job["size"] = os.path.getsize(job["out_path"])
@@ -4591,13 +4699,26 @@ async def editor_export(req: Request):
     settings = body.get("settings") or {}
     name = re.sub(r"[^a-zA-Z0-9_-]", "_", (body.get("name") or "render"))[:60] or "render"
     jid = uuid.uuid4().hex[:12]
-    out_path = str(EDIT_OUT / f"{name}_{jid}.mp4")
+    fmt, alpha = _fmt_norm(settings)
+    is_seq = fmt in ("pngseq", "jpgseq")
+    seqdir = None
+    if is_seq:
+        # ffmpeg writes a numbered image run into its own folder; _run_export zips it.
+        seqdir = EDIT_OUT / f"{name}_{jid}_seq"
+        seqdir.mkdir(parents=True, exist_ok=True)
+        ext = "png" if fmt == "pngseq" else "jpg"
+        target = str(seqdir / f"{name}_%05d.{ext}")
+        out_path = str(EDIT_OUT / f"{name}_{jid}.zip")
+    else:
+        out_path = str(EDIT_OUT / f"{name}_{jid}{_fmt_ext(fmt)}")
+        target = out_path
     try:
-        cmd, total_sec = _build_export_cmd(tl, out_path, settings)
+        cmd, total_sec = _build_export_cmd(tl, target, settings)
     except Exception as e:
         return JSONResponse({"error": f"couldn't build the render: {e}"}, status_code=400)
     EXPORT_JOBS[jid] = {"status": "rendering", "progress": 0.0, "out_path": out_path,
-                        "error": None, "proc": None, "name": f"{name}_{jid}.mp4"}
+                        "error": None, "proc": None, "name": os.path.basename(out_path),
+                        "zip_from": str(seqdir) if seqdir else None}
     _fire(_run_export(jid, cmd, total_sec))
     return {"ok": True, "id": jid}
 
@@ -4631,8 +4752,47 @@ async def editor_export_file(jid: str):
     job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
     if not job or not os.path.isfile(job.get("out_path", "")):
         return JSONResponse({"error": "not found"}, status_code=404)
-    return FileResponse(job["out_path"], media_type="video/mp4",
+    mt = {".mp4": "video/mp4", ".mov": "video/quicktime", ".mp3": "audio/mpeg",
+          ".wav": "audio/wav", ".zip": "application/zip"}.get(
+              os.path.splitext(job["out_path"])[1].lower(), "application/octet-stream")
+    return FileResponse(job["out_path"], media_type=mt,
                         filename=os.path.basename(job["out_path"]))
+
+
+@app.post("/api/editor/export/{jid}/save")
+async def editor_export_save(jid: str):
+    """Native OS 'Save As' dialog → copy the finished render wherever B wants.
+    WebView2 (the desktop shell) silently drops HTML `download` links, so the
+    browser-download path never fires there. This pops the same Tk dialog the
+    Studio bounce uses and copies the file out — the reliable cross-shell path."""
+    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+    if not job or not os.path.isfile(job.get("out_path", "")):
+        return JSONResponse({"error": "render not found — re-export and try again"}, status_code=404)
+    src = job["out_path"]
+    base = os.path.basename(src)
+    ext = os.path.splitext(base)[1] or ".mp4"
+    # Tk's asksaveasfilename in a child process (never touches the async loop).
+    script = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "import sys\n"
+        "r=tk.Tk();r.withdraw();r.attributes('-topmost',True)\n"
+        f"d=filedialog.asksaveasfilename(title='Save render — DeMartinville Editor',"
+        f"initialfile={base!r},defaultextension={ext!r},"
+        "filetypes=[('Video','*.mp4 *.mov'),('Audio','*.mp3 *.wav'),('Frames (zip)','*.zip'),('All files','*.*')])\n"
+        "sys.stdout.write(d or '')\n"
+    )
+    try:
+        r = await asyncio.to_thread(
+            lambda: subprocess.run([_sys.executable, "-c", script],
+                                   capture_output=True, text=True, creationflags=_NOWIN, timeout=600))
+        dest = (r.stdout or "").strip()
+        if not dest:
+            return {"cancelled": True}
+        await asyncio.to_thread(_shutil.copy2, src, dest)
+        return {"saved": dest}
+    except Exception as e:
+        return JSONResponse({"error": f"couldn't save: {e}"}, status_code=500)
 
 
 # ── FRAME-SERVER EXPORT — honors keyframes/effects/transforms ────────────────
@@ -4711,9 +4871,13 @@ async def export_frames(ws: WebSocket):
         total = int(init.get("total", 0)); settings = init.get("settings") or {}
         tl = init.get("timeline") or {}
         name = re.sub(r"[^a-zA-Z0-9_-]", "_", (init.get("name") or "render"))[:60] or "render"
-        out_path = str(EDIT_OUT / f"{name}_{jid}.mp4")
+        fmt, alpha = _fmt_norm(settings)
+        is_seq = fmt in ("pngseq", "jpgseq")
+        # PNG frames whenever we need an alpha channel (transparent .mov / PNG seq); JPEG otherwise.
+        frame_ext = "png" if (alpha or fmt == "pngseq") else "jpg"
+        out_path = str(EDIT_OUT / f"{name}_{jid}{_fmt_ext(fmt)}")
         EXPORT_JOBS[jid] = {"status": "rendering", "progress": 0.0, "error": None,
-                            "proc": None, "out_path": out_path, "name": f"{name}_{jid}.mp4"}
+                            "proc": None, "out_path": out_path, "name": os.path.basename(out_path)}
         await ws.send_json({"type": "ready", "id": jid})
         # ── receive frames until eof/cancel/disconnect ──
         while True:
@@ -4724,7 +4888,7 @@ async def export_frames(ws: WebSocket):
                 break
             b = msg.get("bytes")
             if b is not None:
-                (fdir / f"f_{n:06d}.jpg").write_bytes(b); n += 1
+                (fdir / f"f_{n:06d}.{frame_ext}").write_bytes(b); n += 1
                 if total:
                     EXPORT_JOBS[jid]["progress"] = min(0.6, n / total * 0.6)
                 continue
@@ -4745,28 +4909,44 @@ async def export_frames(ws: WebSocket):
                 try: await ws.send_json({"type": "error", "text": "no frames received"})
                 except Exception: pass
             return
-        # ── audio submix (same amix chain as native) ──
+        # ── Image sequence: the frames ARE the deliverable — just zip them, no re-encode ──
+        if is_seq:
+            EXPORT_JOBS[jid]["progress"] = 0.8
+            try:
+                base = out_path[:-4] if out_path.endswith(".zip") else out_path
+                await asyncio.to_thread(_shutil.make_archive, base, "zip", fdir)
+            except Exception as e:
+                EXPORT_JOBS[jid]["status"] = "error"; EXPORT_JOBS[jid]["error"] = f"couldn't zip frames: {e}"
+                await ws.send_json({"type": "error", "text": EXPORT_JOBS[jid]["error"]}); return
+            if os.path.isfile(out_path):
+                EXPORT_JOBS[jid]["status"] = "done"; EXPORT_JOBS[jid]["progress"] = 1.0
+                EXPORT_JOBS[jid]["size"] = os.path.getsize(out_path)
+                await ws.send_json({"type": "done", "id": jid})
+            else:
+                EXPORT_JOBS[jid]["status"] = "error"; EXPORT_JOBS[jid]["error"] = "zip failed"
+                await ws.send_json({"type": "error", "text": "zip failed"})
+            return
+        # ── audio submix (same amix chain as native; sequences skipped above) ──
         EXPORT_JOBS[jid]["progress"] = 0.62
         audio_path = jobdir / "audio.m4a"
         has_audio = await _render_audio_submix(tl, FPS, str(audio_path))
-        # ── encode the JPEG sequence ──
-        cmd = [FFMPEG, "-y", "-framerate", f"{FPS}", "-i", str(fdir / "f_%06d.jpg")]
+        # ── encode the frame sequence into the chosen container ──
+        cmd = [FFMPEG, "-y", "-framerate", f"{FPS}", "-i", str(fdir / f"f_%06d.{frame_ext}")]
         if has_audio:
             cmd += ["-i", str(audio_path)]
-        enc = settings.get("encoder", "nvenc")
-        if enc == "nvenc" and _has_nvenc():
-            cmd += ["-c:v", "h264_nvenc", "-preset", "p5", "-tune", "hq", "-rc", "vbr",
-                    "-cq", str(settings.get("cq", 21)), "-b:v", "0", "-spatial-aq", "1", "-pix_fmt", "yuv420p"]
-        else:  # no NVIDIA encoder (normal laptop) → CPU encode so export still works
-            cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", str(settings.get("crf", 18)), "-pix_fmt", "yuv420p"]
-        cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+        cmd += _video_codec_args(fmt, alpha, settings)
+        if not alpha:
+            cmd += ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
         if has_audio:
             cmd += ["-c:a", "aac", "-b:a", "256k", "-map", "0:v", "-map", "1:a"]
             if total:
                 cmd += ["-t", f"{total/FPS:.3f}"]
         else:
             cmd += ["-map", "0:v"]
-        cmd += ["-r", f"{FPS}", "-movflags", "+faststart", out_path]
+        cmd += ["-r", f"{FPS}"]
+        if fmt in ("h264", "mov") and not alpha:
+            cmd += ["-movflags", "+faststart"]
+        cmd += [out_path]
         EXPORT_JOBS[jid]["progress"] = 0.7
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
                                                     stderr=asyncio.subprocess.PIPE, creationflags=_NOWIN)
