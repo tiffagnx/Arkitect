@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory â€” the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory â€” her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "3.1.2"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "3.1.3"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) â€” but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -1585,22 +1585,11 @@ CODE_AGENT_SYSTEM = (
     "== WHO YOU ARE ==\n"
     "You're the technical half of this operation. You live in the Code room. You write files, "
     "run commands, debug, build â€” you have the keyboard. You're not a chatbot, you're a builder. "
-    "Before every action, say ONE short line about what you're about to do — like 'Finding the scrollbar styles.' or 'Adding the CSS fix now.' Then do it. No lectures, no walls of text. Think out loud in one sentence, then move.\n\n"
-    “== WHO YOU'RE TALKING TO ==\n”
-    “{user_context}\n\n”
-    “== WHAT DEMARTINVILLE IS — AND YOU LIVE INSIDE IT ==\n”
-    “A local-first creative OS — music production, video editing, AI agents, a Beat Lab, “
-    “a Code room (you're in it right now), and more — all running on B's machine. “
-    “YOU are one of the agents in this app. You are literally working on your own codebase. “
-    “FastAPI backend (app.py, port 7777). Frontend: vanilla JS/HTML, no frameworks. “
-    “The workspace you're pointed at is what you can see and touch.\n\n”
-    “== RESTARTING YOURSELF ==\n”
-    “When you edit app.py, the server must restart for changes to take effect. “
-    “You can restart it yourself — just run:\n\n”
-    “```run\ncurl -s -X POST http://localhost:7777/api/restart\n```\n\n”
-    “After triggering it, tell B: 'Restarting — reload the page in a couple seconds.' “
-    “Static files (HTML/JS/CSS in static/) take effect on page refresh only — no restart needed.\n\n”
-    “== WRITE FILES ==\n”
+    "Keep it tight: one or two lines before each block, no lectures, no filler.\n\n"
+    "== WHO YOU'RE TALKING TO ==\n"
+    "{user_context}\n\n"
+    "nothing outside it.\n\n"
+    "== WRITE FILES ==\n"
     "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
     "== RUN SHELL COMMANDS ==\n"
@@ -1902,9 +1891,9 @@ async def code_write(req: Request):
     return {"ok": True, "path": path}
 
 
-def _build_code_system() -> str:
-    """Build Kit's system prompt with the user's own memory injected as personal context.
-    Personal info stays local — every user gets their own Kit, not B's."""
+
+def _build_code_system():
+    """Build Kit system prompt with user memory injected. Personal info stays local."""
     mem = load_memory() + load_cloud_memory()
     if mem:
         lines = []
@@ -1912,14 +1901,13 @@ def _build_code_system() -> str:
             t = (m.get("title") or "").strip()
             x = (m.get("text") or "").strip()
             if t and x:
-                lines.append(f"- {t}: {x}")
+                lines.append("- %s: %s" % (t, x))
             elif t:
-                lines.append(f"- {t}")
-        user_ctx = "From their memory:\n" + "\n".join(lines) if lines else "No memory saved yet — learn as you go."
+                lines.append("- %s" % t)
+        user_ctx = ("From their memory:\n" + "".join(lines)) if lines else "No memory saved yet -- learn as you go."
     else:
-        user_ctx = "Fresh install — no memory yet. Learn who they are as you work together."
+        user_ctx = "Fresh install -- no memory yet. Learn who they are as you work together."
     return CODE_AGENT_SYSTEM.replace("{user_context}", user_ctx)
-
 
 @app.post("/api/code/agent")
 async def code_agent(req: Request):
@@ -1987,18 +1975,20 @@ async def code_agent(req: Request):
     std_ctx = (ws_ctx + f"\n\nTASK: {instruction}") if ws_ctx else f"TASK: {instruction}"
     std_user = ([{"type": "text", "text": std_ctx}] + img_parts) if img_parts else std_ctx
     _sys = _build_code_system()
-    std_msgs = ([{“role”: “system”, “content”: _sys}] + history +
-                [{“role”: “user”, “content”: std_user}])
-    std_payload = {“model”: model, “messages”: std_msgs, “temperature”: 0.2,
-                   “stream”: True, “max_tokens”: max_tok}
+    std_msgs = ([{"role": "system", "content": _sys}] + history +
+                [{"role": "user", "content": std_user}])
+    std_payload = {"model": model, "messages": std_msgs, "temperature": 0.2,
+                   "stream": True, "max_tokens": max_tok}
 
     # â”€â”€ CLAUDE PAYLOAD with prompt caching â”€â”€
-    claude_sys = [{“type”: “text”, “text”: _sys, “cache_control”: {“type”: “ephemeral”}}]
+    # System blocks carry both Kitâ€™s identity AND the workspace context â€” both cached.
+    # The user message becomes just the task, so cached tokens are ~90% cheaper on every call.
+    claude_sys = [{"type": "text", "text": _sys, "cache_control": {"type": "ephemeral"}}]
     if ws_ctx:
-        claude_sys.append({“type”: “text”, “text”: ws_ctx, “cache_control”: {“type”: “ephemeral”}})
-    lean_user = ([{“type”: “text”, “text”: f”TASK: {instruction}”}] + img_parts) if img_parts else f”TASK: {instruction}”
-    lean_msgs = ([{“role”: “system”, “content”: _sys}] + history +
-                 [{“role”: “user”, “content”: lean_user}])
+        claude_sys.append({"type": "text", "text": ws_ctx, "cache_control": {"type": "ephemeral"}})
+    lean_user = ([{"type": "text", "text": f"TASK: {instruction}"}] + img_parts) if img_parts else f"TASK: {instruction}"
+    lean_msgs = ([{"role": "system", "content": _sys}] + history +
+                 [{"role": "user", "content": lean_user}])
     claude_payload = {"model": model, "messages": lean_msgs, "temperature": 0.2,
                       "stream": True, "max_tokens": max_tok, "_cache_system": claude_sys}
 
@@ -2828,19 +2818,6 @@ async def studio_del(pid: str):
 async def health():
     """Non-booting status for the shared nav pill (does NOT auto-start anything)."""
     return {"brain": await brain_up(), "engine": await _engine_up()}
-
-
-@app.post("/api/restart")
-async def restart_server():
-    """Kit can call this after editing app.py — restarts the server in the background."""
-    import subprocess, sys, threading
-    def _do_restart():
-        import time; time.sleep(0.8)
-        subprocess.Popen([sys.executable, str(ROOT / "app.py")],
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        os._exit(0)
-    threading.Thread(target=_do_restart, daemon=True).start()
-    return {"ok": True, "msg": "Restarting in ~1s — reload the page in a couple seconds."}
 
 
 # â”€â”€ HARDWARE CAPABILITY â€” is this machine fast enough for a LOCAL AI brain? â”€â”€â”€â”€

@@ -1840,5 +1840,183 @@ window.arkCapNudge = function(cap){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",go); else go();
 })();
 </script>
+
+<!-- ── FLOATING CODE PANEL ────────────────────────────────────────────────
+     Triple-click the "Code" tab in the sidebar to toggle float mode on/off.
+     While on, clicking "Code" opens Kit as a draggable overlay instead of
+     navigating away. Position is saved. Works on index.html only; use the
+     ⤢ pop-out button inside code.html for cross-room coverage.
+──────────────────────────────────────────────────────────────────────── -->
+<style>
+#codeFloat {
+  display:none; position:fixed; inset:0; z-index:9998;
+  pointer-events:none;
+}
+#codeFloat.open { display:block; }
+#codeFloatPanel {
+  position:absolute; width:1100px; height:760px;
+  background:#0a1520; border:1px solid rgba(62,156,184,.35);
+  border-radius:12px; box-shadow:0 24px 80px rgba(0,0,0,.85),0 0 0 1px rgba(62,156,184,.12);
+  display:flex; flex-direction:column; overflow:hidden;
+  pointer-events:all; resize:both;
+  min-width:500px; min-height:400px;
+}
+#codeFloatBar {
+  display:flex; align-items:center; gap:8px;
+  padding:7px 10px; background:#060e17;
+  border-bottom:1px solid rgba(62,156,184,.18);
+  cursor:grab; user-select:none; flex:0 0 auto;
+}
+#codeFloatBar:active { cursor:grabbing; }
+#codeFloatTitle {
+  font:700 12px Inter; letter-spacing:.04em;
+  color:rgba(62,156,184,.9); flex:1;
+}
+#codeFloatPopout, #codeFloatClose {
+  border:0; background:rgba(255,255,255,.05);
+  color:rgba(200,210,220,.7); border-radius:6px;
+  padding:3px 8px; font:600 12px Inter; cursor:pointer;
+  transition:background .12s,color .12s;
+}
+#codeFloatPopout:hover { background:rgba(62,156,184,.2); color:#e0eaf2; }
+#codeFloatClose:hover  { background:rgba(220,60,60,.25);  color:#e0eaf2; }
+#codeFloatIframe {
+  flex:1; border:none; width:100%; min-height:0;
+}
+/* blocks iframe mouse-event steal during drag so drag never stops */
+#codeFloatDragShield {
+  display:none; position:absolute; inset:0; z-index:1; cursor:grabbing;
+}
+/* float-mode indicator on the Code tab */
+.csw-float-on { position:relative; }
+.csw-float-on::after {
+  content:''; position:absolute; top:3px; right:4px;
+  width:5px; height:5px; border-radius:50%;
+  background:#36e27b; box-shadow:0 0 5px rgba(54,226,123,.7);
+}
+</style>
+
+<div id="codeFloat">
+  <div id="codeFloatPanel">
+    <div id="codeFloatBar">
+      <span id="codeFloatTitle">⌨ Code — Kit</span>
+      <button id="codeFloatPopout" title="Open in its own window">⤢</button>
+      <button id="codeFloatClose" title="Close (Code tab will navigate normally)">✕</button>
+    </div>
+    <div id="codeFloatDragShield"></div>
+    <iframe id="codeFloatIframe" src="" allow="microphone; clipboard-read; clipboard-write"></iframe>
+  </div>
+</div>
+
+<script>
+(function(){
+  var FLOAT_KEY = 'dmv-float-code';
+  var POS_KEY   = 'dmv-float-pos';
+  var panel     = document.getElementById('codeFloatPanel');
+  var overlay   = document.getElementById('codeFloat');
+  var iframe    = document.getElementById('codeFloatIframe');
+  var bar       = document.getElementById('codeFloatBar');
+  var codeLink  = document.querySelector('.chat-code-sw a[href="/static/code.html"]');
+  if (!panel || !codeLink) return;
+
+  // ── restore saved position ──
+  function restorePos() {
+    try {
+      var p = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+      if (p && typeof p.x === 'number') {
+        panel.style.left = Math.max(0, Math.min(p.x, window.innerWidth  - 200)) + 'px';
+        panel.style.top  = Math.max(0, Math.min(p.y, window.innerHeight - 100)) + 'px';
+      } else {
+        panel.style.left = '80px'; panel.style.top = '38px';
+      }
+    } catch(e) { panel.style.left = '80px'; panel.style.top = '38px'; }
+  }
+
+  // ── open / close ──
+  function openFloat() {
+    restorePos();
+    overlay.classList.add('open');
+    if (!iframe.src || iframe.src === location.href) {
+      iframe.src = '/static/code.html';
+    }
+  }
+  function closeFloat() {
+    overlay.classList.remove('open');
+  }
+
+  // ── dragging ──
+  var shield = document.getElementById('codeFloatDragShield');
+  var dragging = false, ox = 0, oy = 0;
+  bar.addEventListener('mousedown', function(e){
+    if (e.button !== 0) return;
+    dragging = true;
+    if (shield) shield.style.display = 'block';
+    var r = panel.getBoundingClientRect();
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+  function onMove(e) {
+    if (!dragging) return;
+    var x = e.clientX - ox, y = e.clientY - oy;
+    panel.style.left = Math.max(0, x) + 'px';
+    panel.style.top  = Math.max(0, y) + 'px';
+    try { localStorage.setItem(POS_KEY, JSON.stringify({x: Math.max(0,x), y: Math.max(0,y)})); } catch(err){}
+  }
+  function onUp() {
+    dragging = false;
+    if (shield) shield.style.display = 'none';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+
+  // ── float mode toggle: triple-click Code tab ──
+  var clickBuf = [], TRIPLE = 3, WINDOW = 600;
+  codeLink.addEventListener('click', function(e){
+    var now = Date.now();
+    clickBuf.push(now);
+    clickBuf = clickBuf.filter(function(t){ return now - t < WINDOW; });
+
+    if (clickBuf.length >= TRIPLE) {
+      clickBuf = [];
+      var on = localStorage.getItem(FLOAT_KEY) === '1';
+      if (on) {
+        localStorage.removeItem(FLOAT_KEY);
+        codeLink.classList.remove('csw-float-on');
+        closeFloat();
+      } else {
+        localStorage.setItem(FLOAT_KEY, '1');
+        codeLink.classList.add('csw-float-on');
+        openFloat();
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (localStorage.getItem(FLOAT_KEY) === '1') {
+      e.preventDefault();
+      openFloat();
+    }
+    // else: navigate normally
+  });
+
+  // ── close button ──
+  document.getElementById('codeFloatClose').onclick = closeFloat;
+
+  // ── pop-out button ──
+  document.getElementById('codeFloatPopout').onclick = function(){
+    var w = window.open('/static/code.html', '_blank',
+      'width=1100,height=780,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no');
+    if (w) { w.focus(); closeFloat(); }
+    else { alert('Allow pop-ups to use the detached window.'); }
+  };
+
+  // ── restore float mode indicator on load ──
+  if (localStorage.getItem(FLOAT_KEY) === '1') {
+    codeLink.classList.add('csw-float-on');
+  }
+})();
+</script>
 </body>
 </html>
