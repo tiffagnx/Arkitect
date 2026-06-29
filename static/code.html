@@ -1280,7 +1280,7 @@ function renderApplied(aiEl, ev){
   };
   img.onerror=function(){};                          // sheet missing → stays blank, never errors
   img.src="/static/kit-code-sprites.png";
-  var LAST=COLS*ROWS-1, FREEZE_MS=20000;
+  var LAST=COLS*ROWS-1, FREEZE_MS=10000;
   function draw(ts){
     requestAnimationFrame(draw);
     if(!ready)return;

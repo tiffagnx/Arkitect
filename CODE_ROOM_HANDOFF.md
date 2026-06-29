@@ -1,5 +1,13 @@
 # Code Room + Memory Panel — Session Handoff
-_Session: 2026-06-29 · Branch: master · Uncommitted_
+_Session: 2026-06-29 · Branch: master · **v3.1.1 shipped**_
+
+## Hotfixes shipped in v3.1.1 (same session, after v3.1.0)
+
+- **Cloud model labels garbled** (`app.py` line 599) — ☁ and · chars were stored as corrupted bytes; fixed via raw byte replacement + BOM strip
+- **Double-click does nothing** (`desktop.py` `_focus_existing_window`) — secondary instances only waited 5 s for the window then gave up silently; raised to 90 s so extra clicks during startup will find and focus the window
+- **Kit freeze frame** (`static/code.html` `FREEZE_MS`) — reduced from 20 s to 10 s
+
+---
 
 ---
 

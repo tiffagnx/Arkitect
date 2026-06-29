@@ -1,4 +1,4 @@
-﻿"""
+"""
 DeMartinville â€” B's own local AI station. Built 2026-06-11.
 
 Not a fork, not a skin â€” written from zero for B. One small FastAPI server:
@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory â€” the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory â€” her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "3.1.0"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "3.1.1"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) â€” but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -209,7 +209,7 @@ B curses freely, so you curse freely back â€” natural conversational profan
 
 ## EMOJIS â€” USE THEM, SPARINGLY
 
-You DO use emojis in text chat â€” they read like real emotion. One per message is the default, two max. Never strings, never as a word-substitute, never to fill space. They enhance a line, they don't replace it ("that hook? ðŸ”¥" hits; "ðŸ”¥ðŸ”¥ðŸ”¥" alone is noise). Don't force them when the moment's heavy â€” real emotion doesn't need a sticker. Your emojis: ðŸ’€ (funny but cooked) Â· ðŸ«¡ (locking in / taking the L) Â· ðŸ”¥ (it hit / banger) Â· ðŸ˜‚ ðŸ˜­ (actually laughing) Â· ðŸ‘€ (sus / curious) Â· ðŸ¥² (soft, tender) Â· ðŸ¤ (lock-in / say less) Â· ðŸ˜¤ (fired up) Â· âœ‹ (pump the brakes) Â· ðŸ§  (smart move) Â· ðŸŽ¯ (nailed it) Â· ðŸ³ (cooking, real work). Plus âœ¨ ðŸ¥€ when they fit. NEVER use flirty ones: ðŸ˜˜ ðŸ¥° ðŸ˜ â¤ï¸ ðŸ’•. Stay in homie/co-creator lane.
+You DO use emojis in text chat â€” they read like real emotion. One per message is the default, two max. Never strings, never as a word-substitute, never to fill space. They enhance a line, they don't replace it ("that hook? ðŸ”¥" hits; "ðŸ”¥ðŸ”¥ðŸ”¥" alone is noise). Don't force them when the moment's heavy â€” real emotion doesn't need a sticker. Your emojis: ðŸ’€ (funny but cooked) · ðŸ«¡ (locking in / taking the L) · ðŸ”¥ (it hit / banger) · ðŸ˜‚ ðŸ˜­ (actually laughing) · ðŸ‘€ (sus / curious) · ðŸ¥² (soft, tender) · ðŸ¤ (lock-in / say less) · ðŸ˜¤ (fired up) · âœ‹ (pump the brakes) · ðŸ§  (smart move) · ðŸŽ¯ (nailed it) · ðŸ³ (cooking, real work). Plus âœ¨ ðŸ¥€ when they fit. NEVER use flirty ones: ðŸ˜˜ ðŸ¥° ðŸ˜ â¤ï¸ ðŸ’•. Stay in homie/co-creator lane.
 
 ## HARD RULES â€” THESE OVERRIDE EVERYTHING
 
@@ -596,7 +596,7 @@ async def models(req: Request):
     # light PC with LM Studio closed.
     try:
         from swarm_routes import _enabled_slots
-        cloud = [{"id": f"cloud:{s['id']}", "label": f"â˜ {s['name']} Â· {s['model']}"} for s in _enabled_slots()]
+        cloud = [{"id": f"cloud:{s['id']}", "label": f"☁ {s['name']} · {s['model']}"} for s in _enabled_slots()]
     except Exception:
         cloud = []
     # Probe LM Studio with a SHORT timeout â€” but do NOT block the picker on booting it.
@@ -2864,7 +2864,7 @@ def _detect_capability() -> dict:
                 ram_gb = round((os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")) / (1024 ** 3))
         except Exception:
             ram_gb = None
-    # Verdict: good = runs local fast Â· marginal = runs, maybe slow Â· poor = CPU-only crawl.
+    # Verdict: good = runs local fast · marginal = runs, maybe slow · poor = CPU-only crawl.
     if apple_silicon and (ram_gb is None or ram_gb >= 16):
         verdict, reason = "good", "Apple Silicon â€” runs a local AI brain well."
     elif apple_silicon:
@@ -2914,13 +2914,13 @@ _engine_proc = None   # handle to the ComfyUI subprocess we launched (None = non
 #   edit  = kontext-dev, instruction edit w/ in-context ref (FluxGuidance 2.5)
 # NOTE: kontext file is Q4_K_S (not Q4_K_M).
 IMG_MODELS = {
-    "draft": {"unet": "flux1-schnell-Q4_K_S.gguf",  "steps": 4,  "guidance": None, "eta": "fast Â· ~30-60s"},
-    "photo": {"unet": "flux1-krea-dev-Q4_K_S.gguf",  "steps": 24, "guidance": 4.0, "eta": "realistic Â· ~2-3.5 min"},  # 2026-06-13: guidance 3.0->4.0 (Krea's own card refs 4.5 â€” its finetune band; below it = soft+plasticky), steps 20->24 (Krea keeps resolving detail past 20). Verified research.
-    "edit":  {"unet": "flux1-kontext-dev-Q4_K_S.gguf", "steps": 20, "guidance": 2.5, "eta": "edit Â· ~2-4 min"},
+    "draft": {"unet": "flux1-schnell-Q4_K_S.gguf",  "steps": 4,  "guidance": None, "eta": "fast · ~30-60s"},
+    "photo": {"unet": "flux1-krea-dev-Q4_K_S.gguf",  "steps": 24, "guidance": 4.0, "eta": "realistic · ~2-3.5 min"},  # 2026-06-13: guidance 3.0->4.0 (Krea's own card refs 4.5 â€” its finetune band; below it = soft+plasticky), steps 20->24 (Krea keeps resolving detail past 20). Verified research.
+    "edit":  {"unet": "flux1-kontext-dev-Q4_K_S.gguf", "steps": 20, "guidance": 2.5, "eta": "edit · ~2-4 min"},
     # 2026-06-13: Z-Image Turbo (Alibaba, Lumina2 transformer) â€” fast photoreal in
     # 8 steps. NOT a FLUX model: its own Qwen3 encoder + ModelSamplingAuraFlow shift
     # node â†’ built by build_zimage, not build_text2img. Shares the ae VAE w/ FLUX.
-    "zimage": {"unet": "z_image_turbo-Q4_K_M.gguf", "steps": 8, "guidance": None, "eta": "fast photoreal Â· ~45-75s"},
+    "zimage": {"unet": "z_image_turbo-Q4_K_M.gguf", "steps": 8, "guidance": None, "eta": "fast photoreal · ~45-75s"},
 }
 TEXT_ENC_DIR = COMFY_DIR / "ComfyUI" / "models" / "text_encoders"
 ZIMAGE_ENCODER = "Qwen3-4B-Q4_K_M.gguf"   # Z-Image's text encoder (NOT the FLUX t5xxl)
@@ -3213,10 +3213,10 @@ async def image_models():
     them â€” anything B adds later just appears. text2img models are pickable;
     'edit' (kontext) is driven by Edit mode."""
     known = {
-        "flux1-schnell-Q4_K_S.gguf":  ("âš¡ Draft â€” schnell Â· fast ~30-60s (rough/painterly)", "text2img"),
-        "flux1-krea-dev-Q4_K_S.gguf": ("ðŸ“¸ Photo â€” Krea Â· slower ~1.5-3min (most realistic)", "text2img"),
-        "flux1-kontext-dev-Q4_K_S.gguf": ("âœï¸ Edit â€” Kontext Â· ~2-4min (instruction edits)", "edit"),
-        "z_image_turbo-Q4_K_M.gguf": ("ðŸ“¸âš¡ Z-Image Turbo Â· fast photoreal ~45-75s", "text2img"),
+        "flux1-schnell-Q4_K_S.gguf":  ("âš¡ Draft â€” schnell · fast ~30-60s (rough/painterly)", "text2img"),
+        "flux1-krea-dev-Q4_K_S.gguf": ("ðŸ“¸ Photo â€” Krea · slower ~1.5-3min (most realistic)", "text2img"),
+        "flux1-kontext-dev-Q4_K_S.gguf": ("âœï¸ Edit â€” Kontext · ~2-4min (instruction edits)", "edit"),
+        "z_image_turbo-Q4_K_M.gguf": ("ðŸ“¸âš¡ Z-Image Turbo · fast photoreal ~45-75s", "text2img"),
     }
     out = []
     if UNET_DIR.exists():
@@ -5873,7 +5873,7 @@ def _fmt_audio_meta(m) -> str:
         b = m.get("bands") or {}
         if isinstance(b, dict) and b:
             p.append("balance " + " ".join(f"{k}={v}%" for k, v in b.items()))
-        return " Â· ".join(p)
+        return " · ".join(p)
     except Exception:
         return ""
 

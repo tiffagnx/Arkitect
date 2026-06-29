@@ -288,12 +288,13 @@ def _acquire_single_instance() -> bool:
 
 
 def _focus_existing_window():
-    """Bring the already-open DeMartinville window to the front (run by the 2nd launch)."""
+    """Bring the already-open DeMartinville window to the front (run by the 2nd launch).
+    Polls for up to 90 s so extra clicks during a slow server startup still succeed."""
     if sys.platform != "win32":
         return
     import ctypes
     user32 = ctypes.windll.user32
-    for _ in range(50):
+    for _ in range(900):          # 900 × 0.1 s = 90 s — outlasts any startup delay
         hwnd = user32.FindWindowW(None, "DeMartinville")
         if hwnd:
             user32.ShowWindow(hwnd, 9)            # SW_RESTORE
