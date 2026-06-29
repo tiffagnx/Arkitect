@@ -376,14 +376,35 @@
     font-family: Oxanium; font-size: 13px; letter-spacing: .12em; }
   .drawer header button { margin-left: auto; }
   .memlist { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-  .memitem { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--hairline); }
-  .memitem h4 { font: 600 12px Inter; color: #CFE6EE; display: flex; }
-  .memitem h4 button { margin-left: auto; border: none; background: none; color: #E58A8E; cursor: pointer; font-size: 11px; opacity: .7; }
-  .memitem p { font: 400 11.5px Inter; color: var(--dim); margin-top: 4px; line-height: 1.5;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  /* compact memory cards — title-only, expand on click */
+  .memitem { padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--hairline); cursor: pointer; user-select: none; }
+  .memitem h4 { font: 600 11.5px Inter; color: #CFE6EE; display: flex; align-items: center; gap: 5px; min-height: 22px; }
+  .mi-arr { font-size: 8px; color: var(--dim); transition: transform .14s; flex-shrink: 0; }
+  .memitem.expanded .mi-arr { transform: rotate(90deg); }
+  .memitem h4 button { margin-left: auto; border: none; background: none; color: #E58A8E; cursor: pointer; font-size: 11px; opacity: .65; padding: 0 2px; flex-shrink: 0; }
+  .memitem p { font: 400 11px Inter; color: var(--dim); margin: 5px 0 3px; line-height: 1.55; display: none; }
+  .memitem.expanded p { display: block; }
   .memadd { padding: 12px 14px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 8px; }
   .memadd input, .memadd textarea { border: 1px solid var(--hairline); border-radius: 10px; outline: none;
     background: rgba(255,255,255,.04); color: var(--text); font: 400 12.5px Inter; padding: 9px 11px; resize: none; }
+  /* import from another AI */
+  .memimp { border-top: 1px solid var(--hairline); flex-shrink: 0; }
+  .memimp-hd { display: flex; align-items: center; gap: 6px; padding: 9px 14px; cursor: pointer; font: 600 11px Inter; color: var(--dim); letter-spacing: .04em; }
+  .memimp-hd:hover { color: var(--text); }
+  .memimp-arr { font-size: 9px; transition: transform .14s; }
+  .memimp-body.on .memimp-arr { transform: rotate(90deg); } /* N/A — arr is in hd, toggled via JS */
+  .imp-arr-open { transform: rotate(90deg); }
+  .memimp-inner { padding: 0 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .memimp-hint { font: 400 11px Inter; color: var(--dim); line-height: 1.55; margin: 0; }
+  .memimp-checks { display: flex; flex-wrap: wrap; gap: 5px; }
+  .memimp-chk { display: flex; align-items: center; gap: 5px; font: 400 11.5px Inter; color: var(--text-3); cursor: pointer; }
+  .memimp-chk input { accent-color: var(--teal); cursor: pointer; }
+  .memimp-row { display: flex; gap: 6px; }
+  .memimp-copy { flex: 1; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(43,182,168,.3); background: rgba(43,182,168,.07); color: var(--teal); font: 600 12px Inter; cursor: pointer; transition: .12s; }
+  .memimp-copy:hover { background: rgba(43,182,168,.14); }
+  .memimp-paste { border: 1px solid var(--hairline); border-radius: 10px; outline: none; background: rgba(255,255,255,.04); color: var(--text); font: 400 12px Inter; padding: 8px 10px; resize: none; width: 100%; box-sizing: border-box; }
+  .memimp-paste:focus { border-color: rgba(43,182,168,.4); }
+  .memimp-status { font: 400 11px Inter; color: var(--teal); min-height: 15px; }
   /* memory rail buttons (sidebar) — styled exactly like the room links */
   .memlink { background: none; width: 100%; box-sizing: border-box; }
   /* LOCAL | CLOUD tabs inside the drawer */
@@ -509,6 +530,25 @@
   </div>
   <p class="memhint" id="memHint"></p>
   <div class="memlist" id="memList"></div>
+  <!-- import from another AI -->
+  <div class="memimp" id="memImport">
+    <div class="memimp-hd" id="impToggle">
+      <span class="memimp-arr" id="impArr">▸</span>
+      <span>Import from another AI</span>
+    </div>
+    <div id="impInner" style="display:none">
+      <div class="memimp-inner">
+        <p class="memimp-hint">Copy the prompt → paste it into <strong>any AI</strong> (ChatGPT, Gemini, Grok, Claude — whatever you use) → paste their answer back here → Kit handles the rest.</p>
+        <div class="memimp-checks" id="impChecks"></div>
+        <div class="memimp-row">
+          <button class="memimp-copy" id="impCopyBtn">📋 Copy prompt</button>
+        </div>
+        <textarea class="memimp-paste" id="impPaste" rows="4" placeholder="Paste what your AI said back…"></textarea>
+        <button class="newchat" id="impParseBtn" style="margin:0">⚡ Parse &amp; save</button>
+        <div class="memimp-status" id="impStatus"></div>
+      </div>
+    </div>
+  </div>
   <div class="memadd">
     <input id="memTitle" placeholder="Title — e.g. 'New song: Static'" />
     <textarea id="memText" rows="3" placeholder="What should your agents always remember?"></textarea>
@@ -1061,6 +1101,7 @@ function selectMem(scope) {
   $("memHint").textContent = c.hint;
   $("memTitle").placeholder = c.title;
   $("memText").placeholder = c.text;
+  if (typeof updateImpForScope === "function") updateImpForScope(scope);
   loadMemory();
 }
 // Kit (the floating mascot) sits over the send button — z-index above the drawer.
@@ -1068,12 +1109,12 @@ function selectMem(scope) {
 // (reuses his own .in entrance fade) and bring him back when it closes.
 function setMascotForDrawer(open) { document.querySelector(".tec-mascot")?.classList.toggle("in", !open); }
 function closeMem() { $("drawer").classList.remove("open"); setMascotForDrawer(false); }
+let _impInitialized = false;
 function openMem(scope) {
   const d = $("drawer");
-  // clicking the memory you're ALREADY viewing toggles it shut — no hunting for the X.
   if (d.classList.contains("open") && memScope === scope) { closeMem(); return; }
-  // clicking the OTHER one just flips the panel (stays open) — switch freely.
   d.classList.add("open"); setMascotForDrawer(true); selectMem(scope || memScope);
+  if (!_impInitialized) { _impInitialized = true; renderImpChecks(memScope); }
 }
 document.querySelectorAll(".memlink").forEach(b => b.onclick = () => openMem(b.dataset.scope));
 $("tabLocal").onclick = () => selectMem("local");
@@ -1090,15 +1131,17 @@ document.addEventListener("mousedown", (e) => {
 async function loadMemory() {
   const scope = memScope;
   const r = await fetch(`/api/memory?scope=${scope}`).then(r => r.json()).catch(() => ({ memory: [] }));
-  if (scope !== memScope) return;   // user flipped tabs while this was in flight
+  if (scope !== memScope) return;
   const el = $("memList"); el.innerHTML = "";
   (r.memory || []).slice().reverse().forEach(m => {
     const d = document.createElement("div"); d.className = "memitem";
     const badge = m.always ? ` <span class="badge">always on</span>` : "";
-    d.innerHTML = `<h4>${md(m.title || "memory")}${badge} <button>forget</button></h4><p>${md(m.text)}</p>`;
-    d.querySelector("button").onclick = async () => {
+    d.innerHTML = `<h4><span class="mi-arr">▸</span>${md(m.title || "memory")}${badge} <button>forget</button></h4><p>${md(m.text)}</p>`;
+    d.querySelector("button").onclick = async (e) => {
+      e.stopPropagation();
       await fetch(`/api/memory/${m.id}?scope=${scope}`, { method: "DELETE" }); loadMemory();
     };
+    d.onclick = () => d.classList.toggle("expanded");
     el.appendChild(d);
   });
 }
@@ -1110,6 +1153,135 @@ $("memAdd").onclick = async () => {
   $("memTitle").value = ""; $("memText").value = "";
   loadMemory();
 };
+
+/* ── import from another AI ── */
+const IMP_OPTIONS = {
+  cloud: [
+    { id:"imp_name",    label:"Who I am & my background" },
+    { id:"imp_proj",    label:"My current projects" },
+    { id:"imp_prefs",   label:"My preferences & work style" },
+    { id:"imp_goals",   label:"My goals & vision" },
+    { id:"imp_hist",    label:"Important things we've discussed" },
+    { id:"imp_all",     label:"Everything — full dump" },
+  ],
+};
+function renderImpChecks(scope) {
+  const el = $("impChecks"); el.innerHTML = "";
+  if (scope === "local") {
+    const note = document.createElement("p");
+    note.style.cssText = "margin:0;font:400 11px Inter;color:var(--dim);line-height:1.5";
+    note.textContent = "Generates a compressed prompt — your AI will give back a short summary Kit can fold into local memory as key facts only.";
+    el.appendChild(note);
+    return;
+  }
+  IMP_OPTIONS.cloud.forEach(o => {
+    const lbl = document.createElement("label"); lbl.className = "memimp-chk";
+    lbl.innerHTML = `<input type="checkbox" id="${o.id}" checked> ${o.label}`;
+    el.appendChild(lbl);
+  });
+}
+function genImportPrompt(scope) {
+  if (scope === "local") {
+    return "I'm importing my profile into an AI with limited local memory. Give me a compressed snapshot — 8 bullet points max, one short sentence each. Cover: my name and what I do, my current main project, my top preferences, and the most important things to know about me. Ultra-concise only — no paragraphs.";
+  }
+  // cloud — rich full dump
+  const opts = IMP_OPTIONS.cloud;
+  const sel = opts.filter(o => document.getElementById(o.id)?.checked).map(o => o.label);
+  const wantAll = !sel.length || sel.some(s => /everything|full/i.test(s));
+  if (wantAll) {
+    return "I'm building a comprehensive knowledge base for a new AI assistant. Give me everything you know about me — my full name and background, all my current projects and what I'm building, my preferences and work style, my goals and vision, everything important we've discussed, skills, habits, relationships, anything you've learned. Be thorough and detailed. Organize by topic with clear headers. Go as deep as possible — this is my AI's primary memory about me.";
+  }
+  const topics = sel.filter(s => !/everything|full/i.test(s)).map(s => `• ${s}`).join("\n");
+  return `I'm transferring my context to a new AI assistant. Give me a detailed, thorough breakdown covering:\n\n${topics}\n\nBe comprehensive — 3–5 sentences per topic minimum. No summaries — I want the full picture. Organize clearly with headers.`;
+}
+$("impToggle").onclick = () => {
+  const inner = $("impInner"), arr = $("impArr");
+  const open = inner.style.display !== "none";
+  inner.style.display = open ? "none" : "block";
+  arr.style.transform = open ? "" : "rotate(90deg)";
+};
+$("impCopyBtn").onclick = () => {
+  const prompt = genImportPrompt(memScope);
+  if (!prompt) { $("impStatus").textContent = "Select at least one topic first."; return; }
+  navigator.clipboard.writeText(prompt).then(() => {
+    $("impStatus").textContent = "✓ Copied! Paste it into your AI, then paste their reply below.";
+    setTimeout(() => { $("impStatus").textContent = ""; }, 4000);
+  });
+};
+$("impParseBtn").onclick = async () => {
+  const raw = $("impPaste").value.trim();
+  if (!raw) { $("impStatus").textContent = "Paste your AI's response first."; return; }
+  $("impStatus").textContent = "Parsing…";
+  const items = parseImportText(raw, memScope);
+  if (!items.length) { $("impStatus").textContent = "Nothing to parse — try again with bullet points."; return; }
+  for (const item of items) {
+    await fetch("/api/memory", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: item.title, text: item.text, scope: memScope }) });
+  }
+  $("impPaste").value = "";
+  $("impStatus").textContent = `✓ Saved ${items.length} memories. Tiffany and Kit know you now.`;
+  setTimeout(() => { $("impStatus").textContent = ""; }, 5000);
+  loadMemory();
+};
+function parseImportText(raw, scope) {
+  const maxItems = scope === "local" ? 10 : 200;
+  const maxBody  = scope === "local" ? 160 : 99999;
+  const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 4);
+  const items = [];
+  const bulletRe = /^(?:[-•*·◦▸►→]|\d+[.):])\s*(.+)$/;
+  // For cloud, also collect header+body blocks (## Header\nbody text)
+  if (scope === "cloud") {
+    let curHeader = null, curBody = [];
+    const flush = () => {
+      if (curHeader && curBody.length) {
+        const text = curBody.join(" ").trim();
+        if (text.length > 8) items.push({ title: curHeader.slice(0, 60), text });
+      }
+      curHeader = null; curBody = [];
+    };
+    for (const line of lines) {
+      if (items.length >= maxItems) break;
+      const hdr = line.match(/^#{1,3}\s+(.+)$/);
+      if (hdr) { flush(); curHeader = hdr[1].replace(/\*\*/g,"").trim(); continue; }
+      const bul = line.match(bulletRe);
+      if (bul) {
+        // bullet inside a header block → sub-item, fold into body
+        if (curHeader) { curBody.push(bul[1].trim()); continue; }
+        // standalone bullet
+        const content = bul[1].replace(/^\*\*([^*]+)\*\*:?\s*/, "$1 — ").trim();
+        const words = content.split(" ");
+        items.push({ title: words.slice(0,7).join(" ")+(words.length>7?"…":""), text: content });
+      } else if (curHeader) {
+        curBody.push(line);
+      }
+    }
+    flush();
+    if (items.length) return items;
+    // fallback: no headers/bullets — treat non-empty lines as items
+    for (const line of lines.filter(l=>l.length>10)) {
+      if (items.length >= maxItems) break;
+      const words = line.split(" ");
+      items.push({ title: words.slice(0,7).join(" ")+(words.length>7?"…":""), text: line });
+    }
+    return items;
+  }
+  // local — bullets only, very compact
+  for (const line of lines) {
+    if (items.length >= maxItems) break;
+    const m = line.match(bulletRe);
+    const content = m ? m[1].trim() : (lines.length <= 10 ? line : null);
+    if (!content) continue;
+    const body = content.slice(0, maxBody);
+    const words = body.split(" ");
+    items.push({ title: words.slice(0,6).join(" ")+(words.length>6?"…":""), text: body });
+  }
+  return items;
+}
+function updateImpForScope(scope) {
+  renderImpChecks(scope);
+  $("impStatus").textContent = "";
+  $("impPaste").value = "";
+}
 
 /* ── modes + input ── */
 function chatPlaceholder() {

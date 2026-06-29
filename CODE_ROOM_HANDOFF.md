@@ -1,78 +1,101 @@
-# Code Room — handoff (2026-06-28)
+# Code Room + Memory Panel — Session Handoff
+_Session: 2026-06-29 · Branch: master · Uncommitted_
 
-**What:** a new in-app agentic **coding room** — the thin slice of the "coding control center inside DeMartinville" vision (see memory `coding-room-inside-demartinville`). Code lives in a sandbox; an agent (any brain you have) edits files directly. This is the seed that grows into the plugin-builder + marketplace later.
+---
 
-**Status:** BUILT + **VERIFIED LIVE** (on preview port 7793), UNCOMMITTED. `app.py` compiles; path-jail escape tests pass at unit AND HTTP layer (`../../app.py` → 400 "path escapes workspace"). Full pipeline proven: write→tree→read byte-exact; one real agent round on the local gemma model emitted a ```write block → backend wrote the file (`applied:{changed:[...]}`). No console errors. To use in the REAL app (7777), restart it — uvicorn has no `--reload`.
+## What Was Built This Session
 
-**Round 1 "feel like Claude Code" features (DONE + verified):**
-- **Effort/God dial** (Faster/Balanced/Smarter/🔱) — sends `effort`; backend ALREADY routes Claude→native effort (god mode) + others→provider reasoning. 🔱 enables only on cloud; clamps to high on local. Shares `localStorage.dmv-effort`.
-- **Stop button** — Send toggles to ■ during a run; AbortController cancels, keeps the convo + any written files (writes apply at stream end, so a stop writes nothing half-done).
-- **🔑 Keys** — opens the app-wide `window.openKeys("brain")` hub (local LM Studio + any cloud key feed the picker).
-- **🎤 Talk-to-type** — continuous `webkitSpeechRecognition`, auto-restarts across pauses (resumable), never auto-sends.
+### Code Room (`static/code.html`)
 
-## Round 2 — consistency/polish pass (DONE + verified live on 7793)
-Owner saw it on the preview and said it felt like a different site. Fixed to feel native:
-- **Retheme** — was literal hot-pink; now the app palette (steel-cyan `#3E9CB8` + gold, graphite radial-gradient bg, Inter/Oxanium/Space-Mono). The app's `--pink` is itself teal — "no pink" per its own root comment.
-- **Effort buttons → the real LEVER** — ported the exact `.elever` drag component + JS from `index.html` (Faster↔Smarter, 🔱 God on cloud/Claude, writes `localStorage.dmv-effort` + `#think`). `getEffort()` reads `#think.value`.
-- **Killed the whacky wordmark** — removed "⌨ Code · DeMartinville" brand text (brand-law: never font-render the wordmark); replaced with a clean `← home` link.
-- **Removed Summon agent + "?"** in THIS room only — pre-empt the pinkroom-nav guards (`<span data-summon hidden>` + `<script data-help>`) + a backup strip. Did NOT touch the shared injector (parallel-safe).
-- **In the menu** — added `⌨ Code` roomlink to `static/index.html` rail (after Berner Builder). Static file → shows on next hub load, no restart.
-- **Resizable panels** — `.gutter` drag handles; drag to resize, dbl-click to reset, widths persist.
+**Kit identity** (`app.py` CODE_AGENT_SYSTEM ~line 1583)
+- Kit is a technical robot builder; knows Bryan (25-yr SA vocal engineer, Lil Flip/MO3/Big Sid); knows DeMartinville
 
-## Round 4 — Claude-Code-style relayout (DONE + verified live on 7793)
-Owner showed Claude Code's UI as the target and said my IDE layout was "the exact same thing, you didn't change it." Rebuilt to match:
-- **New order: files (left, 220px) · CHAT (center, main) · code editor (right, 40%).** Swapped editor↔chat — the conversation is now the big middle, code on the right (the "HTML on the right side"). Verified: tree 220 / chat 481 / editor 607 at 1320px, all full height.
-- **Controls UNDER the input** (was above): a `.toolbar` row beneath `#ask` — `＋` attach · 🎤 mic · model picker · effort button · ➤ send.
-- **Effort lever + Keys → a popup** (`.effortpop`) that opens when you press the effort button (shows current stop, e.g. "⚡ Quick"). Mirrors Claude Code's Max→popup. Verified: opens, lever + keys inside.
-- **Image upload** — `＋` button → file picker → thumbnails → sent as `images[]`; backend `/api/code/agent` folds them into vision content parts (gemma-vision + Claude). Needs the 7777 restart to process images there.
-- **Model dedup** — collapses LM Studio's `:2`/`:3` duplicate instances in the picker.
-- Agent loop re-verified after the restructure (wrote `layout-ok.txt`, no regression).
+**Media upload** — images, audio, video all work now
+- File input accepts `image/*, audio/*, video/*`
+- Images → vision; audio/video → Whisper transcription → text in input
 
-## Round 5 — polish + the model bug (DONE + verified live on 7793)
-- **🔴 BUG FIXED: only Gemma was showing.** `/api/models` returns `{models:[local], cloud:[{id,label}]}` — the room read only `models` and dropped `cloud`. Now merges both (cloud first); his 5 cloud-key models show (Groq, Gemini, OpenRouter ×2, Claude). MODELS is now `{id,label,cloud}` objects; `isClaudeish` checks the label.
-- **Send + mic moved INSIDE the input box** (bottom-right, `.inbtns`/`.inbtn`); `+` / model / effort stay in the toolbar below.
-- **In-app modals** replace native `prompt()`/`confirm()` (no more "localhost:7777 says"). `dmvPrompt`/`dmvConfirm`.
-- **Markdown in agent replies** — `mdToHtml`: clickable links, **bold**, `inline code`, JSON/code blocks. Write-blocks collapse to "〈✍ wrote X〉".
-- **Paste / drop a screenshot** into the composer → attaches as an image.
-- **Model advisor (slice 1)** — reads `/api/capability` (real GPU/VRAM) + `has_cloud_key`, shows an honest banner atop the model menu (his 2060 SUPER 8GB → "small local models, 32B won't fit, use cloud for hard code"). NO fabricated specs. → owner wants this expanded (best-local-for-coding + cheapest-API-for-the-task); see memory `coding-room-inside-demartinville`.
+**Prompt caching + smart context checklist** (`app.py` `/api/code/agent`)
+- `_sse()` helper avoids curly-quote Python syntax errors
+- Dual payload: Claude gets `cache_control: ephemeral` on system blocks (~90% cost savings); local/non-Claude gets plain payload
+- Smart pre-flight: fetches file tree / file content only if keywords suggest it's needed
+- Token budget by effort: hist_limit 4/8/14/20, max_tok 1024/4096/8192
 
-## Round 6 — Claude-Code integration + the agent auto-pop fix (DONE + verified live)
-- **Chat / Code tabs** in the Code room top bar (replaced the `←`). Chat → main chat (`/`), Code = active. A global link handler strips bare hrefs, so Chat's nav is wired explicitly in JS. Verified: clicking Chat lands on `/`.
-- **Berner Builder REMOVED from the menu** (`static/index.html`) — Code supersedes it. `build.html` kept on disk (reversible). Verified: rail shows ⌨ Code, no Berner.
-- **🔴 Agent auto-pop FIXED (all rooms)** — `static/kit-helper.js`: the window auto-opened on every room load (defaulting to Tiffany via remembered `dmv_active_brain`). Added an `explicit` flag; `win.classList.add("open")` now fires ONLY on drag-in / `?summon=1` / Agent Forge (handoff self-opens). Verified on Visual Labs: 0 open windows on load, Summon opens it (0→1), no console errors. SHARED injector = fixed everywhere at once. See memory `agents-dont-autopop-in-rooms`.
+**Model picker upgrades**
+- `localParamCap()` — accurate VRAM → usable model size (8GB = ~4B, not 7B)
+- `advisorHtml()` — shows Local cap + Cloud providers as two clear sections
+- `modelDesc(m)` — one-liner description under each model name in the dropdown
+- `kitPickModel()` / `codeScore()` — picks best across local AND cloud for current effort
+- "Let Kit choose" button — auto-selects best model for effort level
+- Kit model-advisor bubble — slides up from bottom-right, rule-based recommendation aware of VRAM cap + cloud keys, action buttons to switch or go to Settings
 
-## Round 7 — Sidebar redesign (DONE + verified, this commit)
-- **Removed "local · private · yours"** from the brand (brand-law: just the wordmark).
-- **Removed "Search rooms…"** input — owner called it pointless.
-- **Added Chat / Code toggle** right under the logo (Chat = active/current, Code → `/static/code.html`) — pill switcher, app palette.
-- **Sleeker "+ New chat"** button — smaller padding, tighter radius.
-- **Compressed room list** — smaller icons (22px→), tighter padding, tighter gap; all rooms still accessible, just less tall.
-- Verified on preview (port 7793) + screenshot confirmed.
+**Fast startup** (`desktop.py`)
+- Window appears immediately with dark `_LOADING_HTML` loading screen
+- Navigates to real app once server ready (background thread)
+- Before: blank for up to 60s → user kept double-clicking
 
-## All owner asks: DONE
-Live preview ✓ · advisor slice 2 ✓ · first-run onboarding ✓ · sidebar Chat/Code toggle ✓ · Berner Builder gone ✓ · agent auto-pop fixed ✓
+**Desktop shortcut** (`desktop.py`)
+- `create_desktop_shortcut()` places `DeMartinville.lnk` on Desktop on first launch
 
-Rename "Code" → still owner's call (he mused "burn your code"). Brand-law: don't invent a name.
+### Memory Panel (`static/index.html`)
 
-## Files
-- `static/code.html` — NEW. Three-pane mini-IDE: file tree · textarea editor (Ctrl+S saves, Tab=2sp) · coding-agent chat. App-themed; standard model picker (`/api/models`) + `pinkroom-nav.js`.
-- `static/index.html` — added the `⌨ Code` roomlink (one line, in the "More" rail).
-- `app.py` — added the Code Room block right after `BUILDS_DIR` (~line 1471): `CODE_ROOT`, `CODE_ADMIN`, `_ws_root`, **`_code_path`** (the jail), `_code_tree`, `_flatten_tree`, `CODE_AGENT_SYSTEM`, and endpoints `/api/code/workspaces|tree|read|write|agent`. Added a `/code` page route next to `/editor`.
+**Compact memory cards**
+- Cards collapsed to single title line (click to expand body)
+- Frees up space for the import section below
 
-## The security model (the part that matters)
-- Every file op resolves through `_code_path(ws, rel)`: `.resolve()` collapses `../`+symlinks, then it REQUIRES the result to be the workspace root or under it — else raises. Verified against `../`, `..\`, `C:/...`, leading-slash, mid-path escapes.
-- Workspaces are dirs under `data/code/<ws>/`. A plain user is jailed there and CANNOT touch the real repo.
-- `ws="__repo__"` maps to the real project root **only** when the server is started with env `DMV_CODE_ADMIN=1`. Off by default. That's the admin-vs-user tier, slice 1.
-- The agent loop is ONE round (budget-lean): brain sees the tree + open file, emits ` ```write path="..." ``` ` blocks, backend applies them jailed. No `run`-command yet (that's the next gated, dangerous step — sandbox it before building).
+**Import from another AI**
+- Collapsible section: "Import from another AI" between the card list and "Remember it"
+- Local tab: compressed prompt (8 bullets, one sentence each) → parses up to 10 entries, 160-char bodies
+- Cloud tab: 6 checkboxes, "Everything — full dump" option → rich prompt → parses up to 200 entries, handles `## Header` blocks + bullets
+- Prompt works with ANY AI (ChatGPT, Gemini, Grok, Claude, whatever)
+- Parse & save splits bullets/headers, saves each as a separate memory entry
 
-## Test (after restarting the app on 7777)
-1. Open `http://127.0.0.1:7777/code`
-2. Pick a model (top-right). Type in the agent: *"make hello.py that prints the time"* → it writes the file, a ✓ chip appears, click it to open.
-3. Edit in the textarea, Ctrl+S → saved. ⟳ refreshes the tree.
-4. To edit DeMartinville itself: restart with `DMV_CODE_ADMIN=1` → the "⚠ This project (repo)" workspace appears.
+---
 
-## Next slices (NOT built — owner wants these when he has allotment Wed)
-- **📎 Image attach** — owner uploads images to Claude; reuse `_asset_manifest` + fold image_url parts into the agent's user message (gemma-4-e4b + Claude have vision). Soft ask (he wasn't sure it was needed).
-- **🔊 TTS talk-back** — agent speaks its prose (NOT code blocks) via the app's voice system. He hinted at it ("not just the user doing talk-to-text").
-- **🖥 Rent-a-computer / custom endpoint** — let the picker point at a rented vLLM/LM Studio box (base_url + key + model). Ties to his July GPU bridge. Needs a "custom OpenAI-compatible" provider in `swarm_routes.py`/`keys.js` (SHARED files — coordinate with parallel sessions).
-- Multi-round tool-loop (read→edit→verify) · gated `run` command in a real sandbox · plugin submit→auto-check→quarantine→admin-promote pipeline · per-user workspaces · link from the nav menu (left out to avoid touching the shared injector while parallel sessions run).
+## What Needs a Server Restart (port 7777)
+
+All `app.py` changes need restart before testing:
+- Kit identity system prompt
+- `/api/code/agent` caching + smart checklist
+- `_sse()` helper
+- `swarm_routes.py` caching (`_cache_system` blocks)
+
+Static `.html` / `.js` files take effect on page refresh — no restart needed.
+
+---
+
+## What to Test
+
+- [ ] Kit identity: open Code room, ask "who are you" — should name itself Kit, know Bryan
+- [ ] Image upload: drag a PNG/JPG into Code room chat
+- [ ] Audio upload: drag an mp3 → should transcribe and appear as text
+- [ ] Model dropdown: should show description under each model name
+- [ ] "Let Kit choose": auto-selects best for current effort level
+- [ ] Kit bubble: open model menu → "🤖 Ask Kit" → bubble slides up with smart recommendation
+- [ ] VRAM tip: 8GB should say "local tops at ~4B" (not 7B)
+- [ ] Memory cards: cloud memory panel → cards single-line, click expands
+- [ ] Import (local): copy prompt → paste into ChatGPT → paste back → parse & save → check memory
+- [ ] Import (cloud): same flow with rich prompt → should save many detailed entries
+- [ ] Fast startup: launch via bat → window appears in ~1-2s with dark loading screen
+
+---
+
+## Still Pending
+
+- **Styled dialogs (`dmv-modal.js`)** — all native `confirm()`/`alert()`/`prompt()` across 10+ files still use the browser default. Work started (CSS + HTML planned) but not built yet. Big sweep needed across: `settings.js`, `swarm.html`, `character.html`, `images.html`, `stream.html`, `wall.html`, `studio.html`, `editor.html`, `beats.html`, `kit-helper.js`
+- **Kit bubble auto-routing** — could route automatically (local for quick/free, cloud for deep) without user having to manually switch
+
+---
+
+## Files Changed (uncommitted)
+
+- `app.py` — Kit identity, `_sse()`, caching, `/api/code/agent`
+- `swarm_routes.py` — `_anthropic_body()` accepts `system_blocks` for caching
+- `static/code.html` — media upload, model picker, Kit bubble, VRAM fix, model descriptions
+- `static/index.html` — compact memory cards, import from another AI
+- `desktop.py` — fast startup loading screen, desktop shortcut
+
+## Ports / Run Notes
+
+- Port **7777** — main app (no `--reload` → restart for `.py` changes)
+- Parallel sessions use **7799 / 7788**
+- Never `git add -A` — always add explicit file paths

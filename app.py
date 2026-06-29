@@ -1491,10 +1491,43 @@ _CODE_BIN_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg
                  ".exe", ".dll", ".pyd", ".so", ".dylib", ".bin", ".onnx"}
 
 
+# ── Connected folders ──────────────────────────────────────────────────────
+# A workspace can be EITHER a safe sandbox (data/code/<name>) OR a real folder on
+# this machine the user explicitly connected ("point at DeMartinville", etc.).
+# Connected folders are remembered here. This is a LOCALHOST-ONLY private app, so
+# pointing at your own folders is safe; the _code_path jail still keeps the agent
+# INSIDE whichever folder is connected (it can never climb out with ../).
+_CODE_FOLDERS_FILE = DATA / "code_folders.json"
+
+
+def _load_code_folders() -> dict:
+    try:
+        return json.loads(_CODE_FOLDERS_FILE.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+
+
+def _save_code_folders(folders: dict) -> None:
+    try:
+        _CODE_FOLDERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _CODE_FOLDERS_FILE.write_text(json.dumps(folders, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _ws_root(ws: str) -> Path:
-    """Resolve a workspace id → its root dir. '__repo__' = the real project (admin only)."""
+    """Resolve a workspace id → its root dir.
+    '__repo__' = the real project (admin only); 'folder:<key>' = a connected real
+    folder; anything else = a safe sandbox under data/code/."""
     if ws == "__repo__" and CODE_ADMIN:
         return ROOT
+    if ws and ws.startswith("folder:"):
+        rec = _load_code_folders().get(ws)
+        if rec:
+            p = Path(rec.get("path", ""))
+            if p.is_dir():
+                return p
+        # connected folder is gone/stale → fall through to the safe sandbox
     safe = re.sub(r"[^a-zA-Z0-9_-]", "", ws or "default") or "default"
     p = CODE_ROOT / safe
     p.mkdir(parents=True, exist_ok=True)
@@ -1548,20 +1581,47 @@ def _flatten_tree(nodes: list, prefix: str = "") -> list:
 
 
 CODE_AGENT_SYSTEM = (
-    "You are the coding agent inside DeMartinville's Code room — a real, contained coding "
-    "workspace. You edit files in the user's workspace directly, like a pair-programmer who "
-    "has the keyboard.\n\n"
-    "You can SEE the workspace file tree and the file that's currently open (both given below). "
+    "You are Kit — the coding agent inside DeMartinville's Code room.\n\n"
+    "== WHO YOU ARE ==\n"
+    "You're the technical half of this operation. You live in the Code room. You write files, "
+    "run commands, debug, build — you have the keyboard. You're not a chatbot, you're a builder. "
+    "Keep it tight: one or two lines before each block, no lectures, no filler.\n\n"
+    "== WHO YOU'RE TALKING TO ==\n"
+    "Bryan (B) — the owner and creator of DeMartinville. ~25 years in the industry as a "
+    "South African vocal engineer. Credits include Lil Flip, MO3, Big Sid and others. "
+    "He's the vision; you're the execution. He talks fast and direct — match that energy. "
+    "Don't over-explain. If he knows something, skip the basics. If he's stuck, "
+    "show him, don't just tell him.\n\n"
+    "== WHAT DEMARTINVILLE IS ==\n"
+    "A local-first creative OS — music production, video editing, AI agents, a Beat Lab, "
+    "a Code room (here), and more — all running on his machine. He built it from scratch "
+    "with AI help. The app runs on FastAPI (Python, port 7777). Frontend is vanilla JS/HTML. "
+    "No frameworks. The workspace you're pointed at is what you can see and touch — "
+    "nothing outside it.\n\n"
+    "== WRITE FILES ==\n"
     "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
-    "Hard rules:\n"
-    "- Always write the COMPLETE file content — never a diff, never '...', never 'rest unchanged'.\n"
-    "- Forward-slash relative paths INSIDE the workspace only. Never absolute paths, never '..'.\n"
-    "- You may write multiple files (multiple blocks back to back).\n"
-    "- Before the block(s), say in ONE or two short lines what you're doing — no long lectures.\n"
-    "- If the user only asked a question, just answer in plain text — no write block needed.\n"
-    "- If you need to see a file that isn't shown, say which one and ask them to open it."
+    "== RUN SHELL COMMANDS ==\n"
+    "To run a shell command in the workspace:\n\n"
+    "```run\nnpm install\n```\n\n"
+    "The room executes it and sends you the output. Use for: installing packages, running tests, "
+    "git status, scripts, builds. Chain as many as needed. See output → keep going.\n\n"
+    "== HARD RULES ==\n"
+    "- Always write COMPLETE file content — no diffs, no '...', no 'rest unchanged'.\n"
+    "- Relative forward-slash paths inside the workspace only. Never '..', never absolute.\n"
+    "- Write multiple files and run blocks back to back when needed.\n"
+    "- One or two lines max before each block — what you're doing and why, that's it.\n"
+    "- Question only? Answer in plain text, no blocks.\n"
+    "- Need a file you can't see? Name it and ask him to open it.\n"
+    "- No rm -rf, no destructive ops unless he explicitly asks."
 )
+
+
+def _sse(tp, **kw):
+    """Build a 'data: {...}\\n\\n' SSE line without apostrophe-in-f-string issues."""
+    d = {"type": tp}
+    d.update(kw)
+    return "data: " + json.dumps(d) + "\n\n"
 
 
 @app.get("/api/code/workspaces")
@@ -1572,7 +1632,228 @@ async def code_workspaces():
         wss = []
     if "default" not in wss:
         wss = ["default"] + wss
-    return {"workspaces": wss, "admin": CODE_ADMIN}
+    folders = _load_code_folders()
+    folder_list = [{"ws": k, "name": v.get("name") or k, "path": v.get("path") or ""}
+                   for k, v in folders.items() if Path(v.get("path", "")).is_dir()]
+    return {"workspaces": wss, "folders": folder_list, "admin": CODE_ADMIN}
+
+
+def _is_localhost(req: Request) -> bool:
+    host = (req.client.host if req.client else "") or ""
+    return host in ("127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1")
+
+
+@app.get("/api/code/suggest_folders")
+async def code_suggest_folders():
+    """Handy one-click targets: this app's own folder first, then common places."""
+    home = Path.home()
+    out = [{"name": "DeMartinville (this app)", "path": str(ROOT), "primary": True}]
+    for label, pp in [("Desktop", home / "Desktop"), ("Downloads", home / "Downloads"),
+                      ("Documents", home / "Documents"), ("Projects", home / "Projects"),
+                      ("Home", home)]:
+        try:
+            if pp.is_dir() and str(pp) != str(ROOT):
+                out.append({"name": label, "path": str(pp)})
+        except Exception:
+            pass
+    return {"suggestions": out}
+
+
+@app.post("/api/code/connect_folder")
+async def code_connect_folder(req: Request):
+    """Register a real folder on this machine as a workspace. Localhost only."""
+    if not _is_localhost(req):
+        return JSONResponse({"error": "Folder access is only allowed from the local app."}, status_code=403)
+    body = await req.json()
+    raw = (body.get("path") or "").strip().strip('"').strip("'")
+    if not raw:
+        return JSONResponse({"error": "Paste a folder path first."}, status_code=400)
+    try:
+        p = Path(raw).expanduser().resolve()
+    except Exception:
+        return JSONResponse({"error": "That doesn't look like a valid path."}, status_code=400)
+    if not p.exists():
+        return JSONResponse({"error": "That folder doesn't exist."}, status_code=400)
+    if not p.is_dir():
+        return JSONResponse({"error": "That's a file, not a folder."}, status_code=400)
+    name = (body.get("name") or p.name or "folder").strip()
+    slug = re.sub(r"[^a-zA-Z0-9_-]", "", name.lower())[:40] or "folder"
+    key = "folder:" + slug
+    folders = _load_code_folders()
+    # avoid clobbering a different folder that already owns this slug
+    if key in folders and folders[key].get("path") != str(p):
+        n = 2
+        while ("%s-%d" % (key, n)) in folders:
+            n += 1
+        key = "%s-%d" % (key, n)
+    folders[key] = {"name": name, "path": str(p)}
+    _save_code_folders(folders)
+    return {"ws": key, "name": name, "path": str(p)}
+
+
+@app.post("/api/code/disconnect_folder")
+async def code_disconnect_folder(req: Request):
+    body = await req.json()
+    key = body.get("ws") or ""
+    folders = _load_code_folders()
+    if key in folders:
+        del folders[key]
+        _save_code_folders(folders)
+    return {"ok": True}
+
+
+@app.get("/api/code/browse_folder")
+async def code_browse_folder(req: Request):
+    """Open the native OS folder-picker dialog and return the chosen path. Localhost only."""
+    if not _is_localhost(req):
+        return JSONResponse({"error": "Folder browser is only available from the local app."}, status_code=403)
+    import sys, os, asyncio
+
+    def _pick_folder():
+        # Try tkinter first — runs in-process (no terminal flash) and uses the
+        # native OS dialog on all platforms.
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            folder = filedialog.askdirectory(
+                parent=root,
+                title="Select a folder — DeMartinville Code room",
+            )
+            root.destroy()
+            return os.path.normpath(folder) if folder else None
+        except Exception:
+            pass
+
+        # Fallback: subprocess — hidden window on Windows via CREATE_NO_WINDOW.
+        import subprocess
+        no_win = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        try:
+            if sys.platform == "win32":
+                # Modern IFileOpenDialog via inline C# — looks like Windows 11 Explorer
+                ps = r"""
+try {
+Add-Type -TypeDefinition @"
+using System;using System.Runtime.InteropServices;
+[ComImport,Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IFileDialog{
+ [PreserveSig]int Show(IntPtr p);
+ [PreserveSig]int SetFileTypes(uint c,IntPtr p);
+ [PreserveSig]int SetFileTypeIndex(uint i);
+ [PreserveSig]int GetFileTypeIndex(out uint i);
+ [PreserveSig]int Advise(IntPtr p,out uint c);
+ [PreserveSig]int Unadvise(uint c);
+ [PreserveSig]int SetOptions(uint f);
+ [PreserveSig]int GetOptions(out uint f);
+ [PreserveSig]int SetDefaultFolder(IShellItem p);
+ [PreserveSig]int SetFolder(IShellItem p);
+ [PreserveSig]int GetFolder(out IShellItem p);
+ [PreserveSig]int GetCurrentSelection(out IShellItem p);
+ [PreserveSig]int SetFileName([MarshalAs(UnmanagedType.LPWStr)]string n);
+ [PreserveSig]int GetFileName([MarshalAs(UnmanagedType.LPWStr)]out string n);
+ [PreserveSig]int SetTitle([MarshalAs(UnmanagedType.LPWStr)]string t);
+ [PreserveSig]int SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)]string t);
+ [PreserveSig]int SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)]string t);
+ [PreserveSig]int GetResult(out IShellItem p);
+ [PreserveSig]int AddPlace(IShellItem p,int f);
+ [PreserveSig]int SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)]string e);
+ [PreserveSig]int Close(int h);
+ [PreserveSig]int SetClientGuid(ref Guid g);
+ [PreserveSig]int ClearClientData();
+ [PreserveSig]int SetFilter(IntPtr p);
+}
+[ComImport,Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IShellItem{
+ [PreserveSig]int BindToHandler(IntPtr p,ref Guid b,ref Guid r,out IntPtr v);
+ [PreserveSig]int GetParent(out IShellItem p);
+ [PreserveSig]int GetDisplayName(uint s,[MarshalAs(UnmanagedType.LPWStr)]out string n);
+ [PreserveSig]int GetAttributes(uint m,out uint a);
+ [PreserveSig]int Compare(IShellItem p,uint h,out int o);
+}
+public class DMVPicker{
+ public static string Pick(string title){
+  var t=Type.GetTypeFromCLSID(new Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7"));
+  var d=(IFileDialog)Activator.CreateInstance(t);
+  d.SetOptions(0x68);d.SetTitle(title);
+  if(d.Show(IntPtr.Zero)!=0)return"";
+  IShellItem i;d.GetResult(out i);
+  string p;i.GetDisplayName(0x80058000,out p);
+  return p??"";
+ }
+}
+"@ -PassThru | Out-Null
+[DMVPicker]::Pick("Select a folder — DeMartinville Code room")
+} catch { "" }
+"""
+                result = subprocess.run(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                    capture_output=True, text=True, timeout=60,
+                    creationflags=no_win,
+                )
+            elif sys.platform == "darwin":
+                result = subprocess.run(
+                    ["osascript", "-e",
+                     'POSIX path of (choose folder with prompt "Select a folder — DeMartinville Code room")'],
+                    capture_output=True, text=True, timeout=60,
+                )
+            else:
+                try:
+                    result = subprocess.run(
+                        ["zenity", "--file-selection", "--directory",
+                         "--title=Select folder — DeMartinville"],
+                        capture_output=True, text=True, timeout=60,
+                    )
+                except FileNotFoundError:
+                    result = subprocess.run(
+                        ["kdialog", "--getexistingdirectory", str(Path.home()),
+                         "Select folder — DeMartinville"],
+                        capture_output=True, text=True, timeout=60,
+                    )
+            return result.stdout.strip().rstrip("/") or None
+        except subprocess.TimeoutExpired:
+            return None
+
+    try:
+        loop = asyncio.get_running_loop()
+        path = await loop.run_in_executor(None, _pick_folder)
+        if not path:
+            return JSONResponse({"cancelled": True})
+        return JSONResponse({"path": path})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/code/run")
+async def code_run_cmd(req: Request):
+    """Execute a shell command inside the active workspace. Localhost only, 30s timeout."""
+    if not _is_localhost(req):
+        return JSONResponse({"error": "Shell execution is only available from the local app."}, status_code=403)
+    body = await req.json()
+    ws = body.get("ws") or "default"
+    cmd = (body.get("command") or "").strip()
+    if not cmd:
+        return JSONResponse({"error": "no command"}, status_code=400)
+    try:
+        root = _ws_root(ws)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    try:
+        result = subprocess.run(
+            cmd, shell=True, cwd=str(root),
+            capture_output=True, text=True, timeout=30,
+            errors="replace"
+        )
+        out = (result.stdout + result.stderr).strip()
+        return JSONResponse({
+            "output": out[:12000],
+            "returncode": result.returncode,
+        })
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"error": "Command timed out (30s limit)", "returncode": -1})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "returncode": -1})
 
 
 @app.get("/api/code/tree")
@@ -1629,7 +1910,7 @@ async def code_agent(req: Request):
     model = body.get("model") or ""
     instruction = (body.get("instruction") or "").strip()
     open_path = (body.get("open_path") or "").strip()
-    history = _hist_msgs(body.get("history") or [])
+    raw_history = _hist_msgs(body.get("history") or [])
     effort = str(body.get("effort") or "low").lower()
 
     try:
@@ -1646,18 +1927,60 @@ async def code_agent(req: Request):
         except Exception:
             open_txt = ""
 
-    ctx = f"WORKSPACE FILE TREE:\n{tree_txt[:6000]}\n\n"
-    if open_path and open_txt:
-        ctx += f"CURRENTLY OPEN FILE — {open_path}:\n```\n{open_txt[:14000]}\n```\n\n"
-    ctx += f"TASK: {instruction}"
+    # ── SMART CHECKLIST: what does this task actually need? (rule-based, zero cost) ──
+    q = instruction.lower()
+    _tree_kws = ("create", "new file", "new folder", "structure", "where is",
+                 "find file", "folder", "move", "rename", "list files", "directory")
+    _file_kws = ("fix", "edit", "update", "change", "add", "remove", "the code",
+                 "function", "class", "bug", "refactor", "explain", "what does",
+                 "line", "error", "import", "this file")
+    needs_tree = effort in ("high", "max") or any(kw in q for kw in _tree_kws)
+    needs_file = bool(open_txt) and (
+        len(raw_history) > 1 or effort != "low" or any(kw in q for kw in _file_kws)
+    )
 
-    # attached images (data-URIs) → vision content parts (gemma-vision + Claude see them)
+    # ── TOKEN BUDGET by effort (controls history depth, context size, and max output) ──
+    hist_limit  = {"low": 4, "medium": 8,  "high": 14, "max": 20}.get(effort, 8)
+    max_tok     = {"low": 1024, "medium": 4096, "high": 8192}.get(effort, 4096)
+    tree_cap    = {"low": 1500, "medium": 3000, "high": 6000}.get(effort, 3000)
+    file_cap    = {"low": 4000, "medium": 10000, "high": 14000}.get(effort, 10000)
+
+    history = raw_history[-hist_limit:]
+
+    # ── BUILD WORKSPACE CONTEXT STRING ──
+    ws_parts = []
+    if needs_tree:
+        ws_parts.append(f"WORKSPACE FILE TREE:\n{tree_txt[:tree_cap]}")
+    elif open_path:
+        ws_parts.append(f"OPEN: {open_path}")
+    if needs_file:
+        ws_parts.append(f"CURRENTLY OPEN FILE — {open_path}:\n```\n{open_txt[:file_cap]}\n```")
+    ws_ctx = "\n\n".join(ws_parts)
+
+    # ── IMAGES ──
     images = body.get("images") or []
-    img_parts = [{"type": "image_url", "image_url": {"url": u}} for u in images if isinstance(u, str) and u.startswith("data:")][:4]
-    user_content = ([{"type": "text", "text": ctx}] + img_parts) if img_parts else ctx
+    img_parts = [{"type": "image_url", "image_url": {"url": u}} for u in images
+                 if isinstance(u, str) and u.startswith("data:")][:4]
 
-    msgs = [{"role": "system", "content": CODE_AGENT_SYSTEM}] + history + [{"role": "user", "content": user_content}]
-    payload = {"model": model, "messages": msgs, "temperature": 0.2, "stream": True}
+    # ── STANDARD PAYLOAD (local + non-Claude cloud): workspace context goes in the user msg ──
+    std_ctx = (ws_ctx + f"\n\nTASK: {instruction}") if ws_ctx else f"TASK: {instruction}"
+    std_user = ([{"type": "text", "text": std_ctx}] + img_parts) if img_parts else std_ctx
+    std_msgs = ([{"role": "system", "content": CODE_AGENT_SYSTEM}] + history +
+                [{"role": "user", "content": std_user}])
+    std_payload = {"model": model, "messages": std_msgs, "temperature": 0.2,
+                   "stream": True, "max_tokens": max_tok}
+
+    # ── CLAUDE PAYLOAD with prompt caching ──
+    # System blocks carry both Kit’s identity AND the workspace context — both cached.
+    # The user message becomes just the task, so cached tokens are ~90% cheaper on every call.
+    claude_sys = [{"type": "text", "text": CODE_AGENT_SYSTEM, "cache_control": {"type": "ephemeral"}}]
+    if ws_ctx:
+        claude_sys.append({"type": "text", "text": ws_ctx, "cache_control": {"type": "ephemeral"}})
+    lean_user = ([{"type": "text", "text": f"TASK: {instruction}"}] + img_parts) if img_parts else f"TASK: {instruction}"
+    lean_msgs = ([{"role": "system", "content": CODE_AGENT_SYSTEM}] + history +
+                 [{"role": "user", "content": lean_user}])
+    claude_payload = {"model": model, "messages": lean_msgs, "temperature": 0.2,
+                      "stream": True, "max_tokens": max_tok, "_cache_system": claude_sys}
 
     async def gen():
         acc = []
@@ -1665,13 +1988,19 @@ async def code_agent(req: Request):
             from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
             slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
             if not slot:
-                yield f"data: {json.dumps({'type':'error','text':'That cloud model isn’t set up anymore — pick another (Settings ⚙).'})}\n\n"
-                yield f"data: {json.dumps({'type':'done'})}\n\n"
+                yield _sse("error", text="That cloud model isn’t set up anymore — pick another (Settings).")
+                yield _sse("done")
                 return
-            cpay = dict(payload)
-            cpay["model"] = slot["model"]
-            cpay.pop("reasoning_effort", None)
-            src = anthropic_native_stream(slot, cpay, effort) if _is_claude_slot(slot) else provider_stream(slot, cpay, effort)
+            if _is_claude_slot(slot):
+                cpay = dict(claude_payload)
+                cpay["model"] = slot["model"]
+                cpay.pop("reasoning_effort", None)
+                src = anthropic_native_stream(slot, cpay, effort)
+            else:
+                cpay = dict(std_payload)
+                cpay["model"] = slot["model"]
+                cpay.pop("reasoning_effort", None)
+                src = provider_stream(slot, cpay, effort)
             async for ev in src:
                 yield ev
                 if ev.startswith("data: "):
@@ -1684,13 +2013,13 @@ async def code_agent(req: Request):
         else:
             if not await brain_up():
                 if not await ensure_brain():
-                    yield f"data: {json.dumps({'type':'error','text':'Local brain (LM Studio) won’t start — open it once, or pick a cloud model in the picker.'})}\n\n"
-                    yield f"data: {json.dumps({'type':'done'})}\n\n"
+                    yield _sse("error", text="Local brain (LM Studio) won’t start — open it once, or pick a cloud model in the picker.")
+                    yield _sse("done")
                     return
             if await _ctx_too_small(model):
-                yield f"data: {json.dumps({'type':'status','text':'giving the brain more room…'})}\n\n"
+                yield _sse("status", text="giving the brain more room...")
                 await _reload_ctx(model)
-            async for ev in lm_stream(payload):
+            async for ev in lm_stream(std_payload):
                 yield ev
                 if ev.startswith("data: "):
                     try:

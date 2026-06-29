@@ -56,6 +56,29 @@ else:
 HOST = "127.0.0.1"
 PORT = 7777
 URL = f"http://localhost:{PORT}"
+
+_LOADING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>DeMartinville</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}
+body{background:#060e17;color:#e0e0f0;font-family:Inter,system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:18px}
+.logo{font-size:30px;font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(135deg,#e91e8c,#2bb6a8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.dots{display:flex;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;background:#2bb6a8;animation:p 1.1s ease-in-out infinite}
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes p{0%,100%{opacity:.18}50%{opacity:1}}
+.hint{font-size:12px;color:#3a5060}</style></head>
+<body><div class="logo">DeMartinville</div>
+<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+<div class="hint">starting up…</div></body></html>"""
+
+_ERROR_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>DeMartinville</title>
+<style>*{margin:0;padding:0}body{background:#060e17;color:#e0e0f0;font-family:Inter,system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:14px;padding:40px}
+h2{color:#e91e8c;font-size:18px}p{font-size:13px;color:#6080a0;text-align:center;line-height:1.6}</style></head>
+<body><h2>Couldn't start</h2>
+<p>The engine didn't come up in time.<br>Check <code>arkitect-run.log</code> next to the app,<br>
+or run <strong>START HERE.bat</strong> once to finish setup.</p></body></html>"""
 ICON = os.path.join(ROOT, "static", "app-icon.ico")   # swap this file to change the icon
 APPID = "LePrinceVisualLabs.DeMartinville"
 # Persistent WebView2 profile so a one-time "Allow microphone" STICKS. The default profile is
@@ -216,6 +239,40 @@ def _fatal(msg):
 _SINGLETON_HANDLE = None  # keep the mutex handle alive for the whole process
 
 
+def create_desktop_shortcut():
+    """Place a DeMartinville.lnk on the Desktop — first launch only.
+    Uses WScript.Shell COM via a hidden PowerShell call; no pywin32 needed."""
+    if sys.platform != "win32":
+        return
+    flag = os.path.join(ROOT, "data", ".shortcut_created")
+    if os.path.exists(flag):
+        return
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+    lnk = os.path.join(desktop, "DeMartinville.lnk")
+    exe = sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
+    icon = os.path.join(ROOT, "static", "app-icon.ico")
+    # single-quoted here-string avoids PS escaping headaches with backslashes in paths
+    ps = (
+        "$s = New-Object -ComObject WScript.Shell; "
+        f"$l = $s.CreateShortcut('{lnk}'); "
+        f"$l.TargetPath = '{exe}'; "
+        f"$l.WorkingDirectory = '{ROOT}'; "
+        "$l.Description = 'DeMartinville'; "
+        f"$l.IconLocation = '{icon}'; "
+        "$l.Save()"
+    )
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True, timeout=8,
+            creationflags=0x08000000  # CREATE_NO_WINDOW
+        )
+        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
+        open(flag, "w").close()
+    except Exception:
+        pass
+
+
 def _acquire_single_instance() -> bool:
     """True if we're the FIRST instance. A named mutex is atomic, so a double-click that
     fires two launches still resolves to ONE window — the 2nd launch sees the mutex and
@@ -256,55 +313,45 @@ def main():
     # the running taskbar icon) pins and relaunches correctly. A custom AUMID without
     # a registered shortcut can make the pin fail to relaunch on Win11.
     started = start_server()
-    if not wait_up():
-        # The engine never came up — don't open a blank "can't reach localhost" window.
-        _fatal("DeMartinville's engine didn't start.\n\nSee arkitect-run.log next to the app, "
-               "or run \"START HERE.bat\" once to finish setup.")
-        if isinstance(started, subprocess.Popen):
-            try:
-                started.terminate()
-            except Exception:
-                pass
-        return
+    threading.Thread(target=create_desktop_shortcut, daemon=True).start()
 
-    # (Belt-and-suspenders only.) This env var asks WebView2 to fake-approve getUserMedia, but
-    # pywebview sets its OWN AdditionalBrowserArguments on the environment, and WebView2 ignores
-    # this env var whenever that property is set — so it does NOT actually stop the mic prompt.
-    # The real fix is wire_auto_permissions() below (CoreWebView2.PermissionRequested → auto-Allow).
     os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--use-fake-ui-for-media-stream")
 
     import webview
     threading.Thread(target=set_window_icon, daemon=True).start()
     try:
-        # Pick the native web engine per-OS. Windows: WebView2 / Edge-Chromium. macOS: the
-        # built-in WKWebView (cocoa). Forcing edgechromium on a Mac RAISES, and the except
-        # below would then silently fall back to a browser tab — faking a "native window
-        # works" pass. If the engine is genuinely missing/broken we still catch it.
-        # Open MAXIMIZED so the window lands clean and centered (pywebview's default
-        # placement can drop it low/off-center on some displays). text_select=True keeps
-        # page text selectable like a normal app.
-        webview.create_window("DeMartinville", URL, width=1500, height=950,
-                              min_size=(1100, 700), maximized=True, text_select=True)
+        # Create the window immediately with a dark loading screen — the app appears on first
+        # click instead of hanging invisibly while the server starts up.
+        win = webview.create_window("DeMartinville", html=_LOADING_HTML,
+                                    width=1500, height=950,
+                                    min_size=(1100, 700), maximized=True, text_select=True)
+
+        def _on_gui_ready():
+            # Navigate to the real app once the server is up. Runs in the GUI thread,
+            # so we spin a background thread for the blocking wait_up() call.
+            def _nav():
+                if wait_up():
+                    win.load_url(URL)
+                else:
+                    win.load_html(_ERROR_HTML)
+                    if isinstance(started, subprocess.Popen):
+                        try:
+                            started.terminate()
+                        except Exception:
+                            pass
+            threading.Thread(target=_nav, daemon=True).start()
+
         _gui = "edgechromium" if sys.platform == "win32" else ("cocoa" if sys.platform == "darwin" else None)
-        # WebView2 gates the right-click Paste menu (AreDefaultContextMenusEnabled) and
-        # browser keys on pywebview's `debug` flag. Without it, right-click has no Paste.
-        # Turn debug ON to restore the full copy/paste context menu — but suppress the
-        # auto-opening DevTools so the app still looks clean (F12 stays available).
         try:
             webview.settings['OPEN_DEVTOOLS_IN_DEBUG'] = False
         except Exception:
             pass
-        # private_mode=False + a fixed storage_path = a DURABLE profile, so granted device
-        # permissions (microphone / camera) + sign-ins persist across launches — one "Allow", ever.
         try:
             os.makedirs(WEBVIEW_PROFILE, exist_ok=True)
         except Exception:
             pass
-        # Auto-Allow WebView2's permission prompts (mic / camera / clipboard-read) so the app
-        # stops nagging "Allow" at the top every launch. Started before the blocking start() call;
-        # it polls for the WebView2 core and subscribes once it's up.
         wire_auto_permissions()
-        webview.start(gui=_gui, debug=True, private_mode=False, storage_path=WEBVIEW_PROFILE)
+        webview.start(_on_gui_ready, gui=_gui, debug=True, private_mode=False, storage_path=WEBVIEW_PROFILE)
     except Exception:
         import traceback
         import webbrowser

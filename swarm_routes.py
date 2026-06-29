@@ -428,23 +428,29 @@ def _oa_to_anthropic(messages):
     return ("\n\n".join(p for p in sys_parts if p).strip(), out)
 
 
-def _anthropic_body(model, system, messages, max_tokens, effort):
+def _anthropic_body(model, system, messages, max_tokens, effort, system_blocks=None):
     body = {"model": model or "claude-opus-4-8", "max_tokens": int(max_tokens or 1024),
             "messages": messages, "output_config": {"effort": (effort or "high")},
             "thinking": {"type": "adaptive"}}
-    if system:
-        body["system"] = system
+    if system_blocks:
+        body["system"] = system_blocks       # pre-built content blocks (supports cache_control)
+    elif system:
+        body["system"] = [{"type": "text", "text": system}]
     return body
 
 
 async def anthropic_native_stream(slot, payload, effort="high"):
     """STREAM from Anthropic's native /v1/messages. Same SSE shape as provider_stream
     ({'type':'delta','text':...}). `payload` is the OpenAI-style cpay (messages incl. a leading
-    system message); we split it out, convert content, and set the real effort + adaptive thinking."""
+    system message); we split it out, convert content, and set the real effort + adaptive thinking.
+    If `_cache_system` is set in payload, it overrides the extracted system with pre-built content
+    blocks that include cache_control — enabling prompt caching (~90% savings on cached tokens)."""
+    cache_system = payload.get("_cache_system")   # pre-built blocks with cache_control, if any
     system, msgs = _oa_to_anthropic(payload.get("messages") or [])
     if not msgs:
         msgs = [{"role": "user", "content": "Hello"}]
-    body = _anthropic_body(slot.get("model"), system, msgs, payload.get("max_tokens") or 2048, effort)
+    body = _anthropic_body(slot.get("model"), system, msgs, payload.get("max_tokens") or 2048, effort,
+                           system_blocks=cache_system)
     body["stream"] = True
     try:
         async with httpx.AsyncClient(timeout=None) as cx:
