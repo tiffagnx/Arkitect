@@ -909,10 +909,29 @@ async function saveFile(){
   setDirty(false); setStatus("saved "+curFile,"ok");
 }
 $("saveBtn").onclick = saveFile;
-$("popoutBtn").onclick = () => {
-  const w = window.open(location.href, '_blank',
-    'width=1000,height=780,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
-  if (w) { w.focus(); } else { alert("Allow pop-ups for this page to use pop-out mode."); }
+// If THIS is already the popped-out window, hide the pop-out button — no infinite nesting.
+const IS_POPPED = new URLSearchParams(location.search).has("popped");
+if (IS_POPPED) { const pb=$("popoutBtn"); if(pb) pb.style.display="none"; }
+
+let _popoutCooling = false;
+$("popoutBtn").onclick = async () => {
+  if (_popoutCooling) return;          // ignore rapid double-clicks → no duplicate windows
+  _popoutCooling = true;
+  setTimeout(()=>{ _popoutCooling=false; }, 2500);
+  // Backend-launched app mode: Edge/Chrome with no URL bar, no tabs, no browser chrome.
+  try {
+    const r = await fetch("/api/code/open_popup", {method:"POST"});
+    if (r.ok) return;
+  } catch(_){}
+  // pywebview native window (same process — closes with DeMartinville)
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.open_code_popup) {
+    window.pywebview.api.open_code_popup();
+    return;
+  }
+  // Last resort
+  const w = window.open(location.href + (location.search?"&":"?") + "popped=1", '_blank',
+    'width=1120,height=800,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+  if (w) w.focus();
 };
 $("newFile").onclick = async () => {
   const path=((await dmvPrompt("New file","e.g. src/hello.py"))||"").trim(); if(!path) return;

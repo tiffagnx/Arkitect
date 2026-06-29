@@ -441,14 +441,15 @@
     const r = await fetch("/api/swarm/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_url: base, api_key: key }) }).then(r => r.json()).catch(() => ({ ok: false, error: "couldn't reach it" }));
     btn.disabled = false; btn.textContent = lbl;
     if (r.ok) {
-      // prefer CAPABLE models (vision + tool-calling) when the provider tells us — the agent needs tools
-      const capable = (r.capable && r.capable.length) ? r.capable : null;
-      const show = capable || (r.models || []);
-      const dl = $("asModelList"); dl.innerHTML = ""; show.forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); });
-      const hint = $("asModelHint"); if (hint) hint.textContent = capable
-        ? (capable.length + " agent-ready models (can SEE + use TOOLS) — click the Model box to pick" + (r.total > capable.length ? " · " + r.total + " total" : ""))
-        : ((r.models || []).length + " live models" + (r.total > (r.models || []).length ? (" (of " + r.total + ")") : "") + " — click the Model box to pick");
-      setStatus("✓ " + show.length + (capable ? " agent-ready models" : " models"), "ok");
+      // Show ALL models in the list — vision+tools filter was hiding good models (DeepSeek, etc.)
+      // that have tools but no image input. User picks what they want; capable count is informational.
+      const all = r.models || [];
+      const capable = r.capable || [];
+      const dl = $("asModelList"); dl.innerHTML = "";
+      all.forEach(m => { const o = document.createElement("option"); o.value = m; o.label = capable.includes(m) ? m + " ★" : m; dl.appendChild(o); });
+      const hint = $("asModelHint"); if (hint) hint.textContent =
+        all.length + " models — type to search. ★ = vision + tools (agent-ready). Others work great for chat + coding.";
+      setStatus("✓ " + all.length + " models" + (capable.length ? " · " + capable.length + " vision+tools ★" : ""), "ok");
       $("asModel").focus();
     } else setStatus("couldn't list models: " + (r.error || "?"), "bad");
   };

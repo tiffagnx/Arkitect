@@ -303,6 +303,35 @@ def _focus_existing_window():
         time.sleep(0.1)
 
 
+_popup_windows = []   # track every popup so main-window close kills them all
+
+
+class DmvApi:
+    """JS-callable Python API exposed as window.pywebview.api inside every webview window."""
+
+    def open_code_popup(self):
+        """Open the Code room as a clean native window. If already open, focus it instead."""
+        try:
+            import webview
+            # If there's already a code popup alive, bring it to front — don't stack duplicates
+            for pw in list(_popup_windows):
+                try:
+                    pw.show()
+                    return
+                except Exception:
+                    _popup_windows.remove(pw)
+            popup = webview.create_window(
+                "Code — DeMartinville",
+                url=f"http://localhost:{PORT}/static/code.html?popped=1",
+                width=1120, height=800,
+                min_size=(500, 400),
+                text_select=True,
+            )
+            _popup_windows.append(popup)
+        except Exception:
+            pass   # JS falls back to window.open() if this fails
+
+
 def main():
     # A double-click (or any 2nd launch) must NOT open a second window. The mutex is
     # atomic, so even two near-simultaneous launches end up as ONE window.
@@ -325,7 +354,16 @@ def main():
         # click instead of hanging invisibly while the server starts up.
         win = webview.create_window("DeMartinville", html=_LOADING_HTML,
                                     width=1500, height=950,
-                                    min_size=(1100, 700), maximized=True, text_select=True)
+                                    min_size=(1100, 700), maximized=True, text_select=True,
+                                    js_api=DmvApi())
+
+        def _on_main_closed():
+            for pw in list(_popup_windows):
+                try:
+                    pw.destroy()
+                except Exception:
+                    pass
+        win.events.closed += _on_main_closed
 
         def _on_gui_ready():
             # Navigate to the real app once the server is up. Runs in the GUI thread,

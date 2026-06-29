@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory â€” the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory â€” her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "3.1.3"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "3.1.4"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) â€” but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -875,76 +875,105 @@ async def chat(req: Request):
     }
 
     async def gen():
-        # â”€â”€ CLOUD model picked (cloud:<slot>) â†’ stream from the user's own provider, skip the
-        #    local brain entirely (so a weak PC with LM Studio closed still works). Keys live
-        #    server-side in the swarm store; the picker only ever carries the opaque slot id. â”€â”€
-        if model.startswith("cloud:"):
+        # One-time setup: resolve the source (cloud claude / cloud std / local brain).
+        is_cloud = model.startswith("cloud:")
+        slot = None
+        is_claude = False
+        if is_cloud:
             from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
             slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
             if not slot:
-                yield f"data: {json.dumps({'type':'error','text':'That cloud model isnâ€™t set up anymore â€” pick another in the picker (Settings âš™).'})}\n\n"
-                yield f"data: {json.dumps({'type':'done'})}\n\n"
+                yield _sse("error", text="That cloud model isn't set up anymore -- pick another (Settings).")
+                yield _sse("done")
                 return
-            cpay = dict(payload)
-            cpay["model"] = slot["model"]          # the provider's real model id, not "cloud:<slot>"
-            cpay.pop("reasoning_effort", None)      # LM-Studio-ism â€” many cloud providers 400 on unknown fields
-            # â”€â”€ CLAUDE = GOD MODE â”€â”€ a Claude slot gets the "you ARE Claude, show out" persona AND
-            #    goes through Anthropic's NATIVE /v1/messages endpoint, where the effort lever becomes
-            #    the REAL `output_config.effort` knob (lowâ†’max) + adaptive thinking â€” genuine deep
-            #    reasoning, not just a prompt. Everyone else stays on the OpenAI-compat door.
-            _claude = _is_claude_slot(slot)
-            if _claude and cpay.get("messages") and cpay["messages"][0].get("role") == "system":
-                _m0 = dict(cpay["messages"][0])
-                # the local-finetune _effort_hint is noise to Claude (it has the REAL native effort
-                # dial) â€” strip it before adding the god layer so the system prompt stays clean.
-                _c = (_m0.get("content", "") or "")
-                if _effort_hint and _c.endswith(_effort_hint):
-                    _c = _c[:-len(_effort_hint)]
-                _m0["content"] = _c + _god_layer(_effort)
-                cpay["messages"] = [_m0] + cpay["messages"][1:]
-            _src = anthropic_native_stream(slot, cpay, _effort) if _claude else provider_stream(slot, cpay, _effort)
-            reply_parts = []
-            async for ev in _src:
+            is_claude = _is_claude_slot(slot)
+        else:
+            if not await brain_up():
+                if not await ensure_brain():
+                    yield _sse("error", text="Local brain (LM Studio) won't start -- open it once, or pick a cloud model in the picker.")
+                    yield _sse("done")
+                    return
+            if await _ctx_too_small(model):
+                yield _sse("status", text="giving the brain more room...")
+                await _reload_ctx(model)
+
+        # Build the right streaming source for a round, optionally with extra messages appended.
+        def _make_src(extra):
+            if is_cloud:
+                if is_claude:
+                    from swarm_routes import anthropic_native_stream as _ans
+                    c = dict(claude_payload)
+                    c["messages"] = lean_msgs + extra
+                    c["model"] = slot["model"]
+                    c.pop("reasoning_effort", None)
+                    return _ans(slot, c, effort)
+                else:
+                    from swarm_routes import provider_stream as _ps
+                    s = dict(std_payload)
+                    s["messages"] = std_msgs + extra
+                    s["model"] = slot["model"]
+                    s.pop("reasoning_effort", None)
+                    return _ps(slot, s, effort)
+            else:
+                s = dict(std_payload)
+                s["messages"] = std_msgs + extra
+                return lm_stream(s)
+
+        acc = []
+
+        async def _round(extra):
+            async for ev in _make_src(extra):
                 yield ev
                 if ev.startswith("data: "):
                     try:
                         d = json.loads(ev[6:])
                         if d.get("type") == "delta":
-                            reply_parts.append(d.get("text", ""))
+                            acc.append(d.get("text", ""))
                     except Exception:
                         pass
-            yield f"data: {json.dumps({'type':'done'})}\n\n"
-            # auto-memory stays on the LOCAL brain â€” never burn the cloud key's quota on it
-            if mode != "write":
-                _fire(_auto_remember(DEFAULT_MODEL, messages, "".join(reply_parts)))
-            return
-        if not await brain_up():
-            yield f"data: {json.dumps({'type':'step','icon':'ðŸ§ ','text':'waking her up â€” give it a few secondsâ€¦'})}\n\n"
-            if not await ensure_brain():
-                yield f"data: {json.dumps({'type':'error','text':'Her brain (LM Studio) wont start on its own. Open LM Studio once, then try again.'})}\n\n"
-                yield f"data: {json.dumps({'type':'done'})}\n\n"
-                return
-        # guard the #1 silent failure: model loaded at a too-small context â†’ persona
-        # overflows â†’ empty reply. Reload at 16K (only when actually too small).
-        if await _ctx_too_small(model):
-            yield f"data: {json.dumps({'type':'step','icon':'ðŸ“','text':'giving her more memory room â€” one secâ€¦'})}\n\n"
-            await _reload_ctx(model)
-        reply_parts = []
-        async for ev in lm_stream(payload):
+
+        # Round 1.
+        async for ev in _round([]):
             yield ev
-            if ev.startswith("data: "):           # accumulate her reply for memory extraction
-                try:
-                    d = json.loads(ev[6:])
-                    if d.get("type") == "delta":
-                        reply_parts.append(d.get("text", ""))
-                except Exception:
-                    pass
-        yield f"data: {json.dumps({'type':'done'})}\n\n"
-        # AUTO-MEMORY: she files durable facts about B herself, so memory grows
-        # without him manually saving cards. Fire-and-forget â€” never blocks or
-        # breaks the reply (the user already has it).
-        if mode != "write":
-            _fire(_auto_remember(model, messages, "".join(reply_parts)))
+
+        # Forcing retry: if this was a build/fix/change request but the model only
+        # planned (no write/run block), nudge it once to actually emit the blocks.
+        # This is what makes weaker/cheaper models behave like Claude Code.
+        full = "".join(acc)
+        _ql = instruction.lower()
+        _build_words = ("build", "make", "create", "add", "write", "edit", "update",
+                        "change", "fix", "implement", "refactor", "remove", "delete",
+                        "rename", "replace", "set up", "wire", "hook up", "generate")
+        _build_intent = any(k in _ql for k in _build_words)
+        _has_block = ("```write" in full) or ("```run" in full)
+        if _build_intent and not _has_block and full.strip():
+            yield _sse("status", text="nudging it to actually do the work...")
+            extra = [
+                {"role": "assistant", "content": full[:4000]},
+                {"role": "user", "content":
+                    "You only described a plan -- you did NOT output a single ```write or ```run "
+                    "block, so NOTHING happened on disk. Do it NOW. Output the actual "
+                    "```write path=\"...\" block(s) with the FULL file content, and/or ```run "
+                    "block(s). No more planning, no questions, no 'let me look' -- just the blocks."},
+            ]
+            async for ev in _round(extra):
+                yield ev
+            full = "".join(acc)
+
+        # Apply every ```write block the agent emitted (jailed to the workspace).
+        changed, errors = [], []
+        for m in re.finditer(r'```write\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', full, re.S):
+            rel = m.group(1).strip()
+            content = m.group(2)
+            try:
+                wf = _code_path(ws, rel)
+                wf.parent.mkdir(parents=True, exist_ok=True)
+                wf.write_text(content, encoding="utf-8")
+                changed.append(rel)
+            except Exception as e:
+                errors.append("%s: %s" % (rel, e))
+        yield "data: " + json.dumps({"type": "applied", "changed": changed, "errors": errors}) + "\n\n"
+        yield "data: " + json.dumps({"type": "done"}) + "\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 
@@ -1588,8 +1617,7 @@ CODE_AGENT_SYSTEM = (
     "Keep it tight: one or two lines before each block, no lectures, no filler.\n\n"
     "== WHO YOU'RE TALKING TO ==\n"
     "{user_context}\n\n"
-    "nothing outside it.\n\n"
-    "== WRITE FILES ==\n"
+        "== WRITE FILES ==\n"
     "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
     "== RUN SHELL COMMANDS ==\n"
@@ -1597,7 +1625,36 @@ CODE_AGENT_SYSTEM = (
     "```run\nnpm install\n```\n\n"
     "The room executes it and sends you the output. Use for: installing packages, running tests, "
     "git status, scripts, builds. Chain as many as needed. See output â†’ keep going.\n\n"
-    "== HARD RULES ==\n"
+    "== THIS APP: DEMARTINVILLE ==\n"
+"You are the coding agent INSIDE DeMartinville \u2014 a Python/FastAPI desktop app running on port 7777. "  
+"Know the stack so you can tell him exactly what to do after every change.\n\n"
+"Files + what they need after a change:\n"
+"- app.py, desktop.py, or any .py file \u2192 restart the server (stop 7777, run start.bat or python app.py).\n"
+"- static/*.html, static/*.js, static/*.css \u2192 hard refresh only (Ctrl+Shift+R in the browser, no restart).\n"
+"- data files, sandbox files \u2192 nothing needed.\n\n"
+"Key files:\n"
+"- app.py: all backend API routes, agent loops, voice, code room backend.\n"
+"- desktop.py: pywebview native window wrapper. Needs full app restart (not just server restart).\n"
+"- static/index.html: main chat room.\n"
+"- static/studio.html: DeMartin Audio DAW.\n"
+"- static/editor.html: LePrince video editor.\n"
+"- static/code.html: this Code room.\n"
+"- static/beats.html: Beat Lab.\n"
+"- APP_VERSION must always match in TWO places: app.py AND static/studio.html.\n\n"
+"== AFTER EVERY WRITE: TELL HIM THE NEXT STEP ==\n"
+"Every response that writes a file MUST end with one short line: what he needs to do.\n"
+"Be specific and direct \u2014 talk to him the same way Claude Code does:\n"
+"- Python changed: \"Restart 7777 \u2014 Ctrl+C then python app.py (or start.bat).\"\n"
+"- HTML/JS/CSS only: \"Hard refresh \u2014 Ctrl+Shift+R, no restart needed.\"\n"
+"- desktop.py changed: \"Close DeMartinville fully and reopen it (full restart, not just server).\n"
+"- Sandbox/data file: \"Done \u2014 no restart needed.\"\n"
+"Never leave him hanging. One line. Every time.\n\n"
+"== HARD RULES ==\n"
+    "- ACT, don't narrate. If he asks you to build, add, fix, change, or make ANYTHING, your "
+    "VERY FIRST reply MUST contain at least one ```write or ```run block. You already have the "
+    "file tree and the open file -- never say 'let me look first' and stop. That does nothing. "
+    "Open the file by writing it, or run a command to inspect it.\n"
+    "- Never end a build/fix/change turn with only a plan. A plan with no block = you did nothing.\n"
     "- Always write COMPLETE file content â€” no diffs, no '...', no 'rest unchanged'.\n"
     "- Relative forward-slash paths inside the workspace only. Never '..', never absolute.\n"
     "- Write multiple files and run blocks back to back when needed.\n"
@@ -1814,6 +1871,47 @@ public class DMVPicker{
         return JSONResponse({"path": path})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
+@app.post("/api/code/open_popup")
+async def code_open_popup(req: Request):
+    """Launch Code room as a clean app-mode window — no browser chrome. Localhost only."""
+    if not _is_localhost(req):
+        return JSONResponse({"error": "Local only."}, status_code=403)
+    import subprocess as _sp, os as _os, sys as _sys
+    url = f"http://localhost:{PORT}/static/code.html?popped=1"
+    # Edge app mode: strips URL bar, tabs, bookmarks — looks like a native app
+    edge_paths = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ]
+    for ep in edge_paths:
+        if _os.path.exists(ep):
+            try:
+                _sp.Popen(
+                    [ep, f"--app={url}", "--window-size=1120,800", "--window-position=120,60"],
+                    creationflags=_sp.CREATE_NO_WINDOW if _sys.platform == "win32" else 0,
+                )
+                return {"ok": True, "method": "edge-app"}
+            except Exception as e:
+                return JSONResponse({"error": str(e)}, status_code=500)
+    # Fallback: Chrome
+    chrome_paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    for cp in chrome_paths:
+        if _os.path.exists(cp):
+            try:
+                _sp.Popen(
+                    [cp, f"--app={url}", "--window-size=1120,800"],
+                    creationflags=_sp.CREATE_NO_WINDOW if _sys.platform == "win32" else 0,
+                )
+                return {"ok": True, "method": "chrome-app"}
+            except Exception as e:
+                return JSONResponse({"error": str(e)}, status_code=500)
+    return JSONResponse({"error": "No supported browser found for app mode."}, status_code=404)
 
 
 @app.post("/api/code/run")

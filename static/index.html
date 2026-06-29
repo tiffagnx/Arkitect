@@ -2006,10 +2006,15 @@ window.arkCapNudge = function(cap){
 
   // ── pop-out button ──
   document.getElementById('codeFloatPopout').onclick = function(){
-    var w = window.open('/static/code.html', '_blank',
-      'width=1100,height=780,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no');
-    if (w) { w.focus(); closeFloat(); }
-    else { alert('Allow pop-ups to use the detached window.'); }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_code_popup) {
+      window.pywebview.api.open_code_popup();
+      closeFloat();
+    } else {
+      var w = window.open('/static/code.html', '_blank',
+        'width=1100,height=800,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no');
+      if (w) { w.focus(); closeFloat(); }
+      else { alert('Allow pop-ups to use the detached window.'); }
+    }
   };
 
   // ── restore float mode indicator on load ──

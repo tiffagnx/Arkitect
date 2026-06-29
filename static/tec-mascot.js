@@ -12,7 +12,12 @@
   const VIEW = 72;     // rendered px
   const FPS  = 3.6;    // idle cadence — slow + dreamy
   // playback order — dwell on the eyes-shut frames (4,5,6) so they drift into the music
-  const SEQ  = [0,0,0, 1,2, 3, 4,5,6, 6,5,6,5,6,6, 7,8, 0,0];
+  const SEQ  = [0,0,0, 1,2, 3, 4,5,6, 6,5,6,5,6,6, 7,8,
+                8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,
+                8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,
+                8,8,8,8,8,8,8,8,8,8, 8,8,8,8,8,8,8,8,8,8,
+                8,8,8,8,8,8,8,8,8,8, 8,8,
+                0,0];
 
   // ── the roster. Tiff is the default chat partner; Kit is shipped animated. ──
   const CHARS = {
