@@ -25,6 +25,12 @@
     const a1 = document.createElement("script"); a1.src = "/static/cloud-ai.js"; a1.async = false; a1.setAttribute("data-dmvai", "1"); document.head.appendChild(a1);
     const a2 = document.createElement("script"); a2.src = "/static/cloud-bridge.js"; a2.async = false; a2.setAttribute("data-dmvbridge", "1"); document.head.appendChild(a2);
   }
+  // The floating Code box: a draggable, in-app code panel that rides OVER every room so you can
+  // see the room behind it, screenshot it, and have Kit change it. It's a DIV in the page — never
+  // a browser window, never a frame. Self-skips code.html / index.html / iframes.
+  if (!document.querySelector('script[data-codeov]')) {
+    const co = document.createElement("script"); co.src = "/static/code-overlay.js?v=1"; co.setAttribute("data-codeov", "1"); document.body.appendChild(co);
+  }
   // force the app-window (Edge/Chrome --app mode) title bar to graphite, overriding the OS accent color
   if(!document.querySelector('meta[name="theme-color"]')){ const tc = document.createElement("meta"); tc.name = "theme-color"; tc.content = "#0C0D10"; document.head.appendChild(tc); }
   // app/taskbar icon = Tec (matches the desktop shortcut), not the generic Edge icon
