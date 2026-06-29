@@ -1971,51 +1971,37 @@ window.arkCapNudge = function(cap){
     document.removeEventListener('mouseup', onUp);
   }
 
-  // ── float mode toggle: triple-click Code tab ──
-  var clickBuf = [], TRIPLE = 3, WINDOW = 600;
+  // ── single-click "Code" = open the floating box over the site (NEVER a browser) ──
+  // Hold Shift while clicking to open the full-page Code room instead.
   codeLink.addEventListener('click', function(e){
-    var now = Date.now();
-    clickBuf.push(now);
-    clickBuf = clickBuf.filter(function(t){ return now - t < WINDOW; });
-
-    if (clickBuf.length >= TRIPLE) {
-      clickBuf = [];
-      var on = localStorage.getItem(FLOAT_KEY) === '1';
-      if (on) {
-        localStorage.removeItem(FLOAT_KEY);
-        codeLink.classList.remove('csw-float-on');
-        closeFloat();
-      } else {
-        localStorage.setItem(FLOAT_KEY, '1');
-        codeLink.classList.add('csw-float-on');
-        openFloat();
-      }
-      e.preventDefault();
-      return;
-    }
-
-    if (localStorage.getItem(FLOAT_KEY) === '1') {
-      e.preventDefault();
-      openFloat();
-    }
-    // else: navigate normally
+    if (e.shiftKey) return;            // shift-click → navigate to full page on purpose
+    e.preventDefault();
+    if (overlay.classList.contains('open')) { closeFloat(); }
+    else { openFloat(); }
   });
 
   // ── close button ──
   document.getElementById('codeFloatClose').onclick = closeFloat;
 
-  // ── pop-out button ──
+  // ── ⤢ = maximize / restore the box INSIDE the app (no browser, ever) ──
+  var maxed = false, prevBox = null;
   document.getElementById('codeFloatPopout').onclick = function(){
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_code_popup) {
-      window.pywebview.api.open_code_popup();
-      closeFloat();
+    if (!maxed) {
+      prevBox = { w:panel.style.width, h:panel.style.height, l:panel.style.left, t:panel.style.top };
+      panel.style.left = '2vw'; panel.style.top = '2vh';
+      panel.style.width = '96vw'; panel.style.height = '94vh';
+      maxed = true;
     } else {
-      var w = window.open('/static/code.html', '_blank',
-        'width=1100,height=800,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no');
-      if (w) { w.focus(); closeFloat(); }
-      else { alert('Allow pop-ups to use the detached window.'); }
+      if (prevBox) {
+        panel.style.width  = prevBox.w || '1100px';
+        panel.style.height = prevBox.h || '760px';
+        panel.style.left   = prevBox.l || '80px';
+        panel.style.top    = prevBox.t || '38px';
+      }
+      maxed = false;
     }
   };
+  document.getElementById('codeFloatPopout').title = 'Maximize / restore';
 
   // ── restore float mode indicator on load ──
   if (localStorage.getItem(FLOAT_KEY) === '1') {

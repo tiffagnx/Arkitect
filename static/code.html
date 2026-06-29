@@ -909,9 +909,11 @@ async function saveFile(){
   setDirty(false); setStatus("saved "+curFile,"ok");
 }
 $("saveBtn").onclick = saveFile;
-// If THIS is already the popped-out window, hide the pop-out button — no infinite nesting.
-const IS_POPPED = new URLSearchParams(location.search).has("popped");
-if (IS_POPPED) { const pb=$("popoutBtn"); if(pb) pb.style.display="none"; }
+// The pop-out button is GONE — for good. It opened a browser window, which is the
+// one thing B never wanted. There is no scenario where it helps, so it never shows.
+// The Code room already lives natively inside the DeMartinville app window; the
+// floating box (opened from the Chat→Code tab) is the movable-over-the-site version.
+{ const pb=$("popoutBtn"); if(pb){ pb.style.display="none"; pb.onclick=null; } }
 
 let _popoutCooling = false;
 $("popoutBtn").onclick = async () => {
