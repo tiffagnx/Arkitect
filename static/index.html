@@ -409,7 +409,7 @@
 <div class="app">
   <aside class="side">
     <div class="brand"><div class="brand-dmv"><span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span></div><span class="wallegg" role="button" aria-label="Sign the wall" onclick="location.href='/static/wall.html'"></span></div>
-    <div class="chat-code-sw"><span class="csw-on">Chat</span><a href="/static/code.html">Code</a></div>
+    <div class="chat-code-sw"><span class="csw-on">Chat</span><a id="codeTabBtn" style="cursor:pointer">Code</a></div>
     <button class="newchat" id="newChat">+ New chat</button>
     <div class="sesslist" id="sessList"></div>
     <div class="raillabel">Rooms</div>
@@ -1735,6 +1735,22 @@ window.arkCapNudge = function(cap){
   document.querySelectorAll('a[href="/static/code.html"],a[href*="code.html"]').forEach(function(a){
     a.addEventListener('click',switchToCode);
   });
+})();
+</script>
+<!-- Floating Code box: clicking the "Code" tab opens a draggable window that floats over the
+     chat AND rides into every room (shared flag). No navigation, no browser, no frame. -->
+<script src="/static/code-overlay.js?v=2"></script>
+<script>
+(function(){
+  var btn=document.getElementById('codeTabBtn');
+  if(!btn) return;
+  function fire(){
+    if(window.__dmvCodeToggle){ window.__dmvCodeToggle(); return; }
+    var s=document.createElement('script'); s.src='/static/code-overlay.js?v=2';
+    s.onload=function(){ if(window.__dmvCodeToggle) window.__dmvCodeToggle(); };
+    document.body.appendChild(s);
+  }
+  btn.addEventListener('click',function(e){ e.preventDefault(); fire(); });
 })();
 </script>
 </body>

@@ -15,26 +15,16 @@
   // itself, or on the main chat/home (index.html already has its own float).
   if (window.self !== window.top) return;
   var path = (location.pathname || "").toLowerCase();
-  if (path.indexOf("code.html") !== -1) return;
-  if (path === "/" || path === "" || path.indexOf("index.html") !== -1) return;
+  if (path.indexOf("code.html") !== -1) return;   // not on the code page itself (would nest)
   if (window.__codeOverlay) return;
   window.__codeOverlay = true;
 
   var POS_KEY  = "dmv-codeov-pos";
   var SIZE_KEY = "dmv-codeov-size";
+  var OPEN_KEY = "dmv-code-open";   // shared flag: while "1", the Code box rides over EVERY room
 
-  // ── styles ──
+  // ── styles ── (no launcher button — the room's "Code" tab summons it)
   var css = ''
-  + '#dmvCodeLauncher{position:fixed;right:18px;bottom:18px;z-index:2147483000;'
-  +   'display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;'
-  +   'border-radius:12px;cursor:pointer;border:1px solid rgba(62,156,184,.5);'
-  +   'background:linear-gradient(180deg,#123247,#0a1d2b);color:#cfe8f3;'
-  +   'font:700 13px Inter,system-ui,sans-serif;letter-spacing:.02em;'
-  +   'box-shadow:0 6px 22px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);'
-  +   'transition:transform .12s,border-color .12s,box-shadow .12s;user-select:none;}'
-  + '#dmvCodeLauncher:hover{transform:translateY(-1px);border-color:rgba(62,156,184,.9);'
-  +   'box-shadow:0 10px 28px rgba(62,156,184,.35),inset 0 1px 0 rgba(255,255,255,.1);}'
-  + '#dmvCodeLauncher.hidden{display:none;}'
   + '#dmvCodeOv{position:fixed;inset:0;z-index:2147483100;display:none;pointer-events:none;}'
   + '#dmvCodeOv.open{display:block;}'
   + '#dmvCodePanel{position:absolute;width:960px;height:680px;min-width:480px;min-height:360px;'
@@ -54,13 +44,6 @@
   + '#dmvCodeFrame{flex:1;border:none;width:100%;min-height:0;background:#0a1520;}'
   + '#dmvCodeShield{display:none;position:absolute;inset:0;z-index:5;cursor:grabbing;}';
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
-
-  // ── launcher button ──
-  var launcher = document.createElement("button");
-  launcher.id = "dmvCodeLauncher";
-  launcher.innerHTML = '<span style="font-size:15px">⌨</span> Code';
-  launcher.title = "Open the floating Code box over this room";
-  document.body.appendChild(launcher);
 
   // ── overlay + panel ──
   var ov = document.createElement("div"); ov.id = "dmvCodeOv";
@@ -103,16 +86,24 @@
   function open() {
     restore();
     ov.classList.add("open");
-    launcher.classList.add("hidden");
     if (!frame.src) frame.src = "/static/code.html";
+    try { localStorage.setItem(OPEN_KEY, "1"); } catch (e) {}   // remember → follows into every room
   }
   function close() {
     ov.classList.remove("open");
-    launcher.classList.remove("hidden");
+    try { localStorage.setItem(OPEN_KEY, "0"); } catch (e) {}
   }
+  function toggle() { if (ov.classList.contains("open")) close(); else open(); }
 
-  launcher.onclick = open;
+  // Any room's "Code" tab can summon/dismiss the floating box through this.
+  window.__dmvCodeToggle = toggle;
+  window.__dmvCodeOpen = open;
+
   document.getElementById("dmvCodeClose").onclick = close;
+
+  // If it was left open in another room, bring it straight back here — same window,
+  // riding over every room. No button to click, it just follows you.
+  try { if (localStorage.getItem(OPEN_KEY) === "1") open(); } catch (e) {}
 
   // ── maximize / restore (inside the app — never a window) ──
   var maxed = false, prev = null;
