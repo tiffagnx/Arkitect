@@ -5044,6 +5044,32 @@ async def editor_export_save(jid: str):
         return JSONResponse({"error": f"couldn't save: {e}"}, status_code=500)
 
 
+@app.post("/api/editor/export/{jid}/to_downloads")
+async def editor_export_to_downloads(jid: str):
+    """One-click reliable download: copy the finished render into the user's Downloads
+    folder and report the path. No subprocess, no native dialog, no browser download —
+    so it works identically in the WebView2 desktop app, a browser, and a frozen .exe.
+    (The old Save-As path re-launched the packaged .exe via sys.executable, which tripped
+    the single-instance mutex and un-maximized the window — this avoids all of that.)"""
+    job = EXPORT_JOBS.get(re.sub(r"[^a-f0-9]", "", jid))
+    if not job or not os.path.isfile(job.get("out_path", "")):
+        return JSONResponse({"error": "render not found — re-export and try again"}, status_code=404)
+    src = job["out_path"]
+    downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+    if not os.path.isdir(downloads):
+        downloads = os.path.expanduser("~")
+    dest = os.path.join(downloads, os.path.basename(src))
+    base, ext = os.path.splitext(dest)
+    n = 1
+    while os.path.exists(dest):           # never clobber an earlier render of the same name
+        dest = f"{base} ({n}){ext}"; n += 1
+    try:
+        await asyncio.to_thread(_shutil.copy2, src, dest)
+        return {"saved": dest}
+    except Exception as e:
+        return JSONResponse({"error": f"couldn't save: {e}"}, status_code=500)
+
+
 # ── FRAME-SERVER EXPORT — honors keyframes/effects/transforms ────────────────
 #  The browser renders each frame (same compositor as the live preview) at full
 #  res and streams JPEGs over a WebSocket; we write them to a temp dir and encode

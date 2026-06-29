@@ -264,7 +264,7 @@ let history=[], ATT=[], CAP=null;
 function setStatus(t, kind=""){ const s=$("status"); s.textContent=t; s.className="status grow"+(kind?(" "+kind):""); }
 
 /* Chat/Code tabs — wire Chat → main chat explicitly (a global link handler strips bare hrefs) */
-{ const _ct=document.querySelector('.ccswitch a.cc'); if(_ct) _ct.addEventListener('click', e=>{ e.preventDefault(); window.location.href='/'; }); }
+{ const _ct=document.querySelector('.ccswitch a.cc'); if(_ct) _ct.addEventListener('click', function(e){ e.preventDefault(); if(typeof codeToChat==='function')codeToChat(); else window.location.href='/'; }); }
 
 /* ── model picker — local LM Studio models + ALL your cloud-key models ── */
 function isCoder(s){ return /coder|deepseek|codestral|qwen.*code/i.test(s||""); }
@@ -630,5 +630,83 @@ function renderApplied(aiEl, ev){
 <script data-help>/* help.js intentionally suppressed in the Code room */</script>
 <script>(function(){function strip(){document.querySelectorAll('[data-summon]:not([hidden]),[aria-label*="guide" i],[title*="quick guide" i]').forEach(function(e){e.remove();});}[150,600,1400].forEach(function(t){setTimeout(strip,t);});})();</script>
 <script src="/static/pinkroom-nav.js"></script>
+<!-- Kit — the Code-room mascot. A looping transparent WebM (VP9+alpha) perched on the send
+     button, mirroring the main-chat mascot (tec-mascot.js) so it feels the same across rooms. -->
+<script>(function(){
+  if(document.querySelector(".kit-mascot"))return;
+  var H=54;                                   // rendered height (cropped sheet is 700×820 → taller than wide)
+  var css="" +
+    ".kit-mascot{position:fixed;left:16px;bottom:12px;z-index:9998;height:"+H+"px;"+
+      "pointer-events:none;filter:drop-shadow(0 6px 9px rgba(0,0,0,.5));"+
+      "opacity:0;transform:translateY(6px);transition:opacity .45s ease,transform .45s ease;}"+
+    ".kit-mascot.in{opacity:1;transform:translateY(0);}"+
+    ".kit-mascot video{height:100%;width:auto;display:block;}"+
+    "@media (max-width:680px){.kit-mascot{height:60px;}}";
+  var st=document.createElement("style");st.textContent=css;document.head.appendChild(st);
+  var wrap=document.createElement("div");wrap.className="kit-mascot";
+  var vid=document.createElement("video");
+  vid.src="/static/kit-code.webm";vid.muted=true;vid.loop=true;vid.autoplay=true;
+  vid.setAttribute("playsinline","");vid.setAttribute("muted","");vid.setAttribute("aria-hidden","true");
+  wrap.appendChild(vid);document.body.appendChild(wrap);
+  var play=function(){var p=vid.play();if(p&&p.catch)p.catch(function(){});};
+  vid.addEventListener("canplay",play);play();
+  // perch on the send button, feet on the input bubble's top line (same as the main-chat mascot)
+  var send=document.getElementById("sendBtn");
+  var box=document.querySelector(".inputbox")||document.querySelector(".composer");
+  function place(){
+    if(!send||!box)return;
+    var rs=send.getBoundingClientRect(),rb=box.getBoundingClientRect();
+    var w=wrap.offsetWidth||Math.round(H*700/820);
+    wrap.style.left=(rs.left+rs.width/2-w/2)+"px";
+    wrap.style.right="auto";
+    wrap.style.bottom=(window.innerHeight-rb.top+1)+"px";   // stand on top edge of the input box
+  }
+  place();window.addEventListener("resize",place);
+  // the input box can grow as you type / attach — keep the feet planted on its moving top line
+  if(box&&window.ResizeObserver){try{new ResizeObserver(place).observe(box);}catch(e){}}
+  setTimeout(place,300);setTimeout(function(){wrap.classList.add("in");},120);
+})();</script>
+
+<!-- ─── Transformer: Code → Chat reverse animation ─── -->
+<style>
+.tree.cc-out{transform:translateX(-110%)!important;transition:transform .38s cubic-bezier(.4,0,.8,1)!important;}
+.editor.cc-out{transform:translateX(110%)!important;transition:transform .38s cubic-bezier(.4,0,.8,1)!important;}
+.body>.chat.cc-fade{opacity:0;transition:opacity .22s ease!important;}
+</style>
+<script>
+function codeToChat(){
+  try{
+    var ac=new(window.AudioContext||window.webkitAudioContext)();var t=ac.currentTime;
+    var bLen=Math.round(ac.sampleRate*.028);var b=ac.createBuffer(1,bLen,ac.sampleRate);var d=b.getChannelData(0);
+    for(var i=0;i<bLen;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/bLen*11);
+    var ns=ac.createBufferSource();ns.buffer=b;
+    var nf=ac.createBiquadFilter();nf.type='bandpass';nf.frequency.value=2100;nf.Q.value=1.1;
+    var ng=ac.createGain();ng.gain.setValueAtTime(.5,t);ng.gain.exponentialRampToValueAtTime(.001,t+.09);
+    ns.connect(nf);nf.connect(ng);ng.connect(ac.destination);ns.start(t);
+    /* reverse sweeps */
+    var o1=ac.createOscillator();o1.type='sawtooth';
+    o1.frequency.setValueAtTime(320,t);o1.frequency.exponentialRampToValueAtTime(55,t+.22);
+    var g1=ac.createGain();g1.gain.setValueAtTime(.08,t);g1.gain.exponentialRampToValueAtTime(.001,t+.26);
+    o1.connect(g1);g1.connect(ac.destination);o1.start(t);o1.stop(t+.26);
+    var o2=ac.createOscillator();o2.type='sawtooth';
+    o2.frequency.setValueAtTime(55,t+.05);o2.frequency.exponentialRampToValueAtTime(320,t+.26);
+    var g2=ac.createGain();g2.gain.setValueAtTime(.08,t+.05);g2.gain.exponentialRampToValueAtTime(.001,t+.3);
+    o2.connect(g2);g2.connect(ac.destination);o2.start(t+.05);o2.stop(t+.3);
+    /* exit thuds */
+    var o3=ac.createOscillator();o3.type='sine';
+    o3.frequency.setValueAtTime(90,t);o3.frequency.exponentialRampToValueAtTime(28,t+.35);
+    var g3=ac.createGain();g3.gain.setValueAtTime(.32,t);g3.gain.exponentialRampToValueAtTime(.001,t+.38);
+    o3.connect(g3);g3.connect(ac.destination);o3.start(t);o3.stop(t+.38);
+    setTimeout(function(){try{ac.close();}catch(e){}},700);
+  }catch(e){}
+  var tree=document.querySelector('.tree');
+  var editor=document.querySelector('.editor');
+  var chat=document.querySelector('.body>.chat');
+  if(tree)tree.classList.add('cc-out');
+  if(editor)editor.classList.add('cc-out');
+  if(chat)chat.classList.add('cc-fade');
+  setTimeout(function(){window.location.href='/';},420);
+}
+</script>
 </body>
 </html>
