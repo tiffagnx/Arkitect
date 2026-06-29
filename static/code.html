@@ -227,7 +227,16 @@
   .sh-preview code::before{content:"▶ run  ";color:var(--teal);font-weight:700}
   .sh-preview code{color:var(--steel-2);background:none;border:none;padding:0;font-family:var(--mono);font-size:11.5px;white-space:pre;display:block}
   /* shell output blocks — appear after commands execute */
-  .shell-block{background:rgba(0,0,0,.5);border:1px solid rgba(43,182,168,.2);border-radius:10px;padding:10px 13px;margin:4px 0;font-family:var(--mono)}
+  .shell-block{margin:3px 0}
+  .sh-summary{display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:7px;cursor:pointer;color:var(--text-3);font-size:12px;user-select:none}
+  .sh-summary:hover{background:var(--panel-2);color:var(--text-2)}
+  .sh-arrow{font-size:9px;transition:transform .15s;flex-shrink:0}
+  .shell-block.open .sh-arrow{transform:rotate(90deg)}
+  .sh-detail{display:none;background:rgba(0,0,0,.4);border:1px solid rgba(43,182,168,.15);border-radius:8px;padding:9px 12px;margin:2px 0 4px;font-family:var(--mono)}
+  .shell-block.open .sh-detail{display:block}
+  .sh-cmd{font-size:11.5px;color:var(--teal);margin-bottom:4px}
+  .sh-out{font-size:11px;color:var(--text-3);white-space:pre-wrap;word-break:break-all;max-height:260px;overflow-y:auto;margin:0}
+  .sh-entry+.sh-entry{margin-top:10px;border-top:1px solid var(--hairline);padding-top:10px}
   .sh-label{font:700 9px Oxanium;text-transform:uppercase;letter-spacing:.6px;color:var(--teal);margin-bottom:8px;opacity:.7}
   .sh-entry+.sh-entry{margin-top:10px;padding-top:10px;border-top:1px solid var(--hairline)}
   .sh-cmd{font-size:11.5px;color:var(--steel-2);margin-bottom:4px}
@@ -257,6 +266,12 @@
   .kit-adv-btn{float:right;background:rgba(43,182,168,.1);border:1px solid rgba(43,182,168,.22);color:var(--teal);border-radius:7px;padding:3px 7px;font-size:11px;cursor:pointer;line-height:1.4;transition:background .1s}
   .kit-adv-btn:hover{background:rgba(43,182,168,.22)}
   .thumb-audio .thumb-x{position:absolute;top:-5px;right:-5px;background:var(--bad);color:#fff;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;line-height:1}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:99px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(62,156,184,.35)}
+  .filelist::-webkit-scrollbar-thumb{background:transparent}
+  .filelist:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1)}
 </style>
 </head>
 <body>
@@ -274,6 +289,7 @@
     <button class="tb" id="newFile">＋ New file</button>
     <button class="tb primary" id="saveBtn">Save</button>
     <span class="status grow" id="status">Pick or create a file to start.</span>
+    <button class="tb" id="popoutBtn" title="Pop out into its own window — keep DeMartinville open behind it">⤢ off</button>
   </div>
 
   <div class="body">
@@ -893,6 +909,11 @@ async function saveFile(){
   setDirty(false); setStatus("saved "+curFile,"ok");
 }
 $("saveBtn").onclick = saveFile;
+$("popoutBtn").onclick = () => {
+  const w = window.open(location.href, '_blank',
+    'width=1000,height=780,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');
+  if (w) { w.focus(); } else { alert("Allow pop-ups for this page to use pop-out mode."); }
+};
 $("newFile").onclick = async () => {
   const path=((await dmvPrompt("New file","e.g. src/hello.py"))||"").trim(); if(!path) return;
   const r = await fetch("/api/code/write",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ws:WS,path,content:""})}).then(r=>r.json()).catch(()=>({error:"failed"}));
@@ -1046,8 +1067,13 @@ function addMsg(cls, text){ const d=document.createElement("div"); d.className="
 
 function addShellBlock(results){
   const d=document.createElement("div"); d.className="shell-block";
-  d.innerHTML='<div class="sh-label">▶ shell</div>'+
-    results.map(r=>`<div class="sh-entry"><div class="sh-cmd">${_esc(r.cmd)}</div><pre class="sh-out">${_esc((r.out||"").slice(0,6000))}</pre></div>`).join("");
+  const label=results.length===1 ? results[0].cmd.split("\n")[0].slice(0,60) : results.length+" commands";
+  const allOk=results.every(r=>r.rc===0||r.rc==null);
+  const icon=allOk?"✓":"⚠";
+  const color=allOk?"color:var(--teal)":"color:var(--warn)";
+  d.innerHTML=`<div class="sh-summary"><span class="sh-arrow">▶</span><span style="${color}">${icon}</span><span>ran: ${_esc(label)}</span></div>`+
+    `<div class="sh-detail">${results.map(r=>`<div class="sh-entry"><div class="sh-cmd">$ ${_esc(r.cmd)}</div><pre class="sh-out">${_esc((r.out||"").slice(0,6000))}</pre></div>`).join("")}</div>`;
+  d.querySelector(".sh-summary").onclick=()=>d.classList.toggle("open");
   $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight;
 }
 
@@ -1099,8 +1125,8 @@ async function sendAgent(){
 async function checkRunBlocks(acc){
   const runCmds=[...acc.matchAll(/```run\n([\s\S]*?)```/g)].map(m=>m[1].trim()).filter(Boolean);
   if(!runCmds.length){ agentLoopCount=0; return; }
-  if(agentLoopCount>=8){
-    addMsg("ai","⚠ Reached the 8-step agent loop limit. Showing results — ask me to continue if needed.");
+  if(agentLoopCount>=25){
+    addMsg("ai","⚠ Reached the step limit. Ask me to continue if needed.");
     agentLoopCount=0; return;
   }
   agentLoopCount++;
