@@ -1107,11 +1107,16 @@ def _strip_html(html: str) -> str:
 
 
 def _is_junk(text: str) -> bool:
-    if len(text) < 400:
+    if len(text) < 150:
         return True
-    head = text[:600].lower()
+    head = text[:800].lower()
+    # Cookie-consent / sign-in walls often pad short pages with boilerplate
+    wall_signals = ["accept all cookies", "sign in to continue", "please enable javascript",
+                    "verify you are human", "click allow to confirm", "log in to view"]
+    if any(sig in head for sig in wall_signals) and len(text) < 600:
+        return True
     hits = sum(1 for marker in _JUNK if marker in head)
-    return hits >= 1 and len(text) < 1200  # short AND wall-flavored = junk
+    return hits >= 2 and len(text) < 1200  # short AND multiple wall-flavors = junk
 
 
 async def tavily_search(query: str, n: int = 4) -> list[dict]:
@@ -1143,8 +1148,13 @@ async def ddg_search(query: str, n: int = 5) -> list[dict]:
             break
         try:
             async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                 "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "DNT": "1",
+                "Upgrade-Insecure-Requests": "1",
             }) as cx:
                 r = await cx.post(endpoint, data={"q": query})
                 # main endpoint uses result__a links; lite uses bare result anchors
@@ -1173,11 +1183,19 @@ async def ddg_search(query: str, n: int = 5) -> list[dict]:
 async def fetch_page(url: str, cap: int = 6000) -> str:
     try:
         async with httpx.AsyncClient(timeout=12, follow_redirects=True, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Cache-Control": "no-cache",
+            "DNT": "1",
+            "Upgrade-Insecure-Requests": "1",
         }) as cx:
             r = await cx.get(url)
-            return _strip_html(r.text)[:cap]
+            text = r.text
+            if not text or len(text.strip()) < 100:
+                return ""
+            return _strip_html(text)[:cap]
     except Exception:
         return ""
 
@@ -1660,6 +1678,9 @@ CODE_AGENT_SYSTEM = (
     "the real lines. Never guess what's in there.\n"
     "- Include enough surrounding lines that the SEARCH block is UNIQUE in the file (3-5 lines of "
     "context is usually right). If it matches twice, the edit is rejected.\n"
+    "- Keep SEARCH blocks SMALL — just the few lines that change plus a little context. Do NOT "
+    "paste huge sections; big blocks get cut off and are more likely to mis-copy. Many small edits "
+    "beat one giant one.\n"
     "- You can put SEVERAL SEARCH/REPLACE pairs in one ```edit block for the same file.\n"
     "- If the room says EDIT FAILED, re-read the file and copy the exact current text, then retry.\n\n"
     "== WRITE A WHOLE FILE (only for NEW files or a full rewrite) ==\n"
@@ -1793,9 +1814,28 @@ def _apply_one_sr(text, search, replace):
             if [l.strip() for l in file_lines[i:i + L]] == s_norm]
     if len(hits) > 1:
         return text, "multiple"
-    if not hits:
-        return text, "notfound"
-    i = hits[0]
+    if len(hits) == 1:
+        i = hits[0]
+    else:
+        # Tier 3 — similarity match: the model's copy is slightly off (a changed token,
+        # smart quotes, a dropped space). Find the ONE window that's clearly most similar.
+        import difflib
+        search_join = "\n".join(s_norm)
+        sm = difflib.SequenceMatcher(); sm.set_seq2(search_join)
+        best_i, best_r, second_r = -1, 0.0, 0.0
+        for k in range(len(file_lines) - L + 1):
+            sm.set_seq1("\n".join(l.strip() for l in file_lines[k:k + L]))
+            if sm.quick_ratio() < 0.80:
+                continue
+            r = sm.ratio()
+            if r > best_r:
+                second_r, best_r, best_i = best_r, r, k
+            elif r > second_r:
+                second_r = r
+        # require a strong, unambiguous winner so we never edit the wrong place
+        if not (best_i >= 0 and best_r >= 0.90 and (best_r - second_r) >= 0.04):
+            return text, "notfound"
+        i = best_i
     file_base = _lead_ws(file_lines[i])          # indent the file actually uses
     search_base = _lead_ws(s_lines[0])           # indent the model wrote
     out = []
@@ -2372,7 +2412,7 @@ async def code_agent(req: Request):
 
     # â”€â”€ TOKEN BUDGET by effort (controls history depth, context size, and max output) â”€â”€
     hist_limit  = {"low": 6,  "medium": 12, "high": 20,    "max": 30}.get(effort, 12)
-    max_tok     = {"low": 4096, "medium": 8192, "high": 16000, "max": 32000}.get(effort, 8192)
+    max_tok     = {"low": 6000, "medium": 12000, "high": 20000, "max": 32000}.get(effort, 12000)
     tree_cap    = {"low": 4000, "medium": 8000, "high": 20000, "max": 40000}.get(effort, 8000)
     file_cap    = {"low": 12000, "medium": 40000, "high": 80000, "max": 120000}.get(effort, 40000)
 
