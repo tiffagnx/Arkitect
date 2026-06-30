@@ -1958,6 +1958,48 @@ def _code_search(ws, query, max_results=60):
     return hits
 
 
+# ── PHASE 4: server-authoritative agent sessions ──────────────────────────────
+# The backend (not the frontend's 6-turn slice) now owns each Code-room session's
+# conversation, keyed by session_id. In-memory for speed, write-through to disk so
+# it survives restarts. This is the foundation for continuity across turns: Kit
+# remembers what it found last turn instead of starting blind every message.
+_CODE_AGENT_STATE_FILE = DATA / "code_agent_state.json"
+_AGENT_MSG_CAP = 60   # keep last N messages per session (bounds context growth)
+try:
+    _CODE_AGENT_STATE = json.loads(_CODE_AGENT_STATE_FILE.read_text("utf-8")) \
+        if _CODE_AGENT_STATE_FILE.exists() else {}
+except Exception:
+    _CODE_AGENT_STATE = {}
+
+
+def _save_agent_state():
+    try:
+        _CODE_AGENT_STATE_FILE.write_text(json.dumps(_CODE_AGENT_STATE, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _get_agent_session(sid, ws):
+    s = _CODE_AGENT_STATE.get(sid)
+    if not isinstance(s, dict):
+        s = {"session_id": sid, "ws": ws, "messages": [], "turn": 0}
+        _CODE_AGENT_STATE[sid] = s
+    return s
+
+
+def _record_agent_turn(sid, ws, user_text, assistant_text):
+    """Append one completed turn to the server session + persist (write-through)."""
+    if not sid:
+        return
+    s = _get_agent_session(sid, ws)
+    s["messages"].append({"role": "user", "content": user_text})
+    s["messages"].append({"role": "assistant", "content": (assistant_text or "")[:8000]})
+    s["messages"] = s["messages"][-_AGENT_MSG_CAP:]
+    s["turn"] = s.get("turn", 0) + 1
+    s["ws"] = ws
+    _save_agent_state()
+
+
 _RED_CMD_PATTERNS = [
     r'\brm\s+-', r'\brm\s+\S', r'\brmdir\b', r'\brd\s+/s', r'\bdel\s', r'\berase\s',
     r'\bformat\s', r'\bmkfs\b', r'\bdd\s+if=', r'>\s*/dev/sd',
@@ -2291,7 +2333,13 @@ async def code_agent(req: Request):
     model = body.get("model") or ""
     instruction = (body.get("instruction") or "").strip()
     open_path = (body.get("open_path") or "").strip()
-    raw_history = _hist_msgs(body.get("history") or [])
+    session_id = (body.get("session_id") or "").strip()
+    # PHASE 4: prefer the server-held conversation for this session; fall back to the
+    # frontend's slice for legacy/no-id calls.
+    if session_id and _get_agent_session(session_id, ws).get("messages"):
+        raw_history = _hist_msgs(_get_agent_session(session_id, ws)["messages"])
+    else:
+        raw_history = _hist_msgs(body.get("history") or [])
     effort = str(body.get("effort") or "low").lower()
     # dangerous commands B has explicitly approved (set when he clicks Approve on a blocked card)
     approved_cmds = set(c.strip() for c in (body.get("approved_cmds") or []) if isinstance(c, str))
@@ -2410,6 +2458,7 @@ async def code_agent(req: Request):
         work_std = list(std_msgs)
         work_lean = list(lean_msgs)
         all_changed, all_errors = [], []
+        turn_reply = []           # PHASE 4: accumulate this turn's narration for the session log
         MAX_ROUNDS = {"low": 8, "medium": 12, "high": 16, "max": 20}.get(effort, 12)
 
         for round_i in range(MAX_ROUNDS):
@@ -2441,6 +2490,8 @@ async def code_agent(req: Request):
 
             full = "".join(acc)
             full = _normalize_drift(full)   # rescue JSON-style tool calls (DeepSeek/Kimi drift)
+            if full.strip():
+                turn_reply.append(full)
 
             # 1) apply every ```write block (jailed) — full-file create/replace
             changed, errors = [], []
@@ -2553,6 +2604,13 @@ async def code_agent(req: Request):
             work_lean = work_lean + tail
         else:
             yield _sse("status", text="(reached the work limit -- stopping here)")
+
+        # PHASE 4: persist this turn to the server-held session so the next turn remembers it
+        if session_id:
+            try:
+                _record_agent_turn(session_id, ws, instruction, "\n\n".join(turn_reply))
+            except Exception:
+                pass
 
         yield _sse("done")
 

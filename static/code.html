@@ -756,7 +756,7 @@ async function sendAgent(forceText){
   busy=true; controller=new AbortController(); actBegin();
   const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
 
-  const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs, approved_cmds:APPROVED.slice() };
+  const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs, approved_cmds:APPROVED.slice(), session_id:curSessId||"" };
   let acc="";                 // current bubble's answer text
   let fullAll="";             // everything across rounds (for history)
   let curBubble=aiEl;         // active answer bubble
