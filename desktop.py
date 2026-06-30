@@ -309,6 +309,19 @@ _popup_windows = []   # track every popup so main-window close kills them all
 class DmvApi:
     """JS-callable Python API exposed as window.pywebview.api inside every webview window."""
 
+    def pick_folder(self):
+        """Open a native OS folder-picker; return the chosen path as a string, or '' if cancelled."""
+        try:
+            import webview
+            windows = webview.windows
+            win = windows[0] if windows else None
+            result = win.create_file_dialog(webview.FOLDER_DIALOG) if win else None
+            if result and len(result):
+                return result[0]
+        except Exception:
+            pass
+        return ""
+
     def open_code_popup(self):
         """Open the Code room as a clean native window. If already open, focus it instead."""
         try:

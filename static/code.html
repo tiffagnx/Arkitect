@@ -101,6 +101,14 @@
   .inbtn.send:disabled{opacity:.4;cursor:default}
   .inbtn.send.stop{background:linear-gradient(180deg,var(--bad),#cf6452);color:#1a0c08}
 
+  /* workspace chip (bottom toolbar) */
+  .wschipwrap{position:relative}
+  .wschip{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:34px;padding:0 11px;font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+  .wschip:hover{color:var(--text);border-color:var(--teal)}
+  .wsmenu{position:absolute;bottom:42px;left:0;width:220px;background:var(--panel-2);border:1px solid var(--hairline);border-radius:10px;padding:5px;display:none;z-index:60;box-shadow:0 -10px 40px rgba(0,0,0,.55)}
+  .wsmenu.on{display:block}
+  .wsrow{padding:7px 9px;border-radius:7px;font-size:12.5px;color:var(--text-2);cursor:pointer}
+  .wsrow:hover{background:var(--panel);color:var(--text)} .wsrow.sel{color:var(--teal);font-weight:700}
   /* model picker (in the toolbar; opens UP) */
   .modelwrap,.effortwrap{position:relative}
   .modelpick{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:34px;padding:0 11px;font-size:12px;display:inline-flex;align-items:center;gap:7px;max-width:200px}
@@ -221,6 +229,10 @@
         </div>
         <div class="toolbar">
           <button class="toolbtn" id="addBtn" title="Attach images / screenshots">＋</button>
+          <div class="wschipwrap" id="wsChipWrap">
+            <button class="wschip" id="wsChip" title="Switch workspace / folder">📁 <span id="wsChipName">default</span></button>
+            <div class="wsmenu" id="wsMenu"></div>
+          </div>
           <span class="grow"></span>
           <div class="modelwrap">
             <button class="modelpick" id="modelPick"><span class="dot"></span><span id="modelName">model</span></button>
@@ -350,7 +362,35 @@ function updateScope(){
   $("wsLabel").textContent = WS==="__repo__" ? "the project" : WS;
   $("scopeNote").textContent = WS==="__repo__" ? "⚠ Admin: edits the REAL DeMartinville project files."
     : "Sandboxed to data/code/"+WS+" — can't touch anything outside it.";
+  // sync bottom chip
+  $("wsChipName").textContent = WS==="__repo__" ? "⚠ project" : WS;
+  // rebuild chip dropdown to match top selector
+  const menu=$("wsMenu"); menu.innerHTML="";
+  const sel=$("wsSel");
+  Array.from(sel.options).forEach(o=>{
+    const row=document.createElement("div"); row.className="wsrow"+(WS===o.value?" sel":"");
+    row.textContent=o.textContent; row.dataset.v=o.value;
+    row.onclick=()=>{ $("wsSel").value=o.value; $("wsSel").dispatchEvent(new Event("change")); menu.classList.remove("on"); };
+    menu.appendChild(row);
+  });
+  // "Open folder..." — browse to any folder on this machine
+  const openRow=document.createElement("div"); openRow.className="wsrow";
+  openRow.style.cssText="border-top:1px solid var(--hairline);margin-top:4px;padding-top:8px;color:var(--teal)";
+  openRow.textContent="📂 Open folder…";
+  openRow.onclick=async()=>{
+    menu.classList.remove("on");
+    // hit the backend which opens a real native Windows folder-picker
+    const b=await fetch("/api/code/browse_folder").then(r=>r.json()).catch(()=>null);
+    const path=b&&b.path;
+    if(!path) return;
+    const r=await fetch("/api/code/connect_folder",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path,name:path.split(/[\\/]/).pop()||"folder"})}).then(r=>r.json()).catch(()=>null);
+    if(r&&r.ws){ WS=r.ws; curFile=null; closeEditor(); await loadWorkspaces(); $("wsSel").value=WS; updateScope(); await loadTree(); }
+    else alert("Couldn't open that folder.");
+  };
+  menu.appendChild(openRow);
 }
+$("wsChip").onclick=e=>{ e.stopPropagation(); $("wsMenu").classList.toggle("on"); };
+document.addEventListener("click",()=>$("wsMenu").classList.remove("on"));
 
 /* ── file tree ── */
 async function loadTree(){

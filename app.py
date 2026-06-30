@@ -1510,7 +1510,7 @@ BUILDS_DIR.mkdir(exist_ok=True)
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 CODE_ROOT = DATA / "code"
 CODE_ROOT.mkdir(exist_ok=True)
-CODE_ADMIN = os.environ.get("DMV_CODE_ADMIN") == "1"
+CODE_ADMIN = os.environ.get("DMV_CODE_ADMIN", "1") == "1"  # default ON locally
 _CODE_SKIP = {".git", "venv", ".venv", "node_modules", "__pycache__", "data",
               ".idea", ".vscode", "dist", "build", ".pytest_cache", ".mypy_cache"}
 _CODE_TEXT_MAX = 400_000          # don't shove a 5MB file into the editor/model
@@ -1616,7 +1616,12 @@ CODE_AGENT_SYSTEM = (
     "run commands, debug, build â€” you have the keyboard. You're not a chatbot, you're a builder. "
     "Keep it tight: one or two lines before each block, no lectures, no filler.\n\n"
     "== WHO YOU'RE TALKING TO ==\n"
+    "Call him B. Just B - never his full name, never 'B. Bryan', never Bryan. Just B.\n"
     "{user_context}\n\n"
+    "== FILE TREE ==\n"
+    "You already have the full file tree in context. NEVER run 'ls', 'dir', or 'ls -la' - "
+    "you can already see the files. Use ```run only for: installs, tests, builds, git. "
+    "Not for listing files you already have.\n\n"
         "== WRITE FILES ==\n"
     "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
@@ -1642,13 +1647,13 @@ CODE_AGENT_SYSTEM = (
 "- static/beats.html: Beat Lab.\n"
 "- APP_VERSION must always match in TWO places: app.py AND static/studio.html.\n\n"
 "== AFTER EVERY WRITE: TELL HIM THE NEXT STEP ==\n"
-"Every response that writes a file MUST end with one short line: what he needs to do.\n"
-"Be specific and direct \u2014 talk to him the same way Claude Code does:\n"
-"- Python changed: \"Restart 7777 \u2014 Ctrl+C then python app.py (or start.bat).\"\n"
-"- HTML/JS/CSS only: \"Hard refresh \u2014 Ctrl+Shift+R, no restart needed.\"\n"
-"- desktop.py changed: \"Close DeMartinville fully and reopen it (full restart, not just server).\n"
-"- Sandbox/data file: \"Done \u2014 no restart needed.\"\n"
-"Never leave him hanging. One line. Every time.\n\n"
+"Every response that writes a file MUST end with a clear done signal. Be direct, like Claude Code:\n"
+"- Python changed: 'Done - restart the server (close the bat, reopen it).'\n"
+"- HTML/JS/CSS only: 'Done - hard refresh (Ctrl+Shift+R, no restart needed).'\n"
+"- desktop.py changed: 'Done - close DeMartinville fully and reopen it.'\n"
+"- Sandbox/data file: 'Done - no restart needed, it's live.'\n"
+"Never leave him hanging with no next step. Never end on a code block with no explanation.\n"
+"If something might break, say so in one sentence before you do it.\n\n"
 "== HARD RULES ==\n"
     "- ACT, don't narrate. If he asks you to build, add, fix, change, or make ANYTHING, your "
     "VERY FIRST reply MUST contain at least one ```write or ```run block. You already have the "
@@ -1758,110 +1763,27 @@ async def code_browse_folder(req: Request):
     import sys, os, asyncio
 
     def _pick_folder():
-        # Try tkinter first â€” runs in-process (no terminal flash) and uses the
-        # native OS dialog on all platforms.
-        try:
-            import tkinter as tk
-            from tkinter import filedialog
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            folder = filedialog.askdirectory(
-                parent=root,
-                title="Select a folder â€” DeMartinville Code room",
+        import subprocess, sys
+        if sys.platform == 'win32':
+            ps = (
+                'Add-Type -AssemblyName System.Windows.Forms;'
+                '$d=[System.Windows.Forms.FolderBrowserDialog]::new();'
+                '$d.Description="Select a project folder";'
+                '$d.ShowNewFolderButton=$true;'
+                'if($d.ShowDialog() -eq "OK"){Write-Output $d.SelectedPath}'
             )
-            root.destroy()
-            return os.path.normpath(folder) if folder else None
-        except Exception:
-            pass
+            try:
+                r = subprocess.run(
+                    ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps],
+                    capture_output=True, text=True, timeout=120,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                p = r.stdout.strip()
+                return p if p else None
+            except Exception:
+                pass
+        return None
 
-        # Fallback: subprocess â€” hidden window on Windows via CREATE_NO_WINDOW.
-        import subprocess
-        no_win = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        try:
-            if sys.platform == "win32":
-                # Modern IFileOpenDialog via inline C# â€” looks like Windows 11 Explorer
-                ps = r"""
-try {
-Add-Type -TypeDefinition @"
-using System;using System.Runtime.InteropServices;
-[ComImport,Guid("42F85136-DB7E-439C-85F1-E4075D135FC8"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IFileDialog{
- [PreserveSig]int Show(IntPtr p);
- [PreserveSig]int SetFileTypes(uint c,IntPtr p);
- [PreserveSig]int SetFileTypeIndex(uint i);
- [PreserveSig]int GetFileTypeIndex(out uint i);
- [PreserveSig]int Advise(IntPtr p,out uint c);
- [PreserveSig]int Unadvise(uint c);
- [PreserveSig]int SetOptions(uint f);
- [PreserveSig]int GetOptions(out uint f);
- [PreserveSig]int SetDefaultFolder(IShellItem p);
- [PreserveSig]int SetFolder(IShellItem p);
- [PreserveSig]int GetFolder(out IShellItem p);
- [PreserveSig]int GetCurrentSelection(out IShellItem p);
- [PreserveSig]int SetFileName([MarshalAs(UnmanagedType.LPWStr)]string n);
- [PreserveSig]int GetFileName([MarshalAs(UnmanagedType.LPWStr)]out string n);
- [PreserveSig]int SetTitle([MarshalAs(UnmanagedType.LPWStr)]string t);
- [PreserveSig]int SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)]string t);
- [PreserveSig]int SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)]string t);
- [PreserveSig]int GetResult(out IShellItem p);
- [PreserveSig]int AddPlace(IShellItem p,int f);
- [PreserveSig]int SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)]string e);
- [PreserveSig]int Close(int h);
- [PreserveSig]int SetClientGuid(ref Guid g);
- [PreserveSig]int ClearClientData();
- [PreserveSig]int SetFilter(IntPtr p);
-}
-[ComImport,Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IShellItem{
- [PreserveSig]int BindToHandler(IntPtr p,ref Guid b,ref Guid r,out IntPtr v);
- [PreserveSig]int GetParent(out IShellItem p);
- [PreserveSig]int GetDisplayName(uint s,[MarshalAs(UnmanagedType.LPWStr)]out string n);
- [PreserveSig]int GetAttributes(uint m,out uint a);
- [PreserveSig]int Compare(IShellItem p,uint h,out int o);
-}
-public class DMVPicker{
- public static string Pick(string title){
-  var t=Type.GetTypeFromCLSID(new Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7"));
-  var d=(IFileDialog)Activator.CreateInstance(t);
-  d.SetOptions(0x68);d.SetTitle(title);
-  if(d.Show(IntPtr.Zero)!=0)return"";
-  IShellItem i;d.GetResult(out i);
-  string p;i.GetDisplayName(0x80058000,out p);
-  return p??"";
- }
-}
-"@ -PassThru | Out-Null
-[DMVPicker]::Pick("Select a folder â€” DeMartinville Code room")
-} catch { "" }
-"""
-                result = subprocess.run(
-                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-                    capture_output=True, text=True, timeout=60,
-                    creationflags=no_win,
-                )
-            elif sys.platform == "darwin":
-                result = subprocess.run(
-                    ["osascript", "-e",
-                     'POSIX path of (choose folder with prompt "Select a folder â€” DeMartinville Code room")'],
-                    capture_output=True, text=True, timeout=60,
-                )
-            else:
-                try:
-                    result = subprocess.run(
-                        ["zenity", "--file-selection", "--directory",
-                         "--title=Select folder â€” DeMartinville"],
-                        capture_output=True, text=True, timeout=60,
-                    )
-                except FileNotFoundError:
-                    result = subprocess.run(
-                        ["kdialog", "--getexistingdirectory", str(Path.home()),
-                         "Select folder â€” DeMartinville"],
-                        capture_output=True, text=True, timeout=60,
-                    )
-            return result.stdout.strip().rstrip("/") or None
-        except subprocess.TimeoutExpired:
-            return None
 
     try:
         loop = asyncio.get_running_loop()
@@ -2047,10 +1969,10 @@ async def code_agent(req: Request):
     )
 
     # â”€â”€ TOKEN BUDGET by effort (controls history depth, context size, and max output) â”€â”€
-    hist_limit  = {"low": 4, "medium": 8,  "high": 14, "max": 20}.get(effort, 8)
-    max_tok     = {"low": 1024, "medium": 4096, "high": 8192}.get(effort, 4096)
-    tree_cap    = {"low": 1500, "medium": 3000, "high": 6000}.get(effort, 3000)
-    file_cap    = {"low": 4000, "medium": 10000, "high": 14000}.get(effort, 10000)
+    hist_limit  = {"low": 6,  "medium": 12, "high": 20,    "max": 30}.get(effort, 12)
+    max_tok     = {"low": 4096, "medium": 8192, "high": 16000, "max": 32000}.get(effort, 8192)
+    tree_cap    = {"low": 4000, "medium": 8000, "high": 20000, "max": 40000}.get(effort, 8000)
+    file_cap    = {"low": 12000, "medium": 40000, "high": 80000, "max": 120000}.get(effort, 40000)
 
     history = raw_history[-hist_limit:]
 

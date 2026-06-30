@@ -126,6 +126,7 @@
   var dragging = false, ox = 0, oy = 0;
   bar.addEventListener("mousedown", function (e) {
     if (e.button !== 0) return;
+    if (e.target.tagName === "BUTTON") return;   // let close/max buttons fire normally
     dragging = true;
     shield.style.display = "block";        // stops the iframe stealing the mouse mid-drag
     var r = panel.getBoundingClientRect();
