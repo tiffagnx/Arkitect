@@ -331,6 +331,7 @@ async def provider_stream(slot: dict, payload: dict, effort: str = ""):
     url = f"{base}/chat/completions"
     headers = {"Authorization": f"Bearer {slot.get('api_key','')}", "Content-Type": "application/json",
                "HTTP-Referer": "http://localhost", "X-Title": "Tiff ARKITECT"}
+    split_reasoning = bool(payload.pop("_split_reasoning", False))   # code agent: thinking shown separately
     payload = _sanitize_body(slot, payload, effort)
     try:
         async with httpx.AsyncClient(timeout=None) as cx:
@@ -348,11 +349,19 @@ async def provider_stream(slot: dict, payload: dict, effort: str = ""):
                         break
                     try:
                         d = json.loads(chunk)["choices"][0]["delta"]
-                        delta = d.get("content") or d.get("reasoning_content") or ""
+                        ct = d.get("content") or ""
+                        rc = d.get("reasoning_content") or ""
                     except Exception:
                         continue
-                    if delta:
-                        yield f"data: {json.dumps({'type':'delta','text':delta})}\n\n"
+                    if split_reasoning:
+                        if rc:
+                            yield f"data: {json.dumps({'type':'reasoning','text':rc})}\n\n"
+                        if ct:
+                            yield f"data: {json.dumps({'type':'delta','text':ct})}\n\n"
+                    else:
+                        delta = ct or rc
+                        if delta:
+                            yield f"data: {json.dumps({'type':'delta','text':delta})}\n\n"
     except Exception as e:
         emsg = f"{slot.get('name','cloud')} couldn't be reached: {e}"
         yield f"data: {json.dumps({'type':'error','text':emsg})}\n\n"

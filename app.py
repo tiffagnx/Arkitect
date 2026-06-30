@@ -873,6 +873,16 @@ async def chat(req: Request):
         "reasoning_effort": "low",
         "stream": True,
     }
+    # The gen()/_make_src() below were refactored to the same shape as the code agent
+    # (std_* for OpenAI-compat providers, *_lean/claude_* for native Claude) but the
+    # variable DEFINITIONS were lost in that refactor -> every cloud chat NameError'd and
+    # streamed nothing ("...nothing came back"). Define them here. (fix 2026-06-29)
+    std_msgs = payload["messages"]
+    std_payload = payload
+    lean_msgs = payload["messages"]
+    claude_payload = dict(payload)
+    instruction = ""            # chat has no build-intent; disables the code-room "forcing retry" nudge
+    effort = _effort
 
     async def gen():
         # One-time setup: resolve the source (cloud claude / cloud std / local brain).
@@ -1625,11 +1635,23 @@ CODE_AGENT_SYSTEM = (
         "== WRITE FILES ==\n"
     "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
+    "== READ A FILE ==\n"
+    "You have the file TREE but NOT the contents. To read a file before editing it, output:\n\n"
+    "```read\nrelative/path/to/file.py\n```\n\n"
+    "The room reads it and sends you the full content. ALWAYS read a file before you rewrite it - "
+    "never guess what's inside. One ```read per file; ask for several at once if you need them.\n\n"
     "== RUN SHELL COMMANDS ==\n"
     "To run a shell command in the workspace:\n\n"
-    "```run\nnpm install\n```\n\n"
-    "The room executes it and sends you the output. Use for: installing packages, running tests, "
-    "git status, scripts, builds. Chain as many as needed. See output â†’ keep going.\n\n"
+    "```run\ngit status\n```\n\n"
+    "The room executes it and sends you the output. Use for: findstr/grep to locate code, running "
+    "tests, git status, installs, builds.\n\n"
+    "== HOW THE LOOP WORKS (this is what makes you like Claude Code) ==\n"
+    "After ANY ```read or ```run block, STOP and wait. The room runs it and sends the results back, "
+    "then you continue with what you learned. The real rhythm is:\n"
+    "  1. ```read the file(s) you need  ->  2. see the contents  ->  3. ```write the fix  ->  4. say what you did.\n"
+    "For a big task: read a few files, run a grep to find the right spot, THEN make the change. "
+    "Never write a file blind. Work in steps, like a real engineer. When the task is fully done, "
+    "give a short final summary with NO more read/run blocks.\n\n"
     "== THIS APP: DEMARTINVILLE ==\n"
 "You are the coding agent INSIDE DeMartinville \u2014 a Python/FastAPI desktop app running on port 7777. "  
 "Know the stack so you can tell him exactly what to do after every change.\n\n"
@@ -2013,24 +2035,50 @@ async def code_agent(req: Request):
                       "stream": True, "max_tokens": max_tok, "_cache_system": claude_sys}
 
     async def gen():
-        acc = []
-        if model.startswith("cloud:"):
-            from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
+        from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
+        is_cloud = model.startswith("cloud:")
+        slot = None
+        is_claude = False
+        if is_cloud:
             slot = next((s for s in _enabled_slots() if s["id"] == model[6:]), None)
             if not slot:
-                yield _sse("error", text="That cloud model isnâ€™t set up anymore â€” pick another (Settings).")
+                yield _sse("error", text="That cloud model isn't set up anymore -- pick another (Settings).")
                 yield _sse("done")
                 return
-            if _is_claude_slot(slot):
-                cpay = dict(claude_payload)
-                cpay["model"] = slot["model"]
-                cpay.pop("reasoning_effort", None)
+            is_claude = _is_claude_slot(slot)
+        else:
+            if not await brain_up():
+                if not await ensure_brain():
+                    yield _sse("error", text="Local brain (LM Studio) won't start -- open it once, or pick a cloud model in the picker.")
+                    yield _sse("done")
+                    return
+            if await _ctx_too_small(model):
+                yield _sse("status", text="giving the brain more room...")
+                await _reload_ctx(model)
+
+        # Working message lists, extended each round with tool results (the agentic loop).
+        work_std = list(std_msgs)
+        work_lean = list(lean_msgs)
+        all_changed, all_errors = [], []
+        MAX_ROUNDS = 8
+
+        for round_i in range(MAX_ROUNDS):
+            yield _sse("round", n=round_i)
+            acc = []
+
+            if is_cloud and is_claude:
+                cpay = dict(claude_payload); cpay["model"] = slot["model"]
+                cpay.pop("reasoning_effort", None); cpay["messages"] = work_lean
                 src = anthropic_native_stream(slot, cpay, effort)
-            else:
-                cpay = dict(std_payload)
-                cpay["model"] = slot["model"]
-                cpay.pop("reasoning_effort", None)
+            elif is_cloud:
+                cpay = dict(std_payload); cpay["model"] = slot["model"]
+                cpay.pop("reasoning_effort", None); cpay["messages"] = work_std
+                cpay["_split_reasoning"] = True
                 src = provider_stream(slot, cpay, effort)
+            else:
+                spay = dict(std_payload); spay["messages"] = work_std
+                src = lm_stream(spay)
+
             async for ev in src:
                 yield ev
                 if ev.startswith("data: "):
@@ -2040,40 +2088,73 @@ async def code_agent(req: Request):
                             acc.append(d.get("text", ""))
                     except Exception:
                         pass
-        else:
-            if not await brain_up():
-                if not await ensure_brain():
-                    yield _sse("error", text="Local brain (LM Studio) wonâ€™t start â€” open it once, or pick a cloud model in the picker.")
-                    yield _sse("done")
-                    return
-            if await _ctx_too_small(model):
-                yield _sse("status", text="giving the brain more room...")
-                await _reload_ctx(model)
-            async for ev in lm_stream(std_payload):
-                yield ev
-                if ev.startswith("data: "):
-                    try:
-                        d = json.loads(ev[6:])
-                        if d.get("type") == "delta":
-                            acc.append(d.get("text", ""))
-                    except Exception:
-                        pass
 
-        # â”€â”€ apply every ```write block the agent emitted (jailed) â”€â”€
-        full = "".join(acc)
-        changed, errors = [], []
-        for m in re.finditer(r'```write\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', full, re.S):
-            rel = m.group(1).strip()
-            content = m.group(2)
-            try:
-                wf = _code_path(ws, rel)
-                wf.parent.mkdir(parents=True, exist_ok=True)
-                wf.write_text(content, encoding="utf-8")
-                changed.append(rel)
-            except Exception as e:
-                errors.append(f"{rel}: {e}")
-        yield f"data: {json.dumps({'type':'applied','changed':changed,'errors':errors})}\n\n"
-        yield f"data: {json.dumps({'type':'done'})}\n\n"
+            full = "".join(acc)
+
+            # 1) apply every ```write block (jailed)
+            changed, errors = [], []
+            for m in re.finditer(r'```write\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', full, re.S):
+                rel = m.group(1).strip(); content = m.group(2)
+                try:
+                    wf = _code_path(ws, rel); wf.parent.mkdir(parents=True, exist_ok=True)
+                    wf.write_text(content, encoding="utf-8"); changed.append(rel)
+                except Exception as e:
+                    errors.append(f"{rel}: {e}")
+            if changed or errors:
+                yield _sse("applied", changed=changed, errors=errors)
+                all_changed += changed; all_errors += errors
+
+            # 2) gather tool calls: ```run (shell) and ```read (file)
+            runs = re.findall(r'```run\s*\r?\n(.*?)\r?\n```', full, re.S)
+            reads = re.findall(r'```read\s*\r?\n(.*?)\r?\n```', full, re.S)
+
+            if not runs and not reads:
+                break   # no tool calls -> the agent is done
+
+            results = []
+            for cmd in runs:
+                cmd = cmd.strip()
+                if not cmd:
+                    continue
+                yield _sse("step", icon="⌘", text="ran  " + cmd[:140])
+                try:
+                    root = _ws_root(ws)
+                    rp = subprocess.run(cmd, shell=True, cwd=str(root),
+                                        capture_output=True, text=True, timeout=30, errors="replace")
+                    out = (rp.stdout + rp.stderr).strip()[:8000] or "(no output)"
+                except subprocess.TimeoutExpired:
+                    out = "(timed out at 30s)"
+                except Exception as e:
+                    out = f"(error: {e})"
+                yield _sse("output", label=cmd[:90], text=out[:4000])
+                results.append("$ " + cmd + "\n" + out)
+            for rel in reads:
+                rel = rel.strip()
+                if not rel:
+                    continue
+                yield _sse("step", icon="\U0001F4C4", text="read  " + rel[:140])
+                try:
+                    rf = _code_path(ws, rel)
+                    if rf.is_file() and rf.suffix.lower() not in _CODE_BIN_EXT and rf.stat().st_size <= _CODE_TEXT_MAX:
+                        txt = rf.read_text(encoding="utf-8", errors="replace")[:20000]
+                    else:
+                        txt = "(binary or too large to read)"
+                except Exception as e:
+                    txt = f"(error: {e})"
+                yield _sse("output", label=rel[:90], text=(txt[:1500] + (" ..." if len(txt) > 1500 else "")))
+                results.append("FILE " + rel + ":\n" + txt)
+
+            feedback = ("TOOL RESULTS:\n\n" + "\n\n".join(results) +
+                        "\n\nUse these results to continue the task. When you are fully done, "
+                        "give your final summary with NO more run/read blocks.")
+            tail = [{"role": "assistant", "content": full[:6000]},
+                    {"role": "user", "content": feedback}]
+            work_std = work_std + tail
+            work_lean = work_lean + tail
+        else:
+            yield _sse("status", text="(reached the work limit -- stopping here)")
+
+        yield _sse("done")
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 IMG_META = DATA / "img_meta"          # per-image sidecars: prompt/seed/mode â†’ remix & re-roll

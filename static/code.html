@@ -75,6 +75,17 @@
   .chip{font-size:11.5px;font-family:var(--mono);background:rgba(43,182,168,.13);border:1px solid rgba(43,182,168,.32);color:var(--teal);border-radius:7px;padding:4px 9px;cursor:pointer}
   .chip:hover{filter:brightness(1.12)}
   .chip.err{background:rgba(224,121,106,.12);border-color:rgba(224,121,106,.3);color:var(--bad);cursor:default}
+  /* agentic loop: thinking box, step lines, tool output */
+  .thinkbox{margin:5px 0;border-left:2px solid rgba(43,182,168,.35);padding-left:9px}
+  .thinkbox summary{font-size:11.5px;color:var(--text-3);cursor:pointer;list-style:none;user-select:none}
+  .thinkbox summary::-webkit-details-marker{display:none}
+  .thinkbox .tbody{font-size:11.5px;color:var(--text-3);white-space:pre-wrap;margin-top:5px;opacity:.85;max-height:240px;overflow:auto}
+  .stepline{display:flex;align-items:center;gap:7px;font-size:12px;font-family:var(--mono);color:var(--text-3);margin:5px 0}
+  .stepline .stepdot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex:0 0 auto;box-shadow:0 0 8px rgba(43,182,168,.6)}
+  .outbox{margin:3px 0 6px 13px}
+  .outbox summary{font-size:11px;color:var(--text-4);cursor:pointer;font-family:var(--mono);list-style:none}
+  .outbox summary::-webkit-details-marker{display:none}
+  .outbox pre{background:var(--bg0);border:1px solid var(--hairline);border-radius:7px;padding:8px 10px;overflow:auto;margin:5px 0;font-family:var(--mono);font-size:11px;max-height:280px;color:var(--text-3)}
   .hint{color:var(--text-4);font-size:13px;text-align:center;margin:auto;padding:24px;line-height:1.6;max-width:440px}
   .scope{font-size:11px;color:var(--text-4);padding:0 18px 6px;text-align:center}
 
@@ -560,6 +571,8 @@ async function dmvConfirm(title){ return (await dmvModal({title,input:false,conf
 function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function mdToHtml(t){
   t=t.replace(/```write\s+path="([^"]+)"[\s\S]*?```/g,(m,p)=>'\n〈✍ wrote '+p+'〉\n');
+  t=t.replace(/```read\s*\n([\s\S]*?)```/g,(m,c)=>'\n〈📄 read '+c.trim()+'〉\n');
+  t=t.replace(/```run\s*\n([\s\S]*?)```/g,(m,c)=>'\n〈⌘ '+c.trim().split('\n')[0]+'〉\n');
   const codes=[]; t=t.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{ codes.push(c); return ' '+(codes.length-1)+' '; });
   t=_esc(t);
   t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
@@ -604,7 +617,12 @@ async function sendAgent(){
   const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
 
   const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs };
-  let acc="";
+  let acc="";                 // current bubble's answer text
+  let fullAll="";             // everything across rounds (for history)
+  let curBubble=aiEl;         // active answer bubble
+  let thinkBox=null, thinkBody=null, thinkAcc="";
+  function newBubble(){ const d=document.createElement("div"); d.className="msg ai"; $("log").appendChild(d); return d; }
+  function stepLine(icon,text){ const d=document.createElement("div"); d.className="stepline"; d.innerHTML='<span class="stepdot"></span><span>'+icon+'</span><span>'+_esc(text)+'</span>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
   try{
     const res=await fetch("/api/code/agent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
     const reader=res.body.getReader(), dec=new TextDecoder(); let buf="";
@@ -615,20 +633,30 @@ async function sendAgent(){
       for(const line of lines){
         if(!line.startsWith("data: ")) continue;
         let ev; try{ ev=JSON.parse(line.slice(6)); }catch{ continue; }
-        if(ev.type==="delta"){ acc+=ev.text; aiEl.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; }
-        else if(ev.type==="status"){ aiEl.textContent=acc+"\n("+ev.text+")"; }
-        else if(ev.type==="error"){ aiEl.textContent=(acc||"")+"\n⚠ "+ev.text; setStatus(ev.text,"err"); }
-        else if(ev.type==="applied"){ renderApplied(aiEl, ev); }
+        if(ev.type==="round"){
+          if(ev.n>0){ fullAll+=acc+"\n"; acc=""; curBubble=newBubble(); thinkBox=null; thinkBody=null; thinkAcc=""; }
+        }
+        else if(ev.type==="reasoning"){
+          thinkAcc+=ev.text;
+          if(!thinkBox){ thinkBox=document.createElement("details"); thinkBox.className="thinkbox"; thinkBox.innerHTML='<summary>💭 thinking…</summary><div class="tbody"></div>'; $("log").insertBefore(thinkBox,curBubble); thinkBody=thinkBox.querySelector(".tbody"); }
+          thinkBody.textContent=thinkAcc; $("log").scrollTop=$("log").scrollHeight;
+        }
+        else if(ev.type==="delta"){ acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
+        else if(ev.type==="step"){ stepLine(ev.icon||"·", ev.text||""); }
+        else if(ev.type==="output"){ const d=document.createElement("details"); d.className="outbox"; d.innerHTML='<summary>▸ '+_esc(ev.label||"output")+'</summary><pre>'+_esc(ev.text||"")+'</pre>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
+        else if(ev.type==="status"){ setStatus(ev.text,""); }
+        else if(ev.type==="error"){ curBubble.innerHTML=mdToHtml(acc)+'<br>⚠ '+_esc(ev.text); setStatus(ev.text,"err"); }
+        else if(ev.type==="applied"){ renderApplied(curBubble, ev); }
       }
     }
   }catch(err){
-    if(err&&err.name==="AbortError"){ aiEl.textContent=(acc||"")+"\n■ stopped — kept what we have"; setStatus("stopped — your text & any written files are kept",""); }
-    else{ aiEl.textContent=(acc||"")+"\n⚠ connection dropped"; }
+    if(err&&err.name==="AbortError"){ curBubble.innerHTML=mdToHtml(acc)+"<br>■ stopped — kept what we have"; setStatus("stopped — your text & any written files are kept",""); }
+    else{ curBubble.innerHTML=mdToHtml(acc)+"<br>⚠ connection dropped"; }
   }
   finally{
     busy=false; controller=null;
     const sb2=$("sendBtn"); sb2.classList.remove("stop"); sb2.textContent="➤"; sb2.title=""; sb2.disabled=false;
-    history.push({role:"user",content:q}); history.push({role:"assistant",content:acc.slice(0,4000)});
+    history.push({role:"user",content:q}); history.push({role:"assistant",content:(fullAll+acc).slice(0,4000)});
   }
 }
 function renderApplied(aiEl, ev){
