@@ -117,6 +117,23 @@ def _is_claude_slot(slot) -> bool:
             or "claude" in (slot.get("model", "") or "").lower())
 
 
+# Model families that accept image input. Bias toward known-good matches: a false
+# negative just routes to another vision model (fine); a false positive re-hits the
+# "no endpoints support image input" 404. DeepSeek / Kimi(text) / most text models = no.
+_VISION_RE = re.compile(
+    r'(gemini|gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|chatgpt|o1\b|o3\b|o4-|'
+    r'claude-3|claude-opus|claude-sonnet|claude-haiku|claude-4|'
+    r'pixtral|llava|llama-3\.2|llama-4|grok-2-vision|grok-4|internvl|molmo|'
+    r'vision|-vl\b|qwen2[.\-]?\d*-?vl)', re.I)
+
+
+def _slot_supports_vision(slot) -> bool:
+    if not slot:
+        return False
+    blob = (str(slot.get("model", "")) + " " + str(slot.get("name", ""))).lower()
+    return bool(_VISION_RE.search(blob))
+
+
 def _god_layer(effort: str, persona_set: bool = False) -> str:
     depth = {
         "low":    "Mode: Quick â€” sharp and fast, but unmistakably sharp.",
@@ -2247,7 +2264,24 @@ async def code_agent(req: Request):
                 yield _sse("done")
                 return
             is_claude = _is_claude_slot(slot)
-        else:
+
+        # â”€â”€ VISION AUTO-ROUTE â”€â”€ if an image is attached but the picked model can't see it
+        # (DeepSeek/Kimi/local text models), send THIS turn to a vision-capable key (Gemini/Claude)
+        # so the image actually gets looked at instead of 404-ing.
+        if img_parts:
+            sees = is_cloud and slot and _slot_supports_vision(slot)
+            if not sees:
+                alt = next((s for s in _enabled_slots() if _slot_supports_vision(s)), None)
+                if alt:
+                    picked = slot.get("name", "that model") if slot else "the local model"
+                    yield _sse("status", text="%s can't see images â€” using %s for this one." % (picked, alt.get("name", "a vision model")))
+                    slot = alt; model = "cloud:" + slot["id"]; is_cloud = True; is_claude = _is_claude_slot(slot)
+                else:
+                    yield _sse("error", text="None of your models can see images. Add Gemini, Claude, or GPT-4o in Settings â†’ Keys, then attach the image again.")
+                    yield _sse("done")
+                    return
+
+        if not is_cloud:
             if not await brain_up():
                 if not await ensure_brain():
                     yield _sse("error", text="Local brain (LM Studio) won't start -- open it once, or pick a cloud model in the picker.")
