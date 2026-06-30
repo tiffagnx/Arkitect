@@ -71,11 +71,11 @@
   .sessrow:hover .sx{opacity:.7} .sessrow .sx:hover{opacity:1;color:var(--bad)}
   .sessempty{font-size:11.5px;color:var(--text-4);padding:14px 13px;line-height:1.5}
   .filelist{flex:1;overflow:auto;padding:6px 4px 16px}
-  .node{font-size:12.5px;color:var(--text-2);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;display:flex;align-items:center;gap:5px}
-  .node:hover{background:var(--panel-2);color:var(--text)}
+  .node{font-size:12px;color:var(--text-3);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;display:flex;align-items:center;gap:5px}
+  .node:hover{background:var(--panel-2);color:var(--text-2)}
   .node.sel{background:rgba(62,156,184,.16);color:var(--steel-2)}
   .node .tw{width:12px;flex:0 0 auto;color:var(--text-4);font-size:10px}
-  .node .ic{flex:0 0 auto;opacity:.85}
+  .node .ic{flex:0 0 auto;opacity:.6;font-size:11px}
   .node.bin{color:var(--text-4);cursor:default} .node.bin:hover{background:none}
 
   /* CENTER — the conversation (main) */
@@ -109,6 +109,11 @@
   .outbox summary{font-size:11px;color:var(--text-4);cursor:pointer;font-family:var(--mono);list-style:none}
   .outbox summary::-webkit-details-marker{display:none}
   .outbox pre{background:var(--bg0);border:1px solid var(--hairline);border-radius:7px;padding:8px 10px;overflow:auto;margin:5px 0;font-family:var(--mono);font-size:11px;max-height:280px;color:var(--text-3)}
+  .ichip{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;border-radius:5px;padding:2px 7px;margin:2px 1px;vertical-align:middle}
+  .ichip.ic-read{background:rgba(62,156,184,.10);border:1px solid rgba(62,156,184,.22);color:var(--steel-2)}
+  .ichip.ic-run{background:rgba(43,182,168,.09);border:1px solid rgba(43,182,168,.22);color:var(--teal)}
+  .ichip.ic-edit{background:rgba(95,180,206,.10);border:1px solid rgba(95,180,206,.24);color:var(--steel-2)}
+  .ichip.ic-write{background:rgba(230,193,106,.08);border:1px solid rgba(230,193,106,.2);color:var(--gold)}
   .hint{color:var(--text-4);font-size:13px;text-align:center;margin:auto;padding:24px;line-height:1.6;max-width:440px}
   .scope{font-size:11px;color:var(--text-4);padding:0 18px 6px;text-align:center}
 
@@ -351,11 +356,24 @@ function isClaudeish(id){ return /claude|anthropic|opus|sonnet|haiku/i.test(mode
 $("tabSessions").onclick=()=>{ $("tabSessions").classList.add("on"); $("tabFiles").classList.remove("on"); $("paneSessions").style.display="flex"; $("paneFiles").style.display="none"; };
 $("tabFiles").onclick=()=>{ $("tabFiles").classList.add("on"); $("tabSessions").classList.remove("on"); $("paneFiles").style.display="flex"; $("paneSessions").style.display="none"; loadTree(); };
 
-/* ── sessions: New session + Recents, persisted per browser (localStorage) ── */
+/* ── sessions: server-persisted (data/code_sessions.json) + localStorage mirror ── */
 const SESS_KEY="dmv-code-sessions";
 let SESSIONS=[], curSessId=null;
-function loadSessions(){ try{SESSIONS=JSON.parse(localStorage.getItem(SESS_KEY)||"[]");}catch(e){SESSIONS=[];} renderSessions(); }
-function saveSessions(){ try{localStorage.setItem(SESS_KEY,JSON.stringify(SESSIONS.slice(0,40)));}catch(e){} }
+async function loadSessions(){
+  // 1. try server (survives app restarts, pywebview, any browser)
+  try{
+    const r=await fetch("/api/code/sessions").then(r=>r.json());
+    if(Array.isArray(r) && r.length){ SESSIONS=r; try{localStorage.setItem(SESS_KEY,JSON.stringify(r));}catch(_){} renderSessions(); return; }
+  }catch(_){}
+  // 2. fall back to localStorage if server had nothing
+  try{SESSIONS=JSON.parse(localStorage.getItem(SESS_KEY)||"[]");}catch(e){SESSIONS=[];}
+  renderSessions();
+}
+function saveSessions(){
+  const data=SESSIONS.slice(0,40);
+  try{localStorage.setItem(SESS_KEY,JSON.stringify(data));}catch(_){}
+  fetch("/api/code/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).catch(()=>{});
+}
 function renderSessions(){
   const el=$("sessionList"); if(!el) return; el.innerHTML="";
   if(!SESSIONS.length){ el.innerHTML='<div class="sessempty">No sessions yet. Ask Kit something below — your chats show up here.</div>'; return; }
@@ -671,11 +689,16 @@ async function dmvConfirm(title){ return (await dmvModal({title,input:false,conf
 /* ── tiny markdown → html for the agent's replies (clickable links, JSON/code blocks) ── */
 function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function mdToHtml(t){
-  t=t.replace(/```write\s+path="([^"]+)"[\s\S]*?```/g,(m,p)=>'\n〈✍ wrote '+p+'〉\n');
-  t=t.replace(/```read\s*\n([\s\S]*?)```/g,(m,c)=>'\n〈📄 read '+c.trim()+'〉\n');
-  t=t.replace(/```run\s*\n([\s\S]*?)```/g,(m,c)=>'\n〈⌘ '+c.trim().split('\n')[0]+'〉\n');
+  t=t.replace(/```edit\s+path="([^"]+)"[\s\S]*?```/g,(m,p)=>' \x01edit\x02'+p+'\x03 ');
+  t=t.replace(/```write\s+path="([^"]+)"[\s\S]*?```/g,(m,p)=>' \x01write\x02'+p+'\x03 ');
+  t=t.replace(/```read\s*\n([\s\S]*?)```/g,(m,c)=>' \x01read\x02'+c.trim()+'\x03 ');
+  t=t.replace(/```run\s*\n([\s\S]*?)```/g,(m,c)=>' \x01run\x02'+c.trim().split('\n')[0]+'\x03 ');
   const codes=[]; t=t.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{ codes.push(c); return ' '+(codes.length-1)+' '; });
   t=_esc(t);
+  t=t.replace(/\x01read\x02([^\x03]*)\x03/g,'<span class="ichip ic-read">📄 $1</span>');
+  t=t.replace(/\x01run\x02([^\x03]*)\x03/g,'<span class="ichip ic-run">⌘ $1</span>');
+  t=t.replace(/\x01edit\x02([^\x03]*)\x03/g,'<span class="ichip ic-edit">✎ $1</span>');
+  t=t.replace(/\x01write\x02([^\x03]*)\x03/g,'<span class="ichip ic-write">✍ $1</span>');
   t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
   t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
   t=t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');

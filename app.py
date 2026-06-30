@@ -1632,9 +1632,24 @@ CODE_AGENT_SYSTEM = (
     "You already have the full file tree in context. NEVER run 'ls', 'dir', or 'ls -la' - "
     "you can already see the files. Use ```run only for: installs, tests, builds, git. "
     "Not for listing files you already have.\n\n"
-        "== WRITE FILES ==\n"
-    "To CREATE or REPLACE a file, output a fenced block in EXACTLY this form:\n\n"
+        "== EDIT A FILE (your DEFAULT — use this for existing files) ==\n"
+    "To change an existing file, DON'T rewrite the whole thing. Emit a surgical SEARCH/REPLACE "
+    "edit — only the exact slice that changes:\n\n"
+    "```edit path=\"relative/path/to/file.ext\"\n"
+    "<<<<<<< SEARCH\n<the EXACT current text, copied verbatim from the file>\n"
+    "=======\n<the new text>\n>>>>>>> REPLACE\n```\n\n"
+    "Rules that make edits land every time:\n"
+    "- The SEARCH text must match the file EXACTLY — so ALWAYS ```read the file first, then copy "
+    "the real lines. Never guess what's in there.\n"
+    "- Include enough surrounding lines that the SEARCH block is UNIQUE in the file (3-5 lines of "
+    "context is usually right). If it matches twice, the edit is rejected.\n"
+    "- You can put SEVERAL SEARCH/REPLACE pairs in one ```edit block for the same file.\n"
+    "- If the room says EDIT FAILED, re-read the file and copy the exact current text, then retry.\n\n"
+    "== WRITE A WHOLE FILE (only for NEW files or a full rewrite) ==\n"
+    "To CREATE a new file, or deliberately replace an entire file, output:\n\n"
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
+    "Prefer ```edit for changes to files that already exist — it's faster, cheaper, and safer than "
+    "rewriting. Use ```write only when the file is new or you truly mean to replace all of it.\n\n"
     "== READ A FILE ==\n"
     "You have the file TREE but NOT the contents. To read a file before editing it, output:\n\n"
     "```read\nrelative/path/to/file.py\n```\n\n"
@@ -1678,11 +1693,12 @@ CODE_AGENT_SYSTEM = (
 "If something might break, say so in one sentence before you do it.\n\n"
 "== HARD RULES ==\n"
     "- ACT, don't narrate. If he asks you to build, add, fix, change, or make ANYTHING, your "
-    "VERY FIRST reply MUST contain at least one ```write or ```run block. You already have the "
-    "file tree and the open file -- never say 'let me look first' and stop. That does nothing. "
-    "Open the file by writing it, or run a command to inspect it.\n"
+    "VERY FIRST reply MUST contain a ```read (to see the file), a ```edit / ```write (to change "
+    "it), or a ```run block. You already have the file tree -- never say 'let me look first' and "
+    "stop with no block. That does nothing. The normal rhythm: ```read the file -> ```edit the slice.\n"
     "- Never end a build/fix/change turn with only a plan. A plan with no block = you did nothing.\n"
-    "- Always write COMPLETE file content â€” no diffs, no '...', no 'rest unchanged'.\n"
+    "- In a ```write block, give COMPLETE file content â€” no '...', no 'rest unchanged'. "
+    "In a ```edit block, the REPLACE side is the new text for just that slice.\n"
     "- Relative forward-slash paths inside the workspace only. Never '..', never absolute.\n"
     "- Write multiple files and run blocks back to back when needed.\n"
     "- One or two lines max before each block â€” what you're doing and why, that's it.\n"
@@ -1697,6 +1713,116 @@ def _sse(tp, **kw):
     d = {"type": tp}
     d.update(kw)
     return "data: " + json.dumps(d) + "\n\n"
+
+
+# ── SEARCH/REPLACE editing (Aider-style) ──────────────────────────────────────
+# Kit emits surgical edits instead of rewriting whole files:
+#   ```edit path="rel/file.py"
+#   <<<<<<< SEARCH
+#   old exact text
+#   =======
+#   new text
+#   >>>>>>> REPLACE
+#   ```
+# Apply ladder: exact unique match → line-based fuzzy (ignore per-line indent/blank
+# lines) with indent re-basing. Ambiguous/missing → reported back so Kit retries.
+_EDIT_BLOCK_RE = re.compile(r'```edit\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', re.S)
+_SR_RE = re.compile(
+    r'<{5,}\s*SEARCH\s*\r?\n(.*?)\r?\n={5,}\s*\r?\n(.*?)\r?\n>{5,}\s*REPLACE',
+    re.S)
+
+
+def _lead_ws(s):
+    return s[:len(s) - len(s.lstrip())]
+
+
+def _apply_one_sr(text, search, replace):
+    """Return (new_text, status). status: ok | notfound | multiple | empty."""
+    if not search.strip():
+        return text, "empty"
+    # Tier 1 — exact, must be unique
+    n = text.count(search)
+    if n == 1:
+        return text.replace(search, replace, 1), "ok"
+    if n > 1:
+        return text, "multiple"
+    # Tier 2 — line-based fuzzy: match ignoring per-line leading/trailing whitespace
+    file_lines = text.splitlines()
+    s_lines = search.splitlines()
+    s_norm = [l.strip() for l in s_lines]
+    while s_norm and not s_norm[0]:
+        s_norm.pop(0); s_lines.pop(0)
+    while s_norm and not s_norm[-1]:
+        s_norm.pop(); s_lines.pop()
+    if not s_norm:
+        return text, "notfound"
+    L = len(s_norm)
+    hits = [i for i in range(len(file_lines) - L + 1)
+            if [l.strip() for l in file_lines[i:i + L]] == s_norm]
+    if len(hits) > 1:
+        return text, "multiple"
+    if not hits:
+        return text, "notfound"
+    i = hits[0]
+    file_base = _lead_ws(file_lines[i])          # indent the file actually uses
+    search_base = _lead_ws(s_lines[0])           # indent the model wrote
+    out = []
+    for rl in replace.splitlines():
+        if not rl.strip():
+            out.append("")
+            continue
+        rl_lead = _lead_ws(rl)
+        rel = rl_lead[len(search_base):] if rl_lead.startswith(search_base) else rl_lead
+        out.append(file_base + rel + rl.lstrip())
+    new_lines = file_lines[:i] + out + file_lines[i + L:]
+    result = "\n".join(new_lines)
+    if text.endswith("\n"):
+        result += "\n"
+    return result, "ok"
+
+
+def _apply_edits(ws, full):
+    """Parse + apply every ```edit block. Returns (changed_paths, failures).
+    failures = [{'path':.., 'reason':..}] — fed back so Kit can retry."""
+    changed, failures = [], []
+    for m in _EDIT_BLOCK_RE.finditer(full):
+        rel = m.group(1).strip()
+        body = m.group(2)
+        pairs = _SR_RE.findall(body)
+        if not pairs:
+            failures.append({"path": rel, "reason": "no SEARCH/REPLACE markers found in the edit block"})
+            continue
+        try:
+            f = _code_path(ws, rel)
+        except Exception:
+            failures.append({"path": rel, "reason": "path escapes workspace"})
+            continue
+        if not f.is_file():
+            failures.append({"path": rel, "reason": "file does not exist — use ```write to create it"})
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            failures.append({"path": rel, "reason": "could not read: %s" % e})
+            continue
+        ok_any = False
+        for search, replace in pairs:
+            new_text, status = _apply_one_sr(text, search, replace)
+            if status == "ok":
+                text = new_text; ok_any = True
+            elif status == "multiple":
+                failures.append({"path": rel, "reason": "SEARCH block matched MORE THAN ONCE — add surrounding lines so it's unique"})
+            elif status == "empty":
+                failures.append({"path": rel, "reason": "empty SEARCH block"})
+            else:
+                failures.append({"path": rel, "reason": "SEARCH block not found — it must match the current file EXACTLY (read the file again to get the real text)"})
+        if ok_any:
+            try:
+                f.write_text(text, encoding="utf-8")
+                changed.append(rel)
+            except Exception as e:
+                failures.append({"path": rel, "reason": "write failed: %s" % e})
+    return changed, failures
 
 
 @app.get("/api/code/workspaces")
@@ -1887,6 +2013,27 @@ async def code_run_cmd(req: Request):
         return JSONResponse({"error": "Command timed out (30s limit)", "returncode": -1})
     except Exception as e:
         return JSONResponse({"error": str(e), "returncode": -1})
+
+
+_SESS_FILE = DATA / "code_sessions.json"
+
+@app.get("/api/code/sessions")
+async def code_sessions_get():
+    try:
+        if _SESS_FILE.exists():
+            return JSONResponse(json.loads(_SESS_FILE.read_text("utf-8")))
+    except Exception:
+        pass
+    return JSONResponse([])
+
+@app.post("/api/code/sessions")
+async def code_sessions_post(req: Request):
+    try:
+        sessions = await req.json()
+        _SESS_FILE.write_text(json.dumps(sessions, ensure_ascii=False), encoding="utf-8")
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.get("/api/code/tree")
@@ -2091,7 +2238,7 @@ async def code_agent(req: Request):
 
             full = "".join(acc)
 
-            # 1) apply every ```write block (jailed)
+            # 1) apply every ```write block (jailed) — full-file create/replace
             changed, errors = [], []
             for m in re.finditer(r'```write\s+path="([^"]+)"[ \t]*\r?\n(.*?)\r?\n```', full, re.S):
                 rel = m.group(1).strip(); content = m.group(2)
@@ -2100,6 +2247,14 @@ async def code_agent(req: Request):
                     wf.write_text(content, encoding="utf-8"); changed.append(rel)
                 except Exception as e:
                     errors.append(f"{rel}: {e}")
+
+            # 1b) apply every ```edit SEARCH/REPLACE block — surgical edits
+            edit_changed, edit_fails = _apply_edits(ws, full)
+            for ec in edit_changed:
+                yield _sse("step", icon="✍", text="edited  " + ec[:140])
+            changed += edit_changed
+            errors += [f"{x['path']}: {x['reason']}" for x in edit_fails]
+
             if changed or errors:
                 yield _sse("applied", changed=changed, errors=errors)
                 all_changed += changed; all_errors += errors
@@ -2108,10 +2263,14 @@ async def code_agent(req: Request):
             runs = re.findall(r'```run\s*\r?\n(.*?)\r?\n```', full, re.S)
             reads = re.findall(r'```read\s*\r?\n(.*?)\r?\n```', full, re.S)
 
-            if not runs and not reads:
-                break   # no tool calls -> the agent is done
+            # A failed edit must loop back so Kit can fix it — not end the turn.
+            if not runs and not reads and not edit_fails:
+                break   # no tool calls and no failed edits -> the agent is done
 
             results = []
+            # failed edits go back as tool results so Kit re-reads and retries surgically
+            for ef in edit_fails:
+                results.append("EDIT FAILED on %s: %s" % (ef["path"], ef["reason"]))
             for cmd in runs:
                 cmd = cmd.strip()
                 if not cmd:
