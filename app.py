@@ -2253,6 +2253,7 @@ async def code_agent(req: Request):
                       "stream": True, "max_tokens": max_tok, "_cache_system": claude_sys}
 
     async def gen():
+        nonlocal model            # vision auto-route may re-point this turn to a vision key
         from swarm_routes import _enabled_slots, provider_stream, anthropic_native_stream
         is_cloud = model.startswith("cloud:")
         slot = None
