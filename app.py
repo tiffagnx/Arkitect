@@ -1647,8 +1647,8 @@ CODE_AGENT_SYSTEM = (
     "{user_context}\n\n"
     "== FILE TREE ==\n"
     "You already have the full file tree in context. NEVER run 'ls', 'dir', or 'ls -la' - "
-    "you can already see the files. Use ```run only for: installs, tests, builds, git. "
-    "Not for listing files you already have.\n\n"
+    "you can already see the files. To FIND code inside files, use ```search (below) - never "
+    "findstr/grep. Use ```run only for: installs, tests, builds, git.\n\n"
         "== EDIT A FILE (your DEFAULT — use this for existing files) ==\n"
     "To change an existing file, DON'T rewrite the whole thing. Emit a surgical SEARCH/REPLACE "
     "edit — only the exact slice that changes:\n\n"
@@ -1667,11 +1667,21 @@ CODE_AGENT_SYSTEM = (
     "```write path=\"relative/path/to/file.ext\"\n<the FULL new file content>\n```\n\n"
     "Prefer ```edit for changes to files that already exist — it's faster, cheaper, and safer than "
     "rewriting. Use ```write only when the file is new or you truly mean to replace all of it.\n\n"
-    "== READ A FILE ==\n"
+    "== SEARCH THE CODE (use this to FIND things — it always works) ==\n"
+    "To find where something lives, output:\n\n"
+    "```search\nthe text or name you're looking for\n```\n\n"
+    "The room searches every file and sends back 'path:line: the matching line'. This is a "
+    "reliable substring search across the whole workspace. USE THIS to locate code.\n"
+    "Do NOT use findstr, grep, or dir to search — their syntax is fiddly on Windows and usually "
+    "returns nothing. ```search is the right tool, every time.\n\n"
+    "== READ A FILE (or just part of one) ==\n"
     "You have the file TREE but NOT the contents. To read a file before editing it, output:\n\n"
     "```read\nrelative/path/to/file.py\n```\n\n"
-    "The room reads it and sends you the full content. ALWAYS read a file before you rewrite it - "
-    "never guess what's inside. One ```read per file; ask for several at once if you need them.\n\n"
+    "For a BIG file, read just the lines you need (from a search hit) so you see the real text:\n\n"
+    "```read\napp.py:1200-1280\n```\n\n"
+    "The room sends back that content. ALWAYS read the exact lines before you ```edit them - "
+    "never guess what's inside. The typical flow: ```search to find it -> ```read those lines -> "
+    "```edit the slice.\n\n"
     "== RUN SHELL COMMANDS ==\n"
     "To run a shell command in the workspace:\n\n"
     "```run\ngit status\n```\n\n"
@@ -1723,6 +1733,9 @@ CODE_AGENT_SYSTEM = (
     "- One or two lines max before each block â€” what you're doing and why, that's it.\n"
     "- Question only? Answer in plain text, no blocks.\n"
     "- Need a file you can't see? Name it and ask him to open it.\n"
+    "- NEVER emit JSON tool calls like {\"command\":...} or {\"file_path\":...,\"content\":...}. "
+    "Those do NOT work here. ONLY the fenced blocks above (```search ```read ```edit ```write "
+    "```run) do anything. Use them.\n"
     "- No rm -rf, no destructive ops unless he explicitly asks."
 )
 
@@ -1842,6 +1855,107 @@ def _apply_edits(ws, full):
             except Exception as e:
                 failures.append({"path": rel, "reason": "write failed: %s" % e})
     return changed, failures
+
+
+def _scan_json_objs(text):
+    """Pull every top-level {...} JSON object out of a string (brace-matched, quote-aware)."""
+    objs = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == "{":
+            depth = 0; j = i; instr = False; esc = False
+            while j < n:
+                c = text[j]
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    instr = not instr
+                elif not instr:
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            try:
+                                objs.append(json.loads(text[i:j + 1]))
+                            except Exception:
+                                pass
+                            i = j
+                            break
+                j += 1
+        i += 1
+    return objs
+
+
+def _normalize_drift(full):
+    """Some models (DeepSeek, Kimi) ignore the fenced-block format and emit OpenAI-style
+    JSON tool calls instead -- {"command":...}, {"file_path":...,"content":...},
+    {"pattern":...}. The shell chokes and writes never land. Rescue them: scan the text
+    OUTSIDE our canonical tool blocks for those JSON shapes and append the equivalent
+    real ```block, so the normal parser executes them."""
+    outside = re.sub(r'```(?:write|edit|read|run|search)\b.*?```', '', full, flags=re.S)
+    if "{" not in outside:
+        return full
+    blocks = []
+    for o in _scan_json_objs(outside):
+        if not isinstance(o, dict):
+            continue
+        cmd = o.get("command") or o.get("cmd")
+        path = o.get("file_path") or o.get("path") or o.get("file")
+        content = o.get("content")
+        pattern = o.get("pattern") or o.get("query") or o.get("search")
+        if isinstance(cmd, str) and cmd.strip():
+            blocks.append("```run\n%s\n```" % cmd.strip())
+        elif isinstance(content, str) and isinstance(path, str) and path.strip():
+            blocks.append('```write path="%s"\n%s\n```' % (path.strip(), content))
+        elif isinstance(pattern, str) and pattern.strip():
+            blocks.append("```search\n%s\n```" % pattern.strip())
+        elif isinstance(path, str) and path.strip() and content is None and not pattern:
+            blocks.append("```read\n%s\n```" % path.strip())
+    if blocks:
+        return full + "\n\n" + "\n\n".join(blocks)
+    return full
+
+
+_SEARCH_SKIP_DIRS = {".git", "node_modules", "__pycache__", "venv", ".venv",
+                     "dist", "build", ".next", "site-packages"}
+
+
+def _code_search(ws, query, max_results=60):
+    """Reliable in-process substring search across the workspace's text files.
+    Replaces flaky findstr/grep — returns 'path:line: text' hits. Case-insensitive."""
+    try:
+        root = _ws_root(ws)
+    except Exception:
+        return []
+    q = (query or "").strip().lower()
+    if not q:
+        return []
+    hits = []
+    for p in root.rglob("*"):
+        if len(hits) >= max_results:
+            break
+        if not p.is_file() or p.suffix.lower() in _CODE_BIN_EXT:
+            continue
+        try:
+            rel = p.relative_to(root).as_posix()
+        except Exception:
+            continue
+        if any(seg in _SEARCH_SKIP_DIRS for seg in rel.split("/")):
+            continue
+        try:
+            if p.stat().st_size > _CODE_TEXT_MAX:
+                continue
+            for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                if q in line.lower():
+                    hits.append("%s:%d: %s" % (rel, i, line.strip()[:200]))
+                    if len(hits) >= max_results:
+                        break
+        except Exception:
+            continue
+    return hits
 
 
 _RED_CMD_PATTERNS = [
@@ -2296,7 +2410,7 @@ async def code_agent(req: Request):
         work_std = list(std_msgs)
         work_lean = list(lean_msgs)
         all_changed, all_errors = [], []
-        MAX_ROUNDS = 8
+        MAX_ROUNDS = {"low": 8, "medium": 12, "high": 16, "max": 20}.get(effort, 12)
 
         for round_i in range(MAX_ROUNDS):
             yield _sse("round", n=round_i)
@@ -2326,6 +2440,7 @@ async def code_agent(req: Request):
                         pass
 
             full = "".join(acc)
+            full = _normalize_drift(full)   # rescue JSON-style tool calls (DeepSeek/Kimi drift)
 
             # 1) apply every ```write block (jailed) — full-file create/replace
             changed, errors = [], []
@@ -2353,12 +2468,13 @@ async def code_agent(req: Request):
             for vf in val_fails:
                 yield _sse("step", icon="⚠", text="broke  %s — %s" % (vf["path"], vf["error"][:90]))
 
-            # 2) gather tool calls: ```run (shell) and ```read (file)
+            # 2) gather tool calls: ```search (find code), ```read (file), ```run (shell)
+            searches = re.findall(r'```search\s*\r?\n(.*?)\r?\n```', full, re.S)
             runs = re.findall(r'```run\s*\r?\n(.*?)\r?\n```', full, re.S)
             reads = re.findall(r'```read\s*\r?\n(.*?)\r?\n```', full, re.S)
 
             # Failed edits OR broken syntax must loop back so Kit fixes it — not end the turn.
-            if not runs and not reads and not edit_fails and not val_fails:
+            if not runs and not reads and not searches and not edit_fails and not val_fails:
                 break   # nothing pending -> the agent is done
 
             results = []
@@ -2368,6 +2484,15 @@ async def code_agent(req: Request):
             # syntax/parse breaks Kit just introduced -> it must fix them before finishing
             for vf in val_fails:
                 results.append("VALIDATION FAILED on %s: %s -- you broke this file, fix it now." % (vf["path"], vf["error"]))
+            for qy in searches:
+                qy = qy.strip()
+                if not qy:
+                    continue
+                yield _sse("step", icon="\U0001F50E", text="search  " + qy[:140])
+                hits = _code_search(ws, qy)
+                out = "\n".join(hits) if hits else "(no matches)"
+                yield _sse("output", label="search: " + qy[:80], text=out[:4000])
+                results.append("SEARCH '%s' (path:line: text):\n%s" % (qy, out))
             for cmd in runs:
                 cmd = cmd.strip()
                 if not cmd:
@@ -2392,21 +2517,31 @@ async def code_agent(req: Request):
                     out = f"(error: {e})"
                 yield _sse("output", label=cmd[:90], text=out[:4000])
                 results.append("$ " + cmd + "\n" + out)
-            for rel in reads:
-                rel = rel.strip()
-                if not rel:
+            for spec in reads:
+                spec = spec.strip()
+                if not spec:
                     continue
-                yield _sse("step", icon="\U0001F4C4", text="read  " + rel[:140])
+                # optional line range: "path/to/file.py:120-180" reads just those lines
+                rel = spec; lo = hi = None
+                rng = re.match(r'^(.*?):(\d+)-(\d+)$', spec)
+                if rng:
+                    rel = rng.group(1).strip(); lo = int(rng.group(2)); hi = int(rng.group(3))
+                yield _sse("step", icon="\U0001F4C4", text="read  " + spec[:140])
                 try:
                     rf = _code_path(ws, rel)
-                    if rf.is_file() and rf.suffix.lower() not in _CODE_BIN_EXT and rf.stat().st_size <= _CODE_TEXT_MAX:
-                        txt = rf.read_text(encoding="utf-8", errors="replace")[:20000]
-                    else:
+                    if not (rf.is_file() and rf.suffix.lower() not in _CODE_BIN_EXT and rf.stat().st_size <= _CODE_TEXT_MAX):
                         txt = "(binary or too large to read)"
+                    elif lo is not None:
+                        all_lines = rf.read_text(encoding="utf-8", errors="replace").splitlines()
+                        lo = max(1, lo); hi = min(len(all_lines), hi)
+                        txt = "\n".join(all_lines[lo - 1:hi])[:16000]
+                    else:
+                        txt = rf.read_text(encoding="utf-8", errors="replace")[:24000]
                 except Exception as e:
                     txt = f"(error: {e})"
-                yield _sse("output", label=rel[:90], text=(txt[:1500] + (" ..." if len(txt) > 1500 else "")))
-                results.append("FILE " + rel + ":\n" + txt)
+                label = rel + (":%d-%d" % (lo, hi) if lo is not None else "")
+                yield _sse("output", label=label[:90], text=(txt[:1500] + (" ..." if len(txt) > 1500 else "")))
+                results.append("FILE " + label + ":\n" + txt)
 
             feedback = ("TOOL RESULTS:\n\n" + "\n\n".join(results) +
                         "\n\nUse these results to continue. Fix any FAILED items first. When the "
