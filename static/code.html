@@ -52,6 +52,24 @@
   .tree .head .grow{flex:1}
   .icon-btn{background:none;border:none;color:var(--text-3);font-size:13px;padding:3px 5px;border-radius:6px}
   .icon-btn:hover{color:var(--text);background:var(--panel-2)}
+  /* left-panel tabs + sessions list (Claude-Code-style) */
+  .ltab{background:none;border:none;font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-4);padding:4px 7px;border-radius:6px;cursor:pointer}
+  .ltab:hover{color:var(--text-2)}
+  .ltab.on{color:var(--text);background:var(--panel-2)}
+  .lpane{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .newsess{margin:9px 9px 4px;padding:8px 11px;background:var(--steel);color:#06161b;border:none;border-radius:9px;font:700 12px Inter;cursor:pointer;text-align:left}
+  .newsess:hover{filter:brightness(1.08)}
+  .reclabel{font:700 10px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-4);padding:8px 13px 4px}
+  .sesslist{flex:1;overflow:auto;padding:0 6px 16px}
+  .sessrow{padding:8px 10px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px}
+  .sessrow:hover{background:var(--panel-2)} .sessrow.on{background:var(--panel-2)}
+  .sessrow .sdot{width:6px;height:6px;border-radius:50%;background:var(--text-4);flex:0 0 auto}
+  .sessrow.on .sdot{background:var(--teal);box-shadow:0 0 7px rgba(43,182,168,.6)}
+  .sessrow .stitle{flex:1;font-size:12.5px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sessrow:hover .stitle{color:var(--text)}
+  .sessrow .sx{opacity:0;color:var(--text-4);font-size:12px;padding:0 3px}
+  .sessrow:hover .sx{opacity:.7} .sessrow .sx:hover{opacity:1;color:var(--bad)}
+  .sessempty{font-size:11.5px;color:var(--text-4);padding:14px 13px;line-height:1.5}
   .filelist{flex:1;overflow:auto;padding:6px 4px 16px}
   .node{font-size:12.5px;color:var(--text-2);padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;display:flex;align-items:center;gap:5px}
   .node:hover{background:var(--panel-2);color:var(--text)}
@@ -65,6 +83,11 @@
   .chat .head{padding:10px 14px;border-bottom:1px solid var(--hairline);font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);display:flex;align-items:center;gap:7px}
   .chat .head .glow{width:7px;height:7px;border-radius:50%;background:var(--steel);box-shadow:0 0 9px var(--steel)}
   .chat.claude .head .glow{background:var(--gold);box-shadow:0 0 11px var(--gold)}
+  .chat .head .grow{flex:1}
+  .agentact{font:600 11px Inter;letter-spacing:0;text-transform:none;color:var(--text-3);display:none;align-items:center;gap:7px}
+  .agentact.on{display:flex}
+  .agentact .spin{width:11px;height:11px;border:2px solid rgba(43,182,168,.25);border-top-color:var(--teal);border-radius:50%;animation:cspin .7s linear infinite;flex:0 0 auto}
+  @keyframes cspin{to{transform:rotate(360deg)}}
   .log{flex:1;overflow:auto;padding:18px 18% 14px;display:flex;flex-direction:column;gap:13px}
   @media(max-width:1100px){.log{padding:16px 8% 14px}}
   .msg{font-size:13.5px;line-height:1.55;max-width:100%}
@@ -200,13 +223,10 @@
 <input type="file" id="fileInput" accept="image/*" multiple hidden>
 <div class="wrap">
   <div class="top">
-    <div class="ccswitch">
-      <a class="cc" href="/" title="Go to Chat">💬 Chat</a>
-      <span class="cc on">⌨ Code</span>
-    </div>
-    <span class="sep"></span>
-    <select class="tb" id="wsSel" title="Workspace"></select>
-    <button class="tb" id="newWs" title="New workspace">＋ ws</button>
+    <!-- Chat/Code toggle removed: this window is opened from the home Code button and closed with the ✕ top-right -->
+    <!-- top workspace dropdown + ws hidden: the bottom 📁 chip is the single workspace control (drives this select under the hood) -->
+    <select class="tb" id="wsSel" title="Workspace" style="display:none"></select>
+    <button class="tb" id="newWs" title="New workspace" style="display:none">＋ ws</button>
     <span class="sep"></span>
     <button class="tb" id="newFile">＋ New file</button>
     <button class="tb primary" id="saveBtn">Save</button>
@@ -214,17 +234,32 @@
   </div>
 
   <div class="body">
-    <!-- LEFT: files -->
+    <!-- LEFT: sessions (default) + files (tucked behind a tab), like Claude Code -->
     <div class="tree">
-      <div class="head"><span class="grow" id="wsLabel">files</span><button class="icon-btn" id="refreshTree" title="Refresh">⟳</button></div>
-      <div class="filelist" id="filelist"></div>
+      <div class="head">
+        <button class="ltab on" id="tabSessions">Sessions</button>
+        <button class="ltab" id="tabFiles">Files</button>
+        <span class="grow"></span>
+        <span id="wsLabel" style="display:none"></span>
+        <button class="icon-btn" id="refreshTree" title="Refresh files">⟳</button>
+      </div>
+      <!-- Sessions pane -->
+      <div class="lpane" id="paneSessions">
+        <button id="newSessionBtn" class="newsess">＋ New session</button>
+        <div class="reclabel">RECENT</div>
+        <div id="sessionList" class="sesslist"></div>
+      </div>
+      <!-- Files pane (hidden until you click the Files tab) -->
+      <div class="lpane" id="paneFiles" style="display:none">
+        <div class="filelist" id="filelist"></div>
+      </div>
     </div>
 
     <div class="gutter" id="gutterL" title="Drag to resize"></div>
 
     <!-- CENTER: the conversation -->
     <div class="chat">
-      <div class="head"><span class="glow"></span>Coding agent</div>
+      <div class="head"><span class="glow"></span>Coding agent<span class="grow"></span><span id="agentAct" class="agentact"></span></div>
       <div class="log" id="log">
         <div class="hint">Tell me what to build or change.<br>I can see your file tree and the open file, and I'll write the files directly into this workspace.</div>
       </div>
@@ -311,6 +346,72 @@ function isClaudeish(id){ return /claude|anthropic|opus|sonnet|haiku/i.test(mode
   if(pick) selectModel(pick,false);
   await loadWorkspaces();
 })();
+
+/* ── left-panel tabs: Sessions (default) / Files ── */
+$("tabSessions").onclick=()=>{ $("tabSessions").classList.add("on"); $("tabFiles").classList.remove("on"); $("paneSessions").style.display="flex"; $("paneFiles").style.display="none"; };
+$("tabFiles").onclick=()=>{ $("tabFiles").classList.add("on"); $("tabSessions").classList.remove("on"); $("paneFiles").style.display="flex"; $("paneSessions").style.display="none"; loadTree(); };
+
+/* ── sessions: New session + Recents, persisted per browser (localStorage) ── */
+const SESS_KEY="dmv-code-sessions";
+let SESSIONS=[], curSessId=null;
+function loadSessions(){ try{SESSIONS=JSON.parse(localStorage.getItem(SESS_KEY)||"[]");}catch(e){SESSIONS=[];} renderSessions(); }
+function saveSessions(){ try{localStorage.setItem(SESS_KEY,JSON.stringify(SESSIONS.slice(0,40)));}catch(e){} }
+function renderSessions(){
+  const el=$("sessionList"); if(!el) return; el.innerHTML="";
+  if(!SESSIONS.length){ el.innerHTML='<div class="sessempty">No sessions yet. Ask Kit something below — your chats show up here.</div>'; return; }
+  SESSIONS.forEach(s=>{
+    const r=document.createElement("div"); r.className="sessrow"+(s.id===curSessId?" on":"");
+    r.innerHTML='<span class="sdot"></span><span class="stitle"></span><span class="sx" title="Delete">✕</span>';
+    r.querySelector(".stitle").textContent=s.title||"Untitled";
+    r.onclick=e=>{ if(!e.target.classList.contains("sx")) openSession(s.id); };
+    r.querySelector(".sx").onclick=e=>{ e.stopPropagation(); SESSIONS=SESSIONS.filter(x=>x.id!==s.id); if(curSessId===s.id) curSessId=null; saveSessions(); renderSessions(); };
+    el.appendChild(r);
+  });
+}
+function newSession(){
+  curSessId=null; history.length=0; curFile=null; closeEditor();
+  $("log").innerHTML='<div class="hint">Tell me what to build or change.<br>I can see your file tree and the open file, and I\'ll write the files directly into this workspace.</div>';
+  renderSessions(); ask.focus();
+}
+function ensureSession(firstMsg){
+  if(curSessId) return;
+  curSessId="s"+Date.now();
+  SESSIONS.unshift({ id:curSessId, title:(firstMsg||"New session").slice(0,46), ts:Date.now(), ws:WS, history:[] });
+  saveSessions(); renderSessions();
+}
+function persistSession(){
+  if(!curSessId) return;
+  const s=SESSIONS.find(x=>x.id===curSessId); if(!s) return;
+  s.history=history.slice(-40); s.ts=Date.now(); s.ws=WS; saveSessions();
+}
+function openSession(id){
+  const s=SESSIONS.find(x=>x.id===id); if(!s) return;
+  curSessId=id; history=Array.isArray(s.history)?s.history.slice():[];
+  $("log").innerHTML="";
+  history.forEach(m=>{
+    const txt=typeof m.content==="string"?m.content:"[image]";
+    if(m.role==="user") addMsg("user", txt);
+    else { const d=addMsg("ai",""); d.innerHTML=mdToHtml(txt); }
+  });
+  if(!history.length) $("log").innerHTML='<div class="hint">Empty session — say something below.</div>';
+  renderSessions(); ask.focus();
+}
+$("newSessionBtn").onclick=newSession;
+loadSessions();
+
+/* ── live activity readout: spinner + label + token estimate + elapsed (like Claude Code) ── */
+let actTimer=null, actStart=0, actTokens=0, actLabel="thinking";
+function actBegin(){ actStart=Date.now(); actTokens=0; actLabel="thinking"; $("agentAct").classList.add("on"); actRender(); actTimer=setInterval(actRender,250); }
+function actRender(){
+  const el=$("agentAct"); if(!el) return;
+  const secs=Math.max(0,Math.round((Date.now()-actStart)/1000));
+  const tk=actTokens>=1000?(actTokens/1000).toFixed(1)+"k":String(actTokens);
+  el.innerHTML='<span class="spin"></span><span>'+actLabel+' · '+tk+' tokens · '+secs+'s</span>';
+}
+function actAddTokens(text){ actTokens+=Math.ceil((text||"").length/4); }
+function actSet(label){ actLabel=label; actRender(); }
+function actEnd(){ if(actTimer){clearInterval(actTimer);actTimer=null;} const el=$("agentAct"); if(el){ el.classList.remove("on"); el.innerHTML=""; } }
+
 function selectModel(id,save=true){
   curModel=id; $("modelName").textContent=modelLabel(id);
   if(save) localStorage.setItem("dmv-code-model",id);
@@ -609,11 +710,12 @@ async function sendAgent(){
   const q=ask.value.trim(); if(!q && !ATT.length) return;
   if(!curModel){ setStatus("pick a model first","err"); return; }
   const hint=$("log").querySelector(".hint"); if(hint) hint.remove();
+  ensureSession(q);
   const imgs=ATT.slice(); ATT.length=0; renderThumbs();
   ask.value=""; ask.style.height="auto";
   addMsg("user", q + (imgs.length?("  📎×"+imgs.length):""));
   const aiEl=addMsg("ai",""); aiEl.textContent="…";
-  busy=true; controller=new AbortController();
+  busy=true; controller=new AbortController(); actBegin();
   const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
 
   const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs };
@@ -634,15 +736,17 @@ async function sendAgent(){
         if(!line.startsWith("data: ")) continue;
         let ev; try{ ev=JSON.parse(line.slice(6)); }catch{ continue; }
         if(ev.type==="round"){
+          actSet("thinking");
           if(ev.n>0){ fullAll+=acc+"\n"; acc=""; curBubble=newBubble(); thinkBox=null; thinkBody=null; thinkAcc=""; }
         }
         else if(ev.type==="reasoning"){
+          actSet("thinking"); actAddTokens(ev.text);
           thinkAcc+=ev.text;
           if(!thinkBox){ thinkBox=document.createElement("details"); thinkBox.className="thinkbox"; thinkBox.innerHTML='<summary>💭 thinking…</summary><div class="tbody"></div>'; $("log").insertBefore(thinkBox,curBubble); thinkBody=thinkBox.querySelector(".tbody"); }
           thinkBody.textContent=thinkAcc; $("log").scrollTop=$("log").scrollHeight;
         }
-        else if(ev.type==="delta"){ acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
-        else if(ev.type==="step"){ stepLine(ev.icon||"·", ev.text||""); }
+        else if(ev.type==="delta"){ actSet("writing"); actAddTokens(ev.text); acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
+        else if(ev.type==="step"){ actSet((ev.text||"").trim().startsWith("read")?"reading":"running"); stepLine(ev.icon||"·", ev.text||""); }
         else if(ev.type==="output"){ const d=document.createElement("details"); d.className="outbox"; d.innerHTML='<summary>▸ '+_esc(ev.label||"output")+'</summary><pre>'+_esc(ev.text||"")+'</pre>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
         else if(ev.type==="status"){ setStatus(ev.text,""); }
         else if(ev.type==="error"){ curBubble.innerHTML=mdToHtml(acc)+'<br>⚠ '+_esc(ev.text); setStatus(ev.text,"err"); }
@@ -654,9 +758,10 @@ async function sendAgent(){
     else{ curBubble.innerHTML=mdToHtml(acc)+"<br>⚠ connection dropped"; }
   }
   finally{
-    busy=false; controller=null;
+    busy=false; controller=null; actEnd();
     const sb2=$("sendBtn"); sb2.classList.remove("stop"); sb2.textContent="➤"; sb2.title=""; sb2.disabled=false;
     history.push({role:"user",content:q}); history.push({role:"assistant",content:(fullAll+acc).slice(0,4000)});
+    persistSession();
   }
 }
 function renderApplied(aiEl, ev){
