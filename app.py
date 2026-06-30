@@ -1666,7 +1666,9 @@ CODE_AGENT_SYSTEM = (
     "  1. ```read the file(s) you need  ->  2. see the contents  ->  3. ```write the fix  ->  4. say what you did.\n"
     "For a big task: read a few files, run a grep to find the right spot, THEN make the change. "
     "Never write a file blind. Work in steps, like a real engineer. When the task is fully done, "
-    "give a short final summary with NO more read/run blocks.\n\n"
+    "give a short final summary with NO more read/run blocks.\n"
+    "The room AUTO-CHECKS every Python/JSON file you touch. If it says VALIDATION FAILED, you "
+    "broke that file -- fix it immediately before you finish. Never end with a broken file.\n\n"
     "== THIS APP: DEMARTINVILLE ==\n"
 "You are the coding agent INSIDE DeMartinville \u2014 a Python/FastAPI desktop app running on port 7777. "  
 "Know the stack so you can tell him exactly what to do after every change.\n\n"
@@ -1823,6 +1825,37 @@ def _apply_edits(ws, full):
             except Exception as e:
                 failures.append({"path": rel, "reason": "write failed: %s" % e})
     return changed, failures
+
+
+def _validate_changed(ws, changed):
+    """Cheap, in-process sanity check on files Kit just wrote/edited, so it catches
+    its own corruption before declaring done. Python -> syntax compile; JSON -> parse.
+    Returns [{'path':.., 'error':..}] for files that no longer parse. Other types skip
+    (no false alarms — a real linter is a later phase)."""
+    fails = []
+    for rel in dict.fromkeys(changed):     # dedupe, keep order
+        try:
+            f = _code_path(ws, rel)
+        except Exception:
+            continue
+        ext = f.suffix.lower()
+        try:
+            src = f.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        if ext in (".py", ".pyw"):
+            try:
+                compile(src, str(f), "exec")
+            except SyntaxError as e:
+                fails.append({"path": rel, "error": "SyntaxError line %s: %s" % (e.lineno, e.msg)})
+            except Exception:
+                pass
+        elif ext == ".json":
+            try:
+                json.loads(src)
+            except Exception as e:
+                fails.append({"path": rel, "error": "Invalid JSON: %s" % e})
+    return fails
 
 
 @app.get("/api/code/workspaces")
@@ -2259,18 +2292,26 @@ async def code_agent(req: Request):
                 yield _sse("applied", changed=changed, errors=errors)
                 all_changed += changed; all_errors += errors
 
+            # 1c) validate what was just written — Kit fixes its own syntax breaks
+            val_fails = _validate_changed(ws, changed) if changed else []
+            for vf in val_fails:
+                yield _sse("step", icon="⚠", text="broke  %s — %s" % (vf["path"], vf["error"][:90]))
+
             # 2) gather tool calls: ```run (shell) and ```read (file)
             runs = re.findall(r'```run\s*\r?\n(.*?)\r?\n```', full, re.S)
             reads = re.findall(r'```read\s*\r?\n(.*?)\r?\n```', full, re.S)
 
-            # A failed edit must loop back so Kit can fix it — not end the turn.
-            if not runs and not reads and not edit_fails:
-                break   # no tool calls and no failed edits -> the agent is done
+            # Failed edits OR broken syntax must loop back so Kit fixes it — not end the turn.
+            if not runs and not reads and not edit_fails and not val_fails:
+                break   # nothing pending -> the agent is done
 
             results = []
             # failed edits go back as tool results so Kit re-reads and retries surgically
             for ef in edit_fails:
                 results.append("EDIT FAILED on %s: %s" % (ef["path"], ef["reason"]))
+            # syntax/parse breaks Kit just introduced -> it must fix them before finishing
+            for vf in val_fails:
+                results.append("VALIDATION FAILED on %s: %s -- you broke this file, fix it now." % (vf["path"], vf["error"]))
             for cmd in runs:
                 cmd = cmd.strip()
                 if not cmd:
@@ -2304,8 +2345,9 @@ async def code_agent(req: Request):
                 results.append("FILE " + rel + ":\n" + txt)
 
             feedback = ("TOOL RESULTS:\n\n" + "\n\n".join(results) +
-                        "\n\nUse these results to continue the task. When you are fully done, "
-                        "give your final summary with NO more run/read blocks.")
+                        "\n\nUse these results to continue. Fix any FAILED items first. When the "
+                        "task is fully done and nothing is broken, give a short final summary with "
+                        "NO more read/run/edit/write blocks.")
             tail = [{"role": "assistant", "content": full[:6000]},
                     {"role": "user", "content": feedback}]
             work_std = work_std + tail
