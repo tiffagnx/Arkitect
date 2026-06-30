@@ -109,27 +109,24 @@ def start_server():
     if _port_open():
         return None
     os.chdir(ROOT)
-    if FROZEN:
-        sys.path.insert(0, ROOT)
-        import app as _appmod
-        cfg = uvicorn.Config(_appmod.app, host=HOST, port=PORT, log_level="warning")
-        server = uvicorn.Server(cfg)
+    # ALWAYS run the engine IN-PROCESS (dev + frozen). The old script-mode path spawned
+    # 'pythonw -m uvicorn --reload'; the reload watcher dies silently under the windowless
+    # launcher, so the engine never bound 7777 → "engine didn't start" / dead window.
+    # In-process = no child, no --reload watcher; rock-solid startup.
+    sys.path.insert(0, ROOT)
+    import app as _appmod
+    cfg = uvicorn.Config(_appmod.app, host=HOST, port=PORT, log_level="warning")
+    server = uvicorn.Server(cfg)
 
-        def _run():
-            try:
-                server.run()
-            except Exception:
-                import traceback
-                traceback.print_exc()   # lands in arkitect-run.log via the stdout sink
+    def _run():
+        try:
+            server.run()
+        except Exception:
+            import traceback
+            traceback.print_exc()   # lands in arkitect-run.log via the stdout sink
 
-        threading.Thread(target=_run, daemon=True).start()
-        return server
-    args = [sys.executable, "-m", "uvicorn", "app:app", "--host", HOST, "--port", str(PORT)]
-    if os.path.isdir(os.path.join(ROOT, ".git")):
-        args += ["--reload"]
-    CREATE_NO_WINDOW = 0x08000000
-    flags = CREATE_NO_WINDOW if sys.platform == "win32" else 0
-    return subprocess.Popen(args, cwd=ROOT, creationflags=flags)
+    threading.Thread(target=_run, daemon=True).start()
+    return server
 
 
 _PERMISSION_HANDLERS = []  # keep the .NET delegates alive for the process
