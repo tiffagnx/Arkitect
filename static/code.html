@@ -114,6 +114,17 @@
   .ichip.ic-run{background:rgba(43,182,168,.09);border:1px solid rgba(43,182,168,.22);color:var(--teal)}
   .ichip.ic-edit{background:rgba(95,180,206,.10);border:1px solid rgba(95,180,206,.24);color:var(--steel-2)}
   .ichip.ic-write{background:rgba(230,193,106,.08);border:1px solid rgba(230,193,106,.2);color:var(--gold)}
+  .rerun-note{font-size:11.5px;color:var(--steel-2);font-style:italic}
+  .blockcard{align-self:flex-start;max-width:85%;background:rgba(224,121,106,.07);border:1px solid rgba(224,121,106,.35);border-radius:11px;padding:11px 13px;margin:4px 0}
+  .bc-head{font:700 12px Oxanium;letter-spacing:.3px;color:var(--bad);margin-bottom:4px}
+  .bc-reason{font-size:11.5px;color:var(--text-3);margin-bottom:7px}
+  .bc-cmd{background:var(--bg0);border:1px solid var(--hairline);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:11.5px;color:var(--text-2);overflow:auto;margin:0 0 9px}
+  .bc-btns{display:flex;gap:8px;align-items:center}
+  .bc-ok{background:linear-gradient(180deg,var(--bad),#cf6452);color:#1a0c08;border:none;border-radius:8px;padding:6px 13px;font:700 12px Inter;cursor:pointer}
+  .bc-ok:hover{filter:brightness(1.08)}
+  .bc-no{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:8px;padding:6px 13px;font:600 12px Inter;cursor:pointer}
+  .bc-no:hover{color:var(--text)}
+  .bc-done{font-size:11.5px;color:var(--text-3);font-style:italic}
   .hint{color:var(--text-4);font-size:13px;text-align:center;margin:auto;padding:24px;line-height:1.6;max-width:440px}
   .scope{font-size:11px;color:var(--text-4);padding:0 18px 6px;text-align:center}
 
@@ -721,6 +732,8 @@ function mdToHtml(t){
 
 /* ── coding agent ── */
 let busy=false, controller=null;
+let APPROVED=[];            // dangerous commands B approved this session
+let lastInstruction="";    // for approve-and-rerun
 const ask=$("ask");
 ask.addEventListener("input", ()=>{ ask.style.height="auto"; ask.style.height=Math.min(200,ask.scrollHeight)+"px"; });
 ask.addEventListener("keydown", e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); if(!busy) sendAgent(); } });
@@ -728,20 +741,22 @@ $("sendBtn").onclick = () => { if(busy){ if(controller) controller.abort(); } el
 
 function addMsg(cls, text){ const d=document.createElement("div"); d.className="msg "+cls; d.textContent=text||""; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; return d; }
 
-async function sendAgent(){
+async function sendAgent(forceText){
   if(busy) return;
-  const q=ask.value.trim(); if(!q && !ATT.length) return;
+  const rerun = typeof forceText==="string";          // approve-and-rerun path
+  const q = rerun ? forceText : ask.value.trim();
+  if(!q && !ATT.length) return;
   if(!curModel){ setStatus("pick a model first","err"); return; }
   const hint=$("log").querySelector(".hint"); if(hint) hint.remove();
-  ensureSession(q);
-  const imgs=ATT.slice(); ATT.length=0; renderThumbs();
-  ask.value=""; ask.style.height="auto";
-  addMsg("user", q + (imgs.length?("  📎×"+imgs.length):""));
+  ensureSession(q); lastInstruction=q;
+  const imgs = rerun ? [] : ATT.slice(); if(!rerun){ ATT.length=0; renderThumbs(); }
+  if(!rerun){ ask.value=""; ask.style.height="auto"; addMsg("user", q + (imgs.length?("  📎×"+imgs.length):"")); }
+  else { const n=addMsg("ai",""); n.innerHTML='<span class="rerun-note">▶ approved — re-running</span>'; }
   const aiEl=addMsg("ai",""); aiEl.textContent="…";
   busy=true; controller=new AbortController(); actBegin();
   const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
 
-  const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs };
+  const body={ ws:WS, model:curModel, instruction:q, open_path:curFile||"", history:history.slice(-6), effort:getEffort(), images:imgs, approved_cmds:APPROVED.slice() };
   let acc="";                 // current bubble's answer text
   let fullAll="";             // everything across rounds (for history)
   let curBubble=aiEl;         // active answer bubble
@@ -771,6 +786,7 @@ async function sendAgent(){
         else if(ev.type==="delta"){ actSet("writing"); actAddTokens(ev.text); acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
         else if(ev.type==="step"){ actSet((ev.text||"").trim().startsWith("read")?"reading":"running"); stepLine(ev.icon||"·", ev.text||""); }
         else if(ev.type==="output"){ const d=document.createElement("details"); d.className="outbox"; d.innerHTML='<summary>▸ '+_esc(ev.label||"output")+'</summary><pre>'+_esc(ev.text||"")+'</pre>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
+        else if(ev.type==="blocked"){ renderBlocked(ev.cmd||"", ev.reason||""); actSet("waiting on you"); }
         else if(ev.type==="status"){ setStatus(ev.text,""); }
         else if(ev.type==="error"){ curBubble.innerHTML=mdToHtml(acc)+'<br>⚠ '+_esc(ev.text); setStatus(ev.text,"err"); }
         else if(ev.type==="applied"){ renderApplied(curBubble, ev); }
@@ -796,6 +812,21 @@ function renderApplied(aiEl, ev){
     if(ev.changed&&ev.changed.includes(curFile)) openFile(curFile);
     setStatus((ev.changed||[]).length+" file(s) written","ok");
   }
+}
+
+function renderBlocked(cmd, reason){
+  const card=document.createElement("div"); card.className="blockcard";
+  card.innerHTML='<div class="bc-head">🛑 Blocked — needs your OK</div>'
+    +'<div class="bc-reason">'+_esc(reason)+'</div>'
+    +'<pre class="bc-cmd">'+_esc(cmd)+'</pre>'
+    +'<div class="bc-btns"><button class="bc-ok">Approve &amp; run</button><button class="bc-no">Skip it</button></div>';
+  $("log").appendChild(card); $("log").scrollTop=$("log").scrollHeight;
+  card.querySelector(".bc-ok").onclick=()=>{
+    if(!APPROVED.includes(cmd)) APPROVED.push(cmd);
+    card.querySelector(".bc-btns").innerHTML='<span class="bc-done">✓ approved — re-running</span>';
+    if(!busy) sendAgent(lastInstruction);
+  };
+  card.querySelector(".bc-no").onclick=()=>{ card.querySelector(".bc-btns").innerHTML='<span class="bc-done">skipped</span>'; };
 }
 
 /* ── resizable panels (drag the gutters; persists) ── */

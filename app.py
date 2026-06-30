@@ -1827,6 +1827,25 @@ def _apply_edits(ws, full):
     return changed, failures
 
 
+_RED_CMD_PATTERNS = [
+    r'\brm\s+-', r'\brm\s+\S', r'\brmdir\b', r'\brd\s+/s', r'\bdel\s', r'\berase\s',
+    r'\bformat\s', r'\bmkfs\b', r'\bdd\s+if=', r'>\s*/dev/sd',
+    r'\bshutdown\b', r'\breboot\b', r'\bhalt\b', r'\bpoweroff\b',
+    r'\bgit\s+push\b', r'\bgit\s+reset\s+--hard', r'\bgit\s+clean\b', r'\bgit\s+checkout\s+--',
+    r'\bnpm\s+publish\b', r'\byarn\s+publish\b', r'\bpip\s+uninstall\b',
+    r'\bremove-item\b', r'\btaskkill\b', r'\bkillall\b', r'\bchmod\s+-R\b', r'\bchown\s+-R\b',
+    r':\(\)\s*\{',
+]
+_RED_CMD_RE = re.compile("|".join(_RED_CMD_PATTERNS), re.I)
+
+
+def _cmd_is_dangerous(cmd):
+    """True if a shell command is destructive / irreversible / outward-facing
+    (delete, format, push, publish, kill, shutdown). Those get blocked for B's
+    explicit approval instead of auto-running."""
+    return bool(_RED_CMD_RE.search(cmd or ""))
+
+
 def _validate_changed(ws, changed):
     """Cheap, in-process sanity check on files Kit just wrote/edited, so it catches
     its own corruption before declaring done. Python -> syntax compile; JSON -> parse.
@@ -2143,6 +2162,8 @@ async def code_agent(req: Request):
     open_path = (body.get("open_path") or "").strip()
     raw_history = _hist_msgs(body.get("history") or [])
     effort = str(body.get("effort") or "low").lower()
+    # dangerous commands B has explicitly approved (set when he clicks Approve on a blocked card)
+    approved_cmds = set(c.strip() for c in (body.get("approved_cmds") or []) if isinstance(c, str))
 
     try:
         root = _ws_root(ws)
@@ -2315,6 +2336,14 @@ async def code_agent(req: Request):
             for cmd in runs:
                 cmd = cmd.strip()
                 if not cmd:
+                    continue
+                # risk gate: destructive/outward-facing commands need B's explicit OK
+                if _cmd_is_dangerous(cmd) and cmd not in approved_cmds:
+                    yield _sse("blocked", cmd=cmd,
+                               reason="destructive or outward-facing — needs your approval")
+                    results.append("BLOCKED (NOT run -- waiting on B's approval): " + cmd +
+                                   "\nDo not retry this command. Tell B what it would do and that "
+                                   "it needs his approval, then continue with everything else.")
                     continue
                 yield _sse("step", icon="⌘", text="ran  " + cmd[:140])
                 try:
