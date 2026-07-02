@@ -305,6 +305,7 @@
      <div class="kit-roster"></div>
      <div class="kit-hint">drag an agent into the room, or tap to bring them in</div>
      <div class="kit-tier"><span class="kt-l">Brain</span><select class="kt-model kt-pill" id="ktModel" title="This agent's brain"></select><button class="kt-effort kt-pill" id="ktEffort" type="button" title="How hard this agent thinks — tap to change. 🔱 God unlocks on a Claude brain.">⚡ Quick</button><button class="kt-crew kt-pill" id="ktCrew" type="button" title="Back this agent with a crew of other brains — they weigh in, this agent gives you the answer">+ crew</button><button class="kt-keylink" title="Get a cloud key — turns on a cloud brain">🔑 key</button></div>
+     <div class="kit-tier kit-imgtier"><span class="kt-l">Image</span><select class="kt-model kt-pill" id="ktImgModel" title="Which image model she generates with — a tool she carries into every visual room"></select></div>
      <div class="kit-body"></div>
      <div class="kit-pic"></div>
      <div class="kit-foot"><div class="kit-vm" aria-hidden="true"></div>
@@ -560,6 +561,66 @@
     const d = document.createElement("div"); d.className = "kit-msg " + who;
     if (who === "kit") d.innerHTML = fmt(text); else d.textContent = text;
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
+  }
+
+  // ── SHE GENERATES IN HER OWN WINDOW — the whole point of the 🖼 Image model living up top. When the
+  //    brain says "make this", she fires the image right here on HER selected model + your key, and drops
+  //    the result straight into the chat. A "→ Animation Station" button (when the room can take it)
+  //    pushes it onward. Works in EVERY room — she's a mobile image generator. ──
+  function showGenImage(url, prompt) {
+    const d = document.createElement("div"); d.className = "kit-msg kit";
+    const canPush = !!(window.RoomAPI && typeof window.RoomAPI.addImage === "function");
+    d.innerHTML =
+      '<img src="' + url + '" alt="" style="max-width:100%;border-radius:10px;display:block;margin:2px 0 6px">' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+        (canPush ? '<button class="kit-gen-push kt-pill" type="button" style="cursor:pointer">→ Animation Station</button>' : '') +
+        '<a href="' + url + '" download style="font:600 11px Inter;color:#9fd7e8;text-decoration:none">⤓ Save</a>' +
+      '</div>';
+    body.appendChild(d); body.scrollTop = body.scrollHeight;
+    const pb = d.querySelector(".kit-gen-push");
+    if (pb) pb.onclick = () => {
+      try { window.RoomAPI.addImage(url, prompt); pb.textContent = "✓ sent"; pb.disabled = true; }
+      catch (e) { addMsg("kit", "(couldn't send it over — " + (e.message || e) + ")"); }
+    };
+    return d;
+  }
+  // a creeping progress bar — Kie gives no real %, so this is an honest time-estimate that snaps to
+  // 100 on the actual result. So you SEE it working; never a frozen window.
+  function makeProgress(label) {
+    const d = document.createElement("div"); d.className = "kit-msg kit";
+    d.innerHTML = '<div style="font:600 11px Inter;color:#bfe6f2;margin-bottom:5px">' + label + '</div>' +
+      '<div style="height:7px;background:rgba(120,182,205,.18);border-radius:6px;overflow:hidden">' +
+      '<div class="kgpbar" style="height:100%;width:4%;background:linear-gradient(90deg,#3e9cb8,#7cc7dc);border-radius:6px;transition:width .6s ease"></div></div>';
+    body.appendChild(d); body.scrollTop = body.scrollHeight;
+    const bar = d.querySelector(".kgpbar");
+    let w = 4; const t = setInterval(() => { w += Math.max(0.4, (93 - w) * 0.055); if (w > 95) w = 95; bar.style.width = w + "%"; }, 700);
+    return { done() { clearInterval(t); bar.style.width = "100%"; setTimeout(() => { try { d.remove(); } catch (_) {} }, 280); }, fail() { clearInterval(t); try { d.remove(); } catch (_) {} } };
+  }
+  // which brain is active + how reliable it is at FIRING the make (small local brains fumble tool-calls)
+  function brainInfo() {
+    const v = modelSel ? modelSel.value : "";
+    const name = (modelSel && modelSel.selectedIndex >= 0) ? String(modelSel.options[modelSel.selectedIndex].text || "your brain").replace(/^🖥\s*/, "") : "your brain";
+    return { isLocal: !/^cloud:/.test(v), name: name };
+  }
+  const IMG_RECO = "For making images reliably, switch **Brain** (up top) to a cloud model — tap 🔑 to drop in your key. Those fire it every time. Local brains can do it, but the smaller ones (a 4B like this) are hit-or-miss at it.";
+  let _localBrainWarned = false;
+  async function genImageInWindow(a, refImage) {
+    const img = window.__dmvImg;
+    if (!img || !img.model) { addMsg("kit", "Pick an image model up top first (the 🖼 Image row), then ask me to make it."); return; }
+    const prompt = (a && a.prompt) ? String(a.prompt).trim() : "";
+    const bi = brainInfo();
+    if (!prompt) { addMsg("kit", "I caught that you want an image, but **" + bi.name + "** didn't hand me a clean prompt to run — that's the small-brain fumble. " + IMG_RECO); return; }
+    if (bi.isLocal && !_localBrainWarned) { _localBrainWarned = true; addMsg("kit", "Heads up — you're on **" + bi.name + "** (a local brain). I'll make this now, but if generating ever gets flaky, that's the reason. " + IMG_RECO); }
+    const prog = makeProgress("🎨 Making it on " + img.model + " — ~10–60s, on your key…");
+    const media = refImage ? { images: [refImage] } : {};
+    const payload = { provider: img.provider, kind: "image", model: img.model, mode: refImage ? "i2i" : "t2i", prompt: prompt, options: {}, media };
+    try {
+      const r = await fetch("/api/cloud/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (_) { throw new Error(txt.slice(0, 140) || ("server " + r.status)); }
+      if (!r.ok) { prog.fail(); throw new Error(j.error || ("server " + r.status)); }
+      if (j.ok && j.outputs && j.outputs[0]) { prog.done(); showGenImage(j.outputs[0], prompt); }
+      else { prog.fail(); addMsg("kit", "⚠ " + (j.error || "generation didn't come back — try again")); }
+    } catch (e) { try { prog.fail(); } catch (_) {} addMsg("kit", "⚠ " + (e.message || e)); }
   }
 
   // paint the active character into the header (sprite for Kit, lettered avatar for the rest)
@@ -920,6 +981,37 @@
   };
   { const _kl = win.querySelector(".kt-keylink"); if (_kl) _kl.onclick = () => { if (window.openKeys) window.openKeys("brain"); }; }
 
+  // ── 🖼 IMAGE tool — a shared agent tool that RIDES every room she docks in (added once, here,
+  //    not per-room). ALWAYS present — every agent (Tiff/Kit/built), EVERY room, even where you
+  //    can't fire it yet. Tools don't vanish; the ability is just there. Reads the user's OWN image
+  //    providers (/api/cloud/providers), writes window.__dmvImg {provider,model}; whatever room can
+  //    use it picks that up. Empty option → straight to the image keys in Settings. ──
+  {
+    const imgSel = win.querySelector("#ktImgModel");
+    if (imgSel) {
+      const applyImg = () => {
+        const v = imgSel.value;
+        if (!v) { window.__dmvImg = null; return; }
+        const i = v.indexOf("|"); window.__dmvImg = { provider: v.slice(0, i), model: v.slice(i + 1) };
+      };
+      const fillImg = (provs) => {
+        const opts = [];
+        (provs || []).forEach(p => (p.image_models || []).forEach(m => opts.push({ v: p.id + "|" + m, label: (p.name || p.id) + " · " + m })));
+        if (!opts.length) { imgSel.innerHTML = '<option value="">➕ add an image key in Settings…</option>'; window.__dmvImg = null; return; }
+        imgSel.innerHTML = opts.map(o => '<option value="' + o.v + '">' + o.label + '</option>').join("");
+        let saved = ""; try { saved = localStorage.getItem("dmv_img_model") || ""; } catch (_) {}
+        if (saved && [...imgSel.options].some(o => o.value === saved)) imgSel.value = saved;
+        applyImg();
+      };
+      imgSel.onchange = () => {
+        if (!imgSel.value) { if (window.openKeys) window.openKeys("media"); return; }
+        try { localStorage.setItem("dmv_img_model", imgSel.value); } catch (_) {}
+        applyImg();
+      };
+      fetch("/api/cloud/providers").then(r => r.json()).then(j => fillImg(j && j.providers)).catch(() => fillImg(null));
+    }
+  }
+
   // ── CREW (per-agent BREADTH) — back THIS agent with a team of OTHER brains the user picks. The
   //    agent you dragged in stays the LEAD (it speaks + drives the room); the crew weighs in and the
   //    agent synthesizes the best of it. Opt-in, per-agent. Storage mirrors the model picker:
@@ -1157,22 +1249,37 @@
             addMsg("kit", "*(+" + res.added + " learned — " + res.trained + "/20 trained)*"); }
         }).catch(() => {});
       }
-      // ── the agent DRIVES the room: run a server-validated action through the room's window.RoomAPI ──
-      if (j.action && window.RoomAPI && typeof window.RoomAPI.run === "function") {
+      // ── the brain asked to make something. Priority: if she's carrying an image model up top, SHE
+      //    generates it right here in her window (every room). Else fall back to the room's RoomAPI. ──
+      if (j.action) {
         const a = j.action;
+        const isVid = a.action === "generate_video";
+        const hasRoom = window.RoomAPI && typeof window.RoomAPI.run === "function";
         if (a.action === "fill_agent") {
-          try { window.RoomAPI.run(a); addMsg("kit", "✍️ Filling that in for you…"); }
-          catch (err) { addMsg("kit", "(couldn't fill the form — " + err.message + ")"); }
-        } else if (window.RoomAPI.room === "imagine-cloud" && window.RoomAPI.hasKey && !window.RoomAPI.hasKey()) {
-          addMsg("kit", "Drop your cloud key in the key box up top first, then ask me again — I'll fire it.");
-        } else {
-          addMsg("kit", "⚙ " + (a.action === "generate_video" ? "Generating that video…" : "Dropping the prompt in + generating…"));
-          try {
-            window.RoomAPI.run(a.action === "generate_video"
-              ? { kind: "video", prompt: a.prompt, seconds: a.seconds }
-              : { kind: "image", prompt: a.prompt, mode: a.mode, size: a.size, realism: a.realism, aspect: a.aspect, count: a.count, image: sentImage });
-          } catch (err) { addMsg("kit", "(couldn't drive the room — " + err.message + ")"); }
+          if (hasRoom) { try { window.RoomAPI.run(a); addMsg("kit", "✍️ Filling that in for you…"); } catch (err) { addMsg("kit", "(couldn't fill the form — " + err.message + ")"); } }
+        } else if (!isVid && window.__dmvImg && window.__dmvImg.model) {
+          // SHE makes it — in her own window, on her own model. This is the mobile image generator.
+          genImageInWindow(a, sentImage);
+        } else if (hasRoom) {
+          if (window.RoomAPI.room === "imagine-cloud" && window.RoomAPI.hasKey && !window.RoomAPI.hasKey()) {
+            addMsg("kit", "Drop your cloud key in the key box up top first, then ask me again — I'll fire it.");
+          } else {
+            addMsg("kit", "⚙ " + (isVid ? "Generating that video…" : "Dropping the prompt in + generating…"));
+            try {
+              window.RoomAPI.run(isVid
+                ? { kind: "video", prompt: a.prompt, seconds: a.seconds }
+                : { kind: "image", prompt: a.prompt, mode: a.mode, size: a.size, realism: a.realism, aspect: a.aspect, count: a.count, image: sentImage });
+            } catch (err) { addMsg("kit", "(couldn't drive the room — " + err.message + ")"); }
+          }
+        } else if (!isVid) {
+          addMsg("kit", "Pick an image model up top first (the 🖼 Image row), then ask me again — I'll make it right here.");
         }
+      } else if (window.__dmvImg && window.__dmvImg.model &&
+                 /\b(make|generate|create|draw|render|design)\b[\s\S]{0,40}\b(image|picture|pic|sprite|character|scene|world|art|photo|logo|portrait|background|drawing)\b/i.test(q || "")) {
+        // she just TALKED when you clearly wanted an image + no action fired → the local brain couldn't
+        // tool-call it. Say so + recommend, instead of leaving you wondering why nothing happened. ──
+        const bi = brainInfo();
+        if (bi.isLocal) addMsg("kit", "Looks like you wanted me to *make* an image, but **" + bi.name + "** just talked instead of firing it — that's the small local-brain fumble at tool-calls. " + IMG_RECO);
       }
     } catch (e) { think.remove(); addMsg("kit", "Connection hiccup — try me again."); }
     finally { busy = false; go.disabled = false; winSpr.setSpeed(3); input.focus(); }

@@ -905,11 +905,19 @@ async def swarm_save(req: Request):
            "ts": int(time.time())}
     provs = [p for p in provs if p["id"] != pid] + [row]
     _save_json(PROV_FILE, provs)
-    # secret rides separately; only overwrite when a new key is actually provided
+    # secret rides separately; only overwrite when a new key is actually provided. If the caller left
+    # the key blank but pointed at a sibling slot (adding another model under a provider they already
+    # added a key for), copy that sibling's key instead of forcing a re-paste.
     key = (d.get("api_key") or "").strip()
-    if key:
+    reuse_from = re.sub(r"[^a-zA-Z0-9-]", "", d.get("reuse_key_from") or "")
+    if key or reuse_from:
         async with _KEYS_LOCK:                            # re-read under lock so a concurrent save isn't clobbered
-            keys = _load_keys(); keys[pid] = key; _save_keys(keys)
+            keys = _load_keys()
+            if key:
+                keys[pid] = key
+            elif reuse_from in keys:
+                keys[pid] = keys[reuse_from]
+            _save_keys(keys)
     return {"ok": True, "id": pid}
 
 

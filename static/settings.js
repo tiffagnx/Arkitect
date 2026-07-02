@@ -115,6 +115,7 @@
 
   const $ = (id) => document.getElementById(id);
   let PRESETS = [];
+  let SAVED_PROVIDERS = [];   // last-loaded /api/swarm/providers list, so applyPreset() can offer key reuse
 
   // ── gear: drop into the topbar if there is one, else float top-right ──
   const gear = document.createElement("button");
@@ -335,6 +336,7 @@
   // MULTI-MODEL — one key → as many models as you want, each saved as its own brain (slot). The
   // chips are the models the user picked; Save loops them into one provider record each (same key).
   let pendingModels = [];
+  let reuseKeyId = null;   // sibling provider slot to copy the key from when the key box is left blank
   function renderChips() {
     const c = $("asModelChips"); if (!c) return; c.innerHTML = "";
     pendingModels.forEach((m, i) => {
@@ -372,6 +374,13 @@
     const dl = $("asModelList"); if (dl) { dl.innerHTML = "";
       const picks = _hintIsDesc(firstHint) ? (def ? def.picks : []) : (p.models_hint || "").split(",").map(s => s.trim()).filter(Boolean);
       picks.forEach(m => { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }); }
+    // already have a key for this provider (from an earlier "add a model" round)? offer to reuse it
+    // instead of forcing a re-paste — that's the "why do I have to type my OpenRouter key again" bug.
+    const n = s => (s || "").replace(/\/+$/, "").toLowerCase();
+    const sibling = (SAVED_PROVIDERS || []).find(sp => sp.base_url && p.base_url && n(sp.base_url) === n(p.base_url) && sp.key_masked && sp.key_masked !== "—");
+    reuseKeyId = sibling ? sibling.id : null;
+    $("asKey").value = "";
+    $("asKey").placeholder = reuseKeyId ? `✓ using the ${p.name} key you already saved (${sibling.key_masked}) — paste a different one to override` : "paste your key here";
     const hint = (p.free && p.free !== "—" ? `${p.free}. ` : "") + (p.models_hint ? `models: ${p.models_hint}.` : "");
     const el = $("asHint"); el.textContent = hint;
     if (p.key_url) { el.appendChild(document.createTextNode(" · ")); const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "get a free key ↗"; el.appendChild(a); }
@@ -390,6 +399,7 @@
   async function loadProviders() {
     const r = await fetch("/api/swarm/providers").then(r => r.json()).catch(() => ({ providers: [] }));
     const list = r.providers || []; const el = $("asSlots");
+    SAVED_PROVIDERS = list;
     if (!list.length) { el.innerHTML = `<div class="as-empty">No keys yet — add one below to turn on Swarm research.</div>`; return; }
     el.innerHTML = "";
     list.forEach(p => {
@@ -802,7 +812,10 @@
   $("asTest").onclick = async () => {
     const m = ($("asModel").value.trim()) || pendingModels[0] || "";   // test the typed/first picked model
     const body = { base_url: $("asBase").value.trim(), model: m, api_key: $("asKey").value.trim() };
-    if (!body.base_url || !body.model || !body.api_key) { setStatus("add a model + your key first", "bad"); return; }
+    if (!body.base_url || !body.model || !body.api_key) {
+      setStatus(reuseKeyId ? "Test needs your key typed in — Save doesn't, it'll reuse the saved one" : "add a model + your key first", "bad");
+      return;
+    }
     setStatus("testing…");
     const r = await fetch("/api/swarm/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({ ok: false, error: "couldn't reach it" }));
     setStatus(r.ok ? `✓ works — "${(r.reply || "ok").slice(0, 30)}"` : `✕ ${r.error}`, r.ok ? "ok" : "bad");
@@ -811,14 +824,21 @@
     const typed = $("asModel").value.trim(); if (typed) addModel(typed);   // fold an un-added typed model in
     const models = pendingModels.slice();
     const name = $("asName").value.trim(), base = $("asBase").value.trim(), key = $("asKey").value.trim();
-    if (!name || !base || !key) { setStatus("need name, base URL and key", "bad"); return; }
+    // a blank key is only OK if we already found a saved key for this same provider to reuse —
+    // otherwise this is genuinely the first time and we need one.
+    if (!name || !base || (!key && !reuseKeyId)) { setStatus("need name, base URL and key", "bad"); return; }
     if (!models.length) { setStatus("pick at least one model", "bad"); return; }
     setStatus("saving " + models.length + " model" + (models.length > 1 ? "s" : "") + "…");
     const grounded = /generativelanguage/i.test(base);
     let ok = 0, lastErr = "";
-    // one provider RECORD per model, same key → each shows as its own brain in the picker
-    for (const m of models) { const r = await saveProvider({ name, base_url: base, model: m, api_key: key, enabled: true, grounded }); if (r && r.ok) ok++; else lastErr = (r && r.error) || "save failed"; }
-    if (ok) { pendingModels = []; renderChips(); ["asModel", "asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ added " + ok + " model" + (ok > 1 ? "s" : "") + " on your key", "ok"); }
+    // one provider RECORD per model — a freshly typed key covers all of them; an empty key rides
+    // on the sibling slot's key server-side (reuse_key_from) instead of forcing a re-paste.
+    for (const m of models) {
+      const payload = { name, base_url: base, model: m, enabled: true, grounded };
+      if (key) payload.api_key = key; else if (reuseKeyId) payload.reuse_key_from = reuseKeyId;
+      const r = await saveProvider(payload); if (r && r.ok) ok++; else lastErr = (r && r.error) || "save failed";
+    }
+    if (ok) { pendingModels = []; renderChips(); ["asModel", "asKey"].forEach(id => { $(id).value = ""; }); setStatus("✓ added " + ok + " model" + (ok > 1 ? "s" : "") + (key ? " on your key" : " reusing your saved key"), "ok"); }
     else setStatus(lastErr, "bad");
   };
 

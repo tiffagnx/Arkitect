@@ -1482,6 +1482,54 @@ window.addEventListener('load',function(){
 })();
 </script>
 
+<!-- ════════════════ ANIMATION STATION — RoomAPI: let the docked agent DRIVE it ════════════════ -->
+<script>
+/* When the user asks Tiff/Kit (in her window) to make a character/world, the agent emits an
+   {action} block → kit-helper calls window.RoomAPI.run(action) → this generates on the user's
+   key and drops the result into Animation Station's gallery. "She makes the image, pushes it in;
+   Animation Station animates it." Wired to ROOM_ACTIONS["editor"] in app.py. */
+(function(){
+  function whenAB(fn){ if(window.AB)return fn(); var n=0,t=setInterval(function(){ if(window.AB){clearInterval(t);fn();} else if(++n>120)clearInterval(t); },50); }
+  whenAB(function(){
+    window.AB.agentMake=async function(kind, prompt, style){
+      if(!prompt)return;
+      var AB=window.AB;
+      AB.open();
+      try{ if(!AB.PROVIDERS||!AB.PROVIDERS.length) await AB.loadProviders(); }catch(e){}
+      // honor the image model the user picked in the agent window's 🖼 Image dropdown
+      if(window.__dmvImg && window.__dmvImg.provider){
+        var pS=document.getElementById('asProv'), mS=document.getElementById('asModel');
+        if(pS){ pS.value=window.__dmvImg.provider; if(AB.renderModels)AB.renderModels(); }
+        if(mS && window.__dmvImg.model){ mS.value=window.__dmvImg.model; if(AB.updateNote)AB.updateNote(); }
+      }
+      AB.tab(kind==='world'?'world':'cast');
+      var box=document.getElementById(kind==='world'?'asWorldPrompt':'asCastPrompt');
+      if(box) box.value = style ? (prompt+', '+style) : prompt;
+      return AB.make(kind);   // reuses the real generate path — user's key, saves to the gallery
+    };
+  });
+
+  /* The 🖼 Image-model picker itself now lives ON the agent (kit-helper.js) so it rides into every
+     visual room she docks in — not injected per-room here. It writes window.__dmvImg, which
+     AB.agentMake (above) reads. This room just consumes the choice. */
+  window.RoomAPI = {
+    room:'editor',
+    hasKey:function(){ return !!(window.AB && window.AB.PROVIDERS && window.AB.PROVIDERS.length); },
+    run:async function(o){ o=o||{};
+      if(!window.AB || typeof window.AB.agentMake!=='function'){ (window.toast||function(){})('Open Animation Station (✨ Animate) first, then ask again.'); return; }
+      if(o.action==='make_character') return window.AB.agentMake('cast', o.prompt, o.style);
+      if(o.action==='make_world')     return window.AB.agentMake('world', o.prompt, o.style);
+    },
+    // the agent generated an image IN HER WINDOW → drop it into the Cast gallery, ready to animate
+    addImage:function(url, prompt){
+      if(!(window.AB && AB.saveAsset)) return;
+      AB.open(); AB.tab('cast');
+      return AB.saveAsset({kind:'cast', name:String(prompt||'image').slice(0,60), frames:[url], fps:8, prompt:prompt||''});
+    }
+  };
+})();
+</script>
+
 <div class="toast" id="toast"></div>
 
 <script src="/static/ae-menus.js"></script>

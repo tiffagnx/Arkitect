@@ -79,7 +79,7 @@
   .node.bin{color:var(--text-4);cursor:default} .node.bin:hover{background:none}
 
   /* CENTER — the conversation (main) */
-  .chat{flex:1;display:flex;flex-direction:column;min-width:0;background:transparent}
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0;background:transparent;position:relative}
   .chat .head{padding:10px 14px;border-bottom:1px solid var(--hairline);font:700 11px Oxanium;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);display:flex;align-items:center;gap:7px}
   .chat .head .glow{width:7px;height:7px;border-radius:50%;background:var(--steel);box-shadow:0 0 9px var(--steel)}
   .chat.claude .head .glow{background:var(--gold);box-shadow:0 0 11px var(--gold)}
@@ -90,6 +90,14 @@
   @keyframes cspin{to{transform:rotate(360deg)}}
   .log{flex:1;overflow:auto;padding:18px 18% 14px;display:flex;flex-direction:column;gap:13px}
   @media(max-width:1100px){.log{padding:16px 8% 14px}}
+  .jumpdown{position:absolute;left:50%;bottom:14px;transform:translateX(-50%) translateY(6px);z-index:6;
+    background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);font:700 11.5px Inter;
+    padding:7px 15px;border-radius:20px;cursor:pointer;opacity:0;pointer-events:none;
+    box-shadow:0 6px 18px rgba(0,0,0,.45);transition:opacity .15s ease,transform .15s ease;
+    display:flex;align-items:center;gap:6px}
+  .jumpdown.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+  .jumpdown:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .jumpdown .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 7px rgba(43,182,168,.6)}
   .msg{font-size:13.5px;line-height:1.55;max-width:100%}
   .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);padding:9px 13px;border-radius:13px 13px 4px 13px;max-width:85%;white-space:pre-wrap;word-break:break-word}
   .msg.ai{color:var(--text-2);white-space:pre-wrap;word-break:break-word}
@@ -289,6 +297,7 @@
       <div class="log" id="log">
         <div class="hint">Tell me what to build or change.<br>I can see your file tree and the open file, and I'll write the files directly into this workspace.</div>
       </div>
+      <button class="jumpdown" id="jumpDown" title="Jump to the latest"><span class="dot"></span>New output — jump down</button>
       <div class="scope" id="scopeNote"></div>
       <div class="composer">
         <div class="thumbs" id="thumbs"></div>
@@ -816,11 +825,24 @@ let busy=false, controller=null;
 let APPROVED=[];            // dangerous commands B approved this session
 let lastInstruction="";    // for approve-and-rerun
 const ask=$("ask");
+
+/* ── scroll lock: while a fast model streams, don't drag B's eyes to the
+   bottom if he's scrolled up to read. Only autoscroll while he's already
+   near the bottom; otherwise show a "new output" pill he can click. ── */
+let userScrolledUp=false;
+const logEl=$("log"), jumpBtn=$("jumpDown");
+function nearBottom(){ return logEl.scrollHeight-(logEl.scrollTop+logEl.clientHeight) < 80; }
+function autoScrollLog(){
+  if(userScrolledUp){ jumpBtn.classList.add("show"); return; }
+  logEl.scrollTop=logEl.scrollHeight;
+}
+logEl.addEventListener("scroll", ()=>{ userScrolledUp=!nearBottom(); if(!userScrolledUp) jumpBtn.classList.remove("show"); });
+jumpBtn.addEventListener("click", ()=>{ userScrolledUp=false; jumpBtn.classList.remove("show"); logEl.scrollTop=logEl.scrollHeight; });
 ask.addEventListener("input", ()=>{ ask.style.height="auto"; ask.style.height=Math.min(200,ask.scrollHeight)+"px"; });
 ask.addEventListener("keydown", e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); if(!busy) sendAgent(); } });
 $("sendBtn").onclick = () => { if(busy){ if(controller) controller.abort(); } else sendAgent(); };
 
-function addMsg(cls, text){ const d=document.createElement("div"); d.className="msg "+cls; d.textContent=text||""; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; return d; }
+function addMsg(cls, text){ const d=document.createElement("div"); d.className="msg "+cls; d.textContent=text||""; $("log").appendChild(d); autoScrollLog(); return d; }
 
 async function sendAgent(forceText){
   if(busy) return;
@@ -834,6 +856,7 @@ async function sendAgent(forceText){
   if(!rerun){ ask.value=""; ask.style.height="auto"; addMsg("user", q + (imgs.length?("  📎×"+imgs.length):"")); }
   else { const n=addMsg("ai",""); n.innerHTML='<span class="rerun-note">▶ approved — re-running</span>'; }
   const aiEl=addMsg("ai",""); aiEl.textContent="…";
+  userScrolledUp=false; jumpBtn.classList.remove("show");   // new turn: pin to bottom again
   busy=true; controller=new AbortController(); actBegin();
   const sb=$("sendBtn"); sb.classList.add("stop"); sb.textContent="■"; sb.title="Stop (keeps what's done)";
 
@@ -844,7 +867,7 @@ async function sendAgent(forceText){
   let curBubble=aiEl;         // active answer bubble
   let thinkBox=null, thinkBody=null, thinkAcc="";
   function newBubble(){ const d=document.createElement("div"); d.className="msg ai"; $("log").appendChild(d); return d; }
-  function stepLine(icon,text){ const d=document.createElement("div"); d.className="stepline"; d.innerHTML='<span class="stepdot"></span><span>'+icon+'</span><span>'+_esc(text)+'</span>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
+  function stepLine(icon,text){ const d=document.createElement("div"); d.className="stepline"; d.innerHTML='<span class="stepdot"></span><span>'+icon+'</span><span>'+_esc(text)+'</span>'; $("log").appendChild(d); autoScrollLog(); }
   try{
     const res=await fetch("/api/code/agent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
     const reader=res.body.getReader(), dec=new TextDecoder(); let buf="";
@@ -863,11 +886,11 @@ async function sendAgent(forceText){
           actSet("thinking"); actAddTokens(ev.text);
           thinkAcc+=ev.text;
           if(!thinkBox){ thinkBox=document.createElement("details"); thinkBox.className="thinkbox"; thinkBox.innerHTML='<summary>💭 thinking…</summary><div class="tbody"></div>'; $("log").insertBefore(thinkBox,curBubble); thinkBody=thinkBox.querySelector(".tbody"); }
-          thinkBody.textContent=thinkAcc; $("log").scrollTop=$("log").scrollHeight;
+          thinkBody.textContent=thinkAcc; autoScrollLog();
         }
-        else if(ev.type==="delta"){ actSet("writing"); actAddTokens(ev.text); acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); $("log").scrollTop=$("log").scrollHeight; if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
+        else if(ev.type==="delta"){ actSet("writing"); actAddTokens(ev.text); acc+=ev.text; curBubble.innerHTML=mdToHtml(acc); autoScrollLog(); if(thinkBox){ thinkBox.querySelector("summary").textContent="💭 thinking"; } }
         else if(ev.type==="step"){ actSet((ev.text||"").trim().startsWith("read")?"reading":"running"); stepLine(ev.icon||"·", ev.text||""); }
-        else if(ev.type==="output"){ const d=document.createElement("details"); d.className="outbox"; d.innerHTML='<summary>▸ '+_esc(ev.label||"output")+'</summary><pre>'+_esc(ev.text||"")+'</pre>'; $("log").appendChild(d); $("log").scrollTop=$("log").scrollHeight; }
+        else if(ev.type==="output"){ const d=document.createElement("details"); d.className="outbox"; d.innerHTML='<summary>▸ '+_esc(ev.label||"output")+'</summary><pre>'+_esc(ev.text||"")+'</pre>'; $("log").appendChild(d); autoScrollLog(); }
         else if(ev.type==="blocked"){ renderBlocked(ev.cmd||"", ev.reason||""); actSet("waiting on you"); }
         else if(ev.type==="status"){ setStatus(ev.text,""); }
         else if(ev.type==="error"){ curBubble.innerHTML=mdToHtml(acc)+'<br>⚠ '+_esc(ev.text); setStatus(ev.text,"err"); }
@@ -902,14 +925,13 @@ function renderBlocked(cmd, reason){
     +'<div class="bc-reason">'+_esc(reason)+'</div>'
     +'<pre class="bc-cmd">'+_esc(cmd)+'</pre>'
     +'<div class="bc-btns"><button class="bc-ok">Approve &amp; run</button><button class="bc-no">Skip it</button></div>';
-  $("log").appendChild(card); $("log").scrollTop=$("log").scrollHeight;
+  $("log").appendChild(card); userScrolledUp=false; jumpBtn.classList.remove("show"); logEl.scrollTop=logEl.scrollHeight;
   card.querySelector(".bc-ok").onclick=()=>{
     if(!APPROVED.includes(cmd)) APPROVED.push(cmd);
     card.querySelector(".bc-btns").innerHTML='<span class="bc-done">✓ approved — re-running</span>';
     if(!busy) sendAgent(lastInstruction);
   };
   card.querySelector(".bc-no").onclick=()=>{ card.querySelector(".bc-btns").innerHTML='<span class="bc-done">skipped</span>'; };
-  if(MODE==="bypass"){ setTimeout(()=>{ const ok=card.querySelector(".bc-ok"); if(ok) ok.click(); }, 200); }   // Bypass: auto-approve, never interrupt
 }
 
 /* ── resizable panels (drag the gutters; persists) ── */

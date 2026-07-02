@@ -50,7 +50,7 @@ SESS_DIR = DATA / "sessions"
 MEM_FILE = DATA / "memory.json"            # LOCAL memory â€” the simple facts she picks up as you talk
 CLOUD_MEM_FILE = DATA / "cloud_memory.json"  # CLOUD memory â€” her deep knowledge, curated from the HeyTiff KB
 KB_SEED = DATA / "kb_export.json"
-APP_VERSION = "3.2.0"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
+APP_VERSION = "3.3.0"   # â† canonical app version. Bump this to match each GitHub release tag (vX.Y.Z) when you cut a release; the in-app updater compares it against tiffagnx/Arkitect's latest release.
 LM = "http://localhost:1234/v1"
 LMS_CLI = Path.home() / ".lmstudio" / "bin" / "lms.exe"  # LM Studio CLI
 DEFAULT_MODEL = "gemma-4-e4b-uncensored-hauhaucs-aggressive"  # B's UNCENSORED brain (2026-06-13). Was google/gemma-4-e4b (censored) â€” but B replaced it: `lms ls` shows only the uncensored gemma installed, so the old default would (a) reload a censored brain after every image render's _unload_brain, and (b) fail to load (model gone). This is the actual installed model + B's intent: uncensored Tiff everywhere (chat + polish).
@@ -2577,31 +2577,36 @@ async def code_agent(req: Request):
             yield _sse("round", n=round_i)
             acc = []
 
-            if is_cloud and is_claude:
-                cpay = dict(claude_payload); cpay["model"] = slot["model"]
-                cpay.pop("reasoning_effort", None); cpay["messages"] = work_lean
-                src = anthropic_native_stream(slot, cpay, effort)
-            elif is_cloud:
-                cpay = dict(std_payload); cpay["model"] = slot["model"]
-                cpay.pop("reasoning_effort", None); cpay["messages"] = work_std
-                cpay["_split_reasoning"] = True
-                src = provider_stream(slot, cpay, effort)
-            else:
-                spay = dict(std_payload); spay["messages"] = work_std
-                src = lm_stream(spay)
+            try:
+                if is_cloud and is_claude:
+                    cpay = dict(claude_payload); cpay["model"] = slot["model"]
+                    cpay.pop("reasoning_effort", None); cpay["messages"] = work_lean
+                    src = anthropic_native_stream(slot, cpay, effort)
+                elif is_cloud:
+                    cpay = dict(std_payload); cpay["model"] = slot["model"]
+                    cpay.pop("reasoning_effort", None); cpay["messages"] = work_std
+                    cpay["_split_reasoning"] = True
+                    src = provider_stream(slot, cpay, effort)
+                else:
+                    spay = dict(std_payload); spay["messages"] = work_std
+                    src = lm_stream(spay)
 
-            hit_len_limit = False
-            async for ev in src:
-                yield ev
-                if ev.startswith("data: "):
-                    try:
-                        d = json.loads(ev[6:])
-                        if d.get("type") == "delta":
-                            acc.append(d.get("text", ""))
-                        elif d.get("type") == "stop_reason" and d.get("reason") in ("max_tokens", "length"):
-                            hit_len_limit = True
-                    except Exception:
-                        pass
+                hit_len_limit = False
+                async for ev in src:
+                    yield ev
+                    if ev.startswith("data: "):
+                        try:
+                            d = json.loads(ev[6:])
+                            if d.get("type") == "delta":
+                                acc.append(d.get("text", ""))
+                            elif d.get("type") == "stop_reason" and d.get("reason") in ("max_tokens", "length"):
+                                hit_len_limit = True
+                        except Exception:
+                            pass
+            except Exception as e:
+                yield _sse("error", text=f"Lost the connection to the model mid-turn: {e}")
+                yield _sse("done")
+                return
 
             full = "".join(acc)
             full = _normalize_drift(full)   # rescue JSON-style tool calls (DeepSeek/Kimi drift)
@@ -4402,10 +4407,25 @@ async def _kie_generate(model: str, prompt: str, options: dict, media: dict, key
             if r.status_code >= 400:
                 return JSONResponse({"error": f"Kie error {r.status_code}: {r.text[:300]}"}, status_code=400)
             sub = r.json()
+            # Kie signals errors in the BODY 'code' field (200 = ok), NOT the HTTP status -- a
+            # 200 response can still carry code 500 "server exception". Surface it clearly instead
+            # of the cryptic "no task id", so the user knows whether to retry / check credits / reword.
+            code = str(sub.get("code")) if sub.get("code") is not None else "200"
             data = sub.get("data") if isinstance(sub.get("data"), dict) else sub
-            task_id = data.get("taskId") or data.get("task_id")
+            task_id = (data.get("taskId") or data.get("task_id")) if isinstance(data, dict) else None
             if not task_id:
-                return JSONResponse({"error": f"No task id from Kie: {str(sub)[:300]}"}, status_code=400)
+                kmsg = (sub.get("msg") or sub.get("message") or "").strip()
+                low = kmsg.lower()
+                if code == "500" or "server exception" in low or "try again" in low:
+                    err = ("Kie's server hiccuped -- usually temporary. Wait a few seconds and hit Make again. "
+                           "If it keeps failing on this model, it may be down on Kie's end (try nano-banana-2). [Kie: " + (kmsg or "server exception") + "]")
+                elif code in ("402", "403") or "credit" in low or "balance" in low or "insufficient" in low:
+                    err = ("Kie says out of credits or the key isn't cleared for this model -- check your Kie balance and that your plan covers " + str(model) + ". [Kie: " + kmsg + "]")
+                elif "moderat" in low or "policy" in low or "nsfw" in low or "sensitive" in low or "blocked" in low or "violat" in low:
+                    err = ("Kie / the model refused this prompt (content policy) -- reword it. [Kie: " + kmsg + "]")
+                else:
+                    err = ("Kie couldn't start the job (code " + code + "): " + (kmsg or str(sub)[:200]))
+                return JSONResponse({"error": err}, status_code=400)
 
             deadline = time.time() + 600
             delay = 2.0
@@ -7109,6 +7129,10 @@ ROOM_ACTIONS = {
         "generate_image": {"prompt": "str", "aspect": ["1:1", "16:9", "9:16", "4:3", "3:4"], "count": [1, 2, 3, 4]},
         "generate_video": {"prompt": "str", "seconds": [5, 10]},
     },
+    "editor": {   # LePrince -- the agent drives Animation Station (the in-window sprite/world builder)
+        "make_character": {"prompt": "str", "style": ["16-bit pixel", "cartoon", "slightly realistic"]},
+        "make_world": {"prompt": "str", "style": ["16-bit pixel", "cartoon", "slightly realistic"]},
+    },
     "character": {   # the Agent Forge â€” Tiff FILLS the builder form as she learns what the user does
         "fill_agent": {
             "name": "str", "tagline": "str", "notes": "str",
@@ -7181,6 +7205,18 @@ def _actions_prompt(room: str) -> str:
             "Include ONLY the fields you actually know so far â€” send more later as you learn more. Pick the craft + "
             "vibe that best fit what they tell you. Keep talking warmly the whole time; the block just fills the form. Fields:\n" +
             catalog
+        )
+    if room == "editor":
+        return (
+            "\n\nYOU CAN MAKE ANIMATION-STATION ASSETS FOR THEM. When the user asks you to MAKE / GENERATE a "
+            "CHARACTER or a WORLD / BACKGROUND (for a sprite, an animation, or a music-video shot), do NOT just "
+            "hand back a prompt -- actually make it: reply with ONE short line AND a fenced action block, EXACTLY:\n"
+            "```action\n{\"action\":\"make_character\",\"prompt\":\"...\",\"style\":\"cartoon\"}\n```\n"
+            "It generates the image on the user's OWN key and drops it straight into Animation Station's gallery, "
+            "ready to animate. Write the VIVID, complete prompt yourself (subject, wardrobe, pose, palette, on a "
+            "clean simple background) -- you're the expert prompt-writer. Actions + fields:\n" + catalog +
+            "\nFor EDITING the timeline itself (cuts, trims, effects) there is no action -- just talk them through "
+            "it. Only emit a block when they clearly want a NEW character or world image MADE."
         )
     return (
         "\n\nYOU CAN DRIVE THIS ROOM. When the user asks you to actually MAKE something here "
