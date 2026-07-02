@@ -32,17 +32,17 @@
   .as-steps b{color:#CFE6EE;}
   .as-steps ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:5px;}
   .as-steps a{color:#9CD3E4;}
-  .as-slots{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
-  .as-empty{font:400 12.5px Inter;color:rgba(198,201,208,.55);padding:10px 2px;}
-  .as-slot{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.025);}
+  .as-slots{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
+  .as-empty{font:400 11px Inter;color:rgba(198,201,208,.55);padding:4px 2px;}
+  .as-slot{border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:5px 8px;background:rgba(255,255,255,.025);}
   .as-slot.off{opacity:.55;}
-  .as-slot .nm{font:700 13px Oxanium;letter-spacing:.03em;display:flex;align-items:center;gap:7px;}
-  .as-slot .meta{font:400 10.5px 'Space Mono';color:rgba(198,201,208,.6);word-break:break-all;line-height:1.5;margin-top:3px;}
-  .as-slot .row{display:flex;gap:6px;margin-top:8px;}
-  .as-slot button{font:500 10.5px Inter;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:rgba(206,210,218,.85);}
+  .as-slot .nm{font:700 10.5px Oxanium;letter-spacing:.02em;display:flex;align-items:center;gap:4px;}
+  .as-slot .meta{font:400 8.5px 'Space Mono';color:rgba(198,201,208,.6);word-break:break-all;line-height:1.35;margin-top:1px;}
+  .as-slot .row{display:flex;gap:4px;margin-top:3px;}
+  .as-slot button{font:500 9.5px Inter;padding:3px 7px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:rgba(206,210,218,.85);}
   .as-slot button:hover{color:#E9EAED;border-color:rgba(95,180,206,.5);}
   .as-slot button.del:hover{border-color:rgba(229,86,109,.5);color:#FF9DAB;}
-  .as-tag{font:600 8px 'Space Mono';padding:2px 6px;border-radius:6px;letter-spacing:.04em;}
+  .as-tag{font:600 7.5px 'Space Mono';padding:1px 5px;border-radius:5px;letter-spacing:.04em;}
   .as-tag.on{background:rgba(70,214,168,.14);color:#7fe8c0;} .as-tag.no{background:rgba(255,255,255,.06);color:rgba(198,201,208,.6);}
   .as-tag.web{background:rgba(62,156,184,.16);color:#9CD3E4;}
   .as-addbtn{width:100%;font:600 12.5px Inter;padding:10px;border-radius:11px;cursor:pointer;color:#0B1417;
@@ -78,9 +78,22 @@
   .as-upd-btn{margin-left:auto;flex:none;font:600 11.5px Inter;padding:7px 14px;border-radius:9px;cursor:pointer;border:none;color:#0B1417;background:linear-gradient(120deg,#E6C16A,#D9A441);}
   .as-upd-btn:hover{filter:brightness(1.08);}
   .as-modelrow{display:flex;gap:6px;} .as-modelrow input{flex:1;min-width:0;}
+  .as-earcard{border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.025);padding:11px 12px;margin-bottom:10px;}
+  .as-ear-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:9px;}
+  .as-ear-ic{font-size:18px;line-height:1.2;flex:none;}
+  .as-ear-txt{flex:1;min-width:0;}
+  .as-ear-t{font:700 12.5px Inter,sans-serif;color:#E9EAED;display:flex;align-items:center;gap:7px;}
+  .as-ear-d{font:400 11px Inter,sans-serif;color:rgba(198,201,208,.68);line-height:1.5;margin-top:3px;}
+  .as-ear-d b{color:#9CD3E4;}
+  .as-ear-tag{font:700 8px 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.06);color:rgba(198,201,208,.6);}
+  .as-ear-tag.on{background:rgba(70,214,168,.16);color:#7fe8c0;}
+  .as-ear-key{flex:none;text-decoration:none;font-size:15px;line-height:1;padding:5px 7px;border-radius:8px;border:1px solid rgba(120,182,205,.35);background:rgba(62,156,184,.08);}
+  .as-ear-key:hover{border-color:rgba(120,182,205,.7);background:rgba(62,156,184,.18);}
   .as-listbtn{flex:none;white-space:nowrap;font:600 10.5px Inter;padding:0 11px;border-radius:10px;cursor:pointer;color:#9CD3E4;background:rgba(62,156,184,.10);border:1px solid rgba(95,180,206,.35);}
   .as-listbtn:hover{color:#E9EAED;border-color:rgba(95,180,206,.6);background:rgba(62,156,184,.18);}
   .as-listbtn:disabled{opacity:.6;cursor:default;}
+  /* compact "＋" add button so the "↻ all" (full-catalog) button sits right beside it, like the chat row */
+  .ag-addbtn{padding:0 9px;}
   /* Connect to Claude Desktop (MCP) */
   .as-mcpdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#6b7178;vertical-align:middle;margin-left:7px;}
   .as-mcpdot.amber{background:#D9A441;box-shadow:0 0 7px rgba(217,164,65,.7);}
@@ -107,8 +120,12 @@
   const gear = document.createElement("button");
   gear.className = "as-gear"; gear.title = "Settings — plug in your API keys"; gear.textContent = "⚙";
   const host = document.querySelector(".topbar") || document.querySelector(".top");
-  if (host) host.appendChild(gear);
-  else { gear.style.position = "fixed"; gear.style.top = "12px"; gear.style.right = "14px"; gear.style.zIndex = "99998"; document.body.appendChild(gear); }
+  // In a ROOM the panel is a modal only — opened via window.openKeys/arkOpenSettings from the room's key
+  // links. No gear button, no updater chrome; that lives on the front page (owner: one version readout).
+  if (!window.__dmvRoom) {
+    if (host) host.appendChild(gear);
+    else { gear.style.position = "fixed"; gear.style.top = "12px"; gear.style.right = "14px"; gear.style.zIndex = "99998"; document.body.appendChild(gear); }
+  }
 
   // version badge intentionally REMOVED from every room — it lives ONLY on the front page (the chat,
   // next to brain/engine). Owner's call: one version readout, one place. (Was here next to the gear.)
@@ -125,7 +142,7 @@
           <div class="as-sub">Let Claude — or Claude Code — drive DeMartinville from outside. Talk to your agents, make a beat, cut a video, generate art, run any room, just by asking Claude.</div>
           <div id="asMcpBody"><div class="as-empty">checking…</div></div>
         </div>
-        <div class="as-sec">
+        <div class="as-sec" id="asBrainSec">
           <h3>Cloud models &amp; API keys — make DeMartinville smarter</h3>
           <div class="as-sub">Add a provider with <b>your own API key</b> and its model shows up in your <b>chat model picker</b> (☁) and powers <b>Swarm</b> research. Keys stay on this machine — nothing is shared. On a light PC, this is how you run a frontier brain — flat-monthly picks like <b>Featherless</b> &amp; <b>Z.ai GLM</b>, or free <b>Groq</b>.</div>
           <div class="as-steps"><b>Never done this? It's 3 steps:</b><ol><li>Pick a provider in the <b>Provider</b> dropdown below — <b>Groq</b> is free and fast.</li><li>Click <b>"get a free key ↗"</b> right under it — that opens their site. Make a free account and copy the key they give you.</li><li>Paste it in the <b>API key</b> box and hit <b>Save</b>. Done — Swarm research now runs on your key.</li></ol></div>
@@ -156,6 +173,45 @@
             </div>
           </div>
         </div>
+        <div class="as-sec" id="agSec">
+          <h3>Image &amp; video generation — one key, every room</h3>
+          <div class="as-sub">Add a provider here once — <b>Atlas Cloud</b>, <b>fal.ai</b>, or <b>Kie</b> — and its models show up in <b>Imagination Station</b> and the <b>Treatment</b> room automatically. <b>Just paste your key</b> — good models are picked for you; add your own model ids below only if you want to. Nothing runs anywhere until you add it here.</div>
+          <div class="as-slots" id="agSlots"><div class="as-empty">loading…</div></div>
+          <div class="as-formhead">＋ Add a provider</div>
+          <div class="as-form open">
+            <div class="as-field"><label>Provider</label><select id="agPreset"></select><div class="h" id="agHint"></div></div>
+            <div class="as-field"><label>API key — your own key</label><input id="agKey" type="password" placeholder="paste your key here" autocomplete="off" /></div>
+            <div class="as-field"><label>🖼 Image models <span style="text-transform:none;opacity:.7">— hit ↻ all, then search &amp; pick (or paste your own)</span></label>
+              <div id="agModelChips" style="margin:2px 0 7px"></div>
+              <div class="as-modelrow"><input id="agModel" list="agImgList" placeholder="search a model, or paste an id" /><button type="button" class="as-listbtn ag-addbtn" id="agAddModel" title="Add this model">＋</button><button type="button" class="as-listbtn" id="agAllImg" title="List EVERY image model this provider offers — then search the dropdown">↻ all</button></div>
+              <datalist id="agImgList"></datalist>
+              <span class="h" id="agImgHint"></span>
+            </div>
+            <div class="as-field"><label>🎬 Video models <span style="text-transform:none;opacity:.7">— hit ↻ all, then search &amp; pick (or paste your own)</span></label>
+              <div id="agVideoModelChips" style="margin:2px 0 7px"></div>
+              <div class="as-modelrow"><input id="agVideoModel" list="agVidList" placeholder="search a model, or paste an id" /><button type="button" class="as-listbtn ag-addbtn" id="agAddVideoModel" title="Add this model">＋</button><button type="button" class="as-listbtn" id="agAllVid" title="List EVERY video model this provider offers — then search the dropdown">↻ all</button></div>
+              <datalist id="agVidList"></datalist>
+              <span class="h" id="agVidHint"></span>
+              <div class="h" style="margin-top:5px">Hit <b>↻ all</b> to pull the provider's whole catalog into the search box, then type to find any model and hit <b>＋</b>. Add as many as you want, or paste a custom id. Leave empty to use good defaults.</div>
+            </div>
+            <div class="as-btns">
+              <button class="save" id="agSave">Save</button>
+              <span class="as-status" id="agStatus"></span>
+            </div>
+          </div>
+        </div>
+        <div class="as-sec" id="shSec">
+          <h3>Song hearing — let her critique your track 🎧</h3>
+          <div class="as-sub">Drop a song in chat and <b>she breaks it down like an engineer</b>. Two free keys, each adds one ear — add either, both, or neither. <span style="opacity:.7">No keys? She still critiques from the free built-in sound read (loudness, brightness, dynamics).</span></div>
+          <div class="as-earcard">
+            <div class="as-ear-top"><span class="as-ear-ic">📝</span><div class="as-ear-txt"><div class="as-ear-t">Lyrics — hear the words <span class="as-ear-tag" id="shGroqTag"></span></div><div class="as-ear-d">A free <b>Groq</b> key transcribes the vocal so she can critique your writing &amp; flow, not just the sound.</div></div><a class="as-ear-key" id="shGroqLink" href="https://console.groq.com/keys" target="_blank" rel="noopener" title="Get a free Groq key ↗">🔑</a></div>
+            <div class="as-field"><div class="as-modelrow"><input id="shGroqKey" type="password" placeholder="paste your Groq key" autocomplete="off" /><button type="button" class="as-listbtn" id="shGroqSave">Save</button></div></div>
+          </div>
+          <div class="as-earcard">
+            <div class="as-ear-top"><span class="as-ear-ic">🎧</span><div class="as-ear-txt"><div class="as-ear-t">Real listen — hear the mix <span class="as-ear-tag" id="shGemTag"></span></div><div class="as-ear-d">A free <b>Google AI Studio</b> key lets her actually HEAR it — genre, instruments, groove, how the vocal sits — not just read the numbers.</div></div><a class="as-ear-key" id="shGemLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" title="Get a free Google AI Studio key ↗">🔑</a></div>
+            <div class="as-field"><div class="as-modelrow"><input id="shGemKey" type="password" placeholder="paste your Google AI Studio key" autocomplete="off" /><button type="button" class="as-listbtn" id="shGemSave">Save</button></div></div>
+          </div>
+        </div>
         <div class="as-sec" id="asVoiceSec">
           <h3>Voices — make your agents talk back 🔊</h3>
           <div class="as-sub">Add your <b>Fish Audio</b> key and your agents <b>speak their replies in a real voice</b>, with emotion. No key? They still talk with the free built-in browser voice. The <b>voice model id</b> is a voice/clone from fish.audio — leave the default for the stock voice, or paste your own clone's id.</div>
@@ -172,13 +228,15 @@
   document.body.appendChild(ov);
 
   const open = (anchor) => {
-    ov.classList.add("open"); load(); checkAppUpdate(); loadMcp(); loadVoices();
+    ov.classList.add("open"); load(); checkAppUpdate(); loadMcp(); loadVoices(); loadSongHearing();
     const _rc = $("asMcpRecheck"); if (_rc) _rc.onclick = loadMcp;
-    if (anchor === "mcp") { const s = $("asMcpSec"); if (s) setTimeout(() => s.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }
-    if (anchor === "voices") { const s = $("asVoiceSec"); if (s) setTimeout(() => s.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }
+    // anchors so any room's "🔑 Keys" / "Connect" link lands on the right section of the ONE panel
+    const secFor = { mcp: "asMcpSec", voices: "asVoiceSec", media: "agSec", brain: "asBrainSec", hearing: "shSec" }[anchor];
+    if (secFor) { const s = $(secFor); if (s) setTimeout(() => s.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }
   };
   const close = () => ov.classList.remove("open");
-  window.arkOpenSettings = open;   // let the "Make ARKITECT smarter" CTA (and anything else) open Settings
+  window.arkOpenSettings = open;   // the "Make DeMartinville smarter" CTA + room key links open Settings
+  window.openKeys = open;          // retire keys.js: every openKeys(cat) caller now opens this ONE panel
   gear.onclick = open;
   $("asClose").onclick = close;
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
@@ -340,8 +398,7 @@
       const pcol = /^⚠/.test(priv) ? "#E6C16A" : /^🔒/.test(priv) ? "#7FD3B0" : "#9FB4C0";
       d.innerHTML =
         `<div class="nm">${p.name}${p.grounded ? '<span class="as-tag web">🌐</span>' : ''}<span class="as-tag ${p.enabled ? "on" : "no"}">${p.enabled ? "ON" : "OFF"}</span></div>
-         <div class="meta">${p.model || "(no model)"} · key: ${p.key_masked || "—"}</div>
-         <div class="meta" style="margin-top:4px;color:${pcol};font-weight:600;line-height:1.4">${priv}</div>
+         <div class="meta">${p.model || "(no model)"} · key: ${p.key_masked || "—"}<span style="color:${pcol};font-weight:600"> · ${priv}</span></div>
          <div class="row">
            <button data-act="toggle">${p.enabled ? "Disable" : "Enable"}</button>
            <button class="del" data-act="del">Delete</button>
@@ -355,7 +412,290 @@
     const r = await fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({ error: "failed" }));
     await loadProviders(); window.dispatchEvent(new Event("ark:providers-changed")); return r;   // refresh the chat model picker live
   }
-  async function load() { await loadPresets(); loadProviders(); }   // presets first → saved cards get the right privacy label/colour on open
+  async function load() { await loadPresets(); loadProviders(); loadGenHub(); }   // presets first → saved cards get the right privacy label/colour on open
+
+  // ── Song hearing — Groq (lyrics/Whisper) + Google AI Studio (Gemini, real listen). Reuses the ONE
+  //    provider store: each key becomes a normal brain slot the transcribe/breakdown endpoints auto-pick
+  //    by base_url. We UPDATE an existing Groq/Gemini slot in place (by id) — never a duplicate. ──
+  const _EAR_PRESET = {
+    groq:   { name: "Groq",          base_url: "https://api.groq.com/openai/v1",                          model: "openai/gpt-oss-120b", grounded: false },
+    gemini: { name: "Google Gemini", base_url: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-3.5-flash",     grounded: true  },
+  };
+  const _earMatch = (kind) => (p) => kind === "groq" ? /groq/i.test(p.base_url || "") : /generativelanguage\.googleapis/i.test(p.base_url || "");
+  async function loadSongHearing(){
+    let list = []; try { list = (await fetch("/api/swarm/providers").then(r => r.json())).providers || []; } catch(_){}
+    const set = (tagId, keyId, kind, addLabel) => {
+      const slot = list.find(_earMatch(kind));
+      const tag = $(tagId); if (tag){ tag.textContent = slot ? "✓ connected" : "not added"; tag.className = "as-ear-tag" + (slot ? " on" : ""); }
+      const k = $(keyId); if (k) k.placeholder = slot ? "✓ connected — paste to replace" : addLabel;
+    };
+    set("shGroqTag", "shGroqKey", "groq",   "paste your Groq key");
+    set("shGemTag",  "shGemKey",  "gemini", "paste your Google AI Studio key");
+  }
+  async function saveEar(kind, key){
+    key = (key || "").trim(); if (!key) return false;
+    let list = []; try { list = (await fetch("/api/swarm/providers").then(r => r.json())).providers || []; } catch(_){}
+    const existing = list.find(_earMatch(kind));
+    const pre = _EAR_PRESET[kind];
+    const payload = existing
+      ? { id: existing.id, name: existing.name, base_url: existing.base_url, model: existing.model || pre.model, api_key: key, enabled: true, grounded: existing.grounded }
+      : { name: pre.name, base_url: pre.base_url, model: pre.model, api_key: key, enabled: true, grounded: pre.grounded };
+    const r = await fetch("/api/swarm/providers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({ error: "failed" }));
+    if (r && r.ok) { try { window.dispatchEvent(new Event("ark:providers-changed")); } catch(_){} }
+    return !!(r && r.ok);
+  }
+  (function wireSongHearing(){
+    const wire = (btnId, keyId, kind) => {
+      const btn = $(btnId), inp = $(keyId); if (!btn || !inp) return;
+      const go = async () => {
+        if (!inp.value.trim()) { inp.focus(); return; }
+        btn.textContent = "…"; btn.disabled = true;
+        const ok = await saveEar(kind, inp.value);
+        btn.textContent = ok ? "✓ saved" : "Retry"; btn.disabled = false;
+        if (ok) { inp.value = ""; loadSongHearing(); loadProviders(); }
+        setTimeout(() => { if (btn.textContent !== "…") btn.textContent = "Save"; }, 1500);
+      };
+      btn.onclick = go; inp.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+    };
+    wire("shGroqSave", "shGroqKey", "groq");
+    wire("shGemSave",  "shGemKey",  "gemini");
+  })();
+
+  // ── Image & video generation hub — ONE spot for Atlas Cloud / fal.ai / Kie keys + models,
+  // read by every room (Imagination Station, Treatment, ...) via GET /api/cloud/providers. ──
+  let GEN_PRESETS = [], genPendingModels = [], genVideoPendingModels = [];
+  function renderGenChips() {
+    const c = $("agModelChips"); if (!c) return; c.innerHTML = "";
+    genPendingModels.forEach((m, i) => {
+      const ch = document.createElement("span");
+      ch.style.cssText = "display:inline-flex;align-items:center;gap:5px;font:600 11px Inter,sans-serif;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:14px;padding:3px 4px 3px 9px;margin:0 5px 5px 0;";
+      ch.innerHTML = '<span></span><button type="button" style="border:none;background:rgba(0,0,0,.25);color:#9FCFDD;width:15px;height:15px;border-radius:50%;cursor:pointer;font-size:9px;line-height:1">✕</button>';
+      ch.firstChild.textContent = m;
+      ch.querySelector("button").onclick = () => { genPendingModels.splice(i, 1); renderGenChips(); };
+      c.appendChild(ch);
+    });
+  }
+  // A model page's URL IS its id on these providers — Kie especially (kie.ai/nano-banana-pro →
+  // the id is literally "nano-banana-pro"). So if someone pastes the whole browser URL, grab the
+  // path and use THAT, so they never have to isolate the slug by hand. Leaves plain ids untouched.
+  function extractSlug(tok) {
+    var m = /^https?:\/\/[^/]+\/(.+?)\/?$/i.exec(tok);
+    if (!m) return tok;
+    return m[1].split(/[?#]/)[0].replace(/^(market|models|model)\//i, "").replace(/\/$/, "");
+  }
+  // Splits on newline/comma/semicolon (and plain whitespace as a fallback) so pasting a WHOLE
+  // list of ids from a provider's site — not just one — adds them all in a single Enter/+.
+  function splitModelIds(raw) {
+    return String(raw || "").split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
+      .flatMap(s => s.includes(" ") && !s.includes("/") ? s.split(/\s+/) : [s])
+      .map(extractSlug).map(s => s.trim()).filter(Boolean);
+  }
+  function addGenModel(explicit) {
+    const ids = splitModelIds(explicit != null ? explicit : $("agModel").value);
+    if (!ids.length) return;
+    ids.forEach(v => { if (genPendingModels.indexOf(v) < 0) genPendingModels.push(v); });
+    if (explicit == null) $("agModel").value = ""; renderGenChips();
+  }
+  // video chip list — mirror of the image one; saved under kind:"video" so image pickers never see it
+  function renderGenVideoChips() {
+    const c = $("agVideoModelChips"); if (!c) return; c.innerHTML = "";
+    genVideoPendingModels.forEach((m, i) => {
+      const ch = document.createElement("span");
+      ch.style.cssText = "display:inline-flex;align-items:center;gap:5px;font:600 11px Inter,sans-serif;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:14px;padding:3px 4px 3px 9px;margin:0 5px 5px 0;";
+      ch.innerHTML = '<span></span><button type="button" style="border:none;background:rgba(0,0,0,.25);color:#9FCFDD;width:15px;height:15px;border-radius:50%;cursor:pointer;font-size:9px;line-height:1">✕</button>';
+      ch.firstChild.textContent = m;
+      ch.querySelector("button").onclick = () => { genVideoPendingModels.splice(i, 1); renderGenVideoChips(); };
+      c.appendChild(ch);
+    });
+  }
+  function addGenVideoModel(explicit) {
+    const ids = splitModelIds(explicit != null ? explicit : $("agVideoModel").value);
+    if (!ids.length) return;
+    ids.forEach(v => { if (genVideoPendingModels.indexOf(v) < 0) genVideoPendingModels.push(v); });
+    if (explicit == null) $("agVideoModel").value = ""; renderGenVideoChips();
+  }
+  // The tap-to-pick menu for the currently-selected provider: render its known models as pills
+  // (from the preset's own catalog) + fill the type-ahead datalists. A tap toggles the model in/out
+  // Seed the two search boxes so they're not empty before "↻ all" is pressed. These are just
+  // type-ahead suggestions (invisible until you type) — NOT a preordained visible menu. Pressing
+  // "↻ all" replaces them with the provider's ENTIRE live catalog (see pullGenCatalog).
+  function renderGenPicks() {
+    const p = (GEN_PRESETS || []).find(x => x.id === ($("agPreset") || {}).value);
+    const seed = (listEl, models) => {
+      if (!listEl) return; listEl.innerHTML = "";
+      (models || []).forEach(m => { const o = document.createElement("option"); o.value = m; listEl.appendChild(o); });
+    };
+    seed($("agImgList"), p && (p.image_options || p.image_defaults));
+    seed($("agVidList"), p && (p.video_options || p.video_defaults));
+    // clear any stale "↻ all" status from the previous provider
+    ["agImgHint", "agVidHint"].forEach(id => { const h = $(id); if (h) h.textContent = ""; });
+    _genCatalogCache = null;
+  }
+  // Fill a datalist with the FULL live catalog — replace, don't merge, so it IS the provider's whole
+  // list (searchable), exactly like the chat brain picker's "list all". name shows as the option label.
+  function fillDatalist(listEl, entries) {
+    if (!listEl) return;
+    listEl.innerHTML = "";
+    (entries || []).forEach(e => {
+      const o = document.createElement("option"); o.value = e.id;
+      if (e.name && e.name !== e.id) o.label = e.name;
+      listEl.appendChild(o);
+    });
+  }
+  // one fetch per provider, cached, shared by both "↻ all" buttons (image + video)
+  let _genCatalogCache = null, _genCatalogInFlight = null;
+  async function pullGenCatalog(btn, hintEl) {
+    const provider = ($("agPreset") || {}).value;
+    if (_genCatalogCache && _genCatalogCache.provider === provider) return _genCatalogCache;
+    if (_genCatalogInFlight) return _genCatalogInFlight;
+    const lbl = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "↻ …"; }
+    if (hintEl) { hintEl.textContent = "pulling the full catalog…"; hintEl.style.color = "#9FB4C0"; }
+    _genCatalogInFlight = (async () => {
+      let r;
+      try {
+        r = await fetch("/api/cloud/models/live", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider, api_key: $("agKey").value.trim() }) }).then(x => x.json());
+      } catch (_) { r = { error: "couldn't reach it" }; }
+      if (!(r && ((r.image || []).length || (r.video || []).length))) r._empty = true;
+      else _genCatalogCache = { provider, image: r.image || [], video: r.video || [] };
+      if (btn) { btn.disabled = false; btn.textContent = lbl; }
+      _genCatalogInFlight = null;
+      return r;
+    })();
+    return _genCatalogInFlight;
+  }
+  // wire ONE "↻ all" button (kind = 'image' or 'video') — pulls the catalog, fills its search box
+  function wireGenAll(btnId, kind, listId, hintId) {
+    const btn = $(btnId); if (!btn) return;
+    btn.onclick = async () => {
+      const hint = $(hintId);
+      const r = await pullGenCatalog(btn, hint);
+      const cat = _genCatalogCache;
+      if (cat) {
+        const arr = kind === "video" ? cat.video : cat.image;
+        fillDatalist($(listId), arr);
+        // fill the OTHER box too so one press lights up both
+        if (kind === "image") fillDatalist($("agVidList"), cat.video); else fillDatalist($("agImgList"), cat.image);
+        if (hint) {
+          if (r && r.note) { hint.style.color = "#E6C16A"; hint.textContent = "✓ " + arr.length + " " + kind + " loaded — ⚠ " + r.note; }
+          else { hint.style.color = "#7FD3B0"; hint.textContent = "✓ " + arr.length + " " + kind + " models loaded — click the box and type to search all of them"; }
+        }
+      } else if (hint) {
+        hint.style.color = "#E6C16A";
+        hint.textContent = (r && r.error) ? r.error : "no models came back — paste the id by hand";
+      }
+    };
+  }
+  async function loadGenHub() {
+    const r = await fetch("/api/cloud/presets").then(r => r.json()).catch(() => ({ presets: [] }));
+    GEN_PRESETS = r.presets || [];
+    const sel = $("agPreset"); if (!sel) return; sel.innerHTML = "";
+    GEN_PRESETS.forEach((p, i) => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
+    sel.onchange = async () => {
+      const p = GEN_PRESETS.find(x => x.id === sel.value);
+      $("agHint").innerHTML = ""; genPendingModels = []; genVideoPendingModels = []; renderGenChips(); renderGenVideoChips(); renderGenPicks(); $("agKey").value = "";
+      if (p && p.key_url) { const a = document.createElement("a"); a.href = p.key_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "get a key ↗"; $("agHint").appendChild(a); }
+      // Kie has no public model-list API — tell the user straight instead of a dead "↻ all"
+      const kie = p && p.id === "kie";
+      ["agAllImg", "agAllVid"].forEach(id => { const b = $(id); if (b) { b.style.display = kie ? "none" : ""; } });
+      if (kie) {
+        [$("agImgHint"), $("agVidHint")].forEach(h => {
+          if (!h) return; h.innerHTML = ""; h.style.color = "#9FB4C0";
+          h.append("Kie has no model-list API, so search can't list them — but the model ID is just the name in its web address. Open a model on ");
+          const a = document.createElement("a"); a.href = "https://kie.ai/market"; a.target = "_blank"; a.rel = "noopener";
+          a.textContent = "kie.ai/market ↗"; a.style.color = "#BFE6F2"; h.appendChild(a);
+          h.append(" and paste the whole page URL right here (e.g. kie.ai/nano-banana-pro → we grab “nano-banana-pro”). Paste several at once, one per line, too.");
+        });
+      }
+      // Load what's ALREADY live for this provider into the tags, so the form SHOWS your saved
+      // models instead of a blank box (the "I saved it but can't see it" confusion). The tags ARE
+      // the truth: what you see here is exactly what's saved, and exactly what Save will keep.
+      try {
+        const provs = await fetch("/api/cloud/providers").then(r => r.json());
+        const mine = (provs.providers || []).find(x => x.id === sel.value);
+        if (mine) { genPendingModels = (mine.image_models || []).slice(); genVideoPendingModels = (mine.video_models || []).slice(); renderGenChips(); renderGenVideoChips(); }
+      } catch (_) {}
+      let saved = false; try { saved = !!((await fetch("/api/cloud/key?provider=" + encodeURIComponent(sel.value)).then(r => r.json())).has_key); } catch (_) {}
+      $("agKey").placeholder = saved ? "key saved — paste a new one to replace" : "paste your key here";
+    };
+    sel.onchange();
+    wireGenAll("agAllImg", "image", "agImgList", "agImgHint");
+    wireGenAll("agAllVid", "video", "agVidList", "agVidHint");
+    // A single-line <input> silently STRIPS newlines the instant you paste into it (spec
+    // behaviour, not a bug we can work around by reading .value after the fact) — so a
+    // real multi-line paste ("one model id per line") would glue lines together with no
+    // separator at all. Read the clipboard directly, on the paste event, before that happens.
+    function wirePasteBulkAdd(inputEl, addFn) {
+      if (!inputEl) return;
+      inputEl.addEventListener("paste", e => {
+        const text = (e.clipboardData || window.clipboardData).getData("text");
+        // fire on a list (commas/newlines) OR a single pasted URL (grab its slug) — otherwise
+        // let a plain single id paste behave normally so the user can still edit it before adding.
+        if (!text || (!/[\n,;]/.test(text) && !/^https?:\/\//i.test(text.trim()))) return;
+        e.preventDefault();
+        addFn(text);
+      });
+    }
+    const addBtn = $("agAddModel"); if (addBtn) addBtn.onclick = () => addGenModel();
+    const modelInp = $("agModel"); if (modelInp) modelInp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addGenModel(); } });
+    wirePasteBulkAdd(modelInp, addGenModel);
+    const addVidBtn = $("agAddVideoModel"); if (addVidBtn) addVidBtn.onclick = () => addGenVideoModel();
+    const vidInp = $("agVideoModel"); if (vidInp) vidInp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addGenVideoModel(); } });
+    wirePasteBulkAdd(vidInp, addGenVideoModel);
+    const saveBtn = $("agSave");
+    if (saveBtn) saveBtn.onclick = async () => {
+      // Fold in whatever's still typed in the model boxes but not yet turned into a tag, so a
+      // typed id is NEVER silently lost just because the user didn't press "+". (The trap.)
+      addGenModel(); addGenVideoModel();
+      const provider = sel.value; const key = $("agKey").value.trim();
+      saveBtn.textContent = "saving…";
+      try {
+        if (key) await fetch("/api/cloud/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, api_key: key }) }).then(r => r.json());
+        // image + video lists save SEPARATELY (kind) so a room's image picker never shows video ids.
+        // Empty lists are fine — the server then falls back to the provider's curated defaults.
+        await fetch("/api/cloud/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, kind: "image", models: genPendingModels }) }).then(r => r.json());
+        await fetch("/api/cloud/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, kind: "video", models: genVideoPendingModels }) }).then(r => r.json());
+        $("agStatus").textContent = "✓ saved — live in every room"; $("agStatus").className = "as-status ok";
+        $("agKey").value = ""; sel.onchange(); renderGenSlots();
+        window.dispatchEvent(new Event("ark:gen-providers-changed"));
+      } catch (_) { $("agStatus").textContent = "⚠ couldn't save"; $("agStatus").className = "as-status bad"; }
+      saveBtn.textContent = "Save"; setTimeout(() => { $("agStatus").textContent = ""; }, 2500);
+    };
+    renderGenSlots();
+  }
+  async function renderGenSlots() {
+    const el = $("agSlots"); if (!el) return;
+    const r = await fetch("/api/cloud/providers").then(r => r.json()).catch(() => ({ providers: [] }));
+    const list = r.providers || [];
+    if (!list.length) { el.innerHTML = `<div class="as-empty">No image/video providers yet — add one below.</div>`; return; }
+    el.innerHTML = "";
+    list.forEach(p => {
+      const img = p.image_models || [], vid = p.video_models || [];
+      const parts = [];
+      if (img.length) parts.push("🖼 " + img.length + ": " + img.join(", "));
+      if (vid.length) parts.push("🎬 " + vid.length + ": " + vid.join(", "));
+      const d = document.createElement("div"); d.className = "as-slot";
+      d.innerHTML = `<div class="nm">${p.name}<span class="as-tag on">ON</span>${p.using_defaults ? '<span class="as-tag no" title="good models picked for you — add your own below to override">DEFAULTS</span>' : ''}</div>
+        <div class="meta">${parts.length ? parts.join("  ·  ") : "no models picked yet"}</div>
+        <div class="row"><button data-act="edit">Edit</button><button class="del" data-act="del">Remove</button></div>`;
+      d.querySelector('[data-act="edit"]').onclick = () => {
+        $("agPreset").value = p.id; $("agPreset").onchange();
+        // load what's actually live (defaults or the user's picks) so they tweak from the real list
+        genPendingModels = [...img]; genVideoPendingModels = [...vid];
+        renderGenChips(); renderGenVideoChips(); renderGenPicks();
+        d.scrollIntoView({ behavior: "smooth", block: "center" });
+      };
+      d.querySelector('[data-act="del"]').onclick = async () => {
+        if (!confirm(`Remove ${p.name}? This clears its key and models.`)) return;
+        await fetch("/api/cloud/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: p.id, api_key: "" }) });
+        await fetch("/api/cloud/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: p.id, kind: "image", models: [] }) });
+        await fetch("/api/cloud/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: p.id, kind: "video", models: [] }) });
+        renderGenSlots(); window.dispatchEvent(new Event("ark:gen-providers-changed"));
+      };
+      el.appendChild(d);
+    });
+  }
 
   // ── APP-WIDE UPDATER — on every room (the gear is everywhere). Checks GitHub Releases for the
   //    WHOLE app; if a newer version is out, badges the gear + offers a one-click whole-app update. ──
@@ -364,6 +704,8 @@
   function cmpVer(a, b) { const p = s => String(s || "").replace(/^v/i, "").split(/[.\-+]/).map(n => parseInt(n, 10) || 0); const A = p(a), B = p(b), n = Math.max(A.length, B.length); for (let i = 0; i < n; i++) { const d = (A[i] || 0) - (B[i] || 0); if (d) return d < 0 ? -1 : 1; } return 0; }
   async function checkAppUpdate() {
     const box = $("asUpd"), sec = $("asUpdSec"); if (!box) return;
+    // In a room, no updater chrome — the front page owns "what version am I on / update". Hide + bail.
+    if (window.__dmvRoom) { if (sec) sec.style.display = "none"; return; }
     // The WEB version auto-updates on refresh — the desktop "Update" button + badge don't belong here.
     if (window.DMV_AI && DMV_AI.CLOUD_MODE) { if (sec) sec.style.display = "none"; try { gear.classList.remove("upd"); } catch (e) {} return; }
     let cur = "?"; try { cur = (await fetch("/api/version").then(r => r.json())).version || "?"; } catch (e) { }

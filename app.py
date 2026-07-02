@@ -802,7 +802,9 @@ async def _reload_ctx(model: str):
 
 async def lm_stream(payload: dict):
     """Stream chat deltas from LM Studio as SSE lines."""
-    async with httpx.AsyncClient(timeout=None) as cx:
+    # Bounded IDLE timeout (resets on every byte) so a stalled local brain errors out
+    # instead of hanging the room forever with no recovery.
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=15.0)) as cx:
         async with cx.stream("POST", f"{LM}/chat/completions", json=payload) as r:
             if r.status_code != 200:
                 body = (await r.aread()).decode(errors="replace")[:300]
@@ -815,9 +817,14 @@ async def lm_stream(payload: dict):
                 if chunk.strip() == "[DONE]":
                     break
                 try:
-                    delta = json.loads(chunk)["choices"][0]["delta"].get("content", "")
+                    obj = json.loads(chunk)
+                    choice = obj["choices"][0]
+                    delta = (choice.get("delta") or {}).get("content", "")
+                    fr = choice.get("finish_reason")
                 except Exception:
                     continue
+                if fr:
+                    yield f"data: {json.dumps({'type':'stop_reason','reason':fr})}\n\n"
                 if delta:
                     yield f"data: {json.dumps({'type':'delta','text':delta})}\n\n"
 
@@ -1555,7 +1562,24 @@ BUILDS_DIR.mkdir(exist_ok=True)
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 CODE_ROOT = DATA / "code"
 CODE_ROOT.mkdir(exist_ok=True)
-CODE_ADMIN = os.environ.get("DMV_CODE_ADMIN", "1") == "1"  # default ON locally
+# Self-editing (the coder working on DeMartinville's OWN source) is the CREATOR's power only.
+# Gated on IS_OWNER (owner.md, gitignored, can never ride a release) so a public download can NEVER
+# edit the app it's running inside and brick itself -- it still codes anything else fully. The env
+# var lets the owner turn his own self-edit OFF if he wants; it can't turn a guest's ON.
+CODE_ADMIN = IS_OWNER and (os.environ.get("DMV_CODE_ADMIN", "1") == "1")
+
+
+def _is_app_dir(p: Path) -> bool:
+    """True if `p` IS DeMartinville's own source tree or sits INSIDE it -- editing there would let the
+    coder rewrite the running app. NOT true for ancestors (Desktop, Home): a guest may legitimately
+    connect those to work on their OWN projects; the _code_path jail (below) is what keeps them from
+    reaching down INTO the app dir from an ancestor."""
+    try:
+        rp = p.resolve()
+        root = ROOT.resolve()
+        return rp == root or root in rp.parents
+    except Exception:
+        return False
 _CODE_SKIP = {".git", "venv", ".venv", "node_modules", "__pycache__", "data",
               ".idea", ".vscode", "dist", "build", ".pytest_cache", ".mypy_cache"}
 _CODE_TEXT_MAX = 400_000          # don't shove a 5MB file into the editor/model
@@ -1599,9 +1623,11 @@ def _ws_root(ws: str) -> Path:
         rec = _load_code_folders().get(ws)
         if rec:
             p = Path(rec.get("path", ""))
-            if p.is_dir():
+            # SECURITY: a guest connecting the app's OWN folder would be self-editing through the
+            # back door -- block it here too (defense in depth; connect_folder already refuses it).
+            if p.is_dir() and (IS_OWNER or not _is_app_dir(p)):
                 return p
-        # connected folder is gone/stale â†’ fall through to the safe sandbox
+        # connected folder is gone/stale (or an off-limits app dir) â†’ fall through to the safe sandbox
     safe = re.sub(r"[^a-zA-Z0-9_-]", "", ws or "default") or "default"
     p = CODE_ROOT / safe
     p.mkdir(parents=True, exist_ok=True)
@@ -1616,6 +1642,13 @@ def _code_path(ws: str, rel: str) -> Path:
     target = (root / (rel or "").lstrip("/\\")).resolve()
     if target != root and root not in target.parents:
         raise ValueError("path escapes workspace")
+    # A guest who connected an ANCESTOR of the app (e.g. their Desktop, with the app extracted under
+    # it) must still not be able to reach down into DeMartinville's own files and break the install.
+    # The owner (IS_OWNER) is exempt -- self-editing is their whole point.
+    if not IS_OWNER:
+        app_root = ROOT.resolve()
+        if target == app_root or app_root in target.parents:
+            raise ValueError("path escapes workspace")
     return target
 
 
@@ -1708,6 +1741,13 @@ CODE_AGENT_SYSTEM = (
     "```run\ngit status\n```\n\n"
     "The room executes it and sends you the output. Use for: findstr/grep to locate code, running "
     "tests, git status, installs, builds.\n\n"
+    "== LOOK SOMETHING UP ON THE WEB ==\n"
+    "You CAN browse the internet. To search + read the top real pages, output:\n\n"
+    "```web\ncurrent syntax for X / how does library Y do Z\n```\n\n"
+    "The room runs a real web search and fetches the top pages, then sends you back their actual "
+    "text. Use this whenever you're unsure of current syntax, a library's API, a version number, or "
+    "anything you might be wrong or out of date about -- don't guess, look it up. One clear query "
+    "per ```web block; you can use it more than once per turn.\n\n"
     "== HOW THE LOOP WORKS (this is what makes you like Claude Code) ==\n"
     "After ANY ```read or ```run block, STOP and wait. The room runs it and sends the results back, "
     "then you continue with what you learned. The real rhythm is:\n"
@@ -1742,6 +1782,13 @@ CODE_AGENT_SYSTEM = (
 "Never leave him hanging with no next step. Never end on a code block with no explanation.\n"
 "If something might break, say so in one sentence before you do it.\n\n"
 "== HARD RULES ==\n"
+    "- If he points at something that already exists ('like the page I built in X', 'similar to "
+    "Y', 'the one I showed you') as the model to build from, you MUST ```search / ```read that "
+    "real file FIRST and copy its actual structure -- layout, menu position, everything -- before "
+    "you write anything. NEVER improvise a layout from his description alone when a real reference "
+    "exists; guessing is exactly how you build the wrong thing and move stuff (like his nav) to a "
+    "spot he never asked for. If you can't find the file he means, say so and ask which one, "
+    "don't guess.\n"
     "- ACT, don't narrate. If he asks you to build, add, fix, change, or make ANYTHING, your "
     "VERY FIRST reply MUST contain a ```read (to see the file), a ```edit / ```write (to change "
     "it), or a ```run block. You already have the file tree -- never say 'let me look first' and "
@@ -1755,7 +1802,7 @@ CODE_AGENT_SYSTEM = (
     "- Question only? Answer in plain text, no blocks.\n"
     "- Need a file you can't see? Name it and ask him to open it.\n"
     "- NEVER emit JSON tool calls like {\"command\":...} or {\"file_path\":...,\"content\":...}. "
-    "Those do NOT work here. ONLY the fenced blocks above (```search ```read ```edit ```write "
+    "Those do NOT work here. ONLY the fenced blocks above (```search ```read ```edit ```write ```web "
     "```run) do anything. Use them.\n"
     "- No rm -rf, no destructive ops unless he explicitly asks."
 )
@@ -2113,7 +2160,8 @@ def _is_localhost(req: Request) -> bool:
 async def code_suggest_folders():
     """Handy one-click targets: this app's own folder first, then common places."""
     home = Path.home()
-    out = [{"name": "DeMartinville (this app)", "path": str(ROOT), "primary": True}]
+    # Only the creator gets "edit the app itself" as a suggestion; guests code their own projects.
+    out = [{"name": "DeMartinville (this app)", "path": str(ROOT), "primary": True}] if IS_OWNER else []
     for label, pp in [("Desktop", home / "Desktop"), ("Downloads", home / "Downloads"),
                       ("Documents", home / "Documents"), ("Projects", home / "Projects"),
                       ("Home", home)]:
@@ -2142,6 +2190,10 @@ async def code_connect_folder(req: Request):
         return JSONResponse({"error": "That folder doesn't exist."}, status_code=400)
     if not p.is_dir():
         return JSONResponse({"error": "That's a file, not a folder."}, status_code=400)
+    # The coder works on any of YOUR projects, but editing DeMartinville's own source is the
+    # creator's power only -- so a downloaded copy can't be pointed at itself and broken.
+    if not IS_OWNER and _is_app_dir(p):
+        return JSONResponse({"error": "The coder can work on any of your own projects, but editing DeMartinville's own files is locked to the app's creator so you can't accidentally break your install. Point it at a different folder."}, status_code=403)
     name = (body.get("name") or p.name or "folder").strip()
     slug = re.sub(r"[^a-zA-Z0-9_-]", "", name.lower())[:40] or "folder"
     key = "folder:" + slug
@@ -2346,6 +2398,19 @@ async def code_write(req: Request):
 
 
 
+_ACTION_KWS = ("build", "add", "fix", "change", "make", "create", "remove", "delete",
+               "update", "implement", "write", "move", "rename", "refactor", "replace")
+
+
+def _looks_actionable(instruction):
+    """Rough heuristic: does this READ like a build/fix/change request (vs a plain question)?
+    Used only to decide whether a totally-inert round deserves ONE corrective nudge."""
+    q = (instruction or "").strip().lower()
+    if not q or q.endswith("?"):
+        return False
+    return any(kw in q for kw in _ACTION_KWS)
+
+
 def _build_code_system():
     """Build Kit system prompt with user memory injected. Personal info stays local."""
     mem = load_memory() + load_cloud_memory()
@@ -2411,10 +2476,16 @@ async def code_agent(req: Request):
     )
 
     # â”€â”€ TOKEN BUDGET by effort (controls history depth, context size, and max output) â”€â”€
+    # NOTE: "context window" (how much a model can SEE) and "max output tokens" (how much it
+    # can WRITE in one response) are two different numbers -- even 1M-context frontier models
+    # cap a single response around 64K-128K. The old caps here were far below that on every
+    # tier, which is what was cutting Kit off mid-file/mid-sentence during real work. Raised to
+    # sit close to what these models can actually output/see, not an arbitrary conservative slice.
     hist_limit  = {"low": 6,  "medium": 12, "high": 20,    "max": 30}.get(effort, 12)
-    max_tok     = {"low": 6000, "medium": 12000, "high": 20000, "max": 32000}.get(effort, 12000)
-    tree_cap    = {"low": 4000, "medium": 8000, "high": 20000, "max": 40000}.get(effort, 8000)
-    file_cap    = {"low": 12000, "medium": 40000, "high": 80000, "max": 120000}.get(effort, 40000)
+    max_tok     = {"low": 8000, "medium": 16000, "high": 32000, "max": 64000}.get(effort, 16000)
+    max_tok_claude = {"low": 8000, "medium": 20000, "high": 48000, "max": 128000}.get(effort, 20000)
+    tree_cap    = {"low": 4000, "medium": 12000, "high": 30000, "max": 60000}.get(effort, 12000)
+    file_cap    = {"low": 12000, "medium": 60000, "high": 120000, "max": 200000}.get(effort, 60000)
 
     history = raw_history[-hist_limit:]
 
@@ -2452,7 +2523,7 @@ async def code_agent(req: Request):
     lean_msgs = ([{"role": "system", "content": _sys}] + history +
                  [{"role": "user", "content": lean_user}])
     claude_payload = {"model": model, "messages": lean_msgs, "temperature": 0.2,
-                      "stream": True, "max_tokens": max_tok, "_cache_system": claude_sys}
+                      "stream": True, "max_tokens": max_tok_claude, "_cache_system": claude_sys}
 
     async def gen():
         nonlocal model            # vision auto-route may re-point this turn to a vision key
@@ -2499,6 +2570,7 @@ async def code_agent(req: Request):
         work_lean = list(lean_msgs)
         all_changed, all_errors = [], []
         turn_reply = []           # PHASE 4: accumulate this turn's narration for the session log
+        nudged = False            # self-correction: give a stalled model ONE corrective retry
         MAX_ROUNDS = {"low": 8, "medium": 12, "high": 16, "max": 20}.get(effort, 12)
 
         for round_i in range(MAX_ROUNDS):
@@ -2518,6 +2590,7 @@ async def code_agent(req: Request):
                 spay = dict(std_payload); spay["messages"] = work_std
                 src = lm_stream(spay)
 
+            hit_len_limit = False
             async for ev in src:
                 yield ev
                 if ev.startswith("data: "):
@@ -2525,6 +2598,8 @@ async def code_agent(req: Request):
                         d = json.loads(ev[6:])
                         if d.get("type") == "delta":
                             acc.append(d.get("text", ""))
+                        elif d.get("type") == "stop_reason" and d.get("reason") in ("max_tokens", "length"):
+                            hit_len_limit = True
                     except Exception:
                         pass
 
@@ -2559,13 +2634,49 @@ async def code_agent(req: Request):
             for vf in val_fails:
                 yield _sse("step", icon="⚠", text="broke  %s — %s" % (vf["path"], vf["error"][:90]))
 
-            # 2) gather tool calls: ```search (find code), ```read (file), ```run (shell)
+            # 2) gather tool calls: ```search (find code), ```read (file), ```run (shell), ```web (internet)
             searches = re.findall(r'```search\s*\r?\n(.*?)\r?\n```', full, re.S)
             runs = re.findall(r'```run\s*\r?\n(.*?)\r?\n```', full, re.S)
             reads = re.findall(r'```read\s*\r?\n(.*?)\r?\n```', full, re.S)
+            webs = re.findall(r'```web\s*\r?\n(.*?)\r?\n```', full, re.S)
+
+            # LENGTH-LIMIT CUT-OFF: the provider stopped mid-response (not a clean finish) --
+            # this is the literal "cut off mid-sentence, have to say keep going" bug. Auto-continue
+            # instead of making B type it every time. Checked BEFORE the "nothing pending" break so
+            # it fires even if the cut-off happened before any write/edit/tool block completed.
+            if hit_len_limit and round_i < MAX_ROUNDS - 1:
+                yield _sse("status", text="hit the length limit -- continuing automatically...")
+                nudge = ("You were cut off by the output length limit before finishing -- that's a "
+                         "length cap, not a stopping point. If you were in the middle of a ```write "
+                         "or ```edit block, START THAT BLOCK OVER cleanly and completely in this "
+                         "message (don't try to resume mid-block -- the previous partial one is "
+                         "discarded). If you were only mid-explanation with no open block, just "
+                         "continue that thought.")
+                tail = [{"role": "assistant", "content": full[:6000]},
+                        {"role": "user", "content": nudge}]
+                work_std = work_std + tail
+                work_lean = work_lean + tail
+                continue
 
             # Failed edits OR broken syntax must loop back so Kit fixes it — not end the turn.
-            if not runs and not reads and not searches and not edit_fails and not val_fails:
+            if not runs and not reads and not searches and not webs and not edit_fails and not val_fails:
+                # SELF-CORRECTION: an action-shaped instruction got a round that did NOTHING at
+                # all (no write/edit either) -- a weaker/cheaper model just narrated instead of
+                # acting. Give it ONE corrective nudge before accepting that as the final answer,
+                # so "I can't do shit with it" stops being true just because the model backing
+                # Kit that turn happened to be less reliable than Claude.
+                if round_i == 0 and not nudged and not changed and not errors and _looks_actionable(instruction):
+                    nudged = True
+                    yield _sse("status", text="that didn't act -- nudging it to actually do the task...")
+                    nudge = ("You didn't take any action -- no file was read, searched, edited, written, "
+                             "or run. B asked you to actually DO something. Your reply MUST include a "
+                             "```read, ```search, ```edit, ```write, ```run, or ```web block. Look at "
+                             "what he needs and act now, don't just talk about it.")
+                    tail = [{"role": "assistant", "content": full[:2000]},
+                            {"role": "user", "content": nudge}]
+                    work_std = work_std + tail
+                    work_lean = work_lean + tail
+                    continue
                 break   # nothing pending -> the agent is done
 
             results = []
@@ -2584,6 +2695,27 @@ async def code_agent(req: Request):
                 out = "\n".join(hits) if hits else "(no matches)"
                 yield _sse("output", label="search: " + qy[:80], text=out[:4000])
                 results.append("SEARCH '%s' (path:line: text):\n%s" % (qy, out))
+            for wq in webs:
+                wq = wq.strip()
+                if not wq:
+                    continue
+                yield _sse("step", icon="\U0001F310", text="web  " + wq[:140])
+                try:
+                    hits = await ddg_search(wq, n=4)
+                    if not hits:
+                        out = "(no results)"
+                    else:
+                        parts = []
+                        for h in hits[:3]:
+                            page = await fetch_page(h.get("url", ""), cap=2500)
+                            parts.append("### %s\n%s\n%s" % (
+                                (h.get("title") or "")[:120], h.get("url", ""),
+                                page or "(couldn't fetch the page body)"))
+                        out = "\n\n".join(parts)
+                except Exception as e:
+                    out = f"(web lookup error: {e})"
+                yield _sse("output", label="web: " + wq[:80], text=out[:4000])
+                results.append("WEB '%s':\n%s" % (wq, out[:6000]))
             for cmd in runs:
                 cmd = cmd.strip()
                 if not cmd:
@@ -3034,6 +3166,49 @@ async def build_save(req: Request):
 @app.delete("/api/builds/{bid}")
 async def build_del(bid: str):
     f = BUILDS_DIR / f"{re.sub(r'[^a-zA-Z0-9-]', '', bid)}.json"
+    if f.exists():
+        f.unlink()
+    return {"ok": True}
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════
+#  ANIMATION STATION — asset library (cast / world / foreground cutouts).
+#  Mirrors the builds_* pattern: one JSON per asset in data/anim_assets/. An asset is
+#  {id, kind: 'cast'|'world'|'fg', name, frames: [urls or data-urls], fps, prompt?, ts}.
+#  frames[0] is the still; 2+ frames = a looping sprite the gallery tiles animate live.
+# ═════════════════════════════════════════════════════════════════════════════════════
+ANIM_ASSETS_DIR = DATA / "anim_assets"
+ANIM_ASSETS_DIR.mkdir(exist_ok=True)
+
+
+@app.get("/api/anim/assets")
+async def anim_assets_list():
+    out = []
+    for f in sorted(ANIM_ASSETS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:200]:
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return {"assets": out}
+
+
+@app.post("/api/anim/assets")
+async def anim_asset_save(req: Request):
+    d = await req.json()
+    aid = re.sub(r"[^a-zA-Z0-9-]", "", d.get("id") or str(uuid.uuid4()))
+    d["id"] = aid
+    d["ts"] = int(time.time())
+    if d.get("kind") not in ("cast", "world", "fg"):
+        return JSONResponse({"error": "kind must be cast|world|fg"}, status_code=400)
+    if not (isinstance(d.get("frames"), list) and d["frames"]):
+        return JSONResponse({"error": "frames[] required"}, status_code=400)
+    (ANIM_ASSETS_DIR / f"{aid}.json").write_text(json.dumps(d, indent=1), encoding="utf-8")
+    return {"ok": True, "id": aid}
+
+
+@app.delete("/api/anim/assets/{aid}")
+async def anim_asset_del(aid: str):
+    f = ANIM_ASSETS_DIR / f"{re.sub(r'[^a-zA-Z0-9-]', '', aid)}.json"
     if f.exists():
         f.unlink()
     return {"ok": True}
@@ -4121,6 +4296,160 @@ def _atlas_outputs(data) -> list:
     return [u for u in outs if isinstance(u, str) and u.startswith("http")]
 
 
+async def _fal_generate(model: str, prompt: str, options: dict, media: dict, key: str):
+    """fal.ai's queue API: POST https://queue.fal.run/{model} -> {request_id, status_url,
+    response_url} (or an inline result for fast/sync models); poll status_url until COMPLETED,
+    then GET response_url for the result. Auth is 'Authorization: Key <key>' (not Bearer)."""
+    body = {}
+    if prompt:
+        body["prompt"] = prompt
+    for k, v in (options or {}).items():
+        if v not in (None, ""):
+            body[k] = v
+    if isinstance(media, dict):
+        for field, val in media.items():
+            if val:
+                body[field] = val
+    headers = {"Authorization": f"Key {key}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(f"https://queue.fal.run/{model}", json=body, headers=headers)
+            if r.status_code in (401, 403):
+                return JSONResponse({"error": "fal.ai rejected the key (auth) â€” check it's right."}, status_code=400)
+            if r.status_code >= 400:
+                return JSONResponse({"error": f"fal.ai error {r.status_code}: {r.text[:300]}"}, status_code=400)
+            sub = r.json()
+
+            outs = _fal_outputs(sub)
+            if outs:
+                return {"ok": True, "outputs": outs, "model": model}
+
+            status_url = sub.get("status_url")
+            response_url = sub.get("response_url")
+            if not status_url or not response_url:
+                return JSONResponse({"error": f"No queue info from fal.ai: {str(sub)[:300]}"}, status_code=400)
+
+            deadline = time.time() + 600
+            delay = 2.0
+            while time.time() < deadline:
+                await asyncio.sleep(delay)
+                delay = min(delay * 1.3, 8.0)
+                try:
+                    sr = await cx.get(status_url, headers=headers)
+                except Exception:
+                    continue
+                if sr.status_code >= 400:
+                    continue
+                sj = sr.json()
+                status = (sj.get("status") or "").upper()
+                if status == "COMPLETED":
+                    rr = await cx.get(response_url, headers=headers)
+                    if rr.status_code >= 400:
+                        return JSONResponse({"error": f"fal.ai result fetch failed: {rr.status_code}"}, status_code=400)
+                    outs = _fal_outputs(rr.json())
+                    if outs:
+                        return {"ok": True, "outputs": outs, "model": model}
+                    return JSONResponse({"error": "Finished but no output URL came back."}, status_code=400)
+                if status in ("ERROR", "FAILED"):
+                    return JSONResponse({"error": "Generation failed on fal.ai."}, status_code=400)
+            return JSONResponse({"error": "Timed out waiting for the result â€” try again."}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=400)
+
+
+def _fal_outputs(data) -> list:
+    """Pull result URLs out of a fal.ai response â€” shapes vary by model (images[], image, video)."""
+    if not isinstance(data, dict):
+        return []
+    urls = []
+    for key in ("images", "image", "video", "output"):
+        v = data.get(key)
+        if isinstance(v, dict) and v.get("url"):
+            urls.append(v["url"])
+        elif isinstance(v, list):
+            for it in v:
+                if isinstance(it, dict) and it.get("url"):
+                    urls.append(it["url"])
+                elif isinstance(it, str) and it.startswith("http"):
+                    urls.append(it)
+        elif isinstance(v, str) and v.startswith("http"):
+            urls.append(v)
+    return urls
+
+
+async def _kie_generate(model: str, prompt: str, options: dict, media: dict, key: str):
+    """Kie.ai's job-queue API (per their docs as of this writing â€” their catalog/params change
+    fast, so this is a best-effort integration): POST /api/v1/jobs/createTask {model, input}
+    -> {data:{taskId}}; poll GET /api/v1/jobs/recordInfo?taskId=... until state=success, then
+    read resultJson.resultUrls. If Kie changes this contract, this is the one spot to fix."""
+    base = "https://api.kie.ai/api/v1"
+    inp = {}
+    if prompt:
+        inp["prompt"] = prompt
+    for k, v in (options or {}).items():
+        if v not in (None, ""):
+            inp[k] = v
+    if isinstance(media, dict):
+        for field, val in media.items():
+            if val:
+                inp[field] = val
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=90) as cx:
+            r = await cx.post(f"{base}/jobs/createTask", json={"model": model, "input": inp}, headers=headers)
+            if r.status_code in (401, 403):
+                return JSONResponse({"error": "Kie rejected the key (auth) â€” check it's right."}, status_code=400)
+            if r.status_code >= 400:
+                return JSONResponse({"error": f"Kie error {r.status_code}: {r.text[:300]}"}, status_code=400)
+            sub = r.json()
+            data = sub.get("data") if isinstance(sub.get("data"), dict) else sub
+            task_id = data.get("taskId") or data.get("task_id")
+            if not task_id:
+                return JSONResponse({"error": f"No task id from Kie: {str(sub)[:300]}"}, status_code=400)
+
+            deadline = time.time() + 600
+            delay = 2.0
+            while time.time() < deadline:
+                await asyncio.sleep(delay)
+                delay = min(delay * 1.3, 8.0)
+                try:
+                    pr = await cx.get(f"{base}/jobs/recordInfo", params={"taskId": task_id}, headers=headers)
+                except Exception:
+                    continue
+                if pr.status_code >= 400:
+                    continue
+                pj = pr.json()
+                pdata = pj.get("data") if isinstance(pj.get("data"), dict) else pj
+                state = (pdata.get("state") or pdata.get("status") or "").lower()
+                if state in ("success", "succeeded", "completed"):
+                    outs = _kie_outputs(pdata)
+                    if outs:
+                        return {"ok": True, "outputs": outs, "model": model}
+                    return JSONResponse({"error": "Finished but no output URL came back."}, status_code=400)
+                if state in ("fail", "failed", "error"):
+                    return JSONResponse({"error": "Generation failed: " + str(pdata.get("failMsg") or pdata.get("error") or "unknown")}, status_code=400)
+            return JSONResponse({"error": "Timed out waiting for the result â€” try again."}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=400)
+
+
+def _kie_outputs(data) -> list:
+    """Pull result URLs out of a Kie recordInfo blob â€” resultJson is usually a JSON STRING."""
+    if not isinstance(data, dict):
+        return []
+    rj = data.get("resultJson") or data.get("result_json")
+    if isinstance(rj, str):
+        try:
+            rj = json.loads(rj)
+        except Exception:
+            rj = None
+    if isinstance(rj, dict):
+        urls = rj.get("resultUrls") or rj.get("result_urls") or []
+        if isinstance(urls, list):
+            return [u for u in urls if isinstance(u, str) and u.startswith("http")]
+    return []
+
+
 @app.post("/api/cloud/generate")
 async def cloud_generate(req: Request):
     d = await req.json()
@@ -4134,15 +4463,20 @@ async def cloud_generate(req: Request):
     if not key:                                          # fall back to the saved (encrypted-at-rest) key
         key = (_gen_keys_load().get(provider) or "").strip()
 
-    if provider != "atlascloud":
-        return JSONResponse({"error": f"'{provider}' isn't wired up yet â€” Atlas Cloud only for now."}, status_code=400)
+    if provider not in ("atlascloud", "fal", "kie"):
+        return JSONResponse({"error": f"'{provider}' isn't wired up yet."}, status_code=400)
     if not key:
-        return JSONResponse({"error": "No API key â€” save your Atlas Cloud key up top first."}, status_code=400)
+        return JSONResponse({"error": "No API key â€” save your provider key up top first."}, status_code=400)
     if not model:
         return JSONResponse({"error": "No model selected."}, status_code=400)
     has_media = isinstance(media, dict) and any(media.values())
     if not prompt and not has_media:
         return JSONResponse({"error": "Write a prompt first."}, status_code=400)
+
+    if provider == "fal":
+        return await _fal_generate(model, prompt, options, media, key)
+    if provider == "kie":
+        return await _kie_generate(model, prompt, options, media, key)
 
     # Build the body Atlas expects: model + prompt + model-specific options + refs.
     body = {"model": model}
@@ -4250,6 +4584,289 @@ async def cloud_key_save(req: Request):
 async def cloud_key_status(provider: str = "atlascloud"):
     """Is a key saved for this provider? Never returns the key itself."""
     return {"has_key": bool(_gen_keys_load().get(provider))}
+
+
+# â”€â”€ ONE HUB for image/video provider keys + models â€” set them once in Settings, every room
+#    (Imagination Station, Treatment, etc.) reads the same list. No more per-room key boxes
+#    and no more hardcoded model dropdowns that show models you never unlocked. â”€â”€
+# Curated, VERIFIED default model ids per provider. The point: "add a key" is enough â€” the moment a
+# key is saved, these show up as pickable models in every room (Imagination Station, Treatment), so the
+# user never has to know a model-id string to get started. Their own picks (Settings â†’ Image & video)
+# always OVERRIDE these. IDs verified against each provider's live docs/catalog (Atlas + fal: 2026-06
+# from imagine-cloud's catalog; Kie: docs.kie.ai 2026-07 â€” image nano-banana-2/edit + video kling-3.0
+# (first+last frame) & 2.6, all verified against Kie's live docs). We never ship a fabricated model id.
+# *_defaults = the SMALL set actually used as a fallback if the user picks nothing (keep it lean so a
+# no-pick save doesn't fire up 20 paid models). *_options = the full PICK MENU shown in Settings so the
+# user chooses from a real list instead of hunting model-id strings. Every id below is REAL, pulled from
+# each provider's own live catalog (Atlas: atlascloud.ai/models 2026-07; fal: fal.ai/models 2026-07; Kie:
+# docs.kie.ai — Kie exposes no list API, so its menu is the verified core set only). We never ship a
+# fabricated model id -- an empty/short menu beats a made-up one.
+GEN_PRESETS = [
+    {"id": "atlascloud", "name": "Atlas Cloud", "key_url": "https://www.atlascloud.ai/console/api-keys",
+     "image_defaults": ["google/nano-banana-pro/text-to-image", "bytedance/seedream-v4", "qwen/qwen-image-2.0/text-to-image"],
+     "video_defaults": ["alibaba/wan-2.5/text-to-video", "alibaba/wan-2.7/image-to-video", "minimax/hailuo-02/pro", "kwaivgi/kling-v3.0-pro/image-to-video"],
+     "image_options": [
+         "google/nano-banana-2/text-to-image", "google/nano-banana-2/edit", "google/nano-banana-2/reference-to-image",
+         "google/nano-banana-pro/text-to-image", "bytedance/seedream-v5.0-lite", "bytedance/seedream-v5.0-lite/edit",
+         "bytedance/seedream-v4.5", "bytedance/seedream-v4.5/edit", "qwen/qwen-image-2.0/text-to-image",
+         "qwen/qwen-image-2.0/edit", "qwen/qwen-image-2.0-pro/text-to-image", "openai/gpt-image-2/text-to-image",
+         "openai/gpt-image-2/edit", "openai/gpt-image-1.5/text-to-image", "microsoft/mai-image-2.5/text-to-image",
+         "alibaba/wan-2.7/text-to-image", "baidu/ERNIE-Image-Turbo/text-to-image", "xai/grok-imagine-image-quality/text-to-image",
+         "z-image/turbo"],
+     "video_options": [
+         "alibaba/wan-2.5/text-to-video", "alibaba/wan-2.5/text-to-video-fast", "alibaba/wan-2.7/image-to-video",
+         "bytedance/seedance-2.0-mini/text-to-video", "bytedance/seedance-2.0-mini/image-to-video",
+         "bytedance/seedance-2.0-mini/reference-to-video", "kwaivgi/kling-v3.0-pro/image-to-video",
+         "minimax/hailuo-02/pro"]},
+    {"id": "fal", "name": "fal.ai", "key_url": "https://fal.ai/dashboard/keys",
+     "image_defaults": ["fal-ai/flux/dev", "fal-ai/flux-pro/kontext"],
+     "video_defaults": ["fal-ai/kling-video/v2.1/standard/image-to-video", "fal-ai/minimax/hailuo-02/standard/image-to-video"],
+     "image_options": [
+         "fal-ai/flux/dev", "fal-ai/flux/schnell", "fal-ai/flux-pro/v1.1", "fal-ai/flux-pro/v1.1-ultra",
+         "fal-ai/flux-pro/kontext", "fal-ai/flux-2-pro", "fal-ai/flux-lora", "fal-ai/nano-banana-2",
+         "fal-ai/nano-banana-pro", "fal-ai/nano-banana", "openai/gpt-image-2", "xai/grok-imagine-image"],
+     "video_options": [
+         "fal-ai/kling-video/v3/pro/image-to-video", "fal-ai/kling-video/v2.1/standard/image-to-video",
+         "fal-ai/minimax/hailuo-02/standard/image-to-video", "bytedance/seedance-2.0/image-to-video",
+         "bytedance/seedance-2.0/text-to-video", "fal-ai/pixverse/v6/image-to-video",
+         "fal-ai/ltx-video-13b-distilled/image-to-video", "fal-ai/krea-2/turbo",
+         "xai/grok-imagine-video/image-to-video"]},
+    # Kie truly has no list API (checked docs.kie.ai + a live catalog fetch attempt, both confirm
+    # it -- 2026-07). Every id below is individually verified (Kie's own docs, or a third-party
+    # spec repo that ships per-model YAML specs) -- we do NOT enumerate Kie's whole market page,
+    # because most of those ids can't be confirmed without guessing the vendor/task slug format,
+    # and a wrong id silently wastes the user's money on a failed call. The real fix for "I want
+    # Kie's full catalog" is the bulk-paste box in Settings: copy any ids from kie.ai/market and
+    # paste several at once (comma- or newline-separated) -- see splitModelIds() in settings.js.
+    {"id": "kie", "name": "Kie", "key_url": "https://kie.ai/api-key", "market_url": "https://kie.ai/market",
+     "image_defaults": ["nano-banana-2", "google/nano-banana-edit"],
+     "video_defaults": ["kling-3.0/video", "kling-2.6/image-to-video"],
+     "image_options": ["nano-banana-2", "google/nano-banana-edit", "nano-banana-pro"],
+     "video_options": ["kling-3.0/video", "kling-2.6/image-to-video", "kling-3.0/motion-control"]},
+]
+GEN_MODELS_FILE = ROOT / "data" / "gen_models.json"
+
+
+def _gen_models_load() -> dict:
+    try:
+        return json.loads(GEN_MODELS_FILE.read_text(encoding="utf-8")) if GEN_MODELS_FILE.exists() else {}
+    except Exception:
+        return {}
+
+
+def _gen_models_save(d: dict) -> None:
+    GEN_MODELS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = GEN_MODELS_FILE.with_name(GEN_MODELS_FILE.name + ".tmp")
+    tmp.write_text(json.dumps(d, indent=1), encoding="utf-8")
+    os.replace(tmp, GEN_MODELS_FILE)
+
+
+@app.get("/api/cloud/presets")
+async def cloud_presets():
+    return {"presets": GEN_PRESETS}
+
+
+# LIVE model catalogs -- pull the provider's OWN full list so the user picks from EVERYTHING it
+# offers (searchable), exactly like the chat brain picker's "list all". Both fal and Atlas expose a
+# real public catalog endpoint (verified live 2026-07); Kie does not (models live only on its Market
+# webpage), so Kie honestly can't be listed -- the UI tells the user to paste the id from kie.ai/market.
+_FAL_IMAGE_CATS = {"text-to-image", "image-to-image"}
+_FAL_VIDEO_CATS = {"text-to-video", "image-to-video", "video-to-video"}
+# Atlas' catalog sits behind Cloudflare -- a bare client UA gets a 1010 bot-block, so send a browser UA.
+_BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+
+
+async def _fal_catalog(key):
+    """fal.ai: page api.fal.ai/v1/models (auth optional -- key just raises rate limit), bucket by
+    category. ~800 active models across ~8 pages of 100. Returns (img, vid, partial): `partial` is
+    True if fal cut us off mid-pagination (keyless rate-limit) -- so we can tell the user it's not
+    the whole list rather than silently pretending a throttled slice is everything."""
+    headers = {"Authorization": f"Key {key}"} if key else {}
+    img, vid, cursor, partial = [], [], None, False
+    async with httpx.AsyncClient(timeout=20) as cx:
+        for _ in range(40):
+            url = "https://api.fal.ai/v1/models?limit=100" + (f"&cursor={cursor}" if cursor else "")
+            r = await cx.get(url, headers=headers)
+            if r.status_code != 200:
+                if not img and not vid:
+                    raise ProviderCatalogError(f"fal {r.status_code}: {r.text[:150]}")
+                partial = True   # got some, then throttled -> what we have is incomplete
+                break
+            d = r.json()
+            for m in (d.get("models") or []):
+                md = m.get("metadata") or {}
+                if md.get("status") == "deprecated":
+                    continue
+                eid = m.get("endpoint_id")
+                if not eid:
+                    continue
+                entry = {"id": eid, "name": md.get("display_name") or eid}
+                cat = md.get("category")
+                if cat in _FAL_IMAGE_CATS:
+                    img.append(entry)
+                elif cat in _FAL_VIDEO_CATS:
+                    vid.append(entry)
+            cursor = d.get("next_cursor")
+            if not d.get("has_more") or not cursor:
+                break
+    return img, vid, partial
+
+
+async def _atlas_catalog(key):
+    """Atlas Cloud: GET api.atlascloud.ai/api/v1/models -> 400+ models with a clean 'type' field
+    (Image / Video / Text / Audio). Keyless (a key isn't required to list), but needs a browser UA
+    to clear Cloudflare. Model id is the 'model' field; 'displayName' is the friendly name."""
+    headers = {"User-Agent": _BROWSER_UA, "Accept": "application/json"}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get("https://api.atlascloud.ai/api/v1/models", headers=headers)
+    if r.status_code != 200:
+        raise ProviderCatalogError(f"Atlas {r.status_code}: {r.text[:150]}")
+    img, vid = [], []
+    for m in (r.json().get("data") or []):
+        mid = m.get("model")
+        if not mid:
+            continue
+        entry = {"id": mid, "name": m.get("displayName") or mid}
+        t = (m.get("type") or "").lower()
+        if t == "image":
+            img.append(entry)
+        elif t == "video":
+            vid.append(entry)
+    return img, vid
+
+
+class ProviderCatalogError(Exception):
+    pass
+
+
+@app.post("/api/cloud/models/live")
+async def cloud_models_live(req: Request):
+    """Pull a provider's FULL live model catalog, split image/video, so the user searches + picks from
+    everything it offers (not a hand-picked subset). Body: {provider, api_key?}. fal + Atlas have real
+    list endpoints; Kie doesn't -- it returns a note telling the user to paste the id from its Market."""
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    provider = (body.get("provider") or "").strip()
+    key = (body.get("api_key") or "").strip()
+    note = ""
+    try:
+        if provider == "fal":
+            img, vid, partial = await _fal_catalog(key)
+            if partial:
+                note = ("fal rate-limited the keyless list, so this is only part of the catalog -- "
+                        "add your fal key above (or hit ↻ all again in a moment) for the full list.")
+        elif provider == "atlascloud":
+            img, vid = await _atlas_catalog(key)
+        elif provider == "kie":
+            return {"image": [], "video": [],
+                    "error": "Kie has no public model-list API -- browse kie.ai/market and paste the model id (e.g. nano-banana-2, kling-3.0/video)."}
+        else:
+            return {"image": [], "video": [], "error": "unknown provider"}
+    except ProviderCatalogError as e:
+        return {"image": [], "video": [], "error": str(e)}
+    except Exception as e:
+        return {"image": [], "video": [], "error": str(e)[:160]}
+    return {"image": img, "video": vid, "note": note}
+
+
+@app.post("/api/cloud/models")
+async def cloud_models_save(req: Request):
+    """Save the image OR video model ids picked for a provider. Body: {provider, kind, models:[...]}
+    where kind is 'image' or 'video' â€” kept separate so Imagination Station's two panels (and
+    Treatment's image-only picker) only ever see models of the right kind."""
+    d = await req.json()
+    provider = (d.get("provider") or "").strip()
+    kind = "video" if (d.get("kind") or "image") == "video" else "image"
+    if not provider:
+        return JSONResponse({"error": "no provider"}, status_code=400)
+    models = [str(m).strip() for m in (d.get("models") or []) if str(m).strip()]
+    all_models = _gen_models_load()
+    entry = all_models.get(provider) or {}
+    if not isinstance(entry, dict):   # migrate old flat-list shape if it's ever still lying around
+        entry = {"image": entry, "video": []}
+    if models:
+        entry[kind] = models
+    else:
+        entry.pop(kind, None)
+    if entry.get("image") or entry.get("video"):
+        all_models[provider] = entry
+    else:
+        all_models.pop(provider, None)
+    _gen_models_save(all_models)
+    return {"ok": True, "models": models}
+
+
+@app.get("/api/cloud/providers")
+async def cloud_providers_list():
+    """Every image/video provider with a saved key + its picked models (split by kind) â€” the
+    single source every room (Imagination Station, Treatment, ...) reads from, so 'add it once
+    in Settings' is real."""
+    keys = _gen_keys_load()
+    models = _gen_models_load()
+    out = []
+    for p in GEN_PRESETS:
+        pid = p["id"]
+        if not keys.get(pid):
+            continue
+        entry = models.get(pid) or {}
+        if not isinstance(entry, dict):
+            entry = {"image": entry, "video": []}
+        picked_img, picked_vid = entry.get("image") or [], entry.get("video") or []
+        # The user's own picks win; if they haven't picked any, fall back to the provider's curated
+        # defaults so a bare key still lights up every room. `using_defaults` lets the UI say so.
+        img = picked_img or p.get("image_defaults") or []
+        vid = picked_vid or p.get("video_defaults") or []
+        out.append({"id": pid, "name": p["name"], "image_models": img, "video_models": vid,
+                    "using_defaults": not (picked_img or picked_vid)})
+    return {"providers": out}
+
+
+@app.post("/api/cloud/host_image")
+async def cloud_host_image(req: Request):
+    """Turn a base64 data-URL (a user's chat upload) into a PUBLIC https url a gen provider can fetch
+    as an image-to-image reference. Kie's file host is used (the url is public, so it works even when
+    the gen provider is Atlas/fal). Needs a Kie key saved. If we can't host, we return the value
+    UNCHANGED so the caller can still try base64 pass-through (works on fal/Atlas). Body: {data_url}."""
+    import base64 as _b64
+    d = await req.json()
+    data_url = (d.get("data_url") or "").strip()
+    if not data_url:
+        return JSONResponse({"error": "no image"}, status_code=400)
+    if data_url.startswith("http"):
+        return {"url": data_url}                       # already a fetchable url
+    kie_key = (_gen_keys_load().get("kie") or "").strip()
+    if not (kie_key and data_url.startswith("data:")):
+        return {"url": data_url}                        # nothing to host with â€” caller falls back to base64
+    try:
+        header, b64 = data_url.split(",", 1)
+        raw = _b64.b64decode(b64)
+        mime = "image/png"
+        if ":" in header and ";" in header:
+            mime = header.split(":", 1)[1].split(";", 1)[0] or "image/png"
+        ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/webp": ".webp"}.get(mime, ".png")
+        fname = "ref_" + _hashlib.sha1(raw).hexdigest()[:12] + ext
+        async with httpx.AsyncClient(timeout=60) as cx:
+            r = await cx.post("https://kieai.redpandaai.co/api/file-stream-upload",
+                              headers={"Authorization": f"Bearer {kie_key}"},
+                              files={"file": (fname, raw, mime)},
+                              data={"uploadPath": "images/dmv-refs", "fileName": fname})
+            if r.status_code < 400:
+                data = (r.json() or {}).get("data")
+                url = ""
+                if isinstance(data, dict):
+                    url = data.get("fileUrl") or data.get("downloadUrl") or ""
+                elif isinstance(data, str):
+                    url = data                          # some variants return the url directly
+                if isinstance(url, str) and url.startswith("http"):
+                    return {"url": url}
+    except Exception:
+        pass
+    return {"url": data_url}                             # host failed â€” let the caller try base64
 
 
 @app.get("/api/image/gallery")
@@ -4527,6 +5144,56 @@ async def transcribe_audio(req: Request):
         return {"text": text}
     except Exception as e:
         return {"text": "", "error": str(e)[:160]}
+
+
+# Producer breakdown a song by actually LISTENING to it (genre, instrumentation, groove, key/tempo
+# feel, vocal processing, arrangement) -- the thing loudness/brightness numbers can never give.
+AUDIO_BREAKDOWN_PROMPT = (
+    "You are a working music producer/engineer sitting in the room -- listen to this audio and break "
+    "it down the way you'd tell a collaborator what you hear. Be specific and technical but natural, "
+    "not a bullet dump. Cover:\n"
+    "- Genre + the sub-genres / influences you actually hear (e.g. 'alternative R&B with trap and "
+    "pop-punk influences').\n"
+    "- The instrumentation, named specifically: the lead/riff and how it sounds (e.g. 'distorted "
+    "electric guitar playing a syncopated minor-key riff'), the drums/kit and its character (kick, "
+    "snare, hi-hat pattern -- e.g. 'trap kit with fast clicking hi-hat rolls, punchy kick, crisp "
+    "snare'), the bass, any synths/pads/keys.\n"
+    "- The vocals: delivery (melodic singing vs rap-influenced), and processing you can hear "
+    "(pitch correction, saturation, doubling, reverb/delay).\n"
+    "- Arrangement + dynamics: energy shifts, drops, silences, filtered transitions, sections.\n"
+    "- Best estimate of tempo (BPM) and key -- give your read even if approximate.\n"
+    "- One or two lines of engineer's-ear notes: what's working, and anything that'll get harsh / "
+    "needs attention in the mix (low-end, brightness, harshness, headroom).\n"
+    "Only describe what you actually hear -- don't invent. Write it as one tight, readable breakdown."
+)
+
+
+@app.post("/api/audio/breakdown")
+async def audio_breakdown(req: Request):
+    """Let a model that can actually HEAR (Gemini) listen to the uploaded song and return a real
+    producer breakdown -- genre, instruments, groove, key/tempo, vocal processing, arrangement.
+    This is the half loudness/brightness numbers can't do. Falls back cleanly (error string) so the
+    frontend keeps the lyrics+numbers path when no audio-capable key is set."""
+    body = await req.json()
+    audio = (body.get("audio") or "").strip()
+    name = (body.get("audio_name") or "audio.mp3").strip()
+    extra = (body.get("prompt") or "").strip()
+    if not audio:
+        return {"breakdown": "", "error": "no audio"}
+    try:
+        from swarm_routes import gemini_hear_audio as _hear, _gemini_slot as _gslot
+        raw = audio.split(",", 1)[1] if "," in audio else audio
+        ab = base64.b64decode(raw)
+        if len(ab) >= 18 * 1024 * 1024:
+            return {"breakdown": "", "error": "song too big to send inline (18 MB max) -- bounce a shorter/lower-bitrate copy"}
+        gs = _gslot(_enabled_slots())
+        if not gs:
+            return {"breakdown": "", "error": "no listening model -- add a free Google Gemini key in Settings > Keys so Kit/Tiff can actually hear the song (not just read the numbers)"}
+        prompt = AUDIO_BREAKDOWN_PROMPT + (("\n\nAlso, specifically: " + extra) if extra else "")
+        text = await _hear(gs, ab, name, prompt)
+        return {"breakdown": text}
+    except Exception as e:
+        return {"breakdown": "", "error": str(e)[:200]}
 
 
 @app.post("/api/sfx")
@@ -5314,6 +5981,50 @@ async def studio_update_restart():
     return {"ok": True}
 
 
+async def _editor_register_path(raw: str):
+    """Probe + register ONE local file into the editor's media registry (idempotent by
+    path-hash), kick off the background proxy/thumb/peaks cache, and return the client-safe
+    record (or None if it isn't a real file). Shared by /import and /import_urls so the two
+    entry points can never drift."""
+    path = os.path.abspath(raw)
+    if not os.path.isfile(path):
+        return None
+    mid = _hashlib.sha1(path.lower().encode("utf-8")).hexdigest()[:16]
+    ext = os.path.splitext(path)[1].lower()
+    async with _media_lock:
+        existing = EDIT_MEDIA.get(mid)
+        ready = existing.get("ready") if existing else False
+    if existing and ready:
+        return _media_public(existing)
+    info = _probe(path) or {}
+    kind = _kind_for(ext)
+    if kind == "video" and not info.get("has_video"):
+        kind = "audio" if info.get("has_audio") else "video"
+    # Reject non-media downloads (e.g. an HTML error page saved as .png, a truncated file): an image
+    # must have real dimensions; video/audio must actually carry a stream. Returning None here makes
+    # import_urls hand back a `null` placeholder for that slot instead of a phantom 0x0 clip.
+    if kind == "image":
+        if not (info.get("w") and info.get("h")):
+            return None
+    elif not (info.get("has_video") or info.get("has_audio")):
+        return None
+    dur = info.get("dur", 0) or (5.0 if kind == "image" else 0)
+    fps = info.get("fps", 30.0) or 30.0
+    rec = {
+        "id": mid, "src": path, "name": os.path.basename(path), "kind": kind,
+        "dur": dur, "fps": fps, "frames": int(round(dur * fps)) if kind != "image" else 0,
+        "w": info.get("w", 0), "h": info.get("h", 0),
+        "has_audio": info.get("has_audio", False),
+        "vcodec": info.get("vcodec", ""), "acodec": info.get("acodec", ""),
+        "cache": {}, "ready": False, "ts": int(time.time()),
+    }
+    async with _media_lock:
+        EDIT_MEDIA[mid] = rec
+        _save_media_reg()
+    _fire(_build_cache(mid))
+    return _media_public(rec)
+
+
 @app.post("/api/editor/import")
 async def editor_import(req: Request):
     """Register one or more source files: probe, assign a stable id, kick off
@@ -5324,35 +6035,9 @@ async def editor_import(req: Request):
     paths = body.get("paths") or []
     out = []
     for raw in paths:
-        path = os.path.abspath(raw)
-        if not os.path.isfile(path):
-            continue
-        mid = _hashlib.sha1(path.lower().encode("utf-8")).hexdigest()[:16]
-        ext = os.path.splitext(path)[1].lower()
-        async with _media_lock:
-            existing = EDIT_MEDIA.get(mid)
-            ready = existing.get("ready") if existing else False
-        if existing and ready:
-            out.append(_media_public(existing));  continue
-        info = _probe(path) or {}
-        kind = _kind_for(ext)
-        if kind == "video" and not info.get("has_video"):
-            kind = "audio" if info.get("has_audio") else "video"
-        dur = info.get("dur", 0) or (5.0 if kind == "image" else 0)
-        fps = info.get("fps", 30.0) or 30.0
-        rec = {
-            "id": mid, "src": path, "name": os.path.basename(path), "kind": kind,
-            "dur": dur, "fps": fps, "frames": int(round(dur * fps)) if kind != "image" else 0,
-            "w": info.get("w", 0), "h": info.get("h", 0),
-            "has_audio": info.get("has_audio", False),
-            "vcodec": info.get("vcodec", ""), "acodec": info.get("acodec", ""),
-            "cache": {}, "ready": False, "ts": int(time.time()),
-        }
-        async with _media_lock:
-            EDIT_MEDIA[mid] = rec
-            _save_media_reg()
-        _fire(_build_cache(mid))
-        out.append(_media_public(rec))
+        rec = await _editor_register_path(raw)
+        if rec:
+            out.append(rec)
     return {"media": out}
 
 
@@ -5392,6 +6077,72 @@ async def editor_upload(req: Request):
         except Exception: pass
         return JSONResponse({"error": "empty file"}, status_code=400)
     return {"path": str(dest)}
+
+
+# Content-Type â†’ extension, for remote media whose URL carries no usable file extension.
+_CT_EXT = {
+    "image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/webp": ".webp",
+    "video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm",
+    "audio/mpeg": ".mp3", "audio/mp3": ".mp3", "audio/wav": ".wav", "audio/x-wav": ".wav",
+    "audio/mp4": ".m4a", "audio/aac": ".aac",
+}
+
+
+@app.post("/api/editor/import_urls")
+async def editor_import_urls(req: Request):
+    """Server-side download + register of REMOTE media URLs into the editor's bin. This is how a
+    room (Treatment) hands the editor a set of generated stills/clips by URL: the browser can't
+    fetch a provider's CDN cross-origin, and /import only takes local paths â€” so we pull the bytes
+    here (no CORS), drop them in the uploads dir, and register each like /import.
+    Body: {items:[{url, name?}]}  â€” name (with a real extension) is preferred; we fall back to the
+    URL's extension, then the Content-Type. Returns {media:[record|null, ...]} in the SAME order so
+    the caller can line records up with its clips (null = that one couldn't be fetched)."""
+    if _ffmpeg_missing():
+        return JSONResponse({"error": "ffmpeg not found â€” install ffmpeg/ffprobe on PATH"}, status_code=500)
+    body = await req.json()
+    items = body.get("items") or []
+    if not isinstance(items, list) or not items:
+        return JSONResponse({"error": "no items"}, status_code=400)
+    updir = EDITOR_DIR / "uploads"
+    updir.mkdir(exist_ok=True)
+    known = _VIDEO_EXT | _AUDIO_EXT | _IMAGE_EXT
+    out = []
+    async with httpx.AsyncClient(timeout=180, follow_redirects=True) as cx:
+        for it in items[:200]:
+            url = ((it or {}).get("url") or "").strip()
+            name = os.path.basename(((it or {}).get("name") or "").strip())
+            if not url:
+                out.append(None); continue
+            try:
+                r = await cx.get(url)
+                if r.status_code >= 400 or not r.content:
+                    out.append(None); continue
+                data = r.content
+            except Exception:
+                out.append(None); continue
+            # settle on a filename with a KNOWN extension (upload/probe both key off it)
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in known:
+                url_ext = os.path.splitext(url.split("?")[0])[1].lower()
+                if url_ext in known:
+                    ext = url_ext
+                else:
+                    ext = _CT_EXT.get((r.headers.get("content-type") or "").split(";")[0].strip().lower(), "")
+                if ext not in known:
+                    out.append(None); continue
+                stem = os.path.splitext(name)[0] if name else ("clip" + _hashlib.sha1(url.encode()).hexdigest()[:8])
+                name = stem + ext
+            dest = updir / name
+            if dest.exists():
+                stem = os.path.splitext(name)[0]; i = 1
+                while dest.exists():
+                    dest = updir / f"{stem} ({i}){ext}"; i += 1
+            try:
+                dest.write_bytes(data)
+            except Exception:
+                out.append(None); continue
+            out.append(await _editor_register_path(str(dest)))
+    return {"media": out}
 
 
 @app.get("/api/editor/media")

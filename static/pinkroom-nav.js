@@ -87,10 +87,14 @@
   }
   // the in-room FEEDBACK BUDDY (separate from Kit) — "you're early = you're a builder", collects bugs/ideas
   if (!document.querySelector('script[data-fbk]')) { const fs = document.createElement("script"); fs.src = "/static/feedback-buddy.js"; fs.setAttribute("data-fbk", "1"); document.body.appendChild(fs); }
-  // KEYS — the unified API-key window (exposes window.openKeys): curated picks + deep links + paste, saved locally
   // AUDIO EAR — free in-browser audio analysis (loudness/brightness/dynamics) so docked agents can HEAR uploads
   if (!document.querySelector('script[data-ear]')) { const ear = document.createElement("script"); ear.src = "/static/audio-ear.js"; ear.setAttribute("data-ear", "1"); document.body.appendChild(ear); }
-  if (!document.querySelector('script[data-keys]')) { const kys = document.createElement("script"); kys.src = "/static/keys.js"; kys.setAttribute("data-keys", "1"); document.body.appendChild(kys); }
+  // ONE key UI everywhere. Flag that we're inside a room, then inject the REAL Settings modal (the gear's
+  // panel) rather than a second key window. In a room it runs as a MODAL ONLY — no gear/updater chrome
+  // (that lives on the front page). window.openKeys + window.arkOpenSettings both open this ONE panel.
+  // (Owner's law: one place for keys = Settings. The old separate "keys.js" hub is retired from rooms.)
+  window.__dmvRoom = true;
+  if (!window.__arkSettings && !document.querySelector('script[data-asettings],script[src*="settings.js"]')) { const stg = document.createElement("script"); stg.src = "/static/settings.js"; stg.setAttribute("data-asettings", "1"); document.body.appendChild(stg); }
   // COPY ANYWHERE — reliable right-click→copy in the native shell (where the OS menu is flaky)
   if (!document.querySelector('script[data-copy]')) { const cpy = document.createElement("script"); cpy.src = "/static/copy-anywhere.js"; cpy.setAttribute("data-copy", "1"); document.body.appendChild(cpy); }
   // STREAM PUBLISH — window.publishToStream + window.streamPublishDialog so any lab can drop a

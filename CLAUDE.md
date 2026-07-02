@@ -24,3 +24,23 @@ Run it top to bottom and report as you go in one scannable block.
 7. **Report + rest** — what shipped + what's pending, one tight block, then tell him to go rest. If he's fried or spiraling, lock what's good and call the break instead of grinding (memory: `owner-spiral-is-the-stop-signal`).
 
 **The goal: he never recites the checklist again.** He says "ship it" → the agent runs 1–4 on its own, then asks one "deploy + release — go?" before anything public.
+
+---
+
+## 💰 Bug-fix / audit requests — the cost checklist
+
+**Trigger: ANY time B asks to find/fix bugs, audit code, or review for issues — run this BEFORE touching a tool, every time, without him re-explaining it.** This exists because a full `/code-review` fan-out was run for a "just find 3 bugs" ask on 2026-07-01 and burned ~1.2M tokens (~$20) finding things that included a fabricated "violation" — see `scope-review-cost-to-the-ask.md` in memory.
+
+1. **Scope first.** A number ("find 3 bugs") or "just check X" = small, targeted ask. Do NOT invoke `/code-review`, multi-agent workflows, or spawn parallel Agent-tool subagents for this. Read the relevant file(s)/diff yourself, one pass, report back directly.
+2. **Reserve the heavy multi-agent review** for when he explicitly says "thorough," "ultra," "before I ship," or similar — never by default.
+3. **Match tool weight to the task, every step:**
+   - Confirming a line number or a claim = do it directly (Grep/Read), no subagent, no matter what.
+   - A single well-scoped question about one file/function = one direct read, no subagent.
+   - Only spin up parallel agents when the task is genuinely broad (many files/rooms) AND he asked for that breadth.
+   - When a subagent IS warranted, use the cheapest model that can do the job — a mechanical "find this pattern, report lines" task doesn't need Sonnet/Opus reasoning; only escalate model tier when the task needs real judgment (weighing a subtle bug, comparing designs).
+   - If a fan-out is already running and the ask turns out smaller than expected mid-flight, kill the rest (`TaskList`/`TaskStop`) — don't let it finish just because it's already going.
+4. **Never assert a finding without checking the live file first** — not from an agent's summary, not from a memory note's one-line index line. Open the actual file and quote the real line before calling it a bug. Agents (and compressed memory summaries) get file:line citations wrong — always re-verify against current code before it reaches B.
+5. **If citing a project rule/memory as the reason something is "wrong,"** open and read the actual memory file (not just the MEMORY.md index line) before asserting a violation. A one-line index summary is a pointer, not the rule itself — misreading one and calling something a "bug" that isn't is worse than finding nothing.
+6. **Hand fixes to B in copy-paste, mechanical form** — exact file, exact function/line, exact before/after — precise enough that a cheap/local model (DeepSeek, Kimi, Gemini, Haiku) applies it with zero judgment calls. If writing the fix instruction itself needs real reasoning, that's the one place worth spending on — write it once, carefully; everything downstream should be mechanical.
+
+**The goal:** he asks for bug fixes once, cheaply, correctly — no repeat explanation, no fan-out he didn't ask for, no "bug" that isn't real.

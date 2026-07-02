@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Treatment — DeMartinville</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&family=Inter:wght@400;500;600&family=Oswald:wght@700&family=Allura&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#0C0D10; --bg1:#15161A; --panel:#15161A; --panel-2:#1b1d23;
+    --hairline:rgba(255,255,255,.07); --line:rgba(255,255,255,.07);
+    --text:#E9EAED; --text-2:#C2C8D1; --text-3:rgba(198,201,208,.62); --text-4:rgba(198,201,208,.40);
+    --dim:rgba(198,201,208,.52); --faint:rgba(198,201,208,.45);
+    --steel:#3E9CB8; --steel-2:#5FB4CE; --teal:#2BB6A8; --gold:#E6C16A; --amber:#D9A441;
+    --good:#2BB6A8; --warn:#D9A441; --bad:#E0796A;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+    --ui:Inter,system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:var(--ui);color:var(--text);min-height:100vh;
+    background:radial-gradient(1100px 600px at 50% -18%,#1C1E24 0%,var(--bg1) 55%,var(--bg0) 100%)}
+  button,input,textarea,select{font-family:inherit}
+  button{cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:9px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(62,156,184,.45)}
+
+  /* ── brand lockup + topbar ── */
+  .dmv{display:inline-flex;align-items:center;gap:.42em;line-height:1}
+  .dmv .w{white-space:nowrap;line-height:1}
+  .dmv .b{font-family:Oswald,sans-serif;font-weight:700;font-size:1em;letter-spacing:.005em}
+  .dmv .s{font-family:Allura,cursive;font-size:1.35em;margin-left:-.02em}
+  .dmv .b,.dmv .s{background:linear-gradient(180deg,#f7f9fc,#cfd6df 46%,#9aa3af 55%,#eef1f5);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+  .etch{font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--text-3)}
+  .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;padding:13px 22px;background:rgba(8,9,11,.78);backdrop-filter:blur(12px);border-bottom:1px solid var(--hairline)}
+  .pr-back{display:inline-flex;align-items:center;text-decoration:none;color:var(--text-3);padding:7px 12px;border:1px solid var(--hairline);border-radius:10px;background:rgba(255,255,255,.03);transition:.14s}
+  .pr-back:hover{color:var(--text);border-color:rgba(95,180,206,.5);background:rgba(62,156,184,.10)}
+  .brandwrap{display:flex;align-items:center;gap:13px;font-size:20px}
+  .brandwrap .tag{padding-left:13px;border-left:1px solid var(--line)}
+  .topbar .grow{flex:1}
+  .verspill{font:600 10px 'Space Mono',monospace;letter-spacing:.1em;color:var(--text-4);text-transform:uppercase}
+
+  .wrap{max-width:980px;margin:0 auto;padding:26px 20px 90px}
+
+  /* ── card shell ── */
+  .card{background:var(--panel);border:1px solid var(--hairline);border-radius:16px;margin-bottom:16px;overflow:hidden}
+  .card-pad{padding:18px 20px}
+  .card-h{display:flex;align-items:center;gap:10px;cursor:pointer;padding:16px 20px;user-select:none}
+  .card-h .ttl{font:700 13px Oxanium,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--text)}
+  .card-h .sub{font-size:11.5px;color:var(--text-4)}
+  .card-h .chev{margin-left:auto;color:var(--text-4);font-size:11px;transition:transform .16s}
+  .card-h.open .chev{transform:rotate(180deg)}
+  .card-body{display:none;border-top:1px solid var(--hairline)}
+  .card-body.open{display:block}
+
+  /* ── Tiff panel ── */
+  .tiffhead{display:flex;align-items:center;gap:10px;padding:16px 20px 4px}
+  .tiffhead .ttl{font:700 14px Oxanium,sans-serif;letter-spacing:.03em;color:var(--text)}
+  .tiffhead .sub{font-size:11.5px;color:var(--text-4);margin-top:2px}
+  .songrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 20px 12px}
+  .songchip{display:inline-flex;align-items:center;gap:8px;background:rgba(62,156,184,.10);border:1px solid rgba(62,156,184,.3);color:var(--steel-2);border-radius:999px;padding:5px 12px;font-size:12px}
+  .songchip .si{color:var(--text-3);font-size:11px}
+  .songchip b{cursor:pointer;color:var(--text-4);font-weight:400}
+  .songchip b:hover{color:var(--bad)}
+  .log{padding:6px 20px;min-height:90px;max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:11px}
+  .msg{font-size:13px;line-height:1.5;max-width:90%}
+  .msg.user{align-self:flex-end;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);padding:8px 12px;border-radius:12px 12px 4px 12px;white-space:pre-wrap;word-break:break-word}
+  .msg.ai{color:var(--text-2);white-space:pre-wrap;word-break:break-word;align-self:flex-start}
+  .msg.ai b.who{color:var(--steel-2);font-weight:700;display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;font-family:Oxanium,sans-serif}
+  .hint-empty{color:var(--text-4);font-size:12.5px;padding:8px 0}
+  .composer{padding:12px 20px 16px}
+  .thumbs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .thumbs:empty{display:none}
+  .thumb{position:relative;width:42px;height:42px;border-radius:8px;overflow:hidden;border:1px solid var(--hairline)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb b{position:absolute;top:0;right:0;background:rgba(0,0,0,.6);color:#fff;font-size:10px;width:15px;height:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .inputbox{position:relative}
+  #ask{width:100%;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);border-radius:12px;padding:11px 78px 11px 13px;font-family:inherit;font-size:13.5px;resize:none;outline:none;max-height:140px;line-height:1.5}
+  #ask:focus{border-color:rgba(95,180,206,.55)}
+  .inbtns{position:absolute;right:7px;bottom:7px;display:flex;gap:6px}
+  .inbtn{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;border:1px solid var(--hairline);background:var(--panel);color:var(--text-2)}
+  .inbtn:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .inbtn.mic.on{color:var(--steel-2);border-color:var(--steel);animation:micpulse 1.3s ease-in-out infinite}
+  @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(62,156,184,.5)}50%{box-shadow:0 0 0 6px rgba(62,156,184,0)}}
+  .inbtn.send{background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none;font-weight:700}
+  .inbtn.send:disabled{opacity:.4;cursor:default}
+  .toolbar{display:flex;align-items:center;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .toolbtn{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:32px;padding:0 11px;font-size:11.5px;display:inline-flex;align-items:center;gap:6px;font-weight:600}
+  .toolbtn:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .toolbtn.primary{background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none}
+  .toolbtn.primary:disabled{opacity:.5;cursor:default}
+  .toolbtn:disabled{opacity:.5;cursor:default}
+  .toolbtn.on{color:var(--teal);border-color:rgba(43,182,168,.45);background:rgba(43,182,168,.08)}
+  .grow{flex:1}
+  select.tb{appearance:none;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-2);border-radius:9px;height:32px;padding:0 24px 0 10px;font-size:11.5px;max-width:190px;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 12px) 13px,calc(100% - 7px) 13px;background-size:5px 5px;background-repeat:no-repeat}
+
+  /* ── Cast & Locations ── */
+  .createcard{margin:16px;background:var(--panel-2);border:1px solid var(--hairline);border-radius:13px}
+  .createcard .ch{display:flex;align-items:center;gap:9px;padding:12px 14px;cursor:pointer}
+  .createcard .ch .ttl{font:700 11.5px Oxanium,sans-serif;letter-spacing:.03em;text-transform:uppercase}
+  .createcard .ch .sub{font-size:11px;color:var(--text-4)}
+  .createcard .ch .chev{margin-left:auto;color:var(--text-4);font-size:11px;transition:transform .16s}
+  .createcard .ch.open .chev{transform:rotate(180deg)}
+  .createbody{display:none;padding:0 14px 14px}
+  .createbody.open{display:block}
+  .createrow{display:flex;gap:10px;align-items:flex-start}
+  .refup{flex:0 0 52px;width:52px;height:52px;border-radius:10px;border:1.5px dashed rgba(95,180,206,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-4);font-size:9px;text-align:center;background:var(--panel);overflow:hidden;position:relative}
+  .refup img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .refup:hover{border-color:var(--steel)}
+  .createrow textarea{flex:1;background:var(--panel);border:1px solid var(--hairline);color:var(--text);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;min-height:52px;outline:none}
+  .createrow textarea:focus{border-color:rgba(95,180,206,.55)}
+  .writerow{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+  .writerow .hh{font-size:11px;color:var(--text-4)}
+  .kindtog{display:inline-flex;gap:3px;background:var(--panel);border:1px solid var(--hairline);border-radius:9px;padding:3px}
+  .kindtog button{border:none;background:none;color:var(--text-3);font:600 11px Inter;padding:5px 12px;border-radius:7px}
+  .kindtog button.on{background:rgba(62,156,184,.16);color:var(--text)}
+  .genrow{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+  .genrow .hh{font-size:10.5px;color:var(--text-4)}
+
+  .castgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 16px}
+  @media(max-width:760px){.castgrid{grid-template-columns:repeat(2,1fr)}}
+  .castslot{position:relative;aspect-ratio:3/4;border-radius:12px;border:1px dashed var(--hairline);background:var(--panel-2);display:flex;flex-direction:column;overflow:hidden}
+  .castslot.filled{border-style:solid;border-color:var(--hairline)}
+  .castslot .letter{position:absolute;top:6px;left:6px;width:18px;height:18px;border-radius:5px;background:rgba(95,180,206,.85);color:#06161b;font:700 10px Oxanium,sans-serif;display:flex;align-items:center;justify-content:center;z-index:2}
+  .castslot .img{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+  .castslot .img img{width:100%;height:100%;object-fit:cover;display:block}
+  .castslot .spin{width:20px;height:20px;border:2px solid rgba(95,180,206,.25);border-top-color:var(--steel-2);border-radius:50%;animation:cspin .7s linear infinite}
+  @keyframes cspin{to{transform:rotate(360deg)}}
+  .castslot .acts{display:flex;flex-direction:column;gap:4px;padding:6px}
+  .castslot .acts button{width:100%;background:rgba(0,0,0,.32);border:1px solid var(--hairline);color:var(--text-3);border-radius:7px;padding:5px 6px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .castslot .acts button:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .showmore{text-align:center;padding:0 16px 14px}
+  .showmore button{background:none;border:none;color:var(--text-4);font-size:11px;font-weight:600;letter-spacing:.04em}
+  .showmore button:hover{color:var(--steel-2)}
+
+  /* ── treatment mode pills ── */
+  .pills{display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px 0}
+  .pill{background:var(--panel-2);border:1px solid var(--hairline);color:var(--text-3);border-radius:999px;padding:8px 15px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .pill:hover{color:var(--text)}
+  .pill.on{background:rgba(62,156,184,.16);border-color:rgba(95,180,206,.55);color:var(--text)}
+
+  .field{padding:16px 20px 0}
+  .field label{display:block;font:700 10px 'Space Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--text-4);margin-bottom:8px}
+  .field .help{font-size:11px;color:var(--text-4);margin-top:6px;line-height:1.5}
+  .field textarea, .field input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);border-radius:11px;padding:11px 13px;font-size:13px;outline:none}
+  .field textarea:focus, .field input[type=text]:focus{border-color:rgba(95,180,206,.55)}
+  .field textarea{resize:vertical}
+  #styleLock{min-height:46px}
+  #treatmentTxt{min-height:220px;font-family:var(--mono);font-size:12.5px;line-height:1.6;white-space:pre}
+  .treatfoot{display:flex;justify-content:space-between;align-items:center;padding:9px 20px 0}
+  .treatfoot button{background:none;border:none;color:var(--text-4);font-size:11px;font-weight:600}
+  .treatfoot button:hover{color:var(--text)}
+  .breakbar{padding:16px 20px}
+  .breakbtn{width:100%;background:linear-gradient(180deg,var(--steel-2),var(--steel));color:#06161b;border:none;border-radius:11px;padding:13px;font:700 12.5px Oxanium,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+  .breakbtn:hover{filter:brightness(1.08)}
+  .breakbtn:disabled{opacity:.45;cursor:default}
+  .magicrow{display:flex;gap:8px;align-items:center;padding:14px 20px 0}
+  .magicrow input{flex:1;background:var(--panel-2);border:1px solid var(--hairline);color:var(--text);border-radius:10px;padding:10px 13px;font-size:12.5px;outline:none}
+  .magicrow input:focus{border-color:rgba(95,180,206,.55)}
+  .magicrow button{white-space:nowrap}
+
+  /* ── shot results ── */
+  .shotbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:12px 20px 4px}
+  .shotbar .vidmodel{font-size:10.5px;color:var(--text-4);margin-left:auto;text-align:right;line-height:1.4}
+  .shotwrap{max-height:0;overflow:hidden;transition:max-height .35s ease}
+  .shotwrap.open{max-height:20000px}
+  .shotprog{padding:0 20px 8px;font-size:11.5px;color:var(--text-3)}
+  .shotgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 20px 18px}
+  @media(max-width:760px){.shotgrid{grid-template-columns:1fr}}
+  .shotcard{background:var(--panel-2);border:1px solid var(--hairline);border-radius:12px;overflow:hidden}
+  .shotcard .shimg{aspect-ratio:16/9;background:var(--bg0);display:flex;align-items:center;justify-content:center;position:relative}
+  .shotcard .shimg img,.shotcard .shimg video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+  .shotcard .spin{width:22px;height:22px;border:2px solid rgba(95,180,206,.25);border-top-color:var(--steel-2);border-radius:50%;animation:cspin .7s linear infinite}
+  .shotcard .badge2{position:absolute;top:6px;left:6px;font:700 8.5px 'Space Mono';letter-spacing:.05em;background:rgba(0,0,0,.6);color:var(--steel-2);padding:2px 6px;border-radius:5px;z-index:2}
+  .shotcard .badge2.vid{color:#7FD3B0}
+  .shotcard .tags{position:absolute;top:6px;right:6px;display:flex;gap:3px;z-index:2}
+  .shotcard .tags span{font:700 8.5px Oxanium;background:rgba(95,180,206,.85);color:#06161b;padding:2px 5px;border-radius:4px}
+  .shotcard .meta{padding:9px 11px 4px}
+  .shotcard .lbl{font:700 11px Oxanium,sans-serif;color:var(--text);letter-spacing:.02em}
+  .shotcard .pr{font-size:10.5px;color:var(--text-4);margin-top:4px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .shotcard .sacts{display:flex;gap:5px;padding:6px 9px 10px;flex-wrap:wrap}
+  .shotcard .sacts button{flex:1;min-width:52px;background:rgba(0,0,0,.28);border:1px solid var(--hairline);color:var(--text-3);border-radius:7px;padding:5px 4px;font:700 9px Oxanium;letter-spacing:.03em;text-transform:uppercase}
+  .shotcard .sacts button:hover{color:var(--text);border-color:rgba(95,180,206,.5)}
+  .shotcard .sacts button:disabled{opacity:.4;cursor:default}
+  .shotcard .err{padding:6px 11px;font-size:10.5px;color:var(--bad);line-height:1.4}
+
+  /* ── fire list card (proposed by Tiff, in the vibe chat) ── */
+  .firecard{align-self:stretch;margin:2px 0 4px;background:var(--panel-2);border:1px solid rgba(230,120,90,.4);border-radius:12px;overflow:hidden}
+  .fc-head{display:flex;align-items:center;gap:8px;padding:10px 12px;font:700 11px Oxanium,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#E6A06A;border-bottom:1px solid var(--hairline)}
+  .fc-head .fc-sub{margin-left:auto;font:600 10px 'Space Mono',monospace;color:var(--text-4);letter-spacing:.02em;text-transform:none}
+  .fc-rows{display:flex;flex-direction:column}
+  .fc-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--hairline);font-size:12px;flex-wrap:wrap}
+  .fc-row.off{opacity:.45}
+  .fc-row input[type=checkbox]{accent-color:var(--steel);width:14px;height:14px}
+  .fc-slot{width:20px;height:20px;border-radius:5px;background:rgba(95,180,206,.85);color:#06161b;font:700 10px Oxanium,sans-serif;display:flex;align-items:center;justify-content:center;flex:none}
+  .fc-kind{font:700 9px 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--text-4)}
+  .fc-name{flex:1;min-width:60px;color:var(--text-2)}
+  .fc-model{appearance:none;background:var(--panel);border:1px solid var(--hairline);color:var(--text-3);border-radius:7px;height:26px;padding:0 8px;font-size:10.5px;max-width:150px}
+  .fc-st{width:16px;text-align:center;color:var(--steel-2)}
+  .fc-err{flex-basis:100%;font-size:10.5px;color:var(--bad);padding-top:3px}
+  .fc-fire{width:100%;background:linear-gradient(180deg,#E88A5A,#D9704A);color:#160a06;border:none;padding:10px;font:700 11.5px Oxanium,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+  .fc-fire:hover{filter:brightness(1.06)}
+  .fc-fire:disabled{opacity:.5;cursor:default;filter:none}
+
+  /* ── how it works ── */
+  .howbox{margin:16px 20px 0;padding:14px 16px;background:var(--panel-2);border:1px solid var(--hairline);border-radius:12px}
+  .howbox .ttl{font:700 11px Oxanium,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:9px}
+  .howbox ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+  .howbox li{font-size:12px;color:var(--text-3);line-height:1.5}
+  .howbox code{background:rgba(255,255,255,.06);border:1px solid var(--hairline);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-size:11px;color:var(--steel-2)}
+  .bottompad{height:20px}
+
+  /* gallery popover */
+  .gpop{position:absolute;z-index:80;background:var(--panel-2);border:1px solid var(--hairline);border-radius:11px;padding:8px;display:none;box-shadow:0 18px 50px rgba(0,0,0,.5);width:220px}
+  .gpop.on{display:block}
+  .gpop .gtitle{font-size:10.5px;color:var(--text-4);padding:2px 4px 7px}
+  .gpop .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-height:200px;overflow:auto}
+  .gpop .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--hairline)}
+  .gpop .grid img:hover{border-color:var(--steel)}
+  .gpop .empty{font-size:11px;color:var(--text-4);padding:14px 4px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="pr-back" href="/" title="Back to DeMartinville"><span>&larr;</span></a>
+  <div class="brandwrap">
+    <span class="dmv" role="img" aria-label="DeMartinville"><span class="w"><span class="b">DeMartin</span><span class="s">ville</span></span></span>
+    <span class="tag etch">Treatment Room</span>
+  </div>
+  <div class="grow"></div>
+  <span class="verspill" id="genStatus"></span>
+</div>
+
+<div class="wrap">
+
+  <!-- ── TIFF chat / plan panel ── -->
+  <div class="card">
+    <div class="tiffhead">
+      <div>
+        <div class="ttl">◇ Tiff — vibe this out</div>
+        <div class="sub">plan with Tiff · lock cast + locations · write the treatment here</div>
+      </div>
+    </div>
+    <div class="songrow" id="songRow"></div>
+    <div class="log" id="log"><div class="hint-empty">Tell Tiff what you're making — drop refs, drop the song, talk through the concept, then have her write the treatment.</div></div>
+    <div class="composer">
+      <div class="thumbs" id="thumbs"></div>
+      <div class="inputbox">
+        <textarea id="ask" rows="1" placeholder="Tell Tiff what you're making…"></textarea>
+        <div class="inbtns">
+          <button class="inbtn mic" id="micBtn" title="Talk to type">🎤</button>
+          <button class="inbtn send" id="sendBtn" title="Send">➤</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="toolbtn" id="songBtn" title="Attach the song — Tiff hears its length + BPM">🎵 Song</button>
+        <button class="toolbtn" id="refBtn" title="Attach reference images">📎 Refs</button>
+        <button class="toolbtn primary" id="writeBtn" title="Have Tiff draft the full treatment from this conversation">✨ Write treatment from convo</button>
+        <div class="grow"></div>
+        <select class="tb" id="vibeImgModel" title="Image model Tiff fires cast &amp; locations with"></select>
+        <select class="tb" id="chatModel" title="Tiff's brain for this room"></select>
+      </div>
+      <input type="file" id="songFile" accept="audio/*" hidden>
+      <input type="file" id="refFile" accept="image/*" multiple hidden>
+    </div>
+  </div>
+
+  <!-- ── Cast & Locations ── -->
+  <div class="card">
+    <div class="card-h" id="castHead">
+      <span class="ttl">Cast &amp; Locations</span>
+      <span class="sub">— lock faces &amp; places once, reuse them in every shot</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="card-body" id="castBody">
+      <div class="createcard">
+        <div class="ch" id="createHead">
+          <span class="ttl">Create a character or location</span>
+          <span class="sub">— one prompt → one image → pick a slot</span>
+          <span class="chev">▾</span>
+        </div>
+        <div class="createbody" id="createBody">
+          <div class="createrow">
+            <div class="refup" id="refUp" title="Optional reference photo">REF<br>optional</div>
+            <textarea id="castDesc" rows="2" placeholder="Describe the character or location — e.g. brooding rapper, all-black streetwear, silver chains"></textarea>
+          </div>
+          <input type="file" id="refUpFile" accept="image/*" hidden>
+          <div class="writerow">
+            <div class="kindtog" id="castKind">
+              <button data-k="cast" class="on" title="9:16 studio portrait">👤 Cast</button>
+              <button data-k="loc" title="16:9 cinematic location">📍 Location</button>
+            </div>
+            <button class="toolbtn" id="tiffWritesBtn">✨ Tiff writes it</button>
+            <span class="hh" id="kindHint">Cast → 9:16 studio portrait, clean white background. Same face every time.</span>
+          </div>
+          <div class="genrow">
+            <button class="toolbtn primary" id="genBtn">▷ Generate</button>
+            <select class="tb" id="imgModel" title="Image model — set your key up in Settings"></select>
+            <select class="tb" id="aspectRatio" title="Aspect ratio" style="max-width:80px">
+              <option value="9:16">9:16</option>
+              <option value="16:9">16:9</option>
+              <option value="1:1">1:1</option>
+              <option value="3:4">3:4</option>
+              <option value="4:3">4:3</option>
+            </select>
+            <span class="hh" id="genHint"></span>
+          </div>
+        </div>
+      </div>
+      <div class="castgrid" id="castGrid"></div>
+      <div class="showmore" id="showMoreWrap"><button id="showMoreBtn">+ Show slots I–P</button></div>
+    </div>
+  </div>
+
+  <!-- ── Treatment mode + style lock + project + treatment text ── -->
+  <div class="card">
+    <div class="card-pad" style="padding-bottom:0">
+      <div style="font:700 10px 'Space Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--text-4)">Treatment Mode</div>
+    </div>
+    <div class="pills" id="modePills">
+      <button class="pill on" data-mode="Music Video">🎵 Music Video</button>
+      <button class="pill" data-mode="Commercial">📣 Commercial</button>
+      <button class="pill" data-mode="Lookbook">🗂 Lookbook</button>
+      <button class="pill" data-mode="Album Art">💿 Album Art</button>
+      <button class="pill" data-mode="Short Film">🎞 Short Film</button>
+    </div>
+
+    <div class="field">
+      <label>Style Lock <span style="text-transform:none;opacity:.7">— optional, the "same camera" anchor</span></label>
+      <textarea id="styleLock" rows="2" placeholder="e.g. Shot on Arri Alexa Mini, 35mm anamorphic prime, Kodak Vision3 stock grain, warm tungsten kitchen practicals only, shallow depth of field, naturalistic Roger Deakins grade — same lens, same light, every scene."></textarea>
+      <div class="help">One sentence — lens + film stock + grade + lighting. Tiff weaves it into every scene so all shots feel like one continuous shoot.</div>
+    </div>
+
+    <div class="field">
+      <label>Project Name <span style="text-transform:none;opacity:.7">(optional)</span></label>
+      <input type="text" id="projectName" placeholder="e.g. Made This Way">
+    </div>
+
+    <div class="field">
+      <label>Treatment</label>
+      <textarea id="treatmentTxt" placeholder='Have Tiff write it above, or paste your own.
+
+**HERO SHOT 1 — "The Sermon"**
+CAST: A
+LOC: C
+```
+[IMAGE] brooding rapper on a smoky rooftop at dusk, backlit...
+[VIDEO] slow dolly push-in on his eyes
+```'></textarea>
+    </div>
+    <div class="treatfoot">
+      <button id="copyTreatBtn">⧉ Copy treatment</button>
+      <button id="clearTreatBtn">✕ Clear</button>
+    </div>
+    <div class="magicrow">
+      <input type="text" id="magicEdit" placeholder="✎ Tell Tiff to change it — e.g. cut to 8 shots · make scene 3 a rainy night · add a hook section">
+      <button class="toolbtn" id="magicBtn">✨ Apply</button>
+    </div>
+    <div class="breakbar">
+      <button class="breakbtn" id="breakBtn">Break Down → generate all stills</button>
+    </div>
+  </div>
+
+  <!-- ── shot results ── -->
+  <div class="card" id="shotsCard" style="display:none">
+    <div class="card-pad" style="padding-bottom:0">
+      <div style="font:700 13px Oxanium,sans-serif;letter-spacing:.04em;text-transform:uppercase">Shots</div>
+    </div>
+    <div class="shotbar">
+      <button class="toolbtn primary" id="genVideosBtn" title="Animate every still — 4 at a time">🎬 Generate all videos</button>
+      <select class="tb" id="vidModelSel" title="Video model — defaults to the best; pick any"></select>
+      <button class="toolbtn" id="openEditorBtn" title="Drop every shot onto a LePrince timeline, synced to the song">▶ Open in LePrince</button>
+      <span class="vidmodel" id="vidModelLbl"></span>
+    </div>
+    <div class="shotwrap" id="shotWrap">
+      <div class="shotprog" id="shotProg"></div>
+      <div class="shotgrid" id="shotGrid"></div>
+    </div>
+  </div>
+
+  <div class="howbox">
+    <div class="ttl">Treatment — how it works</div>
+    <ol>
+      <li>Vibe the idea with Tiff, drop the <b>song</b> (she hears its length + BPM) and reference images.</li>
+      <li>Build your <b>cast &amp; locations</b> with her — they lock into slots and become the reference for every shot, so faces &amp; places stay identical.</li>
+      <li>Hit <b>Write treatment from convo</b> — she formats each shot with <code>CAST:</code>/<code>LOC:</code> tags + <code>[IMAGE]</code> and <code>[VIDEO]</code> blocks (and <code>[m:ss-m:ss]</code> timecodes for music videos).</li>
+      <li><b>Break Down</b> generates every still, each locked to its cast/location refs. Review them — regenerate, re-prompt, or pull one from your gallery.</li>
+      <li><b>Generate all videos</b> animates each still (5s or 10s, auto), then <b>Open in LePrince</b> drops the whole cut on a timeline, synced to the song.</li>
+    </ol>
+  </div>
+
+  <div class="bottompad"></div>
+</div>
+
+<div class="gpop" id="gpop"><div class="gtitle">Pick from this session's generations</div><div class="grid" id="gpopGrid"></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+let MODELS = [];
+let messages = [];
+let pendingImgs = [];   // [{url, name}] staged ref images for the next Tiff message
+let songMeta = null;    // {name, note, file, durationSec, bpm}
+let sessionGallery = [];  // every image generated this session: {url}
+let castSlots = Array.from({length:16}, (_,i) => ({ letter: String.fromCharCode(65+i), img: null, busy:false }));
+let showAll16 = false;
+let treatmentMode = "Music Video";
+let castKind = "cast";      // "cast" | "loc"
+let shots = [];             // parsed + generated shots
+let VIDEO_PICK = null;      // {provider, model} auto-picked from the configured video providers
+let chatUploads = [];       // ref images uploaded in the vibe chat — Tiff SEES them (vision) AND they become the i2i refs for cast fire-list items
+let IMG_ENTRIES = [];       // [{value:'provider::model', label}] — the user's image models, shared by every image picker
+
+/* ───────────────────────── boot ───────────────────────── */
+(async () => {
+  const r = await fetch("/api/models").then(r=>r.json()).catch(()=>({models:[],cloud:[]}));
+  const cloud = (r.cloud||[]).map(c => ({id:c.id, label:c.label||c.id, cloud:true}));
+  const seen = new Set();
+  const local = (r.models||[]).map(m=>String(m).replace(/:\d+$/,"")).filter(b=>{ if(seen.has(b)) return false; seen.add(b); return true; }).map(b=>({id:b,label:b,cloud:false}));
+  MODELS = [...cloud, ...local];
+  const sel = $("chatModel");
+  sel.innerHTML = "";
+  MODELS.forEach(m => { const o=document.createElement("option"); o.value=m.id; o.textContent=m.label; sel.appendChild(o); });
+  const savedModel = localStorage.getItem("dmv-treatment-model");
+  if (savedModel && MODELS.some(m=>m.id===savedModel)) sel.value = savedModel;
+  sel.onchange = () => localStorage.setItem("dmv-treatment-model", sel.value);
+
+  // image + video model hub — reads the SAME provider list as Imagination Station
+  // (Settings → gear → "Image & video generation"). No per-room key box, one source of truth.
+  await loadGenProviders();
+
+  const arSel = $("aspectRatio");
+  const savedAR = localStorage.getItem("dmv-treatment-ar");
+  if (savedAR) arSel.value = savedAR;
+  arSel.onchange = () => localStorage.setItem("dmv-treatment-ar", arSel.value);
+
+  // restore text fields (room-scoped, local only)
+  const PERSIST_KEYS = { styleLock: "dmv-treatment-stylelock", projectName: "dmv-treatment-projectname", treatmentTxt: "dmv-treatment-treatment-text" };
+  Object.entries(PERSIST_KEYS).forEach(([id, key]) => {
+    $(id).value = localStorage.getItem(key) || "";
+    $(id).addEventListener("input", () => localStorage.setItem(key, $(id).value));
+  });
+
+  renderCastGrid();
+})();
+
+function autosize(el){ el.style.height="auto"; el.style.height=Math.min(el.scrollHeight,140)+"px"; }
+$("ask").addEventListener("input", () => autosize($("ask")));
+$("ask").addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendChat(); } });
+$("sendBtn").onclick = sendChat;
+
+/* ───────────────────────── collapsible cards ───────────────────────── */
+function wireToggle(headEl, bodyEl, openByDefault){
+  if (openByDefault){ headEl.classList.add("open"); bodyEl.classList.add("open"); }
+  headEl.onclick = () => { headEl.classList.toggle("open"); bodyEl.classList.toggle("open"); };
+}
+wireToggle($("castHead"), $("castBody"), false);
+wireToggle($("createHead"), $("createBody"), false);
+
+/* ───────────────────────── mode pills ───────────────────────── */
+$("modePills").addEventListener("click", e => {
+  const b = e.target.closest(".pill"); if(!b) return;
+  $("modePills").querySelectorAll(".pill").forEach(p=>p.classList.remove("on"));
+  b.classList.add("on");
+  treatmentMode = b.dataset.mode;
+});
+
+/* ───────────────────────── cast/location kind toggle ───────────────────────── */
+$("castKind").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  castKind = b.dataset.k;
+  $("castKind").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+  $("aspectRatio").value = castKind === "cast" ? "9:16" : "16:9";
+  $("kindHint").textContent = castKind === "cast"
+    ? "Cast → 9:16 studio portrait, clean white background. Same face every time."
+    : "Location → 16:9 cinematic frame. Same place, every angle, locked.";
+});
+
+/* ───────────────────────── song attach + analysis ───────────────────────── */
+$("songBtn").onclick = () => $("songFile").click();
+$("songFile").onchange = async () => {
+  const f = $("songFile").files[0]; if(!f) return;
+  const note = prompt("Quick note for Tiff — title / vibe (optional):") || "";
+  songMeta = { name: f.name, note, file: f, durationSec: null, bpm: null };
+  renderSongRow();
+  // analyze in the background so Tiff knows the length + tempo (5s vs 10s cuts, scene count)
+  try {
+    const ab = await f.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    const buf = await ac.decodeAudioData(ab.slice(0));
+    songMeta.durationSec = Math.round(buf.duration);
+    try { songMeta.bpm = detectBPM(buf); } catch(e) {}
+    try { ac.close(); } catch(e) {}
+    renderSongRow();
+  } catch(e) { /* still usable without analysis */ }
+};
+function renderSongRow(){
+  $("songRow").innerHTML = "";
+  if (!songMeta) return;
+  const chip = document.createElement("span");
+  chip.className = "songchip";
+  const dur = songMeta.durationSec ? " · " + fmtTime(songMeta.durationSec) : "";
+  const bpm = songMeta.bpm ? " · " + songMeta.bpm + " BPM" : "";
+  const note = songMeta.note ? " · " + songMeta.note : "";
+  chip.innerHTML = `🎵 ${escHtml(songMeta.name)}<span class="si">${dur}${bpm}${escHtml(note)}</span> <b title="remove">✕</b>`;
+  chip.querySelector("b").onclick = () => { songMeta = null; renderSongRow(); };
+  $("songRow").appendChild(chip);
+}
+function fmtTime(s){ s=Math.round(s); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+function escHtml(s){ return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+// strip the raw <fire_list> XML out of Tiff's bubble (the interactive card renders it instead), then escape
+function escapeStripped(txt){
+  const clean = String(txt||"")
+    .replace(/```[a-z]*\s*<fire_list[\s\S]*?<\/fire_list>\s*```/gi, "")
+    .replace(/<fire_list[\s\S]*?<\/fire_list>/gi, "").trim();
+  return clean.replace(/</g, "&lt;");
+}
+// the in-room instructions that teach Tiff to propose a FIRE LIST + the house style for cast/locations.
+// Prepended ONLY to the vibe chat (kept scoped so it stays cheap — no cloud memory, just the treatment).
+function fireSystemPrompt(){
+  const sel = ($("vibeImgModel") && $("vibeImgModel").value) || "";
+  const defId = sel.split("::")[1] || "your image model";
+  return [
+    "You are Tiff — a music-video / film director planning a shoot with the user. Keep replies tight, in-voice, moving fast.",
+    "You can auto-generate CAST, LOCATIONS and OBJECTS into reference slots A–L by emitting a FIRE LIST — a strict XML block the app parses and fires into the slots.",
+    "Emit a <fire_list> when the user gives a go-signal (go / fire / make it / do it / yes / lock it) OR directly tells you to create a specific cast member or location (e.g. 'make him a cast', 'put her in a red dress for cast', 'turn this into a location'). While you're still brainstorming ideas together, propose in words first — don't fire prematurely.",
+    "When you emit it, use EXACTLY this shape — never rename the tags:",
+    '<fire_list>',
+    '<item kind="cast" name="Short Name" attach_refs="B">full generation-ready prompt</item>',
+    '</fire_list>',
+    "- kind is one of: cast | location | object | wardrobe.",
+    "- attach_refs: comma-separated slot letters A–L whose existing images should anchor THIS item (to keep a face or place consistent). Omit if none.",
+    "- The user's uploaded photos are attached to THIS chat and you can SEE them. When they upload someone/something and want it turned into a cast/location, WRITE THE PROMPT AROUND WHAT YOU SEE — it is passed to the image model as an image-to-image reference. e.g. \"Use the subject in the reference image — a sleek humanoid robot — now in a tailored charcoal three-piece suit…\". NEVER contradict the image (a robot stays a robot).",
+    "HOUSE STYLE per kind — follow it exactly:",
+    "- cast: ONLY the person/character, framed KNEES-TO-HEAD (¾ to full body), on a clean seamless neutral studio backdrop (light grey to white), soft even front key, photoreal, razor-sharp, high detail. NO room, NO environment — just them + their wardrobe, so they drop into any scene later.",
+    "- location: ONLY the place — wide, full spatial volume, real anchor objects, cinematic natural light, photoreal, filmic, high detail. NO people, not even silhouettes.",
+    "- object: ONLY the object on a clean backdrop or in-context plate. No people.",
+    "- wardrobe: ONLY the clothing on a hanger / flat-lay / mannequin.",
+    "Consistency is everything — describe faces, materials, architecture precisely so the same subject regenerates identically.",
+    "Default image model id to assume: " + defId + ".",
+  ].join("\n");
+}
+
+// compact onset-energy autocorrelation BPM detector (self-contained; mirrors beats.html/detectBPM)
+function detectBPM(buf){
+  const sr=buf.sampleRate, data=buf.getChannelData(0), hop=512;
+  const n=Math.floor(data.length/hop); if(n<8) return 120;
+  const env=new Float32Array(n); let prev=0;
+  for(let i=0;i<n;i++){ let s=0; for(let j=0;j<hop;j++){ const v=data[i*hop+j]||0; s+=v*v; } const e=Math.sqrt(s/hop); env[i]=Math.max(0,e-prev); prev=e; }
+  const fps=sr/hop, minLag=Math.floor(fps*60/180), maxLag=Math.floor(fps*60/70);
+  let bestLag=0, best=-1;
+  for(let lag=minLag; lag<=maxLag; lag++){ let s=0; for(let i=lag;i<n;i++) s+=env[i]*env[i-lag]; if(s>best){best=s;bestLag=lag;} }
+  let bpm=bestLag>0?60*fps/bestLag:120;
+  while(bpm<70)bpm*=2; while(bpm>180)bpm/=2;
+  return Math.round(bpm)||120;
+}
+
+/* ───────────────────────── refs attach ───────────────────────── */
+$("refBtn").onclick = () => $("refFile").click();
+$("refFile").onchange = () => {
+  Array.from($("refFile").files).forEach(f => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      pendingImgs.push({url: fr.result, name: f.name});
+      if (chatUploads.indexOf(fr.result) < 0) chatUploads.push(fr.result);   // persist as an i2i reference for cast fire-list items
+      renderThumbs();
+    };
+    fr.readAsDataURL(f);
+  });
+};
+function renderThumbs(){
+  $("thumbs").innerHTML = "";
+  pendingImgs.forEach((a,i) => {
+    const d = document.createElement("div"); d.className="thumb";
+    d.innerHTML = `<img src="${a.url}"><b>✕</b>`;
+    d.querySelector("b").onclick = () => { pendingImgs.splice(i,1); renderThumbs(); };
+    $("thumbs").appendChild(d);
+  });
+}
+
+/* ───────────────────────── chat (Tiff) ───────────────────────── */
+function renderChat(){
+  const log = $("log");
+  log.innerHTML = "";
+  if (!messages.length){ log.innerHTML = `<div class="hint-empty">Tell Tiff what you're making — drop refs, drop the song, talk through the concept, then have her write the treatment.</div>`; return; }
+  messages.forEach(m => {
+    const d = document.createElement("div");
+    if (m.role === "user"){
+      d.className = "msg user";
+      d.textContent = typeof m.content === "string" ? m.content : (m.content.find(p=>p.type==="text")||{}).text || "(image)";
+      log.appendChild(d);
+    } else {
+      d.className = "msg ai";
+      d.innerHTML = `<b class="who">Tiff</b>` + (m.display||"");
+      log.appendChild(d);
+      if (m.fireItems && m.fireItems.length) log.appendChild(buildFireCard(m));   // interactive FIRE ALL card
+    }
+  });
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChat(){
+  const ta = $("ask");
+  const text = ta.value.trim();
+  if (!text && !pendingImgs.length) return;
+  const content = pendingImgs.length
+    ? [{type:"text", text: text || "(image attached — take a look)"}, ...pendingImgs.map(a=>({type:"image_url", image_url:{url:a.url}}))]
+    : text;
+  messages.push({role:"user", content});
+  ta.value = ""; autosize(ta);
+  pendingImgs = []; renderThumbs();
+  renderChat();
+  await streamTiff(messages, null, { fireContext: true });
+  // did Tiff propose a fire list? turn it into an interactive card on her message
+  const last = messages[messages.length-1];
+  if (last && last.role === "assistant"){
+    const items = parseFireList(last.content || "");
+    if (items){ assignSlots(items); last.fireItems = items; last.display = escapeStripped(last.content); renderChat(); }
+  }
+}
+
+// streams an /api/chat call. If onToken is given, tokens go there instead of the chat log.
+async function streamTiff(msgList, onToken, opts){
+  opts = opts || {};
+  let aiMsg = null;
+  if (!onToken){
+    aiMsg = {role:"assistant", content:"", display:""};
+    messages.push(aiMsg);
+    renderChat();
+  }
+  const model = $("chatModel").value;
+  // only the VIBE chat gets the fire-list instructions. /api/chat replaces the system prompt and keeps
+  // only the last ~12 messages, so a prepended system message gets dropped — fold the instructions into
+  // the LAST USER message instead (same trick /api/chat uses for memory), so they always survive.
+  let sendList = msgList;
+  if (opts.fireContext){
+    sendList = msgList.slice();
+    for (let i = sendList.length - 1; i >= 0; i--){
+      if (sendList[i].role !== "user") continue;
+      const orig = sendList[i], instr = "\n\n" + fireSystemPrompt();
+      if (Array.isArray(orig.content)){
+        const c = orig.content.slice();
+        const ti = c.findIndex(p => p && p.type === "text");
+        if (ti >= 0) c[ti] = { ...c[ti], text: (c[ti].text || "") + instr };
+        else c.unshift({ type:"text", text: instr.trim() });
+        sendList[i] = { ...orig, content: c };
+      } else {
+        sendList[i] = { ...orig, content: (orig.content || "") + instr };
+      }
+      break;
+    }
+  }
+  const r = await fetch("/api/chat", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ messages: sendList, model, mode:"chat", character:"tiff" })
+  });
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true){
+    const {done, value} = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split("\n\n");
+    buf = lines.pop();
+    for (const line of lines){
+      if (!line.startsWith("data: ")) continue;
+      let d; try { d = JSON.parse(line.slice(6)); } catch { continue; }
+      if (d.type === "delta"){
+        if (onToken) onToken(d.text || "");
+        else { aiMsg.content += d.text||""; aiMsg.display += (d.text||"").replace(/</g,"&lt;"); renderChat(); }
+      }
+    }
+  }
+}
+
+$("micBtn").onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ alert("Speech recognition isn't available in this browser."); return; }
+  const btn = $("micBtn");
+  if (btn.classList.contains("on")){ btn.classList.remove("on"); if(window.__tRec) window.__tRec.stop(); return; }
+  const rec = new SR(); rec.continuous = true; rec.interimResults = false; rec.lang = "en-US";
+  rec.onresult = (e) => { let t=""; for (let i=e.resultIndex;i<e.results.length;i++) t += e.results[i][0].transcript; $("ask").value += (($("ask").value && !$("ask").value.endsWith(" "))?" ":"") + t; autosize($("ask")); };
+  rec.onend = () => btn.classList.remove("on");
+  rec.start(); window.__tRec = rec; btn.classList.add("on");
+};
+
+/* ── Write treatment from convo — streams straight into the Treatment field ── */
+$("writeBtn").onclick = async () => {
+  if (!messages.length){ alert("Talk to Tiff first so she has something to work from."); return; }
+  const btn = $("writeBtn"); btn.disabled = true; btn.textContent = "✨ writing…";
+  const styleLock = $("styleLock").value.trim();
+  const cast = castSlots.filter(s=>s.img).map(s=>s.letter).join(", ");
+  const songLine = (songMeta && songMeta.durationSec)
+    ? ` The song is about ${songMeta.durationSec}s${songMeta.bpm?` at ~${songMeta.bpm} BPM`:""} — pace the scene count and timecodes to fit it.` : "";
+  const instruction = {
+    role:"user",
+    content: `Based on our conversation, write the full treatment now for a ${treatmentMode}.` +
+      (styleLock ? ` Style lock: ${styleLock}.` : "") +
+      (cast ? ` Cast/location slots already locked: ${cast}.` : "") +
+      songLine +
+      ` Format EVERY shot as: a header line like **HERO SHOT 1 — "Title"** or **SCENE 3 [0:12-0:18] — Title** or **TRANSITION CARD 1**; then on the next lines the locked slot letters that appear in this shot as CAST: A, D and LOC: C; then a fenced ` + "```" + ` code block containing [IMAGE] <one generation-ready image prompt> and, on a new line, [VIDEO] <a short camera/motion directive to animate that still>.` +
+      (treatmentMode === "Music Video" ? ` Put [m:ss-m:ss] timecodes in every SCENE header so the cuts sync to the song.` : "") +
+      ` Output ONLY the treatment, nothing else.`
+  };
+  $("treatmentTxt").value = "";
+  await streamTiff([...messages, instruction], (tok) => {
+    $("treatmentTxt").value += tok;
+    localStorage.setItem("dmv-treatment-treatment-text", $("treatmentTxt").value);
+  });
+  btn.disabled = false; btn.textContent = "✨ Write treatment from convo";
+};
+
+/* ───────────────────────── Cast & Locations grid ───────────────────────── */
+function renderCastGrid(){
+  const grid = $("castGrid");
+  grid.innerHTML = "";
+  const n = showAll16 ? 16 : 8;
+  for (let i=0;i<n;i++){
+    const s = castSlots[i];
+    const el = document.createElement("div");
+    el.className = "castslot" + (s.img ? " filled" : "");
+    el.innerHTML = `<span class="letter">${s.letter}</span><div class="img">${
+      s.busy ? '<div class="spin"></div>' : (s.img ? `<img src="${s.img}">` : '')
+    }</div><div class="acts"><button class="upbtn">↑ Upload</button><button class="galbtn">▦ Gallery</button></div>`;
+    el.querySelector(".upbtn").onclick = () => uploadToSlot(i);
+    el.querySelector(".galbtn").onclick = (ev) => openGalleryPick(ev.currentTarget, (url) => { castSlots[i].img = url; renderCastGrid(); });
+    grid.appendChild(el);
+  }
+  $("showMoreWrap").style.display = showAll16 ? "none" : "block";
+}
+$("showMoreBtn").onclick = () => { showAll16 = true; renderCastGrid(); };
+
+function uploadToSlot(i){
+  const inp = document.createElement("input"); inp.type="file"; inp.accept="image/*";
+  inp.onchange = () => {
+    const f = inp.files[0]; if(!f) return;
+    const fr = new FileReader();
+    fr.onload = () => { castSlots[i].img = fr.result; renderCastGrid(); };
+    fr.readAsDataURL(f);
+  };
+  inp.click();
+}
+
+/* generic gallery picker (used by cast slots AND shot cards) */
+let gpopCb = null;
+function openGalleryPick(anchor, cb){
+  gpopCb = cb;
+  const pop = $("gpop");
+  const r = anchor.getBoundingClientRect();
+  pop.style.left = (r.left + window.scrollX) + "px";
+  pop.style.top = (r.bottom + window.scrollY + 6) + "px";
+  const g = $("gpopGrid");
+  g.innerHTML = sessionGallery.length
+    ? sessionGallery.map((s,gi)=>`<img src="${s.url}" data-gi="${gi}">`).join("")
+    : `<div class="empty">Nothing generated yet this session.</div>`;
+  g.querySelectorAll("img").forEach(img => img.onclick = () => { if (gpopCb) gpopCb(img.src); pop.classList.remove("on"); });
+  pop.classList.add("on");
+}
+document.addEventListener("click", (e) => {
+  if (!$("gpop").contains(e.target) && !e.target.closest(".galbtn") && !e.target.closest("[data-gallery]")) $("gpop").classList.remove("on");
+});
+
+/* ref upload for the create panel */
+$("refUp").onclick = () => $("refUpFile").click();
+let createRefData = null;
+$("refUpFile").onchange = () => {
+  const f = $("refUpFile").files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = () => { createRefData = fr.result; $("refUp").innerHTML = `<img src="${fr.result}">`; };
+  fr.readAsDataURL(f);
+};
+
+$("tiffWritesBtn").onclick = async () => {
+  const desc = $("castDesc").value.trim();
+  if (!desc){ alert("Type a quick description first."); return; }
+  const btn = $("tiffWritesBtn"); btn.disabled = true; btn.textContent = "✨ writing…";
+  const brief = castKind === "cast"
+    ? `a photoreal ¾-to-full-length studio portrait on a clean seamless white background, even soft studio lighting, front-facing neutral pose, so the SAME person can be reused across every shot`
+    : `a photoreal cinematic establishing shot with consistent architecture, props and lighting so the EXACT same place can be reused across every shot`;
+  let out = "";
+  await streamTiff([{role:"user", content:
+    `Turn this into ONE full image-generation prompt for a ${castKind === "cast" ? "CHARACTER" : "LOCATION"} reference — ${brief}. Specific, visual, camera-ready, one paragraph, no preamble: "${desc}"`
+  }], (tok) => { out += tok; });
+  $("castDesc").value = out.trim();
+  btn.disabled = false; btn.textContent = "✨ Tiff writes it";
+};
+
+$("genBtn").onclick = async () => {
+  let prompt = $("castDesc").value.trim();
+  if (!prompt){ alert("Describe the character or location first."); return; }
+  // bake the room aesthetic in so cast/locations come out in Tiff's consistent style
+  prompt += castKind === "cast"
+    ? " — full-length-to-¾ studio portrait, clean seamless white background, even soft studio lighting, front-facing, sharp focus, photoreal, consistent character reference"
+    : " — cinematic establishing shot, photoreal, natural filmic lighting, 35mm, highly detailed, consistent location reference";
+  const n = showAll16 ? 16 : 8;
+  let idx = castSlots.slice(0,n).findIndex(s => !s.img && !s.busy);
+  if (idx === -1) idx = n - 1;
+  castSlots[idx].busy = true; renderCastGrid();
+  $("genStatus").textContent = "generating…";
+  try {
+    const url = await generateImage(prompt, createRefData ? [createRefData] : [], { aspect: castKind === "cast" ? "9:16" : "16:9" });
+    castSlots[idx].img = url; sessionGallery.push({url});
+  } catch (e) {
+    alert("Generate failed: " + e.message);
+  } finally {
+    castSlots[idx].busy = false; renderCastGrid();
+    $("genStatus").textContent = "";
+  }
+};
+
+/* ───────── provider + model hub — same list Imagination Station reads ───────── */
+async function loadGenProviders(){
+  const r = await fetch("/api/cloud/providers").then(r=>r.json()).catch(()=>({providers:[]}));
+  const providers = r.providers || [];
+  IMG_ENTRIES = [];
+  providers.forEach(p => (p.image_models||[]).forEach(m => IMG_ENTRIES.push({ value: p.id + "::" + m, label: shortName(m) + "  ·  " + p.name })));
+  // fill BOTH image pickers from the one list: the create panel (manual) AND the vibe area (fire list)
+  [["imgModel","dmv-treatment-imgmodel"], ["vibeImgModel","dmv-treatment-vibeimgmodel"]].forEach(([id,key]) => {
+    const sel = $(id); if (!sel) return; sel.innerHTML = "";
+    if (!IMG_ENTRIES.length){ sel.innerHTML = `<option value="">no image models — add a key in Settings</option>`; return; }
+    IMG_ENTRIES.forEach(e => { const o=document.createElement("option"); o.value=e.value; o.textContent=e.label; sel.appendChild(o); });
+    const saved = localStorage.getItem(key);
+    if (saved && IMG_ENTRIES.some(e=>e.value===saved)) sel.value = saved;
+    sel.onchange = () => localStorage.setItem(key, sel.value);
+  });
+  if (!IMG_ENTRIES.length){
+    $("genHint").innerHTML = `no image models — add one in <a href="#" id="genSettingsLink" style="color:var(--steel-2)">🔑 Keys</a>`;
+    const l = document.getElementById("genSettingsLink"); if (l) l.onclick = (e) => { e.preventDefault(); openKeysUI(); };
+  } else $("genHint").textContent = IMG_ENTRIES.length + " image model" + (IMG_ENTRIES.length===1?"":"s") + " ready";
+  // VIDEO model picker — every i2v option across the user's providers; defaults to the strongest,
+  // but the user can pick any (Kling 3.0, Wan 2.7, …). "All the options, not just one." (owner)
+  const vidSel = $("vidModelSel"), lbl = $("vidModelLbl");
+  const vids = [];
+  providers.forEach(p => (p.video_models||[]).forEach(m => vids.push({ provider:p.id, model:m })));
+  vidSel.innerHTML = "";
+  if (!vids.length){
+    vidSel.style.display = "none"; VIDEO_PICK = null; $("genVideosBtn").disabled = true;
+    lbl.innerHTML = `video: none — add <a href="#" id="vidKeysLink" style="color:var(--steel-2)">Atlas or fal</a>`;
+    const vl = document.getElementById("vidKeysLink"); if (vl) vl.onclick = (e)=>{ e.preventDefault(); openKeysUI(); };
+  } else {
+    vidSel.style.display = ""; lbl.textContent = "";
+    vids.forEach(v => { const o=document.createElement("option"); o.value=v.provider+"::"+v.model; o.textContent=shortName(v.model)+"  ·  "+v.provider; vidSel.appendChild(o); });
+    const best = pickVideoModel(providers);
+    const bestVal = best ? best.provider+"::"+best.model : vidSel.options[0].value;
+    const saved = localStorage.getItem("dmv-treatment-vidmodel");
+    vidSel.value = (saved && vids.some(v => v.provider+"::"+v.model === saved)) ? saved : bestVal;
+    const applyVid = () => { const parts = vidSel.value.split("::"); VIDEO_PICK = { provider:parts[0], model:parts[1] }; localStorage.setItem("dmv-treatment-vidmodel", vidSel.value); };
+    vidSel.onchange = () => { applyVid(); if (shots.length) renderShots(); };
+    applyVid();
+    $("genVideosBtn").disabled = false;
+  }
+}
+window.addEventListener("ark:gen-providers-changed", loadGenProviders);
+function openKeysUI(){ if (window.openKeys) window.openKeys("media"); else if (window.arkOpenSettings) window.arkOpenSettings("media"); else location.href = "/"; }
+function shortName(id){ return String(id).split("/").pop().replace(/-/g," "); }
+
+// choose the strongest image-to-video model available: Wan 2.7 i2v (first+last+audio) > any i2v > any
+function pickVideoModel(providers){
+  const all = [];
+  providers.forEach(p => (p.video_models||[]).forEach(m => all.push({ provider: p.id, model: m })));
+  if (!all.length) return null;
+  const score = (m) => { const id = m.model.toLowerCase();
+    if (id.includes("kling-3") || id.includes("kling-v3")) return 6;                   // Kling 3.0 — best, does first→last
+    if (id.includes("wan-2.7") && id.includes("image-to-video")) return 5;             // Wan 2.7 — first→last + audio
+    if (id.includes("image-to-video") || id.includes("i2v") || id.includes("/video")) return 3;
+    if (id.includes("kling") || id.includes("hailuo") || id.includes("seedance")) return 2;
+    return 1; };
+  all.sort((a,b) => score(b) - score(a));
+  return all[0];
+}
+
+// per-model reference-image field name (each provider names it differently)
+function imgRefField(id){ id = (id||"").toLowerCase();
+  if (id.includes("nano-banana-edit")) return "image_urls";   // Kie edit
+  if (id.includes("nano-banana-2")) return "image_input";     // Kie t2i w/ reference support
+  if (id.startsWith("fal-ai")) return "image_url";
+  if (id.includes("kontext")) return "image_url";
+  return "images"; }                                          // Atlas nano-banana-pro / seedream / qwen
+function refFieldIsArray(f){ return f === "images" || f === "image_urls" || f === "image_input"; }
+
+// per-model video field names (first frame / last frame / audio) + duration format.
+// Field shapes differ per provider, so we discriminate by the id's vendor prefix:
+//   fal-ai/…  → first="image_url", string duration
+//   <vendor>/…  (Atlas: alibaba/, kwaivgi/, bytedance/, minimax/…) → first="image", numeric duration
+//   bare id (Kie: "kling-2.6/image-to-video", "wan2.5-i2v-preview") → first="image_urls" (array), string duration
+function isAtlasId(s){ return /^(alibaba|kwaivgi|bytedance|minimax|google|qwen)\//.test(s); }
+function vidCaps(id){ const s = (id||"").toLowerCase();
+  if (s.startsWith("fal-ai")) return { first:"image_url", dur:"str" };
+  if (isAtlasId(s)){
+    if (s.includes("wan-2.7") && s.includes("image-to-video")) return { first:"image", last:"last_image", audio:"audio", dur:"num" };
+    if (s.includes("kling")) return { first:"image", last:"end_image", dur:"num" };
+    return { first:"image", dur:"num" };
+  }
+  // Kie — bare model ids: first frame is an ARRAY field ("image_urls"), string duration.
+  // Kling 3.0 packs [first, last] into that SAME array (index 0 = first, 1 = last frame).
+  if (s.includes("kling-3")) return { first:"image_urls", firstArr:true, lastInArr:true, dur:"str" };
+  return { first:"image_urls", firstArr:true, dur:"str" }; }
+
+// shared image generation — provider+key come from the Settings hub, never entered per-room.
+async function generateImage(prompt, refs, opts){
+  opts = opts || {};
+  const sel = $("imgModel").value;
+  if (!sel) throw new Error("add an image provider + model in Settings first");
+  const [provider, model] = sel.split("::");
+  const ar = opts.aspect || $("aspectRatio").value;
+  const media = {};
+  refs = (refs || []).filter(Boolean);
+  if (refs.length){ const field = imgRefField(model); media[field] = refFieldIsArray(field) ? refs : refs[0]; }
+  const r = await fetch("/api/cloud/generate", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ provider, kind:"image", model, prompt, options:{aspect_ratio:ar}, media }) }).then(r=>r.json());
+  if (r.error) throw new Error(r.error);
+  if (!r.outputs || !r.outputs[0]) throw new Error("no image came back");
+  return r.outputs[0];
+}
+
+/* ───────── FIRE LIST — Tiff proposes cast/locations in chat, you fire them into slots (image-to-image) ───────── */
+const IMG_COST = { "nano-banana-2":0.02, "nano-banana-edit":0.04, "google/nano-banana-edit":0.04, "google/nano-banana-pro/text-to-image":0.14, "google/nano-banana-pro/edit":0.14, "bytedance/seedream-v4":0.04, "qwen/qwen-image-2.0/text-to-image":0.03, "fal-ai/flux/dev":0.025, "fal-ai/flux-pro/kontext":0.05 };
+function imgCost(providerModel){ const model = String(providerModel||"").split("::").pop(); return IMG_COST[model] != null ? IMG_COST[model] : 0.05; }
+
+function parseFireList(text){
+  const block = String(text||"").match(/<fire_list[^>]*>([\s\S]*?)<\/fire_list>/i);
+  if (!block) return null;
+  const items = []; const itemRe = /<item\s+([^>]+)>([\s\S]*?)<\/item>/gi; let m;
+  while ((m = itemRe.exec(block[1]))){
+    const attrs = m[1], prompt = m[2].trim();
+    const g = (re) => { const mm = attrs.match(re); return mm ? mm[1].trim() : ""; };
+    const kindRaw = (g(/\bkind\s*=\s*["']([^"']+)["']/i) || "cast").toLowerCase();
+    const kind = ["cast","location","object","wardrobe"].includes(kindRaw) ? kindRaw : "cast";
+    const name = g(/\bname\s*=\s*["']([^"']+)["']/i) || (kind + " item");
+    const attach = (g(/\battach_refs\s*=\s*["']([^"']+)["']/i) || "").split(",").map(s=>s.trim().toUpperCase()).filter(s=>/^[A-P]$/.test(s));
+    if (!prompt) continue;
+    items.push({ id:uid(), kind, name, attach, prompt, slot:null, modelValue:null, status:"queued", selected:true, url:null, error:null });
+  }
+  return items.length ? items : null;
+}
+// give each fresh item the next empty slot (A–P) not already claimed this batch
+function assignSlots(items){
+  const used = new Set();
+  items.forEach(it => {
+    const s = castSlots.find(x => !x.img && !used.has(x.letter));
+    if (s){ used.add(s.letter); it.slot = s.letter; } else it.slot = null;
+  });
+}
+// gather this item's reference URLs (cast auto-attaches your chat uploads; attach_refs pulls slot images),
+// hosting any base64 upload → a public url so the provider can actually fetch it as an i2i reference
+async function resolveRefs(it){
+  const urls = [];
+  if (it.kind === "cast") chatUploads.forEach(u => urls.push(u));
+  it.attach.forEach(letter => { const s = castSlots.find(x => x.letter === letter); if (s && s.img) urls.push(s.img); });
+  const capped = urls.slice(0,4);
+  const out = [];
+  for (const u of capped){
+    if (typeof u === "string" && u.startsWith("data:")){
+      try { const r = await fetch("/api/cloud/host_image", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ data_url:u }) }).then(r=>r.json()); out.push(r.url || u); }
+      catch(e){ out.push(u); }
+    } else out.push(u);
+  }
+  return out;
+}
+async function fireOne(it){
+  it.status = "firing"; it.error = null; renderChat();
+  try {
+    const sel = it.modelValue || ($("vibeImgModel") && $("vibeImgModel").value) || $("imgModel").value;
+    if (!sel || sel.indexOf("::") < 0) throw new Error("pick an image model in Settings first");
+    const [provider, model] = sel.split("::");
+    const refs = await resolveRefs(it);
+    const ar = it.kind === "cast" ? "9:16" : it.kind === "location" ? "16:9" : "1:1";   // cast = tall, full-body
+    const media = {};
+    if (refs.length){ const f = imgRefField(model); media[f] = refFieldIsArray(f) ? refs : refs[0]; }
+    const r = await fetch("/api/cloud/generate", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ provider, kind:"image", model, prompt: it.prompt, options:{ aspect_ratio: ar }, media }) }).then(r=>r.json());
+    if (r.error) throw new Error(r.error);
+    const url = r.outputs && r.outputs[0];
+    if (!url) throw new Error("no image came back");
+    it.url = url; sessionGallery.push({ url });
+    // drop into its slot — or the next empty one if it filled up mid-fire
+    let slot = castSlots.find(s => s.letter === it.slot);
+    if (!slot || slot.img){ slot = castSlots.find(s => !s.img); if (slot) it.slot = slot.letter; }
+    if (slot){ slot.img = url; renderCastGrid(); }
+    it.status = "done";
+  } catch(e){ it.error = e.message; it.status = "failed"; }
+  renderChat();
+}
+async function fireList(items){
+  const active = items.filter(it => it.selected && it.slot && it.status !== "done");
+  if (!active.length) return;
+  const est = active.reduce((s,it)=> s + imgCost(it.modelValue || ($("vibeImgModel")&&$("vibeImgModel").value) || ""), 0);
+  if (est > 3 && !confirm(`Fire ${active.length} images (~$${est.toFixed(2)} on your key)?`)) return;
+  const anchors = active.filter(it => !it.attach.length), dependents = active.filter(it => it.attach.length);
+  await runPool(anchors, 4, fireOne);       // items with no refs first...
+  await runPool(dependents, 4, fireOne);    // ...then ones that reference other slots (now filled)
+}
+function buildFireCard(msg){
+  const items = msg.fireItems;
+  const wrap = document.createElement("div"); wrap.className = "firecard";
+  const active = items.filter(it => it.selected && it.slot && it.status !== "done");
+  const est = active.reduce((s,it)=> s + imgCost(it.modelValue || ($("vibeImgModel")&&$("vibeImgModel").value) || ""), 0);
+  const firing = items.some(it => it.status === "firing");
+  const allDone = items.length > 0 && items.every(it => it.status === "done" || !it.selected);
+  wrap.innerHTML = `<div class="fc-head">🔥 Tiff's fire list<span class="fc-sub">${items.length} item${items.length===1?"":"s"} · ~$${est.toFixed(2)}</span></div><div class="fc-rows"></div><button class="fc-fire">${allDone ? "✓ Fired into your slots" : (firing ? "🔥 Firing…" : "🔥 Fire all → slots")}</button>`;
+  const rows = wrap.querySelector(".fc-rows");
+  items.forEach(it => {
+    const row = document.createElement("div"); row.className = "fc-row" + (it.selected ? "" : " off");
+    const st = it.status === "done" ? "✓" : it.status === "firing" ? "…" : it.status === "failed" ? "⚠" : "";
+    row.innerHTML = `<input type="checkbox" ${it.selected?"checked":""}><span class="fc-slot">${it.slot||"—"}</span><span class="fc-kind">${escHtml(it.kind)}</span><span class="fc-name">${escHtml(it.name)}</span><select class="fc-model"></select><span class="fc-st">${st}</span>`;
+    row.querySelector("input").onchange = (e) => { it.selected = e.target.checked; renderChat(); };
+    const msel = row.querySelector(".fc-model");
+    if (IMG_ENTRIES.length){
+      IMG_ENTRIES.forEach(e => { const o=document.createElement("option"); o.value=e.value; o.textContent=shortName(e.value.split("::")[1]); msel.appendChild(o); });
+      msel.value = it.modelValue || ($("vibeImgModel")&&$("vibeImgModel").value) || IMG_ENTRIES[0].value;
+      msel.onchange = () => { it.modelValue = msel.value; };
+    } else { const o=document.createElement("option"); o.textContent="add a key"; msel.appendChild(o); }
+    if (it.status === "firing" || it.status === "done" || !IMG_ENTRIES.length) msel.disabled = true;
+    rows.appendChild(row);
+    if (it.error){ const e = document.createElement("div"); e.className = "fc-err"; e.textContent = "⚠ " + it.error; row.appendChild(e); }
+  });
+  const fireBtn = wrap.querySelector(".fc-fire");
+  fireBtn.disabled = firing || allDone || !active.length || !IMG_ENTRIES.length;
+  fireBtn.onclick = () => fireList(items);
+  return wrap;
+}
+
+/* ───────────────────────── treatment text actions ───────────────────────── */
+$("copyTreatBtn").onclick = () => navigator.clipboard.writeText($("treatmentTxt").value);
+$("clearTreatBtn").onclick = () => { if(confirm("Clear the treatment text?")) { $("treatmentTxt").value=""; localStorage.removeItem("dmv-treatment-treatment-text"); } };
+
+/* ── Magic Edit — plain-English changes to the whole treatment. Sends ONLY the current treatment +
+   the instruction (not the chat history) so it stays cheap + scoped. After it rewrites, hit Break Down. ── */
+async function magicEditTreatment(){
+  const instruction = $("magicEdit").value.trim();
+  if (!instruction){ $("magicEdit").focus(); return; }
+  const cur = $("treatmentTxt").value.trim();
+  if (!cur){ alert("Write or generate a treatment first (✨ Write treatment from convo, above)."); return; }
+  const btn = $("magicBtn"); btn.disabled = true; btn.textContent = "✨ …";
+  const msg = { role:"user", content:
+    `Here is the current treatment:\n\n${cur}\n\nRevise it to: "${instruction}". Keep the SAME format — headers like **HERO SHOT 1 — "Title"** / **SCENE 3 [0:12-0:18] — Title** / **TRANSITION CARD 1**, CAST:/LOC: slot tags, and fenced code blocks containing [IMAGE] and [VIDEO]. Output ONLY the full revised treatment, nothing else.` };
+  $("treatmentTxt").value = "";
+  try {
+    await streamTiff([msg], (tok) => { $("treatmentTxt").value += tok; localStorage.setItem("dmv-treatment-treatment-text", $("treatmentTxt").value); });
+    $("magicEdit").value = "";
+  } catch(e){ alert("Magic Edit failed: " + e.message); }
+  btn.disabled = false; btn.textContent = "✨ Apply";
+}
+$("magicBtn").onclick = magicEditTreatment;
+$("magicEdit").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); magicEditTreatment(); } });
+
+/* ───────────────────────── Break Down → parse + stills ───────────────────────── */
+function parseTreatment(txt){
+  const out = [];
+  const headerRe = /\*\*(HERO SHOT|SCENE|TRANSITION CARD|END CARD)([^\n*]*)\*\*/g;
+  const heads = []; let m;
+  while ((m = headerRe.exec(txt))) heads.push({ kind:m[1], rest:m[2]||"", start:m.index, end:headerRe.lastIndex });
+  for (let i=0;i<heads.length;i++){
+    const h = heads[i];
+    const body = txt.slice(h.end, i+1 < heads.length ? heads[i+1].start : txt.length);
+    const hb = h.rest + "\n" + body;
+    // timecode  [m:ss - m:ss]
+    let startSec=null, endSec=null;
+    const tc = hb.match(/(\d+):(\d{2})\s*[–\-—]+\s*(\d+):(\d{2})/);
+    if (tc){ startSec = (+tc[1])*60 + (+tc[2]); endSec = (+tc[3])*60 + (+tc[4]); }
+    // cast / loc slot letters
+    const grab = (re) => { const mm = body.match(re); return mm ? (mm[1].match(/[A-P]/gi)||[]).map(s=>s.toUpperCase()) : []; };
+    const cast = grab(/(?:CAST|REF|WARDROBE)\s*:\s*([A-P,\s]+)/i);
+    const loc  = grab(/(?:LOC|LOCATION)\s*:\s*([A-P,\s]+)/i);
+    // prompts — prefer a fenced block; split [IMAGE] / [VIDEO]
+    const fence = body.match(/```([\s\S]*?)```/);
+    const raw = fence ? fence[1] : body;
+    const imgM = raw.match(/\[IMAGE\]([\s\S]*?)(?=\[VIDEO\]|\[NARRATION\]|$)/i);
+    const vidM = raw.match(/\[VIDEO\]([\s\S]*?)(?=\[IMAGE\]|\[NARRATION\]|$)/i);
+    let imgPrompt = (imgM ? imgM[1] : (fence ? raw : "")).trim();
+    // strip stray CAST:/LOC: lines that may sit inside the block
+    imgPrompt = imgPrompt.replace(/^(?:CAST|LOC|LOCATION|REF|WARDROBE)\s*:.*$/gim, "").trim();
+    const vidPrompt = vidM ? vidM[1].trim() : "";
+    if (!imgPrompt) continue;
+    // clip length: from timecode, else default 5s; a "10s"/"5s" hint in [VIDEO] wins
+    let seconds = 5;
+    if (startSec!=null && endSec!=null){ const d = Math.max(1, endSec-startSec); seconds = d >= 8 ? 10 : 5; }
+    if (/\b10\s*s(ec)?/i.test(vidPrompt)) seconds = 10;
+    else if (/\b5\s*s(ec)?/i.test(vidPrompt)) seconds = 5;
+    const label = (h.kind + h.rest).replace(/\[[^\]]*\]/g,"").replace(/\s+/g," ").replace(/[–—-]\s*$/,"").trim() || h.kind;
+    out.push({ id:uid(), kind:h.kind, label, imgPrompt, vidPrompt, cast, loc, startSec, endSec, seconds,
+               still:null, video:null, stillBusy:false, videoBusy:false, error:null });
+  }
+  return out;
+}
+
+function slotRefs(shot){
+  const urls = [];
+  [...shot.cast, ...shot.loc].forEach(letter => {
+    const s = castSlots.find(x => x.letter === letter);
+    if (s && s.img) urls.push(s.img);
+  });
+  return urls.slice(0,4);   // cap at 4 — more refs collapses identity lock
+}
+
+async function genStill(shot){
+  shot.stillBusy = true; shot.error = null; renderShots();
+  try {
+    const styled = shot.imgPrompt + ($("styleLock").value.trim() ? (" — " + $("styleLock").value.trim()) : "");
+    shot.still = await generateImage(styled, slotRefs(shot), { aspect:"16:9" });
+    sessionGallery.push({ url: shot.still });
+  } catch(e){ shot.error = e.message; }
+  shot.stillBusy = false; renderShots();
+}
+
+async function genVideo(shot, nextStill){
+  if (!VIDEO_PICK) throw new Error("no video provider — add Atlas or fal in Settings");
+  if (!shot.still) throw new Error("generate the still first");
+  shot.videoBusy = true; shot.error = null; renderShots();
+  try {
+    const { provider, model } = VIDEO_PICK;
+    const caps = vidCaps(model);
+    const media = {};
+    if (caps.lastInArr){ const arr = [shot.still]; if (nextStill) arr.push(nextStill); media[caps.first] = arr; }   // Kling 3.0: [first, last] in one array
+    else { media[caps.first] = caps.firstArr ? [shot.still] : shot.still; if (caps.last && nextStill) media[caps.last] = nextStill; }
+    const options = {};
+    if (/wan|kling|hailuo|seedance/i.test(model)) options.duration = caps.dur === "str" ? String(shot.seconds) : shot.seconds;
+    const r = await fetch("/api/cloud/generate", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ provider, kind:"video", model, prompt: shot.vidPrompt || shot.imgPrompt, options, media }) }).then(r=>r.json());
+    if (r.error) throw new Error(r.error);
+    if (!r.outputs || !r.outputs[0]) throw new Error("no video came back");
+    shot.video = r.outputs[0];
+  } catch(e){ shot.error = e.message; }
+  shot.videoBusy = false; renderShots();
+}
+
+// simple concurrency pool (n workers) — used for stills + videos
+async function runPool(items, n, fn){
+  let i = 0;
+  const worker = async () => { while (i < items.length){ const k = i++; await fn(items[k], k); } };
+  await Promise.all(Array.from({length: Math.min(n, items.length || 1)}, worker));
+}
+
+$("breakBtn").onclick = async () => {
+  const txt = $("treatmentTxt").value;
+  shots = parseTreatment(txt);
+  if (!shots.length){
+    alert("Couldn't find any **HERO SHOT** / **SCENE** / **TRANSITION CARD** blocks with a prompt underneath. Have Tiff write it above, or check the format in \"how it works\".");
+    return;
+  }
+  const btn = $("breakBtn"); btn.disabled = true;
+  $("shotsCard").style.display = "block";
+  $("shotWrap").classList.add("open");
+  renderShots();
+  let done = 0;
+  await runPool(shots, 3, async (s) => { await genStill(s); done++; $("shotProg").textContent = `stills: ${done} / ${shots.length}…`; });
+  $("shotProg").textContent = `${shots.filter(s=>s.still).length} / ${shots.length} stills ready — review, then 🎬 Generate all videos`;
+  btn.disabled = false;
+};
+
+$("genVideosBtn").onclick = async () => {
+  const ready = shots.filter(s => s.still);
+  if (!ready.length){ alert("Generate the stills first (Break Down)."); return; }
+  if (!VIDEO_PICK){ alert("Add a video provider (Atlas or fal) in Settings — Kie covers stills, but video needs Atlas or fal."); return; }
+  const btn = $("genVideosBtn"); btn.disabled = true;
+  let done = 0;
+  const targets = shots.map((s,i)=>({s,i})).filter(x => x.s.still);
+  await runPool(targets, 4, async (x) => {
+    const next = shots[x.i+1];
+    await genVideo(x.s, next && next.still ? next.still : null);
+    done++; $("shotProg").textContent = `videos: ${done} / ${targets.length}…`;
+  });
+  const got = shots.filter(s=>s.video).length;
+  $("shotProg").textContent = `${got} / ${targets.length} videos ready — ▶ Open in LePrince`;
+  btn.disabled = false;
+};
+
+function renderShots(){
+  const g = $("shotGrid");
+  g.innerHTML = "";
+  shots.forEach((s, i) => {
+    const card = document.createElement("div"); card.className = "shotcard";
+    const busy = s.stillBusy || s.videoBusy;
+    const badge = s.video ? `<span class="badge2 vid">VIDEO ${s.seconds}s</span>` : (s.still ? `<span class="badge2">STILL</span>` : `<span class="badge2">${escHtml(s.kind)}</span>`);
+    const tags = [...s.cast, ...s.loc].map(l=>`<span>${l}</span>`).join("");
+    let visual;
+    if (busy) visual = '<div class="spin"></div>';
+    else if (s.video) visual = `<video src="${s.video}" muted loop playsinline controls></video>`;
+    else if (s.still) visual = `<img src="${s.still}">`;
+    else if (s.error) visual = '⚠';
+    else visual = '';
+    card.innerHTML =
+      `<div class="shimg">${badge}${tags?`<div class="tags">${tags}</div>`:""}${visual}</div>` +
+      `<div class="meta"><div class="lbl">${escHtml(s.label)}</div><div class="pr">${escHtml(s.imgPrompt)}</div></div>` +
+      (s.error ? `<div class="err">⚠ ${escHtml(s.error)}</div>` : "") +
+      `<div class="sacts"></div>`;
+    const acts = card.querySelector(".sacts");
+    const mkBtn = (label, fn, dis) => { const b = document.createElement("button"); b.textContent = label; b.disabled = !!dis; b.onclick = fn; return b; };
+    acts.appendChild(mkBtn(s.still ? "🔁 Still" : "▷ Still", () => genStill(s), busy));
+    acts.appendChild(mkBtn("✎ Prompt", () => {
+      const np = prompt("Edit the image prompt for this shot:", s.imgPrompt);
+      if (np !== null && np.trim()){ s.imgPrompt = np.trim(); genStill(s); }
+    }, busy));
+    acts.appendChild(mkBtn("✨ Fix", async () => {
+      const ins = prompt("Tell Tiff what to change about this shot — e.g. make it night, add rain, tighter on the face:");
+      if (!ins || !ins.trim()) return;
+      let out = "";
+      try { await streamTiff([{ role:"user", content:`Rewrite this image-generation prompt to apply the change "${ins.trim()}", keeping everything else about it intact. Output ONLY the new one-paragraph prompt, no preamble: "${s.imgPrompt}"` }], (t) => { out += t; }); }
+      catch(e){ alert("Couldn't rewrite: " + e.message); return; }
+      if (out.trim()){ s.imgPrompt = out.trim(); genStill(s); }
+    }, busy));
+    const gb = mkBtn("▦ Gallery", null, busy); gb.setAttribute("data-gallery","1");
+    gb.onclick = (ev) => openGalleryPick(ev.currentTarget, (url) => { s.still = url; s.video = null; renderShots(); });
+    acts.appendChild(gb);
+    if (s.still) acts.appendChild(mkBtn(s.video ? "🔁 Video" : "🎬 Video", () => genVideo(s, shots[i+1] && shots[i+1].still ? shots[i+1].still : null), busy || !VIDEO_PICK));
+    g.appendChild(card);
+  });
+}
+
+/* ───────────────────────── Open in LePrince ───────────────────────── */
+$("openEditorBtn").onclick = async () => {
+  const usable = shots.filter(s => s.video || s.still);
+  if (!usable.length){ alert("Generate some shots first — at least the stills."); return; }
+  const btn = $("openEditorBtn"); const old = btn.textContent; btn.disabled = true; btn.textContent = "⏳ building timeline…";
+  $("shotProg").textContent = "importing shots into LePrince…";
+  try {
+    // 1) hand the shot URLs to the server, which downloads + registers them (browsers can't fetch provider CDNs)
+    const items = usable.map((s, i) => {
+      const vid = !!s.video;
+      return { url: s.video || s.still, name: `shot_${String(i+1).padStart(2,"0")}${vid ? ".mp4" : ".png"}`, vid, seconds: s.seconds || 5 };
+    });
+    const r = await fetch("/api/editor/import_urls", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ items: items.map(it => ({ url: it.url, name: it.name })) }) }).then(r=>r.json());
+    if (r.error) throw new Error(r.error);
+    const media = r.media || [];
+
+    // 2) upload + import the song (a local File — no CORS), so it lands on the audio track
+    let audioId = null, audioDur = 0;
+    if (songMeta && songMeta.file){
+      try {
+        const up = await fetch("/api/editor/upload", { method:"POST", headers:{"x-filename": encodeURIComponent(songMeta.name)}, body: songMeta.file }).then(r=>r.json());
+        if (up.path){
+          const im = await fetch("/api/editor/import", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ paths:[up.path] }) }).then(r=>r.json());
+          const am = (im.media||[])[0];
+          if (am){ audioId = am.id; audioDur = am.dur || songMeta.durationSec || 0; }
+        }
+      } catch(e){ /* song is optional — keep going */ }
+    }
+
+    // 3) build the project — shots laid end-to-end on one track, song on another
+    const fps = 30; let f = 0; const clips = [];
+    media.forEach((mrec, i) => {
+      if (!mrec) return;
+      const isVid = items[i].vid;
+      const sec = isVid ? (mrec.dur || items[i].seconds || 5) : (items[i].seconds || 5);
+      const dur = Math.max(1, Math.round(sec * fps));
+      clips.push({ id:uid(), kind: (mrec.kind === "image" ? "image" : "video"), mediaId: mrec.id,
+                   start: f, in:0, dur, transIn:0, transOut:0, opacity:1, audio:true, volume:1 });
+      f += dur;
+    });
+    if (!clips.length) throw new Error("couldn't import the shots — the provider links may have expired. Re-generate and try again.");
+    const tracks = [{ id:uid(), name:"Shots", clips }];
+    if (audioId){
+      const adur = Math.max(1, Math.round((audioDur || (f/fps)) * fps));
+      tracks.push({ id:uid(), name:"Music", clips:[{ id:uid(), kind:"audio", mediaId:audioId, start:0, in:0, dur:adur, volume:1, audioFadeIn:0, audioFadeOut:0 }] });
+    }
+    const proj = { id:"treat-"+uid(), title:(($("projectName").value.trim()) || "Treatment") + " — DeMartinville",
+                   fps, width:1920, height:1080, tracks };
+    const sr = await fetch("/api/editor/projects", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(proj) }).then(r=>r.json());
+    if (!sr.ok) throw new Error(sr.error || "couldn't save the project");
+    try { localStorage.setItem("dmv_handoff", JSON.stringify({ room:"editor", projectId: sr.id, ts: Date.now() })); } catch(e){}
+    $("shotProg").textContent = "opening LePrince…";
+    location.href = "/static/editor.html";
+  } catch(e){
+    alert("Open in LePrince failed: " + e.message);
+    $("shotProg").textContent = "";
+    btn.disabled = false; btn.textContent = old;
+  }
+};
+</script>
+<script src="/static/pinkroom-nav.js"></script>
+</body>
+</html>

@@ -18,9 +18,9 @@
       link: { url: "https://openrouter.ai/keys", label: "Get OpenRouter key →" }
     } : {
       sel: null,
-      title: "First: grab one API key",
-      body: "No local model detected — that's fine. OpenRouter gives you every AI model on one free key: chat models, and soon image + video generation too. Takes 30 seconds.",
-      link: { url: "https://openrouter.ai/keys", label: "Get OpenRouter key →" }
+      title: "First: grab one free API key",
+      body: "No local model detected — that's fine. Groq is free, no credit card, and it's the fastest chat model out there. Takes 30 seconds and you're talking to her.",
+      link: { url: "https://console.groq.com/keys", label: "Get free Groq key →" }
     };
 
     return [
@@ -33,7 +33,9 @@
       {
         sel: ".as-gear",
         title: "Paste your key in Settings",
-        body: "Hit the ⚙ gear above → API Keys → OpenRouter. Paste your key and pick whatever models you want. The list pulls everything available on your key automatically."
+        body: hasLocal
+          ? "Hit the ⚙ gear above → Cloud models → OpenRouter. Paste your key and pick whatever models you want. The list pulls everything available on your key automatically."
+          : "Hit the ⚙ gear above → Cloud models → Groq is already picked. Paste your key and hit Save — that's it, you're talking to her."
       },
       {
         sel: null,

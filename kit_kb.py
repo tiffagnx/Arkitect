@@ -38,6 +38,11 @@ KB_DIRS = [_ROOT / "static" / "kit_kb", _ROOT / "data" / "kit_kb"]
 # settings, privacy). It's CROSS-ROOM, so its chunks are candidates for EVERY room —
 # that's how "Kit anywhere knows about the whole program / the other labs".
 GENERAL_ROOM = "architect"
+# The static/kit_kb/craft/ binder is the shared CRAFT knowledge bank (image/video prompting,
+# treatment craft, music & lyric technique, director references) imported from the HeyTiff KB.
+# Like architect, it's cross-room — every room can pull the relevant slice — but the keyword
+# relevance floor keeps a suno-prompting card out of an EQ question. Ships to every user.
+GENERAL_ROOMS = ("architect", "craft")
 
 # Same tokenizer shape as app.py:261 (kept independent so this module has no import
 # cycle with app.py, which imports US).
@@ -303,7 +308,7 @@ def retrieve(room: str, query: str, k: int = 4, budget: int = 2800, min_terms: i
     # main chat can reach the whole binder).
     known = {c["room"] for c in chunks}
     if room in known:
-        pool = [c for c in chunks if c["room"] in (room, GENERAL_ROOM)]
+        pool = [c for c in chunks if c["room"] == room or c["room"] in GENERAL_ROOMS]
     else:
         pool = chunks
 

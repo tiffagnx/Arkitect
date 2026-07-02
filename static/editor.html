@@ -531,6 +531,7 @@ body.mode-simple .director-only{display:none!important}
     <span class="kit-mount"></span>
     <div class="spacer"></div>
     <div class="proj"><input id="projName" value="Untitled" spellcheck="false"/></div>
+    <button class="tbtn" id="btnAnimate" title="Build an animated shot from images — no video model">✨ Animate</button>
     <button class="tbtn cta" id="btnExport">▶ Export</button>
   </div>
 
@@ -771,6 +772,715 @@ body.mode-simple .director-only{display:none!important}
     </div>
   </div>
 </div>
+
+<!-- ════════════════ ANIMATION STATION — floating builder window ════════════════ -->
+<style>
+#asWin{position:fixed;top:70px;right:18px;width:560px;height:648px;z-index:170;display:none;
+  flex-direction:column;background:var(--panel);backdrop-filter:blur(24px);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;resize:both;
+  min-width:410px;min-height:480px;box-shadow:0 26px 90px rgba(0,0,0,.62),0 0 0 1px var(--cy-soft)}
+#asWin.open{display:flex}
+#asWin.min{height:auto!important;resize:none;min-height:0}
+#asWin.min .as-tabs,#asWin.min .as-body,#asWin.min .as-foot{display:none}
+#asWin.dragging{opacity:.94}
+.as-bar{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:grab;flex:none;
+  background:linear-gradient(180deg,var(--cy-soft),transparent);border-bottom:1px solid var(--line)}
+.as-bar:active{cursor:grabbing}
+.as-mk{width:22px;height:22px;border-radius:6px;flex:none;background:linear-gradient(140deg,#22505d,#3E9CB8)}
+.as-ttl{font:800 13px var(--ui);letter-spacing:.02em;flex:1;white-space:nowrap;color:var(--txt)}
+.as-summon{font:700 11px var(--ui);padding:6px 11px;border-radius:7px;flex:none;
+  color:#bfe6f1;background:var(--cy-soft);border:1px solid var(--cy-line)}
+.as-summon:hover{color:#fff;background:var(--cy-line)}
+.as-ic{width:27px;height:27px;border-radius:7px;display:grid;place-items:center;flex:none;
+  font-size:13px;color:var(--dim);background:var(--surf)}
+.as-ic:hover{color:var(--txt);background:var(--surf2)}
+.as-tabs{display:flex;gap:4px;padding:9px 11px 0;flex:none}
+.as-tab{flex:1;text-align:center;padding:8px;border-radius:8px 8px 0 0;font:700 12px var(--ui);
+  color:var(--dim);background:transparent;border-bottom:2px solid transparent;transition:.12s}
+.as-tab:hover{color:var(--txt)}
+.as-tab.on{color:#bfe6f1;background:var(--cy-soft);border-bottom-color:var(--cy)}
+.as-body{flex:1;overflow:auto;padding:13px;border-top:1px solid var(--line)}
+.as-pane{display:none;flex-direction:column;gap:12px}
+.as-pane.on{display:flex}
+.as-lbl{font:700 9.5px var(--mono);letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.as-2{display:flex;gap:8px}.as-2>*{flex:1;min-width:0}
+.as-sel{background:var(--surf);border:1px solid var(--line);border-radius:7px;padding:8px 9px;
+  font:600 12px var(--ui);color:var(--txt);cursor:pointer;width:100%}
+.as-sel:focus{outline:none;border-color:var(--cy-line)}
+.as-seg{display:inline-flex;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;align-self:flex-start}
+.as-seg button{padding:5px 11px;border-radius:6px;font:600 11.5px var(--ui);color:var(--dim)}
+.as-seg button.on{background:var(--cy-soft);color:#bfe6f1;box-shadow:inset 0 0 0 1px var(--cy-line)}
+.as-note{font-size:11px;color:var(--dim);line-height:1.5}.as-note b{color:#8fd4e6}
+.as-drop{border:1.4px dashed var(--cy-line);border-radius:9px;padding:13px;text-align:center;
+  color:var(--dim);font-size:12px;background:var(--cy-soft);line-height:1.5}
+.as-drop b{color:var(--txt)}
+.as-ta{width:100%;min-height:56px;resize:vertical;border-radius:8px;padding:9px 11px;font:500 12.5px var(--ui);
+  background:var(--surf);border:1px solid var(--line);color:var(--txt)}
+.as-ta::placeholder{color:var(--dim2)}.as-ta:focus{outline:none;border-color:var(--cy-line)}
+.as-chips{display:flex;flex-wrap:wrap;gap:5px}
+.as-chip{font:600 11.5px var(--ui);padding:5px 10px;border-radius:7px;color:var(--dim);
+  background:var(--surf);border:1px solid var(--line)}
+.as-chip:hover{color:var(--txt)}.as-chip.on{background:var(--cy-soft);color:#bfe6f1;border-color:var(--cy-line)}
+.as-cta{padding:11px;border-radius:9px;font:800 13.5px var(--ui);color:#06222b;text-align:center;
+  background:linear-gradient(135deg,#3E9CB8,#2d7d96);border:1px solid transparent}
+.as-cta:hover{filter:brightness(1.08)}
+.as-cta.ghost{background:none;color:var(--dim);border:1px solid var(--line)}
+.as-cta.ghost:hover{color:var(--txt)}
+.as-stage{border:1px solid var(--line);border-radius:10px;min-height:196px;display:grid;place-items:center;
+  color:var(--dim2);font-size:12px;text-align:center;padding:14px;line-height:1.6;
+  background-color:#0e0f13;
+  background-image:linear-gradient(45deg,#15161b 25%,transparent 25%,transparent 75%,#15161b 75%),linear-gradient(45deg,#15161b 25%,#0e0f13 25%,#0e0f13 75%,#15161b 75%);
+  background-size:24px 24px;background-position:0 0,12px 12px}
+.as-stack{display:flex;flex-direction:column;gap:7px}
+.as-shelf{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;background:var(--surf);border:1px solid var(--line)}
+.as-shelf .tag{font:800 9px var(--mono);letter-spacing:.1em;padding:3px 6px;border-radius:4px;flex:none}
+.as-shelf.back .tag{background:var(--cy-soft);color:#8fd4e6}
+.as-shelf.cast .tag{background:rgba(91,185,140,.18);color:#8fdcb4}
+.as-shelf.front .tag{background:rgba(217,164,65,.18);color:#e6c98a}
+.as-shelf .nm{flex:1;font-size:12px;color:var(--txt)}
+.as-shelf .mini{width:36px;height:24px;border-radius:4px;background:#0e0f13;border:1px solid var(--line);flex:none}
+.as-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.as-foot{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;flex:none;
+  border-top:1px solid var(--line);font-size:11px;color:var(--dim)}
+.as-foot a{color:#8fd4e6;text-decoration:none}.as-foot a:hover{text-decoration:underline}
+.as-modelbar{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:7px;flex:none;background:rgba(255,255,255,.015)}
+.as-libgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.as-empty{grid-column:1/-1;color:var(--dim2);font-size:11.5px;text-align:center;padding:16px 10px;border:1px dashed var(--line);border-radius:8px;line-height:1.5}
+.as-asset{aspect-ratio:1;border:1px solid var(--line);border-radius:7px;background:#0e0f13;cursor:grab;overflow:hidden;position:relative}
+.as-asset img,.as-asset canvas{width:100%;height:100%;object-fit:cover;display:block}
+.as-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:5px;display:grid;place-items:center;
+  font-size:11px;color:#fff;background:rgba(10,11,15,.75);opacity:0;transition:opacity .12s}
+.as-asset:hover .as-del{opacity:1}.as-del:hover{background:var(--red)}
+.as-libhead{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+  font:700 9.5px var(--mono);letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.as-libhead:hover{color:var(--txt)}
+.as-libhead .arr{transition:transform .15s;font-size:9px}
+.as-libhead.closed .arr{transform:rotate(-90deg)}
+.as-libhead .cnt{color:#8fd4e6}
+.as-asset.as-loading{display:grid;place-items:center;color:var(--dim);font-size:11px;animation:aspulse 1s ease-in-out infinite}
+.as-asset.as-err{display:grid;place-items:center;color:var(--red);font-size:16px;cursor:default}
+@keyframes aspulse{0%,100%{opacity:.35}50%{opacity:1}}
+.as-refthumb{max-height:52px;border-radius:6px;margin-bottom:4px}
+</style>
+<div id="asWin" role="dialog" aria-label="Animation Station">
+  <div class="as-bar" id="asBar">
+    <span class="as-mk"></span>
+    <span class="as-ttl">Animation Station</span>
+    <button class="as-summon" id="asSummon" title="Bring Kit / Tiff over">✦ Summon</button>
+    <button class="as-ic" id="asMin" title="Minimize">▁</button>
+    <button class="as-ic" id="asClose" title="Close">✕</button>
+  </div>
+  <!-- shared image model — YOUR providers from Settings -->
+  <div class="as-modelbar">
+    <div class="as-lbl">Image model — your keys, from Settings</div>
+    <div class="as-2">
+      <select class="as-sel" id="asProv"></select>
+      <select class="as-sel" id="asModel"></select>
+    </div>
+    <div class="as-seg" id="asMode">
+      <button class="on" data-mode="t2i">Text → image</button>
+      <button data-mode="i2i">Image → image</button>
+    </div>
+    <div class="as-note" id="asModelNote">Checking your providers…</div>
+    <div class="as-note" id="asRec"></div>
+  </div>
+  <div class="as-tabs">
+    <div class="as-tab on" data-pane="cast">Cast</div>
+    <div class="as-tab" data-pane="world">World</div>
+  </div>
+  <div class="as-body">
+    <!-- CAST -->
+    <div class="as-pane on" id="asCast">
+      <div class="as-drop as-refdrop" data-kind="cast" style="display:none"><b>Drop a photo</b> to turn a real person into a character — or just describe one.</div>
+      <input type="file" accept="image/*" id="asCastRef" style="display:none">
+      <textarea class="as-ta" id="asCastPrompt" placeholder="a kid in a red hoodie holding a mic, blue jeans, white sneakers…"></textarea>
+      <div class="as-chips" id="asCastChips"></div>
+      <button class="as-cta" id="asMakeCast">✨ Make character</button>
+      <div class="as-libhead" data-lib="asCastLib"><span class="arr">▾</span> Your cast · <span class="cnt" id="asCastCount">0</span></div>
+      <div class="as-libgrid" id="asCastLib"></div>
+    </div>
+    <!-- WORLD -->
+    <div class="as-pane" id="asWorld">
+      <div class="as-drop as-refdrop" data-kind="world" style="display:none"><b>Drop a reference</b> to build from — or just describe the world.</div>
+      <input type="file" accept="image/*" id="asWorldRef" style="display:none">
+      <textarea class="as-ta" id="asWorldPrompt" placeholder="rooftop at night, neon haze, glowing billboards, palm trees…"></textarea>
+      <div class="as-chips" id="asWorldChips"></div>
+      <button class="as-cta" id="asMakeWorld">✨ Make world</button>
+      <div class="as-libhead" data-lib="asWorldLib"><span class="arr">▾</span> Your worlds &amp; foregrounds · <span class="cnt" id="asWorldCount">0</span></div>
+      <div class="as-libgrid" id="asWorldLib"></div>
+    </div>
+  </div>
+  <div class="as-foot"><span id="asKeyStatus">Checking providers…</span><span>Stage it on the timeline · <a href="#" id="asSettings">Settings</a></span></div>
+</div>
+<script>
+/* Animation Station — builds CAST + WORLD assets. Model list = the user's OWN providers (Settings). */
+window.AB = (function(){
+  const win=()=>document.getElementById('asWin');
+  const AB={mode:'t2i',PROVIDERS:[],ref:{cast:null,world:null}};
+  AB.open=function(){win().classList.add('open');win().classList.remove('min');};
+  AB.close=function(){win().classList.remove('open');};
+  AB.toggle=function(){win().classList.contains('open')?AB.close():AB.open();};
+  AB.min=function(){win().classList.toggle('min');};
+  AB.tab=function(name){
+    document.querySelectorAll('#asWin .as-tab').forEach(t=>t.classList.toggle('on',t.dataset.pane===name));
+    document.querySelectorAll('#asWin .as-pane').forEach(p=>p.classList.remove('on'));
+    const el=document.getElementById({cast:'asCast',world:'asWorld'}[name]); if(el)el.classList.add('on');
+  };
+  AB.summonKit=function(){
+    // Delegate to the app's ONE canonical "Summon agent" button (wired by pinkroom-nav.js): it
+    // opens Kit if already mounted, or mounts it IN PLACE the first time — no reload, no data
+    // loss — by setting dmv_active_brain + re-running kit-helper. Kit's window is z-index 9997,
+    // so it already floats above Animation Station. Delegating keeps us correct even if the Kit
+    // team changes how summon works. Fallbacks below cover the rare case the button isn't there.
+    var b=document.querySelector('[data-summon]');
+    if(b){b.click();return;}
+    if(typeof window.__kitOpen==='function'){window.__kitOpen();return;}
+    try{localStorage.setItem('dmv_active_brain','kit');}catch(e){}
+    if(!window.__kit){var ks=document.createElement('script');ks.src='/static/kit-helper.js?summon=1';document.body.appendChild(ks);}
+    var n=0,t=setInterval(function(){
+      if(typeof window.__kitOpen==='function'){clearInterval(t);window.__kitOpen();}
+      else if(++n>60){clearInterval(t);(window.toast||alert)('Kit is still loading — hit Summon again in a second.');}
+    },50);
+  };
+  // The model list is YOURS — whatever you add in Settings. No hardcoded catalog, no mode filtering.
+  // We only RECOMMEND (B's tier list): 1 Nano Banana Pro Edit · 2 Nano Banana 2 · 3 Wan 2.7 Image Edit.
+  AB.RECS=[{re:/nano-banana-pro.*edit/i,label:'Nano Banana Pro Edit'},
+           {re:/nano-banana-2/i,label:'Nano Banana 2'},
+           {re:/wan-2[.\-]7.*image[-_ ]?edit/i,label:'Wan 2.7 Image Edit'}];
+  AB.tierOf=function(id){for(var i=0;i<AB.RECS.length;i++)if(AB.RECS[i].re.test(id))return i+1;return 9;};
+  AB.pretty=function(id){return String(id).split('/').map(s=>s.replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase())).join(' / ');};
+  AB.provModels=function(){const p=AB.PROVIDERS.find(x=>x.id===document.getElementById('asProv').value);return p?(p.image_models||[]):[];};
+  AB.allModels=function(){const out=[];AB.PROVIDERS.forEach(p=>(p.image_models||[]).forEach(id=>out.push(id)));return out;};
+  AB.renderRec=function(){
+    const have=AB.allModels();
+    const parts=AB.RECS.map(function(r,i){const got=have.some(id=>r.re.test(id));
+      return (i+1)+' '+r.label+(got?' ✓':'')+(i===2?' <span style="opacity:.7">(may fumble)</span>':'');});
+    document.getElementById('asRec').innerHTML='★ Recommended for this, best first: <b>'+parts.join('</b> → <b>')+'</b>. Missing one? Add it in Settings and it gets starred here.';
+  };
+  AB.renderModels=function(){
+    const sel=document.getElementById('asModel'), ids=AB.provModels().slice().sort((a,b)=>AB.tierOf(a)-AB.tierOf(b)); sel.innerHTML='';
+    if(!ids.length){sel.innerHTML='<option value="">— no image models on this provider —</option>';
+      document.getElementById('asModelNote').textContent='Add image models to this provider in Settings — every one shows up here.'; return;}
+    ids.forEach(id=>{const o=document.createElement('option');o.value=id;const t=AB.tierOf(id);
+      o.textContent=AB.pretty(id)+(t<9?'  ★'+t:'');sel.appendChild(o);});
+    AB.updateNote();
+  };
+  AB.updateNote=function(){const id=document.getElementById('asModel').value,t=AB.tierOf(id||'');
+    document.getElementById('asModelNote').innerHTML='Model: <b>'+(id||'—')+'</b>'+(t<9?' · <b>★ recommended #'+t+'</b>':'')+' · does image→image when you attach a reference.';};
+  AB.setMode=function(mode){AB.mode=mode;
+    document.querySelectorAll('#asMode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
+    document.querySelectorAll('#asWin .as-refdrop').forEach(d=>d.style.display= mode==='i2i'?'block':'none');};
+  AB.openSettings=function(e){if(e&&e.preventDefault)e.preventDefault();
+    if(window.openKeys)return window.openKeys('media'); if(window.arkOpenSettings)return window.arkOpenSettings();
+    (window.toast||alert)('Add your image API keys in Settings (DeMartinville home) — every model you add appears here.');};
+  AB.loadProviders=async function(){
+    let r; try{ r=await fetch('/api/cloud/providers').then(x=>x.json()); }catch(e){ r={providers:[]}; }
+    AB.PROVIDERS=(r&&r.providers)||[];
+    const sel=document.getElementById('asProv'), ks=document.getElementById('asKeyStatus'); sel.innerHTML='';
+    if(!AB.PROVIDERS.length){ sel.innerHTML='<option value="">no providers yet</option>';
+      ks.innerHTML='⚠ Add image API keys in Settings';
+      document.getElementById('asModelNote').textContent='No providers yet — add your image API keys in Settings and every model you add lists here.'; return; }
+    AB.PROVIDERS.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+    ks.textContent='🔒 '+AB.PROVIDERS.length+' provider'+(AB.PROVIDERS.length>1?'s':'')+' · your keys';
+    AB.renderModels(); AB.renderRec();
+  };
+  /* ── ASSET LIBRARY — persistent (data/anim_assets via /api/anim/assets), tiles loop live ── */
+  AB.assets=[]; AB._tiles=[]; AB._tileRaf=0;
+  AB.loadAssets=async function(){
+    try{const r=await fetch('/api/anim/assets').then(x=>x.json());AB.assets=(r&&r.assets)||[];}catch(e){AB.assets=[];}
+    AB.renderLibs();
+  };
+  AB.saveAsset=async function(rec){
+    try{
+      const r=await fetch('/api/anim/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rec)});
+      const j=await r.json(); if(!r.ok)throw new Error(j.error||'save failed');
+      rec.id=j.id; rec.ts=Math.floor(Date.now()/1000); AB.assets.unshift(rec); AB.renderLibs(); return rec;
+    }catch(e){(window.toast||alert)('⚠ could not save asset: '+(e.message||e));return null;}
+  };
+  AB.delAsset=async function(id){
+    try{await fetch('/api/anim/assets/'+id,{method:'DELETE'});}catch(e){}
+    AB.assets=AB.assets.filter(a=>a.id!==id); AB.renderLibs();
+  };
+  // frame index per loopMode — 'loop' wraps forward (0..n-1..0), 'pingpong' bounces so the
+  // reverse pass covers the SAME ground instead of snapping to frame 0, 'once' holds the last frame.
+  function frameIx(loopMode,n,step){
+    if(n<=1)return 0;
+    if(loopMode==='pingpong'){const period=(n-1)*2,k=step%period;return k<n?k:period-k;}
+    if(loopMode==='once')return Math.min(n-1,step);
+    return step%n;
+  }
+  AB._tickTiles=function(now){
+    if(!AB._tiles.length){AB._tileRaf=0;return;}
+    AB._tiles.forEach(function(t){
+      const n=t.imgs.length; if(!n)return;
+      const step=Math.floor(now/1000*(t.fps||8));
+      const img=t.imgs[frameIx(t.loopMode,n,step)]; if(!img.complete||!img.naturalWidth)return;
+      const g=t.cv.getContext('2d'),cw=t.cv.width,ch=t.cv.height;
+      const s=Math.max(cw/img.naturalWidth,ch/img.naturalHeight),w=img.naturalWidth*s,h=img.naturalHeight*s;
+      g.clearRect(0,0,cw,ch); g.drawImage(img,(cw-w)/2,(ch-h)/2,w,h);
+    });
+    AB._tileRaf=requestAnimationFrame(AB._tickTiles);
+  };
+  AB.renderLibs=function(){
+    AB._tiles=[];
+    const fill=function(gridId,countId,list,emptyMsg){
+      const grid=document.getElementById(gridId); if(!grid)return;
+      const cnt=document.getElementById(countId); if(cnt)cnt.textContent=list.length;
+      grid.innerHTML='';
+      if(!list.length){const e=document.createElement('div');e.className='as-empty';e.textContent=emptyMsg;grid.appendChild(e);return;}
+      list.forEach(function(a){
+        const cell=document.createElement('div'); cell.className='as-asset';
+        cell.title=(a.name||a.kind)+' — drag onto a timeline track';
+        cell.draggable=true; cell.dataset.aid=a.id; cell.dataset.url=a.frames[0];
+        cell.addEventListener('dragstart',function(e){
+          e.dataTransfer.setData('as-aid',a.id); e.dataTransfer.effectAllowed='copy';
+          if(AB.assetToMedia)AB.assetToMedia(a).catch(function(){}); // pre-warm the upload so the drop lands fast
+        });
+        if(a.frames.length>1){
+          const cv=document.createElement('canvas'); cv.width=160; cv.height=160; cell.appendChild(cv);
+          AB._tiles.push({cv:cv,fps:a.fps||8,loopMode:a.loopMode||'loop',imgs:a.frames.map(function(u){const im=new Image();im.src=u;return im;})});
+          const fb=document.createElement('span'); fb.className='as-frbadge'; fb.textContent=a.frames.length+'f'; cell.appendChild(fb);
+        }else{
+          const im=document.createElement('img'); im.src=a.frames[0]; im.alt=''; cell.appendChild(im);
+        }
+        if(a.kind==='fg'){const b=document.createElement('span');b.className='as-fgbadge';b.textContent='FG';cell.appendChild(b);}
+        const bar=document.createElement('div'); bar.className='as-actions';
+        if(a.kind==='cast'||a.kind==='world'){
+          const an=document.createElement('button'); an.type='button'; an.className='as-anim';
+          an.textContent=a.frames.length>1?'＋ Longer':'▶ Animate';
+          an.addEventListener('click',function(ev){ev.stopPropagation();AB.openAnim(a.id);});
+          bar.appendChild(an);
+        }
+        if(a.kind==='world'){
+          const b=document.createElement('button'); b.type='button'; b.className='as-cutfg'; b.textContent='✂ FG';
+          b.addEventListener('click',function(ev){ev.stopPropagation();AB.openCut(a.frames[0],function(png){AB.addForeground(png,a.name);});});
+          bar.appendChild(b);
+        }
+        if(bar.children.length)cell.appendChild(bar);
+        const del=document.createElement('button');del.className='as-del';del.type='button';del.textContent='✕';del.title='Delete';
+        del.addEventListener('click',function(ev){ev.stopPropagation();AB.delAsset(a.id);});
+        cell.appendChild(del);
+        grid.appendChild(cell);
+      });
+    };
+    fill('asCastLib','asCastCount',AB.assets.filter(a=>a.kind==='cast'),
+      'Characters you make land here — animated, looping, ready to drop on a track.');
+    fill('asWorldLib','asWorldCount',AB.assets.filter(a=>a.kind==='world'||a.kind==='fg'),
+      'Worlds you make land here (hover one → ✂ Cut FG pops a foreground).');
+    if(AB._tiles.length&&!AB._tileRaf)AB._tileRaf=requestAnimationFrame(AB._tickTiles);
+  };
+  AB.make=async function(kind){
+    const prov=document.getElementById('asProv').value, model=document.getElementById('asModel').value;
+    const raw=document.getElementById(kind==='cast'?'asCastPrompt':'asWorldPrompt').value.trim();
+    const t=window.toast||function(){};
+    if(!prov)return AB.openSettings();
+    if(!model)return t('Pick one of your models first',1);
+    if(!raw)return t('Describe the '+kind+' first',1);
+    // light framing so the result is usable as a cast/world asset
+    const framed = kind==='cast' ? raw+', full body, centered' : raw+', wide background scene, no people';
+    const media = (AB.mode==='i2i' && AB.ref[kind]) ? {images:[AB.ref[kind]]} : {};
+    const payload = {provider:prov, kind:'image', model, mode:AB.mode, prompt:framed, options:{}, media};
+    const lib=document.getElementById(kind==='cast'?'asCastLib':'asWorldLib');
+    const empty=lib.querySelector('.as-empty'); if(empty)empty.remove();
+    const cell=document.createElement('div'); cell.className='as-asset as-loading'; cell.textContent='…'; lib.prepend(cell);
+    const btn=document.getElementById(kind==='cast'?'asMakeCast':'asMakeWorld'); btn.disabled=true;
+    t('Generating a '+kind+' on your key — ~10–60s…');
+    try{
+      const r=await fetch('/api/cloud/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const txt=await r.text(); let j; try{j=JSON.parse(txt);}catch(_){throw new Error(txt.slice(0,140)||('server '+r.status));}
+      if(!r.ok)throw new Error(j.error||('server '+r.status));
+      if(j.ok && j.outputs && j.outputs[0]){
+        const url=j.outputs[0];
+        cell.remove();
+        await AB.saveAsset({kind:kind, name:raw.slice(0,60), frames:[url], fps:8, prompt:framed});
+        t(kind==='world'?'Saved. Hover the world → ✂ Cut FG to pop a foreground.':'Saved to your cast.');
+      } else { cell.classList.remove('as-loading'); cell.classList.add('as-err'); cell.textContent='⚠'; cell.title=(j.error||'failed'); t('⚠ '+(j.error||'generation failed'),1); }
+    }catch(e){ cell.classList.remove('as-loading'); cell.classList.add('as-err'); cell.textContent='⚠'; cell.title=String(e.message||e); t('⚠ '+(e.message||e),1); }
+    btn.disabled=false;
+  };
+  return AB;
+})();
+window.addEventListener('load',function(){
+  const $id=id=>document.getElementById(id), bind=(id,ev,fn)=>{const e=$id(id);if(e)e.addEventListener(ev,fn);};
+  bind('btnAnimate','click',()=>window.AB.toggle());
+  bind('asClose','click',()=>window.AB.close());
+  bind('asMin','click',()=>window.AB.min());
+  bind('asSummon','click',()=>window.AB.summonKit());
+  bind('asSettings','click',window.AB.openSettings);
+  document.querySelectorAll('#asWin .as-tab').forEach(t=>t.addEventListener('click',()=>window.AB.tab(t.dataset.pane)));
+  document.querySelectorAll('#asMode button').forEach(b=>b.addEventListener('click',()=>window.AB.setMode(b.dataset.mode)));
+  bind('asProv','change',()=>window.AB.renderModels());
+  bind('asModel','change',()=>window.AB.updateNote());
+  bind('asMakeCast','click',()=>window.AB.make('cast'));
+  bind('asMakeWorld','click',()=>window.AB.make('world'));
+  const addChips=(host,ta,arr)=>{const h=$id(host);if(!h)return;arr.forEach(c=>{const b=document.createElement('button');b.className='as-chip';b.textContent=c;
+    b.addEventListener('click',()=>{const x=$id(ta);x.value=(x.value.trim()?x.value.trim()+', ':'')+c.toLowerCase();x.focus();});h.appendChild(b);});};
+  addChips('asCastChips','asCastPrompt',['Hip-hop producer','Rapper in a fit','Punk singer','Trap rocker','Goth girl','DJ in headphones','Backup dancer','Street kid']);
+  addChips('asWorldChips','asWorldPrompt',['Neon street corner','Rooftop at night','Recording studio','Punk garage','Grimy apartment','Club','3am convenience','Tattoo shop']);
+  // reference photo (image→image) per tab
+  [['cast','asCastRef','asCast'],['world','asWorldRef','asWorld']].forEach(function(t){
+    const kind=t[0], file=$id(t[1]), drop=document.querySelector('#'+t[2]+' .as-refdrop');
+    if(!file||!drop)return; drop.style.cursor='pointer';
+    drop.addEventListener('click',()=>file.click());
+    file.addEventListener('change',()=>{const f=file.files[0]; if(!f)return; const rd=new FileReader();
+      rd.onload=()=>{window.AB.ref[kind]=rd.result; drop.innerHTML='<img class="as-refthumb" src="'+rd.result+'"><br>✓ reference attached — <u>change</u>';};
+      rd.readAsDataURL(f);});
+  });
+  const w=$id('asWin'),bar=$id('asBar');
+  if(bar&&w){let sx,sy,ox,oy,drag=false;
+    bar.addEventListener('mousedown',e=>{if(e.target.closest('button'))return;drag=true;const r=w.getBoundingClientRect();
+      w.style.right='auto';w.style.left=r.left+'px';w.style.top=r.top+'px';sx=e.clientX;sy=e.clientY;ox=r.left;oy=r.top;w.classList.add('dragging');e.preventDefault();});
+    window.addEventListener('mousemove',e=>{if(!drag)return;const r=w.getBoundingClientRect();
+      w.style.left=Math.max(4,Math.min(window.innerWidth-r.width-4,ox+e.clientX-sx))+'px';
+      w.style.top=Math.max(4,Math.min(window.innerHeight-40,oy+e.clientY-sy))+'px';});
+    window.addEventListener('mouseup',()=>{drag=false;w.classList.remove('dragging');});
+  }
+  document.querySelectorAll('#asWin .as-libhead').forEach(function(h){
+    h.addEventListener('click',function(){h.classList.toggle('closed');
+      var g=$id(h.dataset.lib); if(g)g.style.display=h.classList.contains('closed')?'none':'';});
+  });
+  window.AB.loadProviders();
+  window.AB.loadAssets();
+});
+</script>
+
+<!-- ════════════════ ANIMATE ASSET — multi-frame sheet gen + last-frame chaining ════════════════ -->
+<div class="scrim" id="asAnimScrim">
+  <div class="modal">
+    <h2><span class="ic">▶</span> <span id="asAnimTitle">Animate this</span></h2>
+    <div class="sub">Each frame is one image→image gen <b>on your key</b>, anchored to BOTH your original image and the latest frame — that dual-reference is what keeps it from drifting. More frames = longer sequence = more spend, and past ~10-15 chained frames drift gets visible — for a longer piece, prefer a fresh restart over one long chain.</div>
+    <img id="asAnimPrev" alt="" style="width:100%;border-radius:8px;border:1px solid var(--line);margin-bottom:12px"/>
+    <div class="frow"><span>What moves?</span>
+      <textarea class="as-ta" id="asAnimMotion" placeholder="idle sway, breathing, chain swinging slightly…"></textarea>
+      <div class="as-chips" id="asAnimChips"></div></div>
+    <div class="frow"><span>Frames to add</span><div class="as-chips" id="asAnimCount"></div></div>
+    <div class="frow"><span>When it plays back</span><div class="ac-seg" id="asAnimLoopMode">
+      <button class="on" data-lm="loop">Loop (closes back to frame 1)</button>
+      <button data-lm="pingpong">Ping-pong (forward, then reverse)</button>
+      <button data-lm="once">Play once, hold last frame</button>
+    </div></div>
+    <div class="as-note" id="asAnimProg"></div>
+    <div class="actions">
+      <button class="tbtn" id="asAnimCancel">Cancel</button>
+      <button class="tbtn cta" id="asAnimGo">▶ Animate · 6 gens</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var AB=window.AB; if(!AB)return;
+  var A={aid:null,n:6,loopMode:'loop',running:false,abort:false};
+  function $a(id){return document.getElementById(id);}
+  function T(m,e){(window.toast||function(){})(m,e);}
+
+  /* update an existing asset in place (same id → server overwrites the JSON) */
+  AB.updateAsset=async function(asset){
+    try{
+      var r=await fetch('/api/anim/assets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(asset)});
+      var j=await r.json(); if(!r.ok)throw new Error(j.error||'save failed');
+      AB.renderLibs(); return true;
+    }catch(e){T('⚠ could not save frames: '+(e.message||e),1);return false;}
+  };
+
+  /* ── the frame engine ── researched fixes over the naive "chain off the last frame only"
+     approach (that's what's here originally, and it's the #1 documented cause of drift):
+     - DUAL-REFERENCE ANCHOR: every gen after the first sends BOTH the original frame AND
+       the latest frame as reference images, not just the latest. Confirmed independently
+       across Google's own multi-turn-consistency guidance, and academic anti-drift work
+       (AnchorEdit / multi-turn consistent editing) — chaining off only the most recent
+       output is exactly what compounds error each step.
+     - VERBATIM TRAIT LOCK: the asset's original description is quoted back UNCHANGED every
+       call (never re-summarized) — paraphrasing the same trait differently is a documented
+       drift source.
+     - ONE CHANGE PER STEP: a single explicit motion instruction, never stacked changes.
+     - LOOP-CLOSE (loopMode:'loop'): the LAST frame of a batch is asked to ease back toward
+       frame 1. Flagged honestly: no source documents this exact technique for chained
+       single-image edits (it's real for diffusion-video models like AnimateDiff's "closed
+       loop") — this is OUR reasoned extension of that concept + classic ease-in/ease-out,
+       not an established Nano Banana pattern. Skipped for 'pingpong'/'once' since those are
+       B's open-ended action chains (jump→walk→smoke…) that aren't meant to loop back.
+     - Nano Banana has NO exposed denoise/strength knob (that's a Stable-Diffusion-family
+       parameter) — the only lever here is the prompt itself, so it does all the work. ── */
+  function lockedDesc(asset){ return asset.prompt || asset.name || ('this '+(asset.kind==='cast'?'character':'scene')); }
+  function buildFramePrompt(asset,motion,closing){
+    var isCast=asset.kind==='cast', subject=isCast?'character':'scene';
+    var lockedWhat=isCast
+      ? 'the exact character described as: "'+lockedDesc(asset)+'" — same face, hair, outfit, colors and proportions as BOTH reference images'
+      : 'the exact scene described as: "'+lockedDesc(asset)+'" — same layout, palette, and every element not named below, as BOTH reference images';
+    var lock='Two reference images are attached — image 1 is the ORIGINAL '+subject+' (the true identity anchor), image 2 is the CURRENT frame (where it is right now). '+
+      'Keep locked: '+lockedWhat+', plus the camera angle, framing, crop and background — pixel-identical where not named below. Do not crop, zoom, recompose, add, or invent anything.';
+    var change=closing
+      ? 'Change: ease the '+subject+' back toward image 1\'s exact pose, one small step, so a loop from this frame back to image 1 reads seamless — do not fully snap to it yet, just close the gap.'
+      : 'Change: advance ONLY this one motion, one small explicit step from the current pose: '+motion+'.';
+    return lock+' '+change;
+  }
+  AB.animateAsset=async function(aid,motion,addN){
+    var asset=AB.assets.find(function(a){return a.id===aid;}); if(!asset)return;
+    var prov=document.getElementById('asProv').value, model=document.getElementById('asModel').value;
+    if(!prov||!model){T('Pick a provider + model up top first',1);return;}
+    var closeLoop=(A.loopMode==='loop');
+    A.running=true;A.abort=false;$a('asAnimGo').disabled=true;
+    var got=0;
+    for(var i=0;i<addN;i++){
+      if(A.abort)break;
+      var isClosing=closeLoop&&(i===addN-1)&&(asset.frames.length+got>1);   // never "close" on the very first frame ever made
+      $a('asAnimProg').textContent='frame '+(i+1)+' of '+addN+(isClosing?' (closing the loop back to frame 1)':'')+'… (~10–60s each, your key)';
+      try{
+        var first=asset.frames[0], last=asset.frames[asset.frames.length-1];
+        var refs=(first===last)?[last]:[first,last];   // dual-reference anchor — the #1 anti-drift fix
+        var prompt=buildFramePrompt(asset,motion,isClosing);
+        var r=await fetch('/api/cloud/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({provider:prov,kind:'image',model:model,mode:'i2i',prompt:prompt,options:{},media:{images:refs}})});
+        var txt=await r.text(),j; try{j=JSON.parse(txt);}catch(_){throw new Error(txt.slice(0,120)||('server '+r.status));}
+        if(!r.ok||!j.ok||!j.outputs||!j.outputs[0])throw new Error(j.error||'generation failed');
+        asset.frames.push(j.outputs[0]); got++;
+      }catch(e){T('⚠ frame '+(i+1)+' failed: '+(e.message||e)+(got?' — kept the '+got+' good ones':''),1);break;}
+    }
+    A.running=false;$a('asAnimGo').disabled=false;
+    if(got){asset.fps=asset.fps>1?asset.fps:8; asset.loopMode=A.loopMode; await AB.updateAsset(asset);
+      var modeWord={loop:'looping',pingpong:'ping-ponging',once:'playing once'}[A.loopMode];
+      $a('asAnimProg').textContent='done — '+asset.frames.length+' frames total, '+modeWord+' in the gallery.';
+      T('＋'+got+' frames — '+(asset.name||'asset')+' now '+asset.frames.length+' frames.');
+      AB.closeAnim();
+    }else if(!A.abort){$a('asAnimProg').textContent='no frames made — check the model supports image→image.';}
+  };
+
+  AB.openAnim=function(aid){
+    var asset=AB.assets.find(function(a){return a.id===aid;}); if(!asset)return;
+    A.aid=aid; A.loopMode=asset.loopMode||'loop';
+    document.querySelectorAll('#asAnimLoopMode button').forEach(function(b){b.classList.toggle('on',b.dataset.lm===A.loopMode);});
+    $a('asAnimTitle').textContent=(asset.frames.length>1?'＋ Longer — ':'▶ Animate — ')+(asset.name||asset.kind);
+    $a('asAnimPrev').src=asset.frames[asset.frames.length-1];
+    $a('asAnimProg').textContent=asset.frames.length>1
+      ? 'anchored to the ORIGINAL frame + the latest frame ('+asset.frames.length+' so far) — the dual reference is what keeps it from drifting.'
+      : '';
+    $a('asAnimScrim').classList.add('open');
+  };
+  AB.closeAnim=function(){if(A.running){A.abort=true;}$a('asAnimScrim').classList.remove('open');};
+
+  /* ── TIMELINE BRIDGE — an asset becomes a REAL editor media record (upload → import),
+       so preview AND native-ffmpeg export both work. Cached on the asset as _mid. ── */
+  AB.assetToMedia=function(asset){
+    if(asset._midP)return asset._midP;
+    asset._midP=(async function(){
+      var src=asset.frames[0], blob;
+      if(/^data:/.test(src)){ blob=await (await fetch(src)).blob(); }
+      else{
+        try{ blob=await (await fetch(src,{mode:'cors'})).blob(); }
+        catch(e){ // CORS fallback: pull through an image element + canvas
+          blob=await new Promise(function(res,rej){var im=new Image();im.crossOrigin='anonymous';
+            im.onload=function(){var c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;
+              c.getContext('2d').drawImage(im,0,0);c.toBlob(function(b){b?res(b):rej(new Error('canvas blob failed'));},'image/png');};
+            im.onerror=function(){rej(new Error('could not fetch the image'));};im.src=src;});
+        }
+      }
+      var name=((asset.name||asset.kind).replace(/[^a-zA-Z0-9 _-]/g,'').trim()||'asset').slice(0,40)+'.png';
+      var file=new File([blob],name,{type:blob.type||'image/png'});
+      var media=await window.importFiles([file]);           // editor's own pipeline → bin + poster + export-safe
+      if(!media||!media[0])throw new Error('import failed');
+      asset._mid=media[0].id; return media[0];
+    })();
+    asset._midP.catch(function(){asset._midP=null;});        // allow retry on failure
+    return asset._midP;
+  };
+  AB._dropAsset=async function(aid,tid,frame){
+    var asset=AB.assets.find(function(a){return a.id===aid;}); if(!asset)return;
+    try{
+      var m=await AB.assetToMedia(asset);
+      var added;
+      if(tid!=null){ added=window.addClipFromMedia(m.id,tid,frame); }
+      else{
+        var tr={id:'ab'+Math.random().toString(36).slice(2,9),name:'Animation',clips:[]}; window.insertTrack(tr);
+        added=window.addClipFromMedia(m.id,tr.id,frame);
+      }
+      if(added&&window.select)window.select(added.trackId,added.clipId);
+      T((asset.name||'asset')+' → timeline'+(asset.kind==='fg'?' — put it on a track ABOVE your character':''));
+    }catch(e){T('⚠ '+(e.message||e),1);}
+  };
+  /* registered at PARSE time — before the editor's own drop listener — so
+     stopImmediatePropagation keeps the native handler from making a stray track. */
+  var LW=document.getElementById('lanesWrap');
+  if(LW)LW.addEventListener('drop',function(e){
+    var aid=e.dataTransfer.getData('as-aid'); if(!aid)return;   // not ours → native handles
+    e.preventDefault(); e.stopImmediatePropagation();
+    document.querySelectorAll('.lane').forEach(function(l){l.classList.remove('drop-ok');});
+    LW.classList.remove('drop-ok');
+    var lane=e.target.closest('.lane'), tid=lane?lane.dataset.tid:null;
+    var f=window.frameAtEvent?window.frameAtEvent(e):0; if(window.snapFrame)f=window.snapFrame(f);
+    AB._dropAsset(aid,tid,f);
+  });
+
+  window.addEventListener('load',function(){
+    ['idle sway','walk cycle','dancing','head bob','rapping to camera','wind in the trees','cars passing','neon sign flickering'].forEach(function(c){
+      var b=document.createElement('button');b.className='as-chip';b.textContent=c;
+      b.addEventListener('click',function(){var ta=$a('asAnimMotion');ta.value=(ta.value.trim()?ta.value.trim()+', ':'')+c;ta.focus();});
+      $a('asAnimChips').appendChild(b);});
+    [4,6,8,12].forEach(function(n){
+      var b=document.createElement('button');b.className='as-chip'+(n===6?' on':'');b.textContent=String(n);b.dataset.n=n;
+      b.addEventListener('click',function(){A.n=n;document.querySelectorAll('#asAnimCount .as-chip').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');$a('asAnimGo').textContent='▶ Animate · '+n+' gens';});
+      $a('asAnimCount').appendChild(b);});
+    document.querySelectorAll('#asAnimLoopMode button').forEach(function(b){b.addEventListener('click',function(){
+      A.loopMode=b.dataset.lm;document.querySelectorAll('#asAnimLoopMode button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');});});
+    $a('asAnimCancel').addEventListener('click',function(){AB.closeAnim();});
+    $a('asAnimGo').addEventListener('click',function(){
+      var motion=$a('asAnimMotion').value.trim();
+      if(!motion){T('Describe the motion first',1);$a('asAnimMotion').focus();return;}
+      AB.animateAsset(A.aid,motion,A.n);
+    });
+  });
+})();
+</script>
+
+<!-- ════════════════ CUT FOREGROUND — paint-extract tool (ported from heytiff) ════════════════ -->
+<style>
+#asCut{position:fixed;inset:0;z-index:180;display:none;background:rgba(6,7,10,.84);backdrop-filter:blur(8px);
+  flex-direction:column;align-items:center;padding:14px}
+#asCut.open{display:flex}
+.ac-panel{width:min(1180px,96vw);max-height:96vh;display:flex;flex-direction:column;gap:10px;
+  background:var(--panel);border:1px solid var(--cy-line);border-radius:12px;padding:14px;overflow:hidden}
+.ac-head{display:flex;align-items:center;gap:10px}
+.ac-head .t{font:800 14px var(--ui);color:var(--txt)}
+.ac-head .ac-sub{flex:1;font-size:11.5px;color:var(--dim)}
+.ac-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ac-seg{display:inline-flex;background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.ac-seg button{padding:6px 11px;border-radius:6px;font:700 11.5px var(--ui);color:var(--dim)}
+.ac-seg button.on{background:var(--cy-soft);color:#bfe6f1;box-shadow:inset 0 0 0 1px var(--cy-line)}
+.ac-btn{padding:7px 12px;border-radius:8px;font:700 11.5px var(--ui);color:var(--txt);background:var(--surf);border:1px solid var(--line)}
+.ac-btn:hover{background:var(--surf2)}
+.ac-btn.inc.on{background:rgba(0,230,110,.16);color:#4fe08a;border-color:rgba(0,230,110,.4)}
+.ac-btn.exc.on{background:rgba(255,60,80,.16);color:#ff6b7a;border-color:rgba(255,60,80,.4)}
+.ac-btn.go{background:linear-gradient(135deg,#00ffd0,#00b8a8);color:#04231f;border-color:transparent}
+.ac-btn.save{background:linear-gradient(135deg,#3E9CB8,#2d7d96);color:#06222b;border-color:transparent}
+.ac-btn[disabled]{opacity:.45;cursor:not-allowed}
+.ac-size{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+.ac-stage{flex:1;min-height:0;display:grid;place-items:center;overflow:auto;border-radius:10px;
+  background:repeating-conic-gradient(#161320 0% 25%,#221a30 0% 50%) 50%/18px 18px}
+#acOverlay{max-width:100%;max-height:70vh;image-rendering:pixelated;touch-action:none;cursor:crosshair;border-radius:6px}
+.ac-foot{font-size:11px;color:var(--dim);line-height:1.5}
+.ac-foot b.g{color:#4fe08a}.ac-foot b.r{color:#ff6b7a}
+.as-actions{position:absolute;bottom:4px;left:4px;right:4px;display:flex;gap:4px;opacity:0;transition:opacity .12s}
+.as-asset:hover .as-actions{opacity:1}
+.as-actions button{flex:1;font:700 10px var(--ui);padding:4px 2px;border-radius:6px;cursor:pointer}
+.as-cutfg{background:rgba(62,156,184,.9);color:#04231f}
+.as-anim{background:rgba(91,185,140,.9);color:#0a2415}
+.as-frbadge{position:absolute;top:4px;right:28px;font:800 9px var(--mono);padding:2px 5px;border-radius:4px;background:rgba(10,11,15,.75);color:#8fd4e6}
+.as-fgbadge{position:absolute;top:4px;left:4px;font:800 9px var(--mono);padding:2px 5px;border-radius:4px;background:rgba(217,164,65,.9);color:#241a05}
+.as-asset[data-fg] img{background:repeating-conic-gradient(#161320 0% 25%,#221a30 0% 50%) 50%/12px 12px}
+</style>
+<div id="asCut">
+  <div class="ac-panel">
+    <div class="ac-head"><span class="t">✂ Cut Foreground</span><span class="ac-sub" id="acStatus"></span><button class="as-ic" id="acClose">✕</button></div>
+    <div class="ac-tools">
+      <div class="ac-seg" id="acMode"><button class="on" data-m="ai">AI cut</button><button data-m="manual">Manual</button></div>
+      <button class="ac-btn inc on" id="acInc">＋ Keep</button>
+      <button class="ac-btn exc" id="acExc">－ Exclude</button>
+      <span class="ac-size">Size <input type="range" id="acSize" min="4" max="180" step="2" value="28"><span id="acSizeV">28</span></span>
+      <button class="ac-btn" id="acWipe">Wipe strokes</button>
+      <button class="ac-btn" id="acReset">Reset</button>
+      <span style="flex:1"></span>
+      <button class="ac-btn go" id="acExtract">✂ Extract</button>
+      <button class="ac-btn save" id="acSave" disabled>Save</button>
+    </div>
+    <div class="ac-stage"><canvas id="acOverlay"></canvas></div>
+    <div class="ac-foot"><b class="g">GREEN</b> = keep this as the foreground (paint the railing, the wall). <b class="r">RED</b> = exclude. <b>Extract</b> → refine with more strokes. <b>Save</b> bakes a transparent PNG that draws on top of your characters. &nbsp;·&nbsp; B/E brush · [ ] size · Alt swap · Enter extract · X wipe · Esc close</div>
+  </div>
+  <canvas id="acSrc" style="display:none"></canvas><canvas id="acFg" style="display:none"></canvas><canvas id="acBg" style="display:none"></canvas><canvas id="acAlpha" style="display:none"></canvas>
+</div>
+<script>
+(function(){
+  var AB=window.AB; if(!AB)return;
+  var C={mode:'include',manual:false,size:28,alt:false,drawing:false,last:null,W:1280,H:720,sid:null,cvReady:false,hasExtracted:false,onSave:null,worker:null,wnext:1,wpending:{}};
+  AB.cut=C;
+  function $c(id){return document.getElementById(id);}
+  function ctx(id){return $c(id).getContext('2d',{willReadFrequently:true});}
+  function status(s){$c('acStatus').textContent=s||'';}
+  function wsend(p,tr){return new Promise(function(res,rej){var id=C.wnext++;C.wpending[id]={res:res,rej:rej};C.worker.postMessage(Object.assign({},p,{id:id}),tr||[]);});}
+  function ensureWorker(){ if(C.worker)return C.worker; C.worker=new Worker('/static/as-cutout.worker.js');
+    C.worker.onmessage=function(e){var m=e.data||{},cb=C.wpending[m.id];if(!cb)return;delete C.wpending[m.id];if(m.type==='error')cb.rej(new Error(m.error||'worker error'));else cb.res(m);};
+    C.worker.onerror=function(e){for(var k in C.wpending)C.wpending[k].rej(new Error('cutout worker crashed: '+(e.message||'')));C.wpending={};C.worker=null;};
+    return C.worker; }
+  AB.openCut=function(imageUrl,onSave){
+    C.onSave=onSave;C.manual=false;C.mode='include';C.hasExtracted=false;C.cvReady=false;C.sid='s'+(AB._cs=(AB._cs||0)+1);
+    $c('asCut').classList.add('open');$c('acSave').disabled=true;setModeUI();
+    var img=new Image();img.crossOrigin='anonymous';
+    img.onload=function(){
+      var W=Math.min(1280,img.naturalWidth),H=Math.round(W*(img.naturalHeight/img.naturalWidth));C.W=W;C.H=H;
+      ['acSrc','acFg','acBg','acAlpha','acOverlay'].forEach(function(id){var c=$c(id);c.width=W;c.height=H;});
+      ctx('acSrc').drawImage(img,0,0,W,H);ctx('acFg').clearRect(0,0,W,H);ctx('acBg').clearRect(0,0,W,H);ctx('acAlpha').clearRect(0,0,W,H);
+      redraw();status('loading AI engine (one-time)…');ensureWorker();
+      wsend({type:'init'}).then(function(){return wsend({type:'session',sessionId:C.sid,imageData:ctx('acSrc').getImageData(0,0,W,H)});})
+        .then(function(){C.cvReady=true;status('paint GREEN on the foreground, then Extract — or switch to Manual');})
+        .catch(function(err){C.cvReady=false;status('AI engine unavailable — use Manual. ('+(err.message||'')+')');});
+    };
+    img.onerror=function(){status('could not load that image');};
+    img.src=imageUrl;
+  };
+  function effBrush(){if(C.manual)return 'manual';return ((C.mode==='include')===!C.alt)?'include':'exclude';}
+  function setModeUI(){
+    $c('acInc').classList.toggle('on',C.mode==='include');$c('acExc').classList.toggle('on',C.mode==='exclude');
+    document.querySelectorAll('#acMode button').forEach(function(b){b.classList.toggle('on',(b.dataset.m==='manual')===C.manual);});
+    $c('acExtract').style.display=C.manual?'none':'';$c('acInc').style.display=C.manual?'none':'';$c('acExc').style.display=C.manual?'none':'';
+    var ov=$c('acOverlay'),eb=effBrush();ov.style.outline='2px solid '+(eb==='manual'?'rgba(255,27,141,.55)':eb==='include'?'rgba(0,230,110,.55)':'rgba(255,60,80,.55)');ov.style.outlineOffset='-2px';
+  }
+  function redraw(){var g=ctx('acOverlay');g.clearRect(0,0,C.W,C.H);g.globalAlpha=C.hasExtracted?0.45:0.78;g.drawImage($c('acSrc'),0,0);g.globalAlpha=0.7;g.drawImage($c('acAlpha'),0,0);g.globalAlpha=0.55;g.drawImage($c('acFg'),0,0);g.drawImage($c('acBg'),0,0);g.globalAlpha=1;}
+  function evt(e){var ov=$c('acOverlay'),r=ov.getBoundingClientRect();return {x:(e.clientX-r.left)*(ov.width/r.width),y:(e.clientY-r.top)*(ov.height/r.height)};}
+  function stamp(x,y){var eb=effBrush(),rad=C.size/2;
+    if(eb==='manual'){var a=ctx('acAlpha');a.globalCompositeOperation=C.alt?'destination-out':'source-over';a.fillStyle='rgba(255,27,141,1)';a.beginPath();a.arc(x,y,rad,0,6.2832);a.fill();a.globalCompositeOperation='source-over';return;}
+    var inc=eb==='include',tg=ctx(inc?'acFg':'acBg'),ot=ctx(inc?'acBg':'acFg');
+    tg.globalCompositeOperation='source-over';tg.fillStyle=inc?'rgba(0,230,110,1)':'rgba(255,60,80,1)';tg.beginPath();tg.arc(x,y,rad,0,6.2832);tg.fill();
+    ot.globalCompositeOperation='destination-out';ot.beginPath();ot.arc(x,y,rad,0,6.2832);ot.fill();ot.globalCompositeOperation='source-over';}
+  function line(a,b){var d=Math.hypot(b.x-a.x,b.y-a.y),steps=Math.max(1,Math.ceil(d/Math.max(2,C.size/4)));for(var i=1;i<=steps;i++){var t=i/steps;stamp(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t);}}
+  function toMask(id){var d=ctx(id).getImageData(0,0,C.W,C.H).data,m=new Uint8Array(C.W*C.H);for(var i=0;i<m.length;i++)m[i]=d[i*4+3]>16?1:0;return m;}
+  function doExtract(){if(C.manual)return;if(!C.cvReady){status('engine still loading — or use Manual');return;}
+    var fg=toMask('acFg'),bg=toMask('acBg'),any=false;for(var i=0;i<fg.length;i++){if(fg[i]){any=true;break;}}
+    if(!any){status('paint at least one GREEN stroke first');return;}
+    status('extracting…');$c('acExtract').disabled=true;var iters=C.hasExtracted?1:3;
+    wsend({type:'extract',sessionId:C.sid,fgScribble:fg,bgScribble:bg,iters:iters},[fg.buffer,bg.buffer]).then(function(r){
+      var al=r.alpha,im=ctx('acAlpha').createImageData(C.W,C.H),px=im.data;
+      for(var i=0;i<al.length;i++){if(al[i]){px[i*4]=255;px[i*4+1]=27;px[i*4+2]=141;px[i*4+3]=255;}}
+      ctx('acAlpha').putImageData(im,0,0);C.hasExtracted=true;$c('acSave').disabled=false;
+      status('cutout ready ('+Math.round(r.elapsedMs)+'ms) — add strokes to refine, or Save');redraw();
+    }).catch(function(err){status('extract failed: '+(err.message||''));}).then(function(){$c('acExtract').disabled=false;});}
+  function doSave(){var W=C.W,H=C.H,ad=ctx('acAlpha').getImageData(0,0,W,H).data,al=new Uint8Array(W*H),any=false;
+    for(var i=0;i<al.length;i++){al[i]=ad[i*4+3]>16?255:0;if(al[i])any=true;}
+    if(!any){status('nothing to save — paint or extract first');return;}
+    var out=document.createElement('canvas');out.width=W;out.height=H;var o=out.getContext('2d');o.drawImage($c('acSrc'),0,0);
+    var im=o.getImageData(0,0,W,H),px=im.data;for(var j=0;j<al.length;j++)px[j*4+3]=al[j];o.putImageData(im,0,0);
+    var url=out.toDataURL('image/png');closeCut();if(C.onSave)C.onSave(url);}
+  function closeCut(){$c('asCut').classList.remove('open');if(C.sid&&C.worker){wsend({type:'dispose',sessionId:C.sid}).catch(function(){});}}
+  AB.addForeground=function(pngUrl,fromName){
+    AB.saveAsset({kind:'fg',name:fromName?('FG · '+fromName):'foreground cut',frames:[pngUrl],fps:1});
+    (window.toast||function(){})('Foreground cut saved — it drops on a track above your character (timeline wire next).');};
+  function onReady(fn){if(document.readyState==='complete')fn();else window.addEventListener('load',fn);}
+  onReady(function(){
+    var ov=$c('acOverlay');if(!ov)return;
+    ov.addEventListener('pointerdown',function(e){if($c('acExtract').disabled&&!C.manual&&!C.cvReady)return;C.drawing=true;try{ov.setPointerCapture(e.pointerId);}catch(_){}
+      var p=evt(e);C.last=p;stamp(p.x,p.y);redraw();});
+    ov.addEventListener('pointermove',function(e){if(!C.drawing)return;var p=evt(e);if(C.last)line(C.last,p);C.last=p;redraw();});
+    ov.addEventListener('pointerup',function(e){C.drawing=false;try{ov.releasePointerCapture(e.pointerId);}catch(_){}C.last=null;});
+    $c('acInc').addEventListener('click',function(){C.mode='include';setModeUI();});
+    $c('acExc').addEventListener('click',function(){C.mode='exclude';setModeUI();});
+    document.querySelectorAll('#acMode button').forEach(function(b){b.addEventListener('click',function(){C.manual=(b.dataset.m==='manual');setModeUI();status(C.manual?'paint the foreground directly, then Save':'paint GREEN on the foreground, then Extract');});});
+    $c('acSize').addEventListener('input',function(){C.size=+this.value;$c('acSizeV').textContent=this.value;});
+    $c('acWipe').addEventListener('click',function(){ctx('acFg').clearRect(0,0,C.W,C.H);ctx('acBg').clearRect(0,0,C.W,C.H);redraw();});
+    $c('acReset').addEventListener('click',function(){ctx('acFg').clearRect(0,0,C.W,C.H);ctx('acBg').clearRect(0,0,C.W,C.H);ctx('acAlpha').clearRect(0,0,C.W,C.H);C.hasExtracted=false;$c('acSave').disabled=true;if(C.cvReady)wsend({type:'session',sessionId:C.sid,imageData:ctx('acSrc').getImageData(0,0,C.W,C.H)}).catch(function(){});redraw();});
+    $c('acExtract').addEventListener('click',doExtract);
+    $c('acSave').addEventListener('click',doSave);
+    $c('acClose').addEventListener('click',closeCut);
+    window.addEventListener('keydown',function(e){if(!$c('asCut').classList.contains('open'))return;
+      if(e.key==='Alt'){e.preventDefault();C.alt=true;setModeUI();}
+      else if(e.key==='b'||e.key==='B'){C.mode='include';setModeUI();}
+      else if(e.key==='e'||e.key==='E'){C.mode='exclude';setModeUI();}
+      else if(e.key==='['){C.size=Math.max(4,C.size-4);$c('acSize').value=C.size;$c('acSizeV').textContent=C.size;}
+      else if(e.key===']'){C.size=Math.min(180,C.size+4);$c('acSize').value=C.size;$c('acSizeV').textContent=C.size;}
+      else if(e.key==='Enter'){e.preventDefault();doExtract();}
+      else if(e.key==='x'||e.key==='X'){ctx('acFg').clearRect(0,0,C.W,C.H);ctx('acBg').clearRect(0,0,C.W,C.H);redraw();}
+      else if(e.key==='Escape'){closeCut();}});
+    window.addEventListener('keyup',function(e){if(e.key==='Alt'){C.alt=false;setModeUI();}});
+  });
+})();
+</script>
 
 <div class="toast" id="toast"></div>
 
@@ -4640,7 +5350,14 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.scrim.open').fo
 
 // ── BOOT ───────────────────────────────────────────────────────────────
 fitScreen();renderTimeline();refreshInspector();loadExistingMedia();histInit();
-(async()=>{try{const r=await fetch('/api/editor/projects').then(r=>r.json());
+(async()=>{try{
+  // Warm handoff from another room (e.g. Treatment room's "Open in LePrince"): open THAT project by
+  // id, not just the most-recent one — deterministic even when parallel sessions save other projects.
+  try{const h=JSON.parse(localStorage.getItem('dmv_handoff')||'null');
+    if(h&&h.room==='editor'&&h.projectId&&(Date.now()-(h.ts||0)<600000)){localStorage.removeItem('dmv_handoff');
+      const hp=await fetch('/api/editor/projects/'+encodeURIComponent(h.projectId)).then(r=>r.json());
+      if(hp&&hp.tracks&&hp.tracks.some(t=>t.clips.length)){loadProject(hp);return;}}}catch(e){}
+  const r=await fetch('/api/editor/projects').then(r=>r.json());
   if(r.projects&&r.projects.length){const p=await fetch('/api/editor/projects/'+r.projects[0].id).then(r=>r.json());
     if(p&&p.tracks&&p.tracks.some(t=>t.clips.length))loadProject(p);}}catch{}})();
 window.addEventListener('resize',fitScreen);

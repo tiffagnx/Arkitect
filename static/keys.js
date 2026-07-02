@@ -7,15 +7,14 @@
   if (window.__keys) return; window.__keys = true;
 
   // ── curated MEDIA providers (image / video / sound). Verified key pages 2026-06-21 —
-  //    re-check the URLs over time, providers move their dashboards. ──
+  //    re-check the URLs over time, providers move their dashboards. Key + picked models save
+  //    SERVER-SIDE (/api/cloud/key + /api/cloud/models) — same store Imagination Station and the
+  //    Treatment room read from, so add-it-once-here shows up there automatically. ──
   const MEDIA = [
-    { id: "atlascloud", name: "Atlas Cloud", note: "Image + video, 300+ models — the cheapest", rec: true, url: "https://www.atlascloud.ai/" },
+    { id: "atlascloud", name: "Atlas Cloud", note: "Image + video, 300+ models — the cheapest", rec: true, url: "https://www.atlascloud.ai/console/api-keys" },
     { id: "fal",        name: "FAL",         note: "Fast image + video generation",              url: "https://fal.ai/dashboard/keys" },
     { id: "kie",        name: "KIE",         note: "One key, many models — image / video / music", url: "https://kie.ai/api-key" },
   ];
-  const MEDIA_STORE = "dmv_media_keys";
-  const loadMedia = () => { try { return JSON.parse(localStorage.getItem(MEDIA_STORE)) || {}; } catch (e) { return {}; } };
-  function saveMedia(id, key) { const m = loadMedia(); if (key) m[id] = key; else delete m[id]; try { localStorage.setItem(MEDIA_STORE, JSON.stringify(m)); } catch (e) {} }
 
   // ── VOICES — agents talk back (Fish Audio TTS). The KEY saves SERVER-SIDE (via /api/cloud/key, like
   //    the SFX key) so /api/tts can read it; the per-agent voice MODEL IDs (the cloned-voice
@@ -107,6 +106,71 @@
     return d;
   }
 
+  // media provider card: key paste (server-side) + two model-chip lists, IMAGE and VIDEO, saved
+  // separately — the models you pick here are exactly what shows up in Imagination Station's
+  // two panels / Treatment's image picker, and never cross-contaminate between kinds.
+  function mediaModelBlock(d, kind, label, models) {
+    let pending = [...models];
+    const wrap = document.createElement("div"); wrap.style.marginTop = "9px";
+    wrap.innerHTML = `<div style="font:700 10px 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#8FC9DA;margin-bottom:5px">${label}</div>` +
+      `<div class="kw-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>` +
+      `<div class="kw-paste"><input type="text" placeholder="paste a ${kind} model id" /><button class="kw-addmodel">＋ add</button></div>` +
+      `<div style="margin-top:6px"><button class="kw-savemodels" style="border:none;border-radius:9px;cursor:pointer;padding:6px 13px;font:700 11px Inter;color:#08171c;background:linear-gradient(180deg,#6FC0D8,#3E9CB8)">Save ${kind} models</button> <span class="kw-modelstatus" style="font:600 10.5px 'Space Mono',monospace;color:#7FD3B0"></span></div>`;
+    d.appendChild(wrap);
+    const chipsInp = wrap.querySelector("input"), addBtn = wrap.querySelector(".kw-addmodel");
+    const chipsBox = wrap.querySelector(".kw-chips");
+    const saveModelsBtn = wrap.querySelector(".kw-savemodels"), modelStatus = wrap.querySelector(".kw-modelstatus");
+    function renderChips() {
+      chipsBox.innerHTML = "";
+      pending.forEach((m, i) => {
+        const ch = document.createElement("span");
+        ch.style.cssText = "display:inline-flex;align-items:center;gap:5px;font:600 11px Inter;color:#BFE6F2;background:rgba(62,156,184,.16);border:1px solid rgba(120,182,205,.45);border-radius:14px;padding:3px 4px 3px 9px";
+        ch.innerHTML = '<span></span><button type="button" style="border:none;background:rgba(0,0,0,.25);color:#9FCFDD;width:15px;height:15px;border-radius:50%;cursor:pointer;font-size:9px;line-height:1">✕</button>';
+        ch.firstChild.textContent = m;
+        ch.querySelector("button").onclick = () => { pending.splice(i, 1); renderChips(); };
+        chipsBox.appendChild(ch);
+      });
+    }
+    renderChips();
+    const addModel = () => { const v = chipsInp.value.trim(); if (!v) return; if (pending.indexOf(v) < 0) pending.push(v); chipsInp.value = ""; renderChips(); chipsInp.focus(); };
+    addBtn.onclick = addModel;
+    chipsInp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addModel(); } });
+    saveModelsBtn.onclick = async () => {
+      saveModelsBtn.textContent = "saving…";
+      try {
+        await fetch("/api/cloud/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: d.dataset.providerId, kind, models: pending }) }).then(r => r.json());
+        modelStatus.textContent = "✓ saved — live in every room";
+        try { window.dispatchEvent(new Event("ark:gen-providers-changed")); } catch (e) {}
+      } catch (e) { modelStatus.textContent = "⚠ couldn't save"; }
+      saveModelsBtn.textContent = "Save " + kind + " models"; setTimeout(() => { modelStatus.textContent = ""; }, 2500);
+    };
+  }
+  function mediaCard(p, hasKey, imageModels, videoModels) {
+    const d = document.createElement("div"); d.className = "kw-card" + (p.rec ? " rec" : ""); d.dataset.providerId = p.id;
+    d.innerHTML =
+      `<div class="kw-crow"><span class="kw-nm">${p.name}</span>${p.rec ? '<span class="kw-rec">CHEAPEST</span>' : ''}` +
+      `<span class="kw-saved" style="display:${hasKey ? "inline" : "none"}">✓ saved</span>` +
+      `<a class="kw-get" href="${p.url}" target="_blank" rel="noopener">Get key ↗</a></div>` +
+      `<div class="kw-note">${p.note || ""}</div>` +
+      `<div class="kw-paste"><input type="password" placeholder="${hasKey ? "key saved — paste a new one to replace" : "paste your " + p.name + " key here"}" autocomplete="off" /><button class="kw-keysave">Save key</button></div>`;
+    const keyInp = d.querySelector("input");
+    const keyBtn = d.querySelector(".kw-keysave"), savedTag = d.querySelector(".kw-saved");
+    keyBtn.onclick = async () => {
+      const k = keyInp.value.trim(); if (!k) { keyInp.focus(); return; }
+      keyBtn.disabled = true; keyBtn.textContent = "…";
+      try {
+        await fetch("/api/cloud/key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: p.id, api_key: k }) }).then(r => r.json());
+        savedTag.style.display = "inline"; keyInp.value = ""; keyInp.placeholder = "key saved — paste a new one to replace";
+        try { window.dispatchEvent(new Event("ark:gen-providers-changed")); } catch (e) {}
+      } catch (e) {}
+      keyBtn.textContent = "Save key"; keyBtn.disabled = false;
+    };
+    keyInp.addEventListener("keydown", e => { if (e.key === "Enter") keyBtn.click(); });
+    mediaModelBlock(d, "image", "🖼 Image models", imageModels);
+    mediaModelBlock(d, "video", "🎬 Video models", videoModels);
+    return d;
+  }
+
   async function render() {
     body.innerHTML = `<div class="kw-cat">loading…</div>`;
     // BRAIN — reuse the server's curated provider presets (they already carry key-page links +
@@ -170,8 +234,12 @@
     const mh = document.createElement("div"); mh.className = "kw-cat"; mh.textContent = "Images & video"; body.appendChild(mh);
     body.insertAdjacentHTML("beforeend", '<div class="kw-explain">Heads up — these run on <b>your own account</b>, and image/video isn\'t free: most start you with <b>free credits</b>, then it\'s pay-as-you-go (usually pennies per image). You add a little money on their site to keep going.' +
       '<details><summary>Never done this? Here\'s the whole thing ↓</summary><div style="margin-top:6px">1. Hit <b>Get key ↗</b> — it opens the provider.<br>2. Make a free account (most hand you <b>free credits</b> to try it).<br>3. When the credits run low, drop a few dollars on — pay-as-you-go, you only pay for what you actually make.<br>4. Copy your key, paste it here, hit Save. That\'s it.</div></details></div>');
-    const media = loadMedia();
-    MEDIA.forEach(p => body.appendChild(card(p, { saved: !!media[p.id], save: (k) => { saveMedia(p.id, k); return Promise.resolve(); } })));
+    let genProviders = [];
+    try { genProviders = (await fetch("/api/cloud/providers").then(r => r.json())).providers || []; } catch (e) {}
+    MEDIA.forEach(p => {
+      const cur = genProviders.find(g => g.id === p.id);
+      body.appendChild(mediaCard(p, !!cur, cur ? cur.image_models : [], cur ? cur.video_models : []));
+    });
 
     // ── VOICES — agents speak their replies (Fish Audio). Key saves server-side; per-agent voice ids local. ──
     const vh = document.createElement("div"); vh.className = "kw-cat"; vh.textContent = "Voices — make your agents talk"; body.appendChild(vh);

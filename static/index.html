@@ -416,6 +416,7 @@
     <div class="roomrail">
       <a class="roomlink" href="/static/studio.html"><span class="ri">🎚</span><span>DeMartin Audio Labs</span></a>
       <a class="roomlink" href="/static/editor.html"><span class="ri">🎬</span><span>LePrince Visual Labs</span></a>
+      <a class="roomlink" href="/static/treatment.html"><span class="ri">📋</span><span>Treatment Room</span></a>
     </div>
     <div class="raillabel">More</div>
     <div class="roomrail">
@@ -570,7 +571,8 @@ window.addEventListener("ark:providers-changed", arkRebuildModels);   // Setting
   //    up. One-time + scoped + free — NOT persistent cross-room memory (that's the bloat we avoid).
   (function () {
     const ROOM_OF = { "/static/studio.html": "studio", "/static/beats.html": "beats", "/static/editor.html": "editor",
-      "/static/images.html": "images", "/static/build.html": "build", "/static/stream.html": "stream", "/static/character.html": "character" };
+      "/static/images.html": "images", "/static/build.html": "build", "/static/stream.html": "stream", "/static/character.html": "character",
+      "/static/treatment.html": "treatment" };
     const _mtext = (m) => { if (!m) return ""; if (m._typed) return m._typed; const c = m.content;
       if (typeof c === "string") return c;
       if (Array.isArray(c)) return c.filter(p => p && p.type === "text").map(p => p.text || "").join(" ");
@@ -826,13 +828,17 @@ async function send() {
   const atts = pendingAtt.filter(a => !a.error);
   if (!typed && !atts.length) return;
 
+  // keep a reference before it gets nulled below — the SUNG-lyrics transcription further down
+  // (near the Rich Voice tone block) needs the same recording, not just the uncensor check.
+  const voiceBlobForThisTurn = lastVoiceBlob;
+
   // 🔊→📝 UNCENSOR: if Chrome's speech engine bleeped a cuss (***) and we recorded the take,
   //    re-transcribe with Whisper (uncensored + more accurate). Only fires WHEN censored, so a
   //    normal send stays instant — you only eat the ~1s when there's actually a bleep to fix.
-  if (lastVoiceBlob && /\*/.test(typed)) {
+  if (voiceBlobForThisTurn && /\*/.test(typed)) {
     setStatus("cleaning up the transcript…");
     try {
-      const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(lastVoiceBlob); });
+      const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(voiceBlobForThisTurn); });
       const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: dataUrl, audio_name: "voice.webm" }) }).then(r => r.json());
       if (tr && tr.text && tr.text.trim() && !/\*/.test(tr.text)) { typed = tr.text.trim(); ta.value = typed; setStatus("ready"); }
       else if (tr && tr.error) { setStatus("(kept your words — Whisper off: " + String(tr.error).slice(0, 55) + ")", true); }
@@ -851,34 +857,84 @@ async function send() {
   //    nothing typed and she checks it out on her own, then asks what you want to do.
   const audAtt = atts.find(a => a.kind === "audio" && a.url);
   if (audAtt) {
-    setStatus("having a listen…");
-    let lyrics = "", terr = "";
-    try { const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: audAtt.url, audio_name: audAtt.name }) }).then(r => r.json()); lyrics = (tr && tr.text) || ""; terr = (tr && tr.error) || ""; } catch (_) {}
+    setStatus("having a real listen…");
+    // Two independent reads, in parallel: WORDS (Whisper) + how it actually SOUNDS heard by ear
+    // (Gemini listens to the real audio -> genre, instruments, groove, key/tempo, vocal processing).
+    // The browser DSP numbers (audio-ear.js) ride along as supporting engineering data.
+    const bp = modelText.trim();   // if he typed a specific ask ("is the low end too much?"), pass it along
+    const [tr, br] = await Promise.all([
+      fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: audAtt.url, audio_name: audAtt.name }) }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/audio/breakdown", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: audAtt.url, audio_name: audAtt.name, prompt: bp }) }).then(r => r.json()).catch(() => ({})),
+    ]);
+    const lyrics = (tr && tr.text) || "", terr = (tr && tr.error) || "";
+    const breakdown = (br && br.breakdown) || "", berr = (br && br.error) || "";
+    // Don't make him hunt for it in a wall of text -- same move the app already makes for Fish
+    // Audio (setVoiceReplyOn, above): the FIRST time a key is missing, jump straight to the exact
+    // Settings section, no searching. Once-only (localStorage flag) so it doesn't pop every upload.
+    if (/key/i.test(berr) && !localStorage.getItem("dmv-nudged-gemini-key")) {
+      localStorage.setItem("dmv-nudged-gemini-key", "1");
+      setStatus("no listening key yet — opening Settings so you can add a free Google Gemini key…");
+      if (window.arkOpenSettings) window.arkOpenSettings("brain");
+    } else if (/key/i.test(terr) && !localStorage.getItem("dmv-nudged-groq-key")) {
+      localStorage.setItem("dmv-nudged-groq-key", "1");
+      setStatus("no transcription key yet — opening Settings so you can add a free Groq key…");
+      if (window.arkOpenSettings) window.arkOpenSettings("brain");
+    }
     const m = audAtt.meta || {};
     const mline = [m.durationSec && (m.durationSec + "s"), m.peakDb != null && ("peak " + m.peakDb + "dB"), m.rmsDb != null && ("RMS " + m.rmsDb + "dB"), m.crestDb != null && ("crest " + m.crestDb + "dB"), m.centroidHz && ("brightness " + m.centroidHz + "Hz"), m.bands && ("balance " + Object.keys(m.bands).map(k => k + "=" + m.bands[k] + "%").join(" "))].filter(Boolean).join(" · ");
     const head = modelText.trim() ? modelText : "I just dropped you a song — give it a real listen, break down what it sounds like (the vibe AND the engineering: loudness/headroom, brightness, dynamics, low-end, anything that'll get harsh), then ask me what I want to do with it.";
-    const noLyric = /key/i.test(terr) ? " (no transcription key — break down the sound from the measured numbers, and tell me I can add a free Groq key for the lyrics)" : " (no transcript — read it from the measured sound)";
-    modelText = head + "\n\n[🎵 " + (audAtt.name || "audio") + (mline ? " — measured: " + mline : "") + (lyrics ? "\nlyrics/transcript:\n" + lyrics.slice(0, 1800) : noLyric) + "]";
+    // present the heard-by-ear breakdown as the star; you (Kit/Tiff) put it in YOUR voice + add your
+    // own engineer's take + ask what he wants to do. If Gemini couldn't listen, fall back to numbers.
+    const soundPart = breakdown
+      ? "\nHOW IT SOUNDS (heard by ear): " + breakdown.slice(0, 2600)
+      : (/key/i.test(berr) ? "\n(no listening model connected — read the sound from the measured numbers, and tell me I can add a free Google Gemini key in Settings → Keys so you can actually HEAR the instruments/genre/key, not just the levels)" : "");
+    const noLyric = /key/i.test(terr) ? " (no transcription key — tell me I can add a free Groq key for the lyrics)" : "";
+    modelText = head + "\n\n[🎵 " + (audAtt.name || "audio")
+      + soundPart
+      + (lyrics ? "\nLYRICS/TRANSCRIPT:\n" + lyrics.slice(0, 1800) : noLyric)
+      + (mline ? "\nmeasured levels: " + mline : "")
+      + "\nTake this, put it in your own words as the producer in the room, add your own read, then ask what I want to do with it.]";
   }
   // 🎙 RICH VOICE — how it was SAID/SUNG (measured live off the mic), folded in like the song numbers above
   if (lastVoiceTone && lastVoiceTone.ok) {
     if (lastVoiceTone.kind === "sung") {
       const shaky = lastVoiceTone.confidence < 0.5 ? " (the read was shaky — fine to tell me to run it back)" : "";
+      // DMV Ear only measures the SOUND (pitch/energy/dynamics) — it never transcribes words.
+      // Whisper the same recording so Kit/Tiff get the actual lyrics too, not just the vibe.
+      let sungLyrics = "", sungErr = "";
+      if (voiceBlobForThisTurn) {
+        try {
+          const dataUrl = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(voiceBlobForThisTurn); });
+          const tr = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: dataUrl, audio_name: "voice.webm" }) }).then(r => r.json());
+          sungLyrics = (tr && tr.text) || ""; sungErr = (tr && tr.error) || "";
+        } catch (_) {}
+      }
+      const noLyric = /key/i.test(sungErr) ? " (no transcription key — react to the measured sound, and tell me I can add a free Groq key in Settings → Keys to get the lyrics too)" : "";
       modelText = (modelText.trim() ? modelText : "(no text typed — react to how I just sang it)")
         + "\n\n[🎙 Rich Voice — performed live, dry vocal, measured: " + lastVoiceTone.line + "." + shaky
-        + " Be the engineer in the room: my style is never 'wrong,' but call the pitch/timing straight and we fix it in post. Only claim what you can actually hear.]";
+        + " Be the engineer in the room: my style is never 'wrong,' but call the pitch/timing straight and we fix it in post. Only claim what you can actually hear."
+        + (sungLyrics ? " Lyrics/words heard: " + sungLyrics.slice(0, 1800) : noLyric) + "]";
     } else {
       modelText += "\n\n[🎙 voice (how I said it): " + lastVoiceTone.line + "]";
     }
+    // UNIVERSAL rule, text or voice reply: awareness shows up as a SHIFT IN YOU, never a caption on
+    // ME. Applies whether or not she's about to speak this reply aloud — text-only chat gets the
+    // same tone data above, so it needs the same rule, not just the voice-mode block below.
+    modelText += "\n\n[You just heard how I said that. NEVER narrate it — don't say 'I can hear in your "
+      + "voice,' 'I can tell how much this means to you,' 'your tone says,' or anything else that "
+      + "points out you picked up on my emotion. That's obvious and it's annoying to have said out "
+      + "loud. Instead, just respond differently because of it: warmer, calmer, more direct, more "
+      + "energy — whatever fits — in your own words. The awareness should show up as a change in YOU, "
+      + "not a comment about ME. Exception: if I sang or held a note, real engineer feedback on the "
+      + "pitch/timing is useful and wanted — that's not narrating my mood, that's just the job.]";
   }
   // 🔊 when her reply will be SPOKEN, teach her the delivery: structured lines + punctuation pacing +
   //    hidden inline Fish tags (research-backed). Conversational — NEVER song format.
   if (voiceReplyOn()) {
     modelText += "\n\n[VOICE MODE — your reply is read aloud in your REAL voice (Fish Audio S2). Talk like a person, not a song:\n"
-      + "• MIRROR MY EMOTION. Read how I sound from the [🎙 Rich Voice] note + my words, and match it: I'm down/sad -> [sad] or [whispering] or [comforting]; I'm hyped/happy -> [excited] or [joyful]; I praise you / say good job -> [grateful] or [joyful] or [proud]; I say you messed up -> [embarrassed] then [sincere]; things going wrong / I'm stressed -> [worried] or [nervous]; I'm chill -> [relaxed]; I impress you -> [surprised] or [amused].\n"
+      + "• MIRROR MY EMOTION in your delivery. Read how I sound from the [🎙 Rich Voice] note + my words, and match it: I'm down/sad -> [sad] or [whispering] or [comforting]; I'm hyped/happy -> [excited] or [joyful]; I praise you / say good job -> [grateful] or [joyful] or [proud]; I say you messed up -> [embarrassed] then [sincere]; things going wrong / I'm stressed -> [worried] or [nervous]; I'm chill -> [relaxed]; I impress you -> [surprised] or [amused].\n"
       + "• Put ONE tag right before the words it colors — about one every 2-3 sentences, never every line. Use ONLY these EXACT tags: [whispering] [soft tone] [sad] [excited] [joyful] [delighted] [embarrassed] [proud] [grateful] [confident] [curious] [serious] [empathetic] [comforting] [sincere] [relaxed] [amused] [chuckling] [laughing] [surprised] [worried] [nervous] [frustrated] [confused]. NO other bracket words. Tags are hidden from the reader.\n"
-      + "• Natural flowing phrases. Do NOT trail off with \"…\" and do NOT use ellipses — finish every sentence and END on a period. No markdown, no emoji, no stage directions.\n"
-      + "• If I sang or held a note, SAY you heard it — call the vibe or the pitch. That's the whole point: you can HEAR me.]";
+      + "• Natural flowing phrases. Do NOT trail off with \"…\" and do NOT use ellipses — finish every sentence and END on a period. No markdown, no emoji, no stage directions.]";
   }
   const content = imgAtts.length
     ? [{ type: "text", text: modelText || "(image attached — take a look)" },
@@ -1193,6 +1249,11 @@ $("mic").onclick = () => {
   };
   rec.onerror = (e) => { if (e.error === "no-speech" || e.error === "aborted") return; setStatus("mic: " + e.error, true); };
   rec.onend = () => {
+    // Chrome cycles the recognition session on its own (that's why a pause restarts below) —
+    // if it cycles right as you finish a phrase, whatever was still sitting as INTERIM (seen on
+    // screen, never promoted to finalText because no final result arrived before the session
+    // died) would just vanish on the next result. Commit it now so those words are never lost.
+    if (pendingInterim) { finalText += pendingInterim.replace(/\s+$/, "") + " "; pendingInterim = ""; $("input").value = finalText.replace(/\s{2,}/g, " "); growInput(); }
     if (!wantStop) { try { rec.start(); return; } catch(_){} }           // a pause isn't "done" — restart, keep going
     listening = false; micActive(false); setStatus("ready — press ➤ when you're done");
   };

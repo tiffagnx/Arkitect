@@ -41,6 +41,13 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 router = APIRouter()
 
+# Streaming calls used to open with timeout=None (wait forever). If a provider stalls
+# mid-stream — dead key, rate-limit purgatory, a hung upstream — the request just hangs
+# with no error, no recovery, nothing (this is the Code room "it froze" bug). A read
+# timeout is an IDLE timeout in httpx — it resets on every byte received, so a slow-but-
+# streaming model is never cut off; only a truly stalled connection times out.
+_STREAM_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=15.0)
+
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
@@ -334,7 +341,7 @@ async def provider_stream(slot: dict, payload: dict, effort: str = ""):
     split_reasoning = bool(payload.pop("_split_reasoning", False))   # code agent: thinking shown separately
     payload = _sanitize_body(slot, payload, effort)
     try:
-        async with httpx.AsyncClient(timeout=None) as cx:
+        async with httpx.AsyncClient(timeout=_STREAM_TIMEOUT) as cx:
             async with cx.stream("POST", url, headers=headers, json=payload) as r:
                 if r.status_code != 200:
                     body = (await r.aread()).decode(errors="replace")[:300]
@@ -348,11 +355,19 @@ async def provider_stream(slot: dict, payload: dict, effort: str = ""):
                     if chunk.strip() == "[DONE]":
                         break
                     try:
-                        d = json.loads(chunk)["choices"][0]["delta"]
+                        obj = json.loads(chunk)
+                        choice = obj["choices"][0]
+                        d = choice.get("delta") or {}
                         ct = d.get("content") or ""
                         rc = d.get("reasoning_content") or ""
+                        fr = choice.get("finish_reason")
                     except Exception:
                         continue
+                    # tell the caller WHY the stream ended -- "length" means the model got cut off
+                    # mid-response (not a clean finish), so the agent loop can auto-continue instead
+                    # of silently treating a truncated reply as "done".
+                    if fr:
+                        yield f"data: {json.dumps({'type':'stop_reason','reason':fr})}\n\n"
                     if split_reasoning:
                         if rc:
                             yield f"data: {json.dumps({'type':'reasoning','text':rc})}\n\n"
@@ -462,7 +477,7 @@ async def anthropic_native_stream(slot, payload, effort="high"):
                            system_blocks=cache_system)
     body["stream"] = True
     try:
-        async with httpx.AsyncClient(timeout=None) as cx:
+        async with httpx.AsyncClient(timeout=_STREAM_TIMEOUT) as cx:
             async with cx.stream("POST", _anthropic_url(slot), headers=_anthropic_headers(slot), json=body) as r:
                 if r.status_code != 200:
                     txt = (await r.aread()).decode(errors="replace")[:300]
@@ -483,6 +498,13 @@ async def anthropic_native_stream(slot, payload, effort="high"):
                         d = obj.get("delta") or {}
                         if d.get("type") == "text_delta" and d.get("text"):
                             yield f"data: {json.dumps({'type':'delta','text':d['text']})}\n\n"
+                    elif t == "message_delta":
+                        # carries stop_reason -- "max_tokens" means Claude got cut off mid-response,
+                        # not a clean finish. Tell the agent loop so it can auto-continue instead of
+                        # silently treating a truncated reply as "done".
+                        sr = (obj.get("delta") or {}).get("stop_reason")
+                        if sr:
+                            yield f"data: {json.dumps({'type':'stop_reason','reason':sr})}\n\n"
                     elif t == "message_stop":
                         return
                     elif t == "error":
@@ -568,6 +590,48 @@ async def gemini_grounded_once(slot: dict, prompt: str, max_tokens: int = 800):
         if w.get("uri"):
             srcs.append({"title": w.get("title") or w["uri"], "url": w["uri"]})
     return text, srcs
+
+
+def _gemini_slot(slots):
+    """Pick an enabled Gemini slot -- the ONE provider here whose model can actually LISTEN
+    to audio (hear instruments/genre/key, not just read numbers). Prefer a direct Google
+    Gemini key (native endpoint) over an OpenRouter-proxied one. Returns slot or None."""
+    for s in (slots or []):
+        if "generativelanguage.googleapis" in (s.get("base_url", "") or "").lower():
+            return s
+    return None
+
+
+_AUDIO_MIME = {"mp3": "audio/mpeg", "mpeg": "audio/mpeg", "mpga": "audio/mpeg",
+               "wav": "audio/wav", "m4a": "audio/mp4", "mp4": "audio/mp4",
+               "aac": "audio/aac", "ogg": "audio/ogg", "oga": "audio/ogg",
+               "flac": "audio/flac", "webm": "audio/webm"}
+
+
+async def gemini_hear_audio(slot: dict, audio_bytes: bytes, filename: str, prompt: str,
+                            max_tokens: int = 900):
+    """LET GEMINI ACTUALLY HEAR THE SONG. The OpenAI-compat chat path is text-only, so this
+    hits the NATIVE generateContent endpoint with the raw audio inline -- Gemini listens and
+    returns a real producer breakdown (genre, instrumentation, groove, key/tempo feel, vocal
+    processing, arrangement), the way a person in the room would call it. Returns breakdown text.
+    Raises RateLimited / ProviderError so the caller can fall back to lyrics+numbers."""
+    import base64 as _b64
+    ext = (filename or "").rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+    mime = _AUDIO_MIME.get(ext, "audio/mpeg")
+    base = re.sub(r"/v1beta/openai/?$", "", (slot["base_url"] or "https://generativelanguage.googleapis.com").rstrip("/"))
+    url = f"{base}/v1beta/models/{slot['model']}:generateContent"
+    body = {"contents": [{"parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime, "data": _b64.b64encode(audio_bytes).decode("ascii")}}]}],
+            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.4}}
+    async with httpx.AsyncClient(timeout=180) as cx:
+        r = await cx.post(url, headers={"x-goog-api-key": slot["api_key"], "Content-Type": "application/json"}, json=body)
+    if r.status_code == 429:
+        raise RateLimited(slot["name"])
+    if r.status_code != 200:
+        raise ProviderError(f"{slot['name']} {r.status_code}: {r.text[:200]}")
+    cand = (r.json().get("candidates") or [{}])[0]
+    return " ".join(p.get("text", "") for p in ((cand.get("content") or {}).get("parts") or []) if p.get("text")).strip()
 
 
 # ── page-fetch cache — DuckDuckGo's HTML scrape is flaky and two agents can land on
